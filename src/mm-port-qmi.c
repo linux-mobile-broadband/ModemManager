@@ -67,7 +67,6 @@ struct _MMPortQmiPrivate {
     /* timeout monitoring */
     gulong timeout_monitoring_id;
     /* endpoint info */
-    gulong              endpoint_info_signal_id;
     QmiDataEndpointType endpoint_type;
     gint                endpoint_interface_number;
     /* kernel data mode */
@@ -149,10 +148,7 @@ initialize_endpoint_info (MMPortQmi *self)
 
     kernel_device = mm_port_peek_kernel_device (MM_PORT (self));
 
-    if (!kernel_device)
-        self->priv->endpoint_type = QMI_DATA_ENDPOINT_TYPE_UNDEFINED;
-    else
-        self->priv->endpoint_type = mm_port_subsys_to_qmi_endpoint_type (mm_port_get_subsys (MM_PORT (self)));
+    self->priv->endpoint_type = mm_port_net_driver_to_qmi_endpoint_type (self->priv->net_driver);
 
     switch (self->priv->endpoint_type) {
         case QMI_DATA_ENDPOINT_TYPE_HSUSB:
@@ -2578,6 +2574,7 @@ mm_port_qmi_set_net_driver (MMPortQmi   *self,
     g_assert (MM_IS_PORT_QMI (self));
     g_assert (!self->priv->net_driver);
     self->priv->net_driver = g_strdup (net_driver);
+    initialize_endpoint_info (self);
 }
 
 /*****************************************************************************/
@@ -2729,12 +2726,6 @@ static void
 mm_port_qmi_init (MMPortQmi *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_PORT_QMI, MMPortQmiPrivate);
-
-    /* load endpoint info as soon as kernel device is set */
-    self->priv->endpoint_info_signal_id = g_signal_connect (self,
-                                                            "notify::" MM_PORT_KERNEL_DEVICE,
-                                                            G_CALLBACK (initialize_endpoint_info),
-                                                            NULL);
 }
 
 #if defined WITH_QRTR
@@ -2783,11 +2774,6 @@ dispose (GObject *object)
 {
     MMPortQmi *self = MM_PORT_QMI (object);
     GList *l;
-
-    if (self->priv->endpoint_info_signal_id) {
-        g_signal_handler_disconnect (self, self->priv->endpoint_info_signal_id);
-        self->priv->endpoint_info_signal_id = 0;
-    }
 
     /* Deallocate all clients */
     for (l = self->priv->services; l; l = g_list_next (l)) {

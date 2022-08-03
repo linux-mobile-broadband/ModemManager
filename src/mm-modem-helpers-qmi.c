@@ -1795,29 +1795,18 @@ qmi_mobile_equipment_error_from_verbose_call_end_reason_3gpp (QmiWdsVerboseCallE
 /* QMI/WDA to MM translations */
 
 QmiDataEndpointType
-mm_port_subsys_to_qmi_endpoint_type (MMPortSubsys subsys)
+mm_port_net_driver_to_qmi_endpoint_type (const gchar *net_driver)
 {
-    switch (subsys) {
-        case MM_PORT_SUBSYS_USBMISC:
-            return QMI_DATA_ENDPOINT_TYPE_HSUSB;
-        case MM_PORT_SUBSYS_RPMSG:
-        case MM_PORT_SUBSYS_QRTR:
-            return QMI_DATA_ENDPOINT_TYPE_EMBEDDED;
-        /* The WWAN subsystem abstracts the underlying transport bus, and so
-         * endpoint type can not be deducted from that. This function should
-         * then be revisited, but in practice, only MHI/PCI modem ports are
-         * exposed through the WWAN subsystem for now.
-         */
-        case MM_PORT_SUBSYS_WWAN:
-            return QMI_DATA_ENDPOINT_TYPE_PCIE;
-        case MM_PORT_SUBSYS_UNKNOWN:
-        case MM_PORT_SUBSYS_TTY:
-        case MM_PORT_SUBSYS_NET:
-        case MM_PORT_SUBSYS_UNIX:
-        default:
-            g_assert_not_reached ();
-            break;
-    }
+    if (!g_strcmp0 (net_driver, "qmi_wwan"))
+        return QMI_DATA_ENDPOINT_TYPE_HSUSB;
+    if (!g_strcmp0 (net_driver, "mhi_net"))
+        return QMI_DATA_ENDPOINT_TYPE_PCIE;
+    if (!g_strcmp0 (net_driver, "ipa"))
+        return QMI_DATA_ENDPOINT_TYPE_EMBEDDED;
+    if (!g_strcmp0 (net_driver, "bam-dmux"))
+        return QMI_DATA_ENDPOINT_TYPE_BAM_DMUX;
+
+    return QMI_DATA_ENDPOINT_TYPE_UNKNOWN;
 }
 
 /*****************************************************************************/

@@ -140,7 +140,7 @@ GError *qmi_mobile_equipment_error_from_verbose_call_end_reason_3gpp (QmiWdsVerb
 /*****************************************************************************/
 /* QMI/WDA to MM translations */
 
-QmiDataEndpointType mm_port_subsys_to_qmi_endpoint_type (MMPortSubsys subsys);
+QmiDataEndpointType mm_port_net_driver_to_qmi_endpoint_type (const gchar *net_driver);
 
 /*****************************************************************************/
 /* QMI/OMA to MM translations */
