@@ -6257,6 +6257,13 @@ load_sim_slots_context_free (LoadSimSlotsContext *ctx)
     g_slice_free (LoadSimSlotsContext, ctx);
 }
 
+static void
+sim_slot_free (MMBaseSim *sim)
+{
+    if (sim)
+        g_object_unref (sim);
+}
+
 static gboolean
 load_sim_slots_finish (MMIfaceModem *self,
                        GAsyncResult *res,
@@ -6501,7 +6508,7 @@ query_sys_caps_ready (MbimDevice   *device,
         return;
     }
     ctx->number_slots = number_slots;
-    ctx->sim_slots = g_ptr_array_new_full (number_slots, NULL);
+    ctx->sim_slots = g_ptr_array_new_full (number_slots, (GDestroyNotify) sim_slot_free);
 
     if (number_executors == 0) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
