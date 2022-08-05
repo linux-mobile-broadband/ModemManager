@@ -64,6 +64,73 @@ parse_gtrndis_read_response (const gchar *response,
 }
 
 /*****************************************************************************/
+/* Connection status monitoring                                              */
+
+static MMBearerConnectionStatus
+load_connection_status_finish (MMBaseBearer  *bearer,
+                               GAsyncResult  *res,
+                               GError       **error)
+{
+    GError *inner_error = NULL;
+    gssize value;
+
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_BEARER_CONNECTION_STATUS_UNKNOWN;
+    }
+    return (MMBearerConnectionStatus) value;
+}
+
+static void
+gtrndis_query_ready (MMBaseModem  *modem,
+                     GAsyncResult *res,
+                     GTask        *task)
+{
+    MMBaseBearer *bearer;
+    GError       *error = NULL;
+    const gchar  *result;
+    guint         state;
+    guint         cid;
+
+    bearer = g_task_get_source_object (task);
+    result = mm_base_modem_at_command_finish (modem, res, &error);
+    if (!result)
+        g_task_return_error (task, error);
+    else if (!parse_gtrndis_read_response (result, &state, &cid, &error))
+        g_task_return_error (task, error);
+    else if (!state || (gint) cid != mm_base_bearer_get_profile_id (bearer))
+        g_task_return_int (task, MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+    else
+        g_task_return_int (task, MM_BEARER_CONNECTION_STATUS_CONNECTED);
+
+    g_object_unref (task);
+}
+
+static void
+load_connection_status (MMBaseBearer        *bearer,
+                        GAsyncReadyCallback  callback,
+                        gpointer             user_data)
+{
+    GTask       *task;
+    MMBaseModem *modem = NULL;
+
+    task = g_task_new (bearer, NULL, callback, user_data);
+
+    g_object_get (MM_BASE_BEARER (bearer),
+                  MM_BASE_BEARER_MODEM, &modem,
+                  NULL);
+
+    mm_base_modem_at_command (modem,
+                              "+GTRNDIS?",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback) gtrndis_query_ready,
+                              task);
+    g_object_unref (modem);
+}
+
+/*****************************************************************************/
 /* 3GPP Connect                                                              */
 
 typedef struct {
@@ -458,7 +525,11 @@ mm_broadband_bearer_fibocom_ecm_init (MMBroadbandBearerFibocomEcm *self)
 static void
 mm_broadband_bearer_fibocom_ecm_class_init (MMBroadbandBearerFibocomEcmClass *klass)
 {
+    MMBaseBearerClass *base_bearer_class = MM_BASE_BEARER_CLASS (klass);
     MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
+
+    base_bearer_class->load_connection_status = load_connection_status;
+    base_bearer_class->load_connection_status_finish = load_connection_status_finish;
 
     broadband_bearer_class->connect_3gpp = connect_3gpp;
     broadband_bearer_class->connect_3gpp_finish = connect_3gpp_finish;
