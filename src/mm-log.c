@@ -96,8 +96,8 @@ mm_to_syslog_priority (MMLogLevel level)
     return 0;
 }
 
-static int
-glib_to_syslog_priority (GLogLevelFlags level)
+static MMLogLevel
+glib_level_to_mm_level (GLogLevelFlags level)
 {
     /* if the log was flagged as fatal (e.g. G_DEBUG=fatal-warnings), ignore
      * the fatal flag for logging purposes */
@@ -106,17 +106,15 @@ glib_to_syslog_priority (GLogLevelFlags level)
 
     switch (level) {
     case G_LOG_LEVEL_ERROR:
-        return LOG_CRIT;
     case G_LOG_LEVEL_CRITICAL:
-        return LOG_ERR;
+        return MM_LOG_LEVEL_ERR;
     case G_LOG_LEVEL_WARNING:
-        return LOG_WARNING;
+        return MM_LOG_LEVEL_WARN;
     case G_LOG_LEVEL_MESSAGE:
-        return LOG_NOTICE;
     case G_LOG_LEVEL_INFO:
-        return LOG_INFO;
+        return MM_LOG_LEVEL_INFO;
     case G_LOG_LEVEL_DEBUG:
-        return LOG_DEBUG;
+        return MM_LOG_LEVEL_DEBUG;
     case G_LOG_LEVEL_MASK:
     case G_LOG_FLAG_FATAL:
     case G_LOG_FLAG_RECURSION:
@@ -249,7 +247,8 @@ _mm_log (gpointer     obj,
     }
 
 #if defined MM_LOG_FUNC_LOC
-    g_string_append_printf (msgbuf, "[%s] %s(): ", loc, func);
+    if (loc && func)
+        g_string_append_printf (msgbuf, "[%s] %s(): ", loc, func);
 #endif
 
     if (obj)
@@ -268,11 +267,17 @@ _mm_log (gpointer     obj,
 
 static void
 log_handler (const gchar    *log_domain,
-             GLogLevelFlags  level,
+             GLogLevelFlags  glib_level,
              const gchar    *message,
              gpointer        ignored)
 {
-    log_backend (NULL, NULL, glib_to_syslog_priority (level), message, strlen (message));
+    _mm_log (NULL, /* obj */
+             NULL, /* module */
+             NULL, /* loc */
+             NULL, /* func */
+             glib_level_to_mm_level (glib_level),
+             "%s",
+             message);
 }
 
 gboolean
