@@ -134,15 +134,15 @@ log_level_description (MMLogLevel level)
 {
     switch (level) {
     case MM_LOG_LEVEL_ERR:
-        return "<error>";
+        return "<err>";
     case MM_LOG_LEVEL_WARN:
-        return "<warn> ";
+        return "<wrn>";
     case MM_LOG_LEVEL_MSG:
-        return "<msg>  ";
+        return "<msg>";
     case MM_LOG_LEVEL_INFO:
-        return "<info> ";
+        return "<inf>";
     case MM_LOG_LEVEL_DEBUG:
-        return "<debug>";
+        return "<dbg>";
     default:
         break;
     }
