@@ -11,7 +11,8 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2011-2020 Red Hat, Inc.
- * Copyright (C) 2020 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2020-2022 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2022 Google, Inc.
  */
 
 #ifndef MM_LOG_H
@@ -24,7 +25,7 @@ typedef enum {
     MM_LOG_LEVEL_ERR   = 0x00000001,
     MM_LOG_LEVEL_WARN  = 0x00000002,
     MM_LOG_LEVEL_INFO  = 0x00000004,
-    MM_LOG_LEVEL_DEBUG = 0x00000008
+    MM_LOG_LEVEL_DEBUG = 0x00000008,
 } MMLogLevel;
 
 #if !defined MM_MODULE_NAME
@@ -53,16 +54,15 @@ void _mm_log (gpointer     obj,
               const gchar *fmt,
               ...)  __attribute__((__format__ (__printf__, 6, 7)));
 
-gboolean mm_log_set_level (const char *level, GError **error);
-
-gboolean mm_log_setup (const char *level,
-                       const char *log_file,
-                       gboolean log_journal,
-                       gboolean show_ts,
-                       gboolean rel_ts,
-                       gboolean show_personal_info,
-                       GError **error);
-
-void mm_log_shutdown (void);
+gboolean mm_log_set_level (const gchar  *level,
+                           GError      **error);
+gboolean mm_log_setup     (const gchar  *level,
+                           const gchar  *log_file,
+                           gboolean      log_journal,
+                           gboolean      show_ts,
+                           gboolean      rel_ts,
+                           gboolean      show_personal_info,
+                           GError      **error);
+void     mm_log_shutdown  (void);
 
 #endif  /* MM_LOG_H */

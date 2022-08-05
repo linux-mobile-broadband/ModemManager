@@ -51,16 +51,16 @@ enum {
 };
 
 static gboolean ts_flags = TS_FLAG_NONE;
-static guint32 log_level = MM_LOG_LEVEL_INFO | MM_LOG_LEVEL_WARN | MM_LOG_LEVEL_ERR;
+static guint32  log_level = MM_LOG_LEVEL_INFO | MM_LOG_LEVEL_WARN | MM_LOG_LEVEL_ERR;
 static GTimeVal rel_start = { 0, 0 };
-static int logfd = -1;
+static int      logfd = -1;
 static gboolean append_log_level_text = TRUE;
 
 static void (*log_backend) (const char *loc,
                             const char *func,
-                            int syslog_level,
+                            int         syslog_level,
                             const char *message,
-                            size_t length);
+                            size_t      length);
 
 typedef struct {
     guint32 num;
@@ -69,10 +69,9 @@ typedef struct {
 
 static const LogDesc level_descs[] = {
     { MM_LOG_LEVEL_ERR, "ERR" },
-    { MM_LOG_LEVEL_WARN | MM_LOG_LEVEL_ERR, "WARN" },
-    { MM_LOG_LEVEL_INFO | MM_LOG_LEVEL_WARN | MM_LOG_LEVEL_ERR, "INFO" },
+    { MM_LOG_LEVEL_WARN  | MM_LOG_LEVEL_ERR, "WARN" },
+    { MM_LOG_LEVEL_INFO  | MM_LOG_LEVEL_WARN | MM_LOG_LEVEL_ERR, "INFO" },
     { MM_LOG_LEVEL_DEBUG | MM_LOG_LEVEL_INFO | MM_LOG_LEVEL_WARN | MM_LOG_LEVEL_ERR, "DEBUG" },
-    { 0, NULL }
 };
 
 static GString *msgbuf = NULL;
@@ -82,14 +81,14 @@ static int
 mm_to_syslog_priority (MMLogLevel level)
 {
     switch (level) {
-    case MM_LOG_LEVEL_DEBUG:
-        return LOG_DEBUG;
+    case MM_LOG_LEVEL_ERR:
+        return LOG_ERR;
     case MM_LOG_LEVEL_WARN:
         return LOG_WARNING;
     case MM_LOG_LEVEL_INFO:
         return LOG_INFO;
-    case MM_LOG_LEVEL_ERR:
-        return LOG_ERR;
+    case MM_LOG_LEVEL_DEBUG:
+        return LOG_DEBUG;
     default:
         break;
     }
@@ -130,14 +129,14 @@ static const char *
 log_level_description (MMLogLevel level)
 {
     switch (level) {
-    case MM_LOG_LEVEL_DEBUG:
-        return "<debug>";
+    case MM_LOG_LEVEL_ERR:
+        return "<error>";
     case MM_LOG_LEVEL_WARN:
         return "<warn> ";
     case MM_LOG_LEVEL_INFO:
         return "<info> ";
-    case MM_LOG_LEVEL_ERR:
-        return "<error>";
+    case MM_LOG_LEVEL_DEBUG:
+        return "<debug>";
     default:
         break;
     }
@@ -148,11 +147,12 @@ log_level_description (MMLogLevel level)
 static void
 log_backend_file (const char *loc,
                   const char *func,
-                  int syslog_level,
+                  int         syslog_level,
                   const char *message,
-                  size_t length)
+                  size_t      length)
 {
     ssize_t ign;
+
     ign = write (logfd, message, length);
     if (ign) {} /* whatever; really shut up about unused result */
 
@@ -162,9 +162,9 @@ log_backend_file (const char *loc,
 static void
 log_backend_syslog (const char *loc,
                     const char *func,
-                    int syslog_level,
+                    int         syslog_level,
                     const char *message,
-                    size_t length)
+                    size_t      length)
 {
     syslog (syslog_level, "%s", message);
 }
@@ -173,15 +173,15 @@ log_backend_syslog (const char *loc,
 static void
 log_backend_systemd_journal (const char *loc,
                              const char *func,
-                             int syslog_level,
+                             int         syslog_level,
                              const char *message,
-                             size_t length)
+                             size_t      length)
 {
     const char *line;
-    size_t file_length;
+    size_t      file_length;
 
     if (loc == NULL) {
-        sd_journal_send ("MESSAGE=%s", message,
+        sd_journal_send ("MESSAGE=%s",  message,
                          "PRIORITY=%d", syslog_level,
                          NULL);
         return;
@@ -197,11 +197,11 @@ log_backend_systemd_journal (const char *loc,
         file_length = 0;
     }
 
-    sd_journal_send ("MESSAGE=%s", message,
-                     "PRIORITY=%d", syslog_level,
-                     "CODE_FUNC=%s", func,
+    sd_journal_send ("MESSAGE=%s",     message,
+                     "PRIORITY=%d",    syslog_level,
+                     "CODE_FUNC=%s",   func,
                      "CODE_FILE=%.*s", file_length, loc,
-                     "CODE_LINE=%s", line,
+                     "CODE_LINE=%s",   line,
                      NULL);
 }
 #endif
@@ -215,7 +215,7 @@ _mm_log (gpointer     obj,
          const gchar *fmt,
          ...)
 {
-    va_list args;
+    va_list  args;
     GTimeVal tv;
 
     if (!(log_level & level))
@@ -267,31 +267,32 @@ _mm_log (gpointer     obj,
 }
 
 static void
-log_handler (const gchar *log_domain,
-             GLogLevelFlags level,
-             const gchar *message,
-             gpointer ignored)
+log_handler (const gchar    *log_domain,
+             GLogLevelFlags  level,
+             const gchar    *message,
+             gpointer        ignored)
 {
     log_backend (NULL, NULL, glib_to_syslog_priority (level), message, strlen (message));
 }
 
 gboolean
-mm_log_set_level (const char *level, GError **error)
+mm_log_set_level (const gchar  *level,
+                  GError      **error)
 {
-    gboolean found = FALSE;
-    const LogDesc *diter;
+    guint i;
 
-    for (diter = &level_descs[0]; diter->name; diter++) {
-        if (!strcasecmp (diter->name, level)) {
-            log_level = diter->num;
-            found = TRUE;
+    for (i = 0; i < G_N_ELEMENTS (level_descs); i++) {
+        if (!g_ascii_strcasecmp (level_descs[i].name, level)) {
+            log_level = level_descs[i].num;
             break;
         }
     }
 
-    if (!found)
+    if (i == G_N_ELEMENTS (level_descs)) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
                      "Unknown log level '%s'", level);
+        return FALSE;
+    }
 
 #if defined WITH_QMI
     qmi_utils_set_traces_enabled (log_level & MM_LOG_LEVEL_DEBUG ? TRUE : FALSE);
@@ -301,17 +302,17 @@ mm_log_set_level (const char *level, GError **error)
     mbim_utils_set_traces_enabled (log_level & MM_LOG_LEVEL_DEBUG ? TRUE : FALSE);
 #endif
 
-    return found;
+    return TRUE;
 }
 
 gboolean
-mm_log_setup (const char *level,
-              const char *log_file,
-              gboolean log_journal,
-              gboolean show_timestamps,
-              gboolean rel_timestamps,
-              gboolean show_personal_info,
-              GError **error)
+mm_log_setup (const gchar  *level,
+              const gchar  *log_file,
+              gboolean      log_journal,
+              gboolean      show_timestamps,
+              gboolean      rel_timestamps,
+              gboolean      show_personal_info,
+              GError      **error)
 {
     /* levels */
     if (level && strlen (level) && !mm_log_set_level (level, error))
@@ -331,7 +332,7 @@ mm_log_setup (const char *level,
         append_log_level_text = FALSE;
     } else
 #endif
-    if (log_file == NULL) {
+    if (!log_file) {
         openlog (G_LOG_DOMAIN, LOG_CONS | LOG_PID | LOG_PERROR, LOG_DAEMON);
         log_backend = log_backend_syslog;
     } else {
