@@ -4951,9 +4951,9 @@ activation_event_report_indication_cb (QmiClientDms *client,
     new = mm_modem_cdma_activation_state_from_qmi_activation_state (state);
 
     if (self->priv->activation_state != new)
-        mm_obj_info (self, "activation state changed: '%s'-->'%s'",
-                     mm_modem_cdma_activation_state_get_string (self->priv->activation_state),
-                     mm_modem_cdma_activation_state_get_string (new));
+        mm_obj_msg (self, "activation state changed: '%s'-->'%s'",
+                    mm_modem_cdma_activation_state_get_string (self->priv->activation_state),
+                    mm_modem_cdma_activation_state_get_string (new));
 
     /* Cache the new value */
     self->priv->activation_state = new;
@@ -5138,7 +5138,7 @@ cdma_activation_context_step (GTask *task)
         if (ctx->input_automatic) {
             QmiMessageDmsSetEventReportInput *input;
 
-            mm_obj_info (ctx->self, "activation step [1/5]: enabling indications");
+            mm_obj_msg (ctx->self, "activation step [1/5]: enabling indications");
             input = qmi_message_dms_set_event_report_input_new ();
             qmi_message_dms_set_event_report_input_set_activation_state_reporting (input, TRUE, NULL);
             qmi_client_dms_set_event_report (
@@ -5154,14 +5154,14 @@ cdma_activation_context_step (GTask *task)
 
         /* Manual activation, no indications needed */
         g_assert (ctx->input_manual != NULL);
-        mm_obj_info (ctx->self, "activation step [1/5]: indications not needed in manual activation");
+        mm_obj_msg (ctx->self, "activation step [1/5]: indications not needed in manual activation");
         ctx->step++;
         /* Fall through */
 
     case CDMA_ACTIVATION_STEP_REQUEST_ACTIVATION:
         /* Automatic activation */
         if (ctx->input_automatic) {
-            mm_obj_info (ctx->self, "activation step [2/5]: requesting automatic (OTA) activation");
+            mm_obj_msg (ctx->self, "activation step [2/5]: requesting automatic (OTA) activation");
             qmi_client_dms_activate_automatic (ctx->client,
                                                ctx->input_automatic,
                                                10,
@@ -5174,9 +5174,9 @@ cdma_activation_context_step (GTask *task)
         /* Manual activation */
         g_assert (ctx->input_manual != NULL);
         if (!ctx->segments)
-            mm_obj_info (ctx->self, "activation step [2/5]: requesting manual activation");
+            mm_obj_msg (ctx->self, "activation step [2/5]: requesting manual activation");
         else {
-            mm_obj_info (ctx->self, "activation step [2/5]: requesting manual activation (PRL segment %u/%u)",
+            mm_obj_msg (ctx->self, "activation step [2/5]: requesting manual activation (PRL segment %u/%u)",
                          (ctx->segment_i + 1), ctx->n_segments);
             qmi_message_dms_activate_manual_input_set_prl (
                 ctx->input_manual,
@@ -5198,14 +5198,14 @@ cdma_activation_context_step (GTask *task)
         /* Automatic activation */
         if (ctx->input_automatic) {
             /* State updates via unsolicited messages */
-            mm_obj_info (ctx->self, "activation step [3/5]: waiting for activation state updates");
+            mm_obj_msg (ctx->self, "activation step [3/5]: waiting for activation state updates");
             return;
         }
 
         /* Manual activation; needs MSISDN checks */
         g_assert (ctx->input_manual != NULL);
         ctx->n_mdn_check_retries++;
-        mm_obj_info (ctx->self, "activation step [3/5]: checking MDN update (retry %u)", ctx->n_mdn_check_retries);
+        mm_obj_msg (ctx->self, "activation step [3/5]: checking MDN update (retry %u)", ctx->n_mdn_check_retries);
         qmi_client_dms_get_msisdn (ctx->client,
                                    NULL,
                                    5,
@@ -5215,14 +5215,14 @@ cdma_activation_context_step (GTask *task)
         return;
 
     case CDMA_ACTIVATION_STEP_RESET:
-        mm_obj_info (ctx->self, "activation step [4/5]: power-cycling...");
+        mm_obj_msg (ctx->self, "activation step [4/5]: power-cycling...");
         mm_shared_qmi_reset (MM_IFACE_MODEM (ctx->self),
                              (GAsyncReadyCallback)activation_reset_ready,
                              task);
         return;
 
     case CDMA_ACTIVATION_STEP_LAST:
-        mm_obj_info (ctx->self, "activation step [5/5]: finished");
+        mm_obj_msg (ctx->self, "activation step [5/5]: finished");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
@@ -13069,7 +13069,7 @@ wds_set_autoconnect_settings_ready (QmiClientWds *client,
     if (!output || !qmi_message_wds_set_autoconnect_settings_output_get_result (output, &error))
         mm_obj_warn (self, "failed disabling autoconnect: %s", error->message);
     else
-        mm_obj_info (self, "autoconnect explicitly disabled");
+        mm_obj_msg (self, "autoconnect explicitly disabled");
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
@@ -13259,8 +13259,8 @@ qmi_device_removed_cb (QmiDevice *device,
                        MMBroadbandModemQmi *self)
 {
     /* Reprobe the modem here so we can get notifications back. */
-    mm_obj_info (self, "connection to qmi-proxy for %s lost, reprobing",
-                 qmi_device_get_path_display (device));
+    mm_obj_msg (self, "connection to qmi-proxy for %s lost, reprobing",
+                qmi_device_get_path_display (device));
 
     g_signal_handler_disconnect (device, self->priv->qmi_device_removed_id);
     self->priv->qmi_device_removed_id = 0;

@@ -124,9 +124,9 @@ mm_iface_modem_oma_update_session_state (MMIfaceModemOma *self,
 
     old_session_state = mm_gdbus_modem_oma_get_session_state (skeleton);
     if (old_session_state != new_session_state) {
-        mm_obj_info (self, "OMA session state changed (%s -> %s)",
-                     mm_oma_session_state_get_string (old_session_state),
-                     mm_oma_session_state_get_string (new_session_state));
+        mm_obj_msg (self, "OMA session state changed (%s -> %s)",
+                    mm_oma_session_state_get_string (old_session_state),
+                    mm_oma_session_state_get_string (new_session_state));
 
         /* Flush current change before signaling the state change,
          * so that clients get the proper state already in the

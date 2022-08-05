@@ -1107,7 +1107,7 @@ ublox_ciev_unsolicited_handler (MMPortSerialAt *port,
         return;
     }
 
-    mm_obj_info (self, "CIEV: sim hot swap detected '%d'", sim_insert_status);
+    mm_obj_msg (self, "CIEV: sim hot swap detected '%d'", sim_insert_status);
     if (sim_insert_status == CIEV_SIM_STATUS_INSERTED ||
         sim_insert_status == CIEV_SIM_STATUS_REMOVED) {
         mm_iface_modem_process_sim_event (MM_IFACE_MODEM (self));
@@ -1167,7 +1167,7 @@ process_cind_verbosity_response (MMBaseModem  *self,
         return;
     }
 
-    mm_obj_info (self, "CIND unsolicited response codes processing verbosity configured successfully");
+    mm_obj_dbg (self, "CIND unsolicited response codes processing verbosity configured successfully");
 
     if (!mm_broadband_modem_sim_hot_swap_ports_context_init (MM_BROADBAND_MODEM (self), &error))
         mm_obj_warn (self, "failed to initialize SIM hot swap ports context: %s", error->message);

@@ -2397,7 +2397,7 @@ port_open_step (GTask *task)
 
 #if defined WITH_QRTR
         if (self->priv->node) {
-            mm_obj_info (self, "Creating QMI device from QRTR node...");
+            mm_obj_dbg (self, "Creating QMI device from QRTR node...");
             qmi_device_new_from_node (self->priv->node,
                                       g_task_get_cancellable (task),
                                       (GAsyncReadyCallback) qmi_device_new_ready,

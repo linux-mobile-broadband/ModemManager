@@ -882,7 +882,7 @@ setup_link_ready (MMPortMbim    *mbim,
 
     /* From now on link_name will be set, and we'll use that to know
      * whether we should cleanup the link upon a connection failure */
-    mm_obj_info (self, "net link %s created (session id %u)", ctx->link_name, ctx->session_id);
+    mm_obj_msg (self, "net link %s created (session id %u)", ctx->link_name, ctx->session_id);
 
     /* Wait for the data port with the given interface name, which will be
      * added asynchronously */

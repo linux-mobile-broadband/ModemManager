@@ -557,8 +557,8 @@ connection_step (ConnectionContext *ctx)
         /* fall through */
 
     case CONNECTION_STEP_UNLOCK_CHECK:
-        mm_obj_info (ctx->self, "simple connect state (%d/%d): unlock check",
-                     ctx->step, CONNECTION_STEP_LAST);
+        mm_obj_msg (ctx->self, "simple connect state (%d/%d): unlock check",
+                    ctx->step, CONNECTION_STEP_LAST);
         mm_iface_modem_update_lock_info (MM_IFACE_MODEM (ctx->self),
                                          MM_MODEM_LOCK_UNKNOWN, /* ask */
                                          (GAsyncReadyCallback)update_lock_info_ready,
@@ -566,8 +566,8 @@ connection_step (ConnectionContext *ctx)
         return;
 
     case CONNECTION_STEP_WAIT_FOR_INITIALIZED:
-        mm_obj_info (ctx->self, "simple connect state (%d/%d): wait to get fully initialized",
-                     ctx->step, CONNECTION_STEP_LAST);
+        mm_obj_msg (ctx->self, "simple connect state (%d/%d): wait to get fully initialized",
+                    ctx->step, CONNECTION_STEP_LAST);
         mm_iface_modem_wait_for_final_state (MM_IFACE_MODEM (ctx->self),
                                              MM_MODEM_STATE_DISABLED, /* disabled == initialized */
                                              (GAsyncReadyCallback)wait_for_initialized_ready,
@@ -575,16 +575,16 @@ connection_step (ConnectionContext *ctx)
         return;
 
     case CONNECTION_STEP_ENABLE:
-        mm_obj_info (ctx->self, "simple connect state (%d/%d): enable",
-                     ctx->step, CONNECTION_STEP_LAST);
+        mm_obj_msg (ctx->self, "simple connect state (%d/%d): enable",
+                    ctx->step, CONNECTION_STEP_LAST);
         mm_base_modem_enable (MM_BASE_MODEM (ctx->self),
                               (GAsyncReadyCallback)enable_ready,
                               ctx);
         return;
 
     case CONNECTION_STEP_WAIT_FOR_ENABLED:
-        mm_obj_info (ctx->self, "simple connect state (%d/%d): wait to get fully enabled",
-                     ctx->step, CONNECTION_STEP_LAST);
+        mm_obj_msg (ctx->self, "simple connect state (%d/%d): wait to get fully enabled",
+                    ctx->step, CONNECTION_STEP_LAST);
         mm_iface_modem_wait_for_final_state (MM_IFACE_MODEM (ctx->self),
                                              MM_MODEM_STATE_UNKNOWN, /* just a final state */
                                              (GAsyncReadyCallback)wait_for_enabled_ready,
@@ -592,8 +592,8 @@ connection_step (ConnectionContext *ctx)
         return;
 
     case CONNECTION_STEP_WAIT_AFTER_ENABLED:
-        mm_obj_info (ctx->self, "simple connect state (%d/%d): wait after enabled",
-                     ctx->step, CONNECTION_STEP_LAST);
+        mm_obj_msg (ctx->self, "simple connect state (%d/%d): wait after enabled",
+                    ctx->step, CONNECTION_STEP_LAST);
         /* When we have just enabled, we want to give it some time before starting
          * the registration process, so that any pending registration update that may
          * have been scheduled during the enabling phase is applied. We don't want to
@@ -603,8 +603,8 @@ connection_step (ConnectionContext *ctx)
 
 
     case CONNECTION_STEP_REGISTER:
-        mm_obj_info (ctx->self, "simple connect state (%d/%d): register",
-                     ctx->step, CONNECTION_STEP_LAST);
+        mm_obj_msg (ctx->self, "simple connect state (%d/%d): register",
+                    ctx->step, CONNECTION_STEP_LAST);
         if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self)) ||
             mm_iface_modem_is_cdma (MM_IFACE_MODEM (ctx->self))) {
             /* 3GPP or CDMA registration */
@@ -622,8 +622,8 @@ connection_step (ConnectionContext *ctx)
         /* fall through */
 
     case CONNECTION_STEP_PACKET_SERVICE_ATTACH:
-        mm_obj_info (ctx->self, "simple connect state (%d/%d): wait to get packet service state attached",
-                     ctx->step, CONNECTION_STEP_LAST);
+        mm_obj_msg (ctx->self, "simple connect state (%d/%d): wait to get packet service state attached",
+                    ctx->step, CONNECTION_STEP_LAST);
         if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self))) {
             mm_iface_modem_3gpp_wait_for_packet_service_state (MM_IFACE_MODEM_3GPP (ctx->self),
                                                                MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED,
@@ -638,8 +638,8 @@ connection_step (ConnectionContext *ctx)
     case CONNECTION_STEP_BEARER: {
         g_autoptr(MMBearerProperties) bearer_properties = NULL;
 
-        mm_obj_info (ctx->self, "simple connect state (%d/%d): bearer",
-                     ctx->step, CONNECTION_STEP_LAST);
+        mm_obj_msg (ctx->self, "simple connect state (%d/%d): bearer",
+                    ctx->step, CONNECTION_STEP_LAST);
 
         bearer_properties = mm_simple_connect_properties_get_bearer_properties (ctx->properties);
 
@@ -660,8 +660,8 @@ connection_step (ConnectionContext *ctx)
     } /* fall through */
 
     case CONNECTION_STEP_CONNECT:
-        mm_obj_info (ctx->self, "simple connect state (%d/%d): connect",
-                     ctx->step, CONNECTION_STEP_LAST);
+        mm_obj_msg (ctx->self, "simple connect state (%d/%d): connect",
+                    ctx->step, CONNECTION_STEP_LAST);
 
         /* At this point, we can cleanup the cancellation point in the Simple interface,
          * because the bearer connection has its own cancellation setup. */
@@ -683,8 +683,8 @@ connection_step (ConnectionContext *ctx)
         /* fall through */
 
     case CONNECTION_STEP_LAST:
-        mm_obj_info (ctx->self, "simple connect state (%d/%d): all done",
-                     ctx->step, CONNECTION_STEP_LAST);
+        mm_obj_msg (ctx->self, "simple connect state (%d/%d): all done",
+                    ctx->step, CONNECTION_STEP_LAST);
         /* All done, yey! */
         mm_gdbus_modem_simple_complete_connect (
             ctx->skeleton,
@@ -740,7 +740,7 @@ connect_auth_ready (MMBaseModem *self,
         return;
     }
 
-    mm_obj_info (self, "simple connect started...");
+    mm_obj_msg (self, "simple connect started...");
 
     /* Log about all the parameters being used for the simple connect */
     {

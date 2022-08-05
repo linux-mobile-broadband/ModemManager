@@ -1986,8 +1986,8 @@ update_registration_reload_current_registration_info_ready (MMIfaceModem3gpp *se
 
     new_state = GPOINTER_TO_UINT (user_data);
 
-    mm_obj_info (self, "3GPP registration state changed (registering -> %s)",
-                 mm_modem_3gpp_registration_state_get_string (new_state));
+    mm_obj_msg (self, "3GPP registration state changed (registering -> %s)",
+                mm_modem_3gpp_registration_state_get_string (new_state));
     mm_obj_dbg (self, "consolidated registration state: cs '%s', ps '%s', eps '%s', 5gs '%s' --> '%s'",
                 mm_modem_3gpp_registration_state_get_string (priv->state_cs),
                 mm_modem_3gpp_registration_state_get_string (priv->state_ps),
@@ -2075,8 +2075,8 @@ update_registration_state (MMIfaceModem3gpp             *self,
             return;
         }
 
-        mm_obj_info (self, "3GPP registration state changed (%s -> registering)",
-                     mm_modem_3gpp_registration_state_get_string (old_state));
+        mm_obj_msg (self, "3GPP registration state changed (%s -> registering)",
+                    mm_modem_3gpp_registration_state_get_string (old_state));
 
         /* Reload current registration info. ONLY update the state to REGISTERED
          * after having loaded operator code/name/subscription state */
@@ -2088,9 +2088,9 @@ update_registration_state (MMIfaceModem3gpp             *self,
         return;
     }
 
-    mm_obj_info (self, "3GPP registration state changed (%s -> %s)",
-                 mm_modem_3gpp_registration_state_get_string (old_state),
-                 mm_modem_3gpp_registration_state_get_string (new_state));
+    mm_obj_msg (self, "3GPP registration state changed (%s -> %s)",
+                mm_modem_3gpp_registration_state_get_string (old_state),
+                mm_modem_3gpp_registration_state_get_string (new_state));
     mm_obj_dbg (self, "consolidated registration state: cs '%s', ps '%s', eps '%s', 5gs '%s' --> '%s'",
                 mm_modem_3gpp_registration_state_get_string (priv->state_cs),
                 mm_modem_3gpp_registration_state_get_string (priv->state_ps),

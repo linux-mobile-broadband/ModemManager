@@ -2851,16 +2851,16 @@ cinterion_scks_unsolicited_handler (MMPortSerialAt *port,
 
     switch (scks) {
         case 0:
-            mm_obj_info (self, "SIM removal detected");
+            mm_obj_msg (self, "SIM removal detected");
             break;
         case 1:
-            mm_obj_info (self, "SIM insertion detected");
+            mm_obj_msg (self, "SIM insertion detected");
             break;
         case 2:
-            mm_obj_info (self, "SIM interface hardware deactivated (Potentially non-electrically compatible SIM inserted)");
+            mm_obj_msg (self, "SIM interface hardware deactivated (potentially non-electrically compatible SIM inserted)");
             break;
         case 3:
-            mm_obj_info (self, "SIM interface hardware deactivated (Technical problem, no precise diagnosis)");
+            mm_obj_msg (self, "SIM interface hardware deactivated (technical problem, no precise diagnosis)");
             break;
         default:
             g_assert_not_reached ();

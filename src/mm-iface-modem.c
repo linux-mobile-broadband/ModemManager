@@ -1966,9 +1966,9 @@ update_state_internal (MMIfaceModem             *self,
 
     /* Update state only if different */
     if (new_state != old_state) {
-        mm_obj_info (self, "state changed (%s -> %s)",
-                     mm_modem_state_get_string (old_state),
-                     mm_modem_state_get_string (new_state));
+        mm_obj_msg (self, "state changed (%s -> %s)",
+                    mm_modem_state_get_string (old_state),
+                    mm_modem_state_get_string (new_state));
 
         /* The property in the interface is bound to the property
          * in the skeleton, so just updating here is enough */
@@ -4170,7 +4170,7 @@ set_power_state_step (GTask *task)
                 mm_gdbus_modem_set_power_state (ctx->skeleton, ctx->previous_real_power_state);
             g_task_return_error (task, g_steal_pointer (&ctx->saved_error));
         } else {
-            mm_obj_info (self, "power state updated: %s", mm_modem_power_state_get_string (ctx->requested_power_state));
+            mm_obj_msg (self, "power state updated: %s", mm_modem_power_state_get_string (ctx->requested_power_state));
             mm_gdbus_modem_set_power_state (ctx->skeleton, ctx->requested_power_state);
             g_task_return_boolean (task, TRUE);
         }

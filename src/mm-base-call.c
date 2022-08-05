@@ -97,7 +97,7 @@ static gboolean
 incoming_timeout_cb (MMBaseCall *self)
 {
     self->priv->incoming_timeout = 0;
-    mm_obj_info (self, "incoming call timed out: no response");
+    mm_obj_msg (self, "incoming call timed out: no response");
     mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_TERMINATED);
     return G_SOURCE_REMOVE;
 }
@@ -187,7 +187,7 @@ handle_start_ready (MMBaseCall         *self,
         return;
     }
 
-    mm_obj_info (self, "call is started");
+    mm_obj_msg (self, "call is started");
 
     /* If dialing to ringing supported, leave it dialing */
     if (!ctx->self->priv->supports_dialing_to_ringing) {
@@ -229,7 +229,7 @@ handle_start_auth_ready (MMBaseModem *modem,
         return;
     }
 
-    mm_obj_info (ctx->self, "user request to start call");
+    mm_obj_msg (ctx->self, "user request to start call");
 
     /* Disallow non-emergency calls when in emergency-only state */
     if (!mm_iface_modem_voice_authorize_outgoing_call (MM_IFACE_MODEM_VOICE (modem), ctx->self, &error)) {
@@ -316,7 +316,7 @@ handle_accept_ready (MMBaseCall *self,
         return;
     }
 
-    mm_obj_info (self, "call is accepted");
+    mm_obj_msg (self, "call is accepted");
 
     if (ctx->self->priv->incoming_timeout) {
         g_source_remove (ctx->self->priv->incoming_timeout);
@@ -353,7 +353,7 @@ handle_accept_auth_ready (MMBaseModem *modem,
         return;
     }
 
-    mm_obj_info (ctx->self, "user request to accept call");
+    mm_obj_msg (ctx->self, "user request to accept call");
 
     /* Check if we do support doing it */
     if (!MM_BASE_CALL_GET_CLASS (ctx->self)->accept ||
@@ -426,7 +426,7 @@ handle_deflect_ready (MMBaseCall           *self,
         return;
     }
 
-    mm_obj_info (self, "call is deflected to '%s'", ctx->number);
+    mm_obj_msg (self, "call is deflected to '%s'", ctx->number);
     mm_base_call_change_state (ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_DEFLECTED);
     mm_gdbus_call_complete_deflect (MM_GDBUS_CALL (ctx->self), ctx->invocation);
     handle_deflect_context_free (ctx);
@@ -458,7 +458,7 @@ handle_deflect_auth_ready (MMBaseModem          *modem,
         return;
     }
 
-    mm_obj_info (ctx->self, "user request to deflect call");
+    mm_obj_msg (ctx->self, "user request to deflect call");
 
     /* Check if we do support doing it */
     if (!MM_BASE_CALL_GET_CLASS (ctx->self)->deflect ||
@@ -715,7 +715,7 @@ handle_hangup_auth_ready (MMBaseModem *modem,
         return;
     }
 
-    mm_obj_info (ctx->self, "user request to hangup call");
+    mm_obj_msg (ctx->self, "user request to hangup call");
 
     /* Check if we do support doing it */
     if (!MM_BASE_CALL_GET_CLASS (ctx->self)->hangup ||
@@ -991,10 +991,10 @@ mm_base_call_change_state (MMBaseCall        *self,
     if (old_state == new_state)
         return;
 
-    mm_obj_info (self, "call state changed: %s -> %s (%s)",
-                 mm_call_state_get_string (old_state),
-                 mm_call_state_get_string (new_state),
-                 mm_call_state_reason_get_string (reason));
+    mm_obj_msg (self, "call state changed: %s -> %s (%s)",
+                mm_call_state_get_string (old_state),
+                mm_call_state_get_string (new_state),
+                mm_call_state_reason_get_string (reason));
 
     /* Setup/cleanup unsolicited events  based on state transitions to/from ACTIVE */
     if (new_state == MM_CALL_STATE_TERMINATED) {

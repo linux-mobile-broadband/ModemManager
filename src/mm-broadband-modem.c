@@ -2909,7 +2909,7 @@ bearer_report_disconnected (MMBaseBearer *bearer,
     if (mm_base_bearer_get_status (bearer) == MM_BEARER_STATUS_DISCONNECTED)
         return;
 
-    mm_obj_info (bearer, "explicitly disconnected");
+    mm_obj_msg (bearer, "explicitly disconnected");
     mm_base_bearer_report_connection_status (bearer, MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
 }
 
@@ -2933,13 +2933,13 @@ cgev_process_detach (MMBroadbandModem *self,
                      MM3gppCgev        type)
 {
     if (type == MM_3GPP_CGEV_NW_DETACH) {
-        mm_obj_info (self, "network forced PS detach: all contexts have been deactivated");
+        mm_obj_msg (self, "network forced PS detach: all contexts have been deactivated");
         bearer_list_report_disconnections (self, MM_3GPP_PROFILE_ID_UNKNOWN);
         return;
     }
 
     if (type == MM_3GPP_CGEV_ME_DETACH) {
-        mm_obj_info (self, "mobile equipment forced PS detach: all contexts have been deactivated");
+        mm_obj_msg (self, "mobile equipment forced PS detach: all contexts have been deactivated");
         bearer_list_report_disconnections (self, MM_3GPP_PROFILE_ID_UNKNOWN);
         return;
     }
@@ -2963,17 +2963,17 @@ cgev_process_primary (MMBroadbandModem *self,
 
     switch (type) {
     case MM_3GPP_CGEV_NW_ACT_PRIMARY:
-        mm_obj_info (self, "network request to activate context (cid %u)", cid);
+        mm_obj_msg (self, "network request to activate context (cid %u)", cid);
         break;
     case MM_3GPP_CGEV_ME_ACT_PRIMARY:
-        mm_obj_info (self, "mobile equipment request to activate context (cid %u)", cid);
+        mm_obj_msg (self, "mobile equipment request to activate context (cid %u)", cid);
         break;
     case MM_3GPP_CGEV_NW_DEACT_PRIMARY:
-        mm_obj_info (self, "network request to deactivate context (cid %u)", cid);
+        mm_obj_msg (self, "network request to deactivate context (cid %u)", cid);
         bearer_list_report_disconnections (self, (gint)cid);
         break;
     case MM_3GPP_CGEV_ME_DEACT_PRIMARY:
-        mm_obj_info (self, "mobile equipment request to deactivate context (cid %u)", cid);
+        mm_obj_msg (self, "mobile equipment request to deactivate context (cid %u)", cid);
         bearer_list_report_disconnections (self, (gint)cid);
         break;
     case MM_3GPP_CGEV_UNKNOWN:
@@ -3014,17 +3014,17 @@ cgev_process_secondary (MMBroadbandModem *self,
 
     switch (type) {
     case MM_3GPP_CGEV_NW_ACT_SECONDARY:
-        mm_obj_info (self, "network request to activate secondary context (cid %u, primary cid %u)", cid, p_cid);
+        mm_obj_msg (self, "network request to activate secondary context (cid %u, primary cid %u)", cid, p_cid);
         break;
     case MM_3GPP_CGEV_ME_ACT_SECONDARY:
-        mm_obj_info (self, "mobile equipment request to activate secondary context (cid %u, primary cid %u)", cid, p_cid);
+        mm_obj_msg (self, "mobile equipment request to activate secondary context (cid %u, primary cid %u)", cid, p_cid);
         break;
     case MM_3GPP_CGEV_NW_DEACT_SECONDARY:
-        mm_obj_info (self, "network request to deactivate secondary context (cid %u, primary cid %u)", cid, p_cid);
+        mm_obj_msg (self, "network request to deactivate secondary context (cid %u, primary cid %u)", cid, p_cid);
         bearer_list_report_disconnections (self, (gint)cid);
         break;
     case MM_3GPP_CGEV_ME_DEACT_SECONDARY:
-        mm_obj_info (self, "mobile equipment request to deactivate secondary context (cid %u, primary cid %u)", cid, p_cid);
+        mm_obj_msg (self, "mobile equipment request to deactivate secondary context (cid %u, primary cid %u)", cid, p_cid);
         bearer_list_report_disconnections (self, (gint)cid);
         break;
     case MM_3GPP_CGEV_UNKNOWN:
@@ -3066,28 +3066,28 @@ cgev_process_pdp (MMBroadbandModem *self,
 
     switch (type) {
     case MM_3GPP_CGEV_REJECT:
-        mm_obj_info (self, "network request to activate context (type %s, address %s) has been automatically rejected", pdp_type, pdp_addr);
+        mm_obj_msg (self, "network request to activate context (type %s, address %s) has been automatically rejected", pdp_type, pdp_addr);
         break;
     case MM_3GPP_CGEV_NW_REACT:
         /* NOTE: we don't currently notify about automatic reconnections like this one */
         if (cid)
-            mm_obj_info (self, "network request to reactivate context (type %s, address %s, cid %u)", pdp_type, pdp_addr, cid);
+            mm_obj_msg (self, "network request to reactivate context (type %s, address %s, cid %u)", pdp_type, pdp_addr, cid);
         else
-            mm_obj_info (self, "network request to reactivate context (type %s, address %s, cid unknown)", pdp_type, pdp_addr);
+            mm_obj_msg (self, "network request to reactivate context (type %s, address %s, cid unknown)", pdp_type, pdp_addr);
         break;
     case MM_3GPP_CGEV_NW_DEACT_PDP:
         if (cid) {
-            mm_obj_info (self, "network request to deactivate context (type %s, address %s, cid %u)", pdp_type, pdp_addr, cid);
+            mm_obj_msg (self, "network request to deactivate context (type %s, address %s, cid %u)", pdp_type, pdp_addr, cid);
             bearer_list_report_disconnections (self, (gint)cid);
         } else
-            mm_obj_info (self, "network request to deactivate context (type %s, address %s, cid unknown)", pdp_type, pdp_addr);
+            mm_obj_msg (self, "network request to deactivate context (type %s, address %s, cid unknown)", pdp_type, pdp_addr);
         break;
     case MM_3GPP_CGEV_ME_DEACT_PDP:
         if (cid) {
-            mm_obj_info (self, "mobile equipment request to deactivate context (type %s, address %s, cid %u)", pdp_type, pdp_addr, cid);
+            mm_obj_msg (self, "mobile equipment request to deactivate context (type %s, address %s, cid %u)", pdp_type, pdp_addr, cid);
             bearer_list_report_disconnections (self, (gint)cid);
         } else
-            mm_obj_info (self, "mobile equipment request to deactivate context (type %s, address %s, cid unknown)", pdp_type, pdp_addr);
+            mm_obj_msg (self, "mobile equipment request to deactivate context (type %s, address %s, cid unknown)", pdp_type, pdp_addr);
         break;
     case MM_3GPP_CGEV_UNKNOWN:
     case MM_3GPP_CGEV_NW_DETACH:
@@ -4200,8 +4200,8 @@ complete_sim_swap_check (GTask       *task,
         g_assert_not_reached();
 
     if (g_strcmp0 (current, cached) != 0) {
-        mm_obj_info (self, "SIM %s has changed: %s -> %s",
-                     str, cached ? cached : "<none>", current ? current : "<none>");
+        mm_obj_msg (self, "SIM %s has changed: %s -> %s",
+                    str, cached ? cached : "<none>", current ? current : "<none>");
         mm_iface_modem_process_sim_event (MM_IFACE_MODEM (self));
         ctx->step = SIM_SWAP_CHECK_STEP_LAST;
     } else {
@@ -4375,7 +4375,7 @@ modem_check_for_sim_swap (MMIfaceModem        *self,
                       NULL);
 
         if (modem_state == MM_MODEM_STATE_FAILED) {
-            mm_obj_info (self, "new SIM detected, handle as SIM hot-swap");
+            mm_obj_msg (self, "new SIM detected, handle as SIM hot-swap");
             mm_iface_modem_process_sim_event (MM_IFACE_MODEM (self));
             g_task_return_boolean (task, TRUE);
         } else {
@@ -12246,8 +12246,8 @@ syncing_step (GTask *task)
             g_object_unref (task);
             return;
         }
-        mm_obj_info (self, "resume synchronization state (%d/%d): modem interface sync",
-                     ctx->step, SYNCING_STEP_LAST);
+        mm_obj_msg (self, "resume synchronization state (%d/%d): modem interface sync",
+                    ctx->step, SYNCING_STEP_LAST);
         mm_iface_modem_sync (MM_IFACE_MODEM (self),
                              (GAsyncReadyCallback)iface_modem_sync_ready,
                              task);
@@ -12261,8 +12261,8 @@ syncing_step (GTask *task)
          */
         if (self->priv->modem_3gpp_dbus_skeleton &&
             (self->priv->modem_state >= MM_MODEM_STATE_ENABLED)) {
-            mm_obj_info (self, "resume synchronization state (%d/%d): 3GPP interface sync",
-                         ctx->step, SYNCING_STEP_LAST);
+            mm_obj_msg (self, "resume synchronization state (%d/%d): 3GPP interface sync",
+                        ctx->step, SYNCING_STEP_LAST);
             mm_iface_modem_3gpp_sync (MM_IFACE_MODEM_3GPP (self), (GAsyncReadyCallback)iface_modem_3gpp_sync_ready, task);
             return;
         }
@@ -12273,8 +12273,8 @@ syncing_step (GTask *task)
         /* Start Time interface synchronization, only if modem was enabled */
         if (self->priv->modem_time_dbus_skeleton &&
             (self->priv->modem_state >= MM_MODEM_STATE_ENABLED)) {
-            mm_obj_info (self, "resume synchronization state (%d/%d): time interface sync",
-                         ctx->step, SYNCING_STEP_LAST);
+            mm_obj_msg (self, "resume synchronization state (%d/%d): time interface sync",
+                        ctx->step, SYNCING_STEP_LAST);
             mm_iface_modem_time_sync (MM_IFACE_MODEM_TIME (self), (GAsyncReadyCallback)iface_modem_time_sync_ready, task);
             return;
         }
@@ -12282,8 +12282,8 @@ syncing_step (GTask *task)
         /* fall through */
 
     case SYNCING_STEP_LAST:
-        mm_obj_info (self, "resume synchronization state (%d/%d): all done",
-                     ctx->step, SYNCING_STEP_LAST);
+        mm_obj_msg (self, "resume synchronization state (%d/%d): all done",
+                    ctx->step, SYNCING_STEP_LAST);
         /* We are done without errors! */
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);

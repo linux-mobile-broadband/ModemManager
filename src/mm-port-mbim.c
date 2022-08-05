@@ -451,10 +451,10 @@ qmi_device_open_ready (QmiDevice    *dev,
         g_error_free (error);
         g_clear_object (&self->priv->qmi_device);
         /* Ignore error and complete */
-        mm_obj_info (self, "MBIM device is not QMI capable");
+        mm_obj_msg (self, "MBIM device is not QMI capable");
         self->priv->qmi_supported = FALSE;
     } else {
-        mm_obj_info (self, "MBIM device is QMI capable");
+        mm_obj_msg (self, "MBIM device is QMI capable");
     }
 
     self->priv->in_progress = FALSE;
@@ -477,7 +477,7 @@ qmi_device_new_ready (GObject      *unused,
         mm_obj_dbg (self, "error: couldn't create QmiDevice: %s", error->message);
         g_error_free (error);
         /* Ignore error and complete */
-        mm_obj_info (self, "MBIM device is not QMI capable");
+        mm_obj_msg (self, "MBIM device is not QMI capable");
         self->priv->qmi_supported = FALSE;
         self->priv->in_progress = FALSE;
         g_task_return_boolean (task, TRUE);
@@ -546,7 +546,7 @@ mbim_query_device_services_ready (MbimDevice   *device,
     file = G_FILE (g_task_get_task_data (task));
 
     if (!file || !self->priv->qmi_supported) {
-        mm_obj_info (self, "MBIM device is not QMI capable");
+        mm_obj_msg (self, "MBIM device is not QMI capable");
         self->priv->in_progress = FALSE;
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);

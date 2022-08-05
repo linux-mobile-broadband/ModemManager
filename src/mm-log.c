@@ -52,7 +52,7 @@ enum {
 };
 
 static gboolean ts_flags = TS_FLAG_NONE;
-static guint32  log_level = MM_LOG_LEVEL_INFO | MM_LOG_LEVEL_WARN | MM_LOG_LEVEL_ERR;
+static guint32  log_level = MM_LOG_LEVEL_MSG | MM_LOG_LEVEL_WARN | MM_LOG_LEVEL_ERR;
 static GTimeVal rel_start = { 0, 0 };
 static int      logfd = -1;
 static gboolean append_log_level_text = TRUE;
@@ -71,8 +71,10 @@ typedef struct {
 static const LogDesc level_descs[] = {
     { MM_LOG_LEVEL_ERR, "ERR" },
     { MM_LOG_LEVEL_WARN  | MM_LOG_LEVEL_ERR, "WARN" },
-    { MM_LOG_LEVEL_INFO  | MM_LOG_LEVEL_WARN | MM_LOG_LEVEL_ERR, "INFO" },
-    { MM_LOG_LEVEL_DEBUG | MM_LOG_LEVEL_INFO | MM_LOG_LEVEL_WARN | MM_LOG_LEVEL_ERR, "DEBUG" },
+    { MM_LOG_LEVEL_MSG   | MM_LOG_LEVEL_WARN | MM_LOG_LEVEL_ERR, "MSG" },
+    { MM_LOG_LEVEL_INFO  | MM_LOG_LEVEL_MSG  | MM_LOG_LEVEL_WARN | MM_LOG_LEVEL_ERR, "INFO" },
+    { MM_LOG_LEVEL_DEBUG | MM_LOG_LEVEL_INFO | MM_LOG_LEVEL_MSG  | MM_LOG_LEVEL_WARN | MM_LOG_LEVEL_ERR, "DEBUG" },
+    { 0, NULL }
 };
 
 static GString *msgbuf = NULL;
@@ -86,6 +88,8 @@ mm_to_syslog_priority (MMLogLevel level)
         return LOG_ERR;
     case MM_LOG_LEVEL_WARN:
         return LOG_WARNING;
+    case MM_LOG_LEVEL_MSG:
+        return LOG_NOTICE;
     case MM_LOG_LEVEL_INFO:
         return LOG_INFO;
     case MM_LOG_LEVEL_DEBUG:
@@ -112,6 +116,7 @@ glib_level_to_mm_level (GLogLevelFlags level)
     case G_LOG_LEVEL_WARNING:
         return MM_LOG_LEVEL_WARN;
     case G_LOG_LEVEL_MESSAGE:
+        return MM_LOG_LEVEL_MSG;
     case G_LOG_LEVEL_INFO:
         return MM_LOG_LEVEL_INFO;
     case G_LOG_LEVEL_DEBUG:
@@ -132,6 +137,8 @@ log_level_description (MMLogLevel level)
         return "<error>";
     case MM_LOG_LEVEL_WARN:
         return "<warn> ";
+    case MM_LOG_LEVEL_MSG:
+        return "<msg>  ";
     case MM_LOG_LEVEL_INFO:
         return "<info> ";
     case MM_LOG_LEVEL_DEBUG:

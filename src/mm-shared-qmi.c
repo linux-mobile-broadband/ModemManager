@@ -2141,7 +2141,7 @@ reset_set_operating_mode_reset_ready (QmiClientDms *client,
     if (!output || !qmi_message_dms_set_operating_mode_output_get_result (output, &error)) {
         g_task_return_error (task, error);
     } else {
-        mm_obj_info (self, "rebooting now");
+        mm_obj_msg (self, "rebooting now");
         g_task_return_boolean (task, TRUE);
     }
 
@@ -2632,8 +2632,8 @@ find_requested_carrier_config (GTask *task)
         g_assert (config_fallback_i >= 0);
 
         config = &g_array_index (priv->config_list, ConfigInfo, config_fallback_i);
-        mm_obj_info (self, "using fallback carrier configuration '%s' (version 0x%08x, size %u bytes)",
-                     config->description, config->version, config->total_size);
+        mm_obj_dbg (self, "using fallback carrier configuration '%s' (version 0x%08x, size %u bytes)",
+                    config->description, config->version, config->total_size);
 
         g_free (ctx->config_requested);
         ctx->config_requested = config_fallback;
@@ -2679,7 +2679,7 @@ setup_carrier_config_step (GTask *task)
         g_assert (ctx->config_requested_i >= 0);
         g_assert (priv->config_active_i >= 0 || priv->config_active_default);
         if (ctx->config_requested_i == priv->config_active_i) {
-            mm_obj_info (self, "carrier config switching not needed: already using '%s'", ctx->config_requested);
+            mm_obj_msg (self, "carrier config switching not needed: already using '%s'", ctx->config_requested);
             ctx->step = SETUP_CARRIER_CONFIG_STEP_LAST;
             setup_carrier_config_step (task);
             return;
@@ -3490,7 +3490,7 @@ uim_switch_slot_ready (QmiClientUim *client,
         else
             g_task_return_error (task, g_steal_pointer (&error));
     } else {
-        mm_obj_info (self, "SIM slot switch operation request successful");
+        mm_obj_msg (self, "SIM slot switch operation request successful");
         g_task_return_boolean (task, TRUE);
     }
     g_object_unref (task);
@@ -6891,8 +6891,8 @@ inject_xtra_data_next (GTask *task)
 
     ctx->i += count;
 
-    mm_obj_info (self, "injecting xtra data: %" G_GSIZE_FORMAT " bytes (%u/%u)",
-                 count, (guint) ctx->n_part, (guint) ctx->total_parts);
+    mm_obj_dbg (self, "injecting xtra data: %" G_GSIZE_FORMAT " bytes (%u/%u)",
+                count, (guint) ctx->n_part, (guint) ctx->total_parts);
     qmi_client_loc_inject_xtra_data (ctx->client,
                                      input,
                                      10,
@@ -7044,8 +7044,8 @@ inject_assistance_data_next (GTask *task)
 
     ctx->i += count;
 
-    mm_obj_info (self, "injecting predicted orbits data: %" G_GSIZE_FORMAT " bytes (%u/%u)",
-                 count, (guint) ctx->n_part, (guint) ctx->total_parts);
+    mm_obj_dbg (self, "injecting predicted orbits data: %" G_GSIZE_FORMAT " bytes (%u/%u)",
+                count, (guint) ctx->n_part, (guint) ctx->total_parts);
     qmi_client_loc_inject_predicted_orbits_data (ctx->client,
                                                  input,
                                                  10,

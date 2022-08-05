@@ -1400,7 +1400,7 @@ cdma_automatic_activation_step (GTask *task)
         /* fall-through */
 
     case CDMA_AUTOMATIC_ACTIVATION_STEP_UNLOCK:
-        mm_obj_info (self, "activation step [1/4]: unlocking device");
+        mm_obj_msg (self, "activation step [1/4]: unlocking device");
         mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "~NAMLCK=000000",
                                   20,
@@ -1412,7 +1412,7 @@ cdma_automatic_activation_step (GTask *task)
     case CDMA_AUTOMATIC_ACTIVATION_STEP_CDV: {
         gchar *command;
 
-        mm_obj_info (self, "activation step [2/4]: requesting OTASP");
+        mm_obj_msg (self, "activation step [2/4]: requesting OTASP");
         command = g_strdup_printf ("+CDV%s", ctx->carrier_code);
         mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   command,
@@ -1425,7 +1425,7 @@ cdma_automatic_activation_step (GTask *task)
     }
 
     case CDMA_AUTOMATIC_ACTIVATION_STEP_CHECK:
-        mm_obj_info (self, "activation step [3/4]: checking activation info");
+        mm_obj_msg (self, "activation step [3/4]: checking activation info");
         mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "~NAMVAL?0",
                                   3,
@@ -1435,7 +1435,7 @@ cdma_automatic_activation_step (GTask *task)
         return;
 
     case CDMA_AUTOMATIC_ACTIVATION_STEP_LAST:
-        mm_obj_info (self, "activation step [4/4]: activation process finished");
+        mm_obj_msg (self, "activation step [4/4]: activation process finished");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
@@ -1532,7 +1532,7 @@ cdma_manual_activation_step (GTask *task)
     case CDMA_MANUAL_ACTIVATION_STEP_SPC: {
         gchar *command;
 
-        mm_obj_info (self, "activation step [1/5]: unlocking device");
+        mm_obj_msg (self, "activation step [1/5]: unlocking device");
         command = g_strdup_printf ("~NAMLCK=%s",
                                    mm_cdma_manual_activation_properties_get_spc (ctx->properties));
         mm_base_modem_at_command (MM_BASE_MODEM (self),
@@ -1548,7 +1548,7 @@ cdma_manual_activation_step (GTask *task)
     case CDMA_MANUAL_ACTIVATION_STEP_MDN_MIN: {
         gchar *command;
 
-        mm_obj_info (self, "activation step [2/5]: setting MDN/MIN/SID");
+        mm_obj_msg (self, "activation step [2/5]: setting MDN/MIN/SID");
         command = g_strdup_printf ("~NAMVAL=0,%s,%s,%" G_GUINT16_FORMAT ",65535",
                                    mm_cdma_manual_activation_properties_get_mdn (ctx->properties),
                                    mm_cdma_manual_activation_properties_get_min (ctx->properties),
@@ -1564,7 +1564,7 @@ cdma_manual_activation_step (GTask *task)
     }
 
     case CDMA_MANUAL_ACTIVATION_STEP_OTASP:
-        mm_obj_info (self, "activation step [3/5]: requesting OTASP");
+        mm_obj_msg (self, "activation step [3/5]: requesting OTASP");
         mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "!IOTASTART",
                                   20,
@@ -1574,7 +1574,7 @@ cdma_manual_activation_step (GTask *task)
         return;
 
     case CDMA_MANUAL_ACTIVATION_STEP_CHECK:
-        mm_obj_info (self, "activation step [4/5]: checking activation info");
+        mm_obj_msg (self, "activation step [4/5]: checking activation info");
         mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "~NAMVAL?0",
                                   20,
@@ -1584,7 +1584,7 @@ cdma_manual_activation_step (GTask *task)
         return;
 
     case CDMA_MANUAL_ACTIVATION_STEP_LAST:
-        mm_obj_info (self, "activation step [5/5]: activation process finished");
+        mm_obj_msg (self, "activation step [5/5]: activation process finished");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;

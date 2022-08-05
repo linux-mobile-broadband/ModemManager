@@ -204,8 +204,8 @@ device_support_check_ready (MMPluginManager          *plugin_manager,
     /* Receive plugin result from the plugin manager */
     plugin = mm_plugin_manager_device_support_check_finish (plugin_manager, res, &error);
     if (!plugin) {
-        mm_obj_info (ctx->self, "couldn't check support for device '%s': %s",
-                     mm_device_get_uid (ctx->device), error->message);
+        mm_obj_msg (ctx->self, "couldn't check support for device '%s': %s",
+                    mm_device_get_uid (ctx->device), error->message);
         g_error_free (error);
         g_hash_table_remove (ctx->self->priv->devices, mm_device_get_uid (ctx->device));
         find_device_support_context_free (ctx);
@@ -226,8 +226,8 @@ device_support_check_ready (MMPluginManager          *plugin_manager,
     }
 
     /* Modem now created */
-    mm_obj_info (ctx->self, "modem for device '%s' successfully created",
-                 mm_device_get_uid (ctx->device));
+    mm_obj_msg (ctx->self, "modem for device '%s' successfully created",
+                mm_device_get_uid (ctx->device));
     find_device_support_context_free (ctx);
 }
 
@@ -267,7 +267,7 @@ device_removed (MMBaseManager *self,
      * ourselves. */
     g_object_ref (device);
 
-    mm_obj_info (self, "port %s released by device '%s'", name, mm_device_get_uid (device));
+    mm_obj_msg (self, "port %s released by device '%s'", name, mm_device_get_uid (device));
     mm_device_release_port_name (device, subsystem, name);
 
     /* If port probe list gets empty, remove the device object iself */
@@ -741,7 +741,7 @@ base_modem_sync_ready (MMBaseModem  *self,
         mm_obj_warn (self, "synchronization failed: %s", error->message);
         return;
     }
-    mm_obj_info (self, "synchronization finished");
+    mm_obj_msg (self, "synchronization finished");
 }
 
 void
@@ -798,7 +798,7 @@ set_logging_auth_ready (MMAuthProvider    *authp,
     else if (!mm_log_set_level (ctx->level, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
-        mm_obj_info (ctx->self, "logging: level '%s'", ctx->level);
+        mm_obj_msg (ctx->self, "logging: level '%s'", ctx->level);
         mm_gdbus_org_freedesktop_modem_manager1_complete_set_logging (
             MM_GDBUS_ORG_FREEDESKTOP_MODEM_MANAGER1 (ctx->self),
             ctx->invocation);
@@ -1139,7 +1139,7 @@ inhibit_sender_lost (GDBusConnection          *connection,
                      const gchar              *sender_name,
                      InhibitSenderLostContext *lost_ctx)
 {
-    mm_obj_info (lost_ctx->self, "device inhibition teardown for uid '%s' (owner disappeared from bus)", lost_ctx->uid);
+    mm_obj_msg (lost_ctx->self, "device inhibition teardown for uid '%s' (owner disappeared from bus)", lost_ctx->uid);
     remove_device_inhibition (lost_ctx->self, lost_ctx->uid);
 }
 
@@ -1194,7 +1194,7 @@ device_inhibit_ready (MMDevice             *device,
 
     g_hash_table_insert (ctx->self->priv->inhibited_devices, g_strdup (ctx->uid), info);
 
-    mm_obj_info (ctx->self, "device inhibition setup for uid '%s'", ctx->uid);
+    mm_obj_msg (ctx->self, "device inhibition setup for uid '%s'", ctx->uid);
 
     mm_gdbus_org_freedesktop_modem_manager1_complete_inhibit_device (
         MM_GDBUS_ORG_FREEDESKTOP_MODEM_MANAGER1 (ctx->self),
@@ -1243,7 +1243,7 @@ base_manager_uninhibit_device (InhibitDeviceContext *ctx)
         return;
     }
 
-    mm_obj_info (ctx->self, "device inhibition teardown for uid '%s'", ctx->uid);
+    mm_obj_msg (ctx->self, "device inhibition teardown for uid '%s'", ctx->uid);
     remove_device_inhibition (ctx->self, ctx->uid);
 
     mm_gdbus_org_freedesktop_modem_manager1_complete_inhibit_device (
@@ -1310,7 +1310,7 @@ handle_set_profile (MmGdbusTest *skeleton,
     gchar *physdev_uid;
     GError *error = NULL;
 
-    mm_obj_info (self, "test profile set to: '%s'", id);
+    mm_obj_msg (self, "test profile set to: '%s'", id);
 
     /* Create device and keep it listed in the Manager */
     physdev_uid = g_strdup_printf ("/virtual/%s", id);
@@ -1342,8 +1342,8 @@ handle_set_profile (MmGdbusTest *skeleton,
         goto out;
     }
 
-    mm_obj_info (self, "modem for virtual device '%s' successfully created",
-                 mm_device_get_uid (device));
+    mm_obj_msg (self, "modem for virtual device '%s' successfully created",
+                mm_device_get_uid (device));
 
 out:
 

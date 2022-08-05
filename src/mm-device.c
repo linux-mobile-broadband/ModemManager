@@ -490,9 +490,9 @@ mm_device_create_modem (MMDevice  *self,
             return FALSE;
         }
 
-        mm_obj_info (self, "creating modem with plugin '%s' and '%u' ports",
-                     mm_plugin_get_name (self->priv->plugin),
-                     g_list_length (self->priv->port_probes));
+        mm_obj_msg (self, "creating modem with plugin '%s' and '%u' ports",
+                    mm_plugin_get_name (self->priv->plugin),
+                    g_list_length (self->priv->port_probes));
     } else {
         if (!self->priv->virtual_ports) {
             g_set_error (error,
@@ -502,9 +502,9 @@ mm_device_create_modem (MMDevice  *self,
             return FALSE;
         }
 
-        mm_obj_info (self, "creating virtual modem with plugin '%s' and '%u' ports",
-                     mm_plugin_get_name (self->priv->plugin),
-                     g_strv_length (self->priv->virtual_ports));
+        mm_obj_msg (self, "creating virtual modem with plugin '%s' and '%u' ports",
+                    mm_plugin_get_name (self->priv->plugin),
+                    g_strv_length (self->priv->virtual_ports));
     }
 
     self->priv->modem = mm_plugin_create_modem (self->priv->plugin, self, error);

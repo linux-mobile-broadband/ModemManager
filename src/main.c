@@ -44,7 +44,7 @@ static MMBaseManager *manager;
 static gboolean
 quit_cb (gpointer user_data)
 {
-    mm_info ("caught signal, shutting down...");
+    mm_msg ("caught signal, shutting down...");
 
     if (manager)
         g_object_set (manager, MM_BASE_MANAGER_CONNECTION, NULL, NULL);
@@ -178,8 +178,8 @@ main (int argc, char *argv[])
     /* Early register all known errors */
     register_dbus_errors ();
 
-    mm_info ("ModemManager (version " MM_DIST_VERSION ") starting in %s bus...",
-             mm_context_get_test_session () ? "session" : "system");
+    mm_msg ("ModemManager (version " MM_DIST_VERSION ") starting in %s bus...",
+            mm_context_get_test_session () ? "session" : "system");
 
     /* Detect runtime charset conversion support */
     mm_modem_charsets_init ();
@@ -250,7 +250,7 @@ main (int argc, char *argv[])
 
     g_bus_unown_name (name_id);
 
-    mm_info ("ModemManager is shut down");
+    mm_msg ("ModemManager is shut down");
 
     mm_log_shutdown ();
 

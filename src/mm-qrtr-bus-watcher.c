@@ -83,7 +83,7 @@ qrtr_node_services_ready (QrtrNode      *node,
         return;
     }
 
-    mm_obj_info (ctx->self, "qrtr services ready for node %u", node_id);
+    mm_obj_dbg (ctx->self, "qrtr services ready for node %u", node_id);
     g_signal_emit (ctx->self, signals[QRTR_DEVICE_ADDED], 0, node_id);
     device_context_free (ctx);
 }
@@ -152,7 +152,7 @@ handle_qrtr_node_removed (QrtrBus          *qrtr_bus,
     }
 
     g_hash_table_remove (self->priv->nodes, GUINT_TO_POINTER (node_id));
-    mm_obj_info (self, "qrtr node %u removed", node_id);
+    mm_obj_dbg (self, "qrtr node %u removed", node_id);
 
     g_signal_emit (self, signals[QRTR_DEVICE_REMOVED], 0, node_id);
 }

@@ -1043,7 +1043,7 @@ cdma_activation_step (GTask *task)
     case CDMA_ACTIVATION_STEP_REQUEST_ACTIVATION: {
         gchar *command;
 
-        mm_obj_info (self, "activation step [1/5]: setting up activation details");
+        mm_obj_msg (self, "activation step [1/5]: setting up activation details");
         command = g_strdup_printf ("$NWACTIVATION=%s,%s,%s",
                                    mm_cdma_manual_activation_properties_get_spc (ctx->properties),
                                    mm_cdma_manual_activation_properties_get_mdn (ctx->properties),
@@ -1059,7 +1059,7 @@ cdma_activation_step (GTask *task)
     }
 
     case CDMA_ACTIVATION_STEP_OTA_UPDATE:
-        mm_obj_info (self, "activation step [2/5]: starting OTA activation");
+        mm_obj_msg (self, "activation step [2/5]: starting OTA activation");
         mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "+IOTA=1",
                                   20,
@@ -1069,7 +1069,7 @@ cdma_activation_step (GTask *task)
         return;
 
     case CDMA_ACTIVATION_STEP_PRL_UPDATE:
-        mm_obj_info (self, "activation step [3/5]: starting PRL update");
+        mm_obj_msg (self, "activation step [3/5]: starting PRL update");
         mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "+IOTA=2",
                                   20,
@@ -1079,7 +1079,7 @@ cdma_activation_step (GTask *task)
         return;
 
     case CDMA_ACTIVATION_STEP_WAIT_UNTIL_FINISHED:
-        mm_obj_info (self, "activation step [4/5]: checking activation process status");
+        mm_obj_msg (self, "activation step [4/5]: checking activation process status");
         mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "+IOTA?",
                                   20,
@@ -1089,7 +1089,7 @@ cdma_activation_step (GTask *task)
         return;
 
     case CDMA_ACTIVATION_STEP_LAST:
-        mm_obj_info (self, "activation step [5/5]: activation process finished");
+        mm_obj_msg (self, "activation step [5/5]: activation process finished");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;

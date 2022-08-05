@@ -571,7 +571,7 @@ bearer_update_status (MMBaseBearer *self,
                                     ", tx: %" G_GUINT64_FORMAT " bytes, rx: %" G_GUINT64_FORMAT " bytes",
                                     mm_bearer_stats_get_tx_bytes (self->priv->stats),
                                     mm_bearer_stats_get_rx_bytes (self->priv->stats));
-        mm_obj_info (self, "%s", report->str);
+        mm_obj_msg (self, "%s", report->str);
     }
 }
 
@@ -979,11 +979,11 @@ reload_stats_supported_ready (MMBaseBearer *self,
                               GTask        *task)
 {
     if (MM_BASE_BEARER_GET_CLASS (self)->reload_stats_finish (self, NULL, NULL, res, NULL)) {
-        mm_obj_info (self, "reloading stats is supported by the device");
+        mm_obj_dbg (self, "reloading stats is supported by the device");
         self->priv->reload_stats_supported = TRUE;
         mm_gdbus_bearer_set_reload_stats_supported (MM_GDBUS_BEARER (self), self->priv->reload_stats_supported);
     } else
-        mm_obj_info (self, "reloading stats is not supported by the device");
+        mm_obj_dbg (self, "reloading stats is not supported by the device");
 
     if (connect_check_cancel (self, task))
         return;

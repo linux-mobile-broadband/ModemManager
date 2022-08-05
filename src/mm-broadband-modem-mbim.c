@@ -461,7 +461,7 @@ complete_current_capabilities (GTask *task)
          * capability and mode related operations are going to be done via QMI as well, so that we
          * don't mix both logics */
         if (self->priv->qmi_capability_and_mode_switching)
-            mm_obj_info (self, "QMI-based capability and mode switching support enabled");
+            mm_obj_dbg (self, "QMI-based capability and mode switching support enabled");
     }
 #else
     result = ctx->current_mbim;
@@ -3150,8 +3150,8 @@ mbim_device_removed_cb (MbimDevice           *device,
 {
     /* We have to do a full re-probe here because simply reopening the device
      * and restarting mbim-proxy will leave us without MBIM notifications. */
-    mm_obj_info (self, "connection to mbim-proxy for %s lost, reprobing",
-                 mbim_device_get_path_display (device));
+    mm_obj_msg (self, "connection to mbim-proxy for %s lost, reprobing",
+                mbim_device_get_path_display (device));
 
     g_signal_handler_disconnect (device,
                                  self->priv->mbim_device_removed_id);

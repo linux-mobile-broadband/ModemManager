@@ -105,7 +105,7 @@ static void
 run_loop_for_ms (TestData *tdata,
                  guint32 timeout)
 {
-    mm_info ("Run loop for %u ms", timeout);
+    mm_msg ("Run loop for %u ms", timeout);
     tdata->timeout_id = g_timeout_add (timeout, loop_timeout_cb, tdata);
     g_main_loop_run (tdata->loop);
 }
@@ -117,7 +117,7 @@ stop_loop (TestData *tdata)
         g_source_remove (tdata->timeout_id);
         tdata->timeout_id = 0;
     }
-    mm_info ("Stop the loop");
+    mm_msg ("Stop the loop");
     g_main_loop_quit (tdata->loop);
 }
 
@@ -133,7 +133,7 @@ add_modem_completion_cb (GObject *source_object,
 
     tdata = (TestData*)user_data;
 
-    mm_info ("AddModem DBus call completed");
+    mm_msg ("AddModem DBus call completed");
     dbus_return = g_dbus_proxy_call_finish (tdata->mm_proxy, res, &error);
     g_assert_no_error (error);
     g_assert_nonnull (dbus_return);
@@ -189,7 +189,7 @@ emit_state_changed_completion_cb (GObject *source_object,
 
     tdata = (TestData*)user_data;
 
-    mm_info ("EmitStateChanged DBus call completed");
+    mm_msg ("EmitStateChanged DBus call completed");
     dbus_return = g_dbus_proxy_call_finish (tdata->mm_proxy, res, &error);
     g_assert_no_error (error);
     g_assert_nonnull (dbus_return);
@@ -277,7 +277,7 @@ set_modem_unlock_completion_cb (GObject *source_object,
 
     tdata = (TestData*)user_data;
 
-    mm_info ("org.freedesktop.DBus.Properties.Set DBus call completed");
+    mm_msg ("org.freedesktop.DBus.Properties.Set DBus call completed");
     dbus_return = g_dbus_proxy_call_finish (tdata->mm_modem_prop_proxy, res, &error);
     g_assert_no_error (error);
     g_assert_nonnull (dbus_return);
@@ -368,7 +368,7 @@ mm_sim_send_pin_completion_cb (GObject *source_object,
 
     tdata = (TestData*)user_data;
 
-    mm_info("SendPin DBus method call completed");
+    mm_msg ("SendPin DBus method call completed");
     ret = mm_sim_send_pin_finish (tdata->sim, res, &error);
     if (tdata->pin_error) {
         g_assert_nonnull (error);

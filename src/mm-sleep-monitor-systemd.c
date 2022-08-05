@@ -148,11 +148,11 @@ signal_cb (GDBusProxy  *proxy,
     g_variant_get (args, "(b)", &is_about_to_suspend);
 
     if (is_about_to_suspend) {
-        mm_obj_info (self, "system is about to suspend");
+        mm_obj_msg (self, "system is about to suspend");
         g_signal_emit (self, signals[SLEEPING], 0);
         drop_inhibitor (self);
     } else {
-        mm_obj_info (self, "system is resuming");
+        mm_obj_msg (self, "system is resuming");
         take_inhibitor (self);
         g_signal_emit (self, signals[RESUMING], 0);
     }
