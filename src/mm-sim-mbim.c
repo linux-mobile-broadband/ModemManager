@@ -273,8 +273,13 @@ preload_subscriber_info (MMSimMbim           *self,
     }
     self->priv->preload = TRUE;
 
+
+#if defined WITH_SUSPEND_RESUME
+
     /* If modem reports sync needed, we will reset the preloaded info */
     setup_modem_sync_monitor (self);
+
+#endif
 
     message = mbim_message_subscriber_ready_status_query_new (NULL);
     mbim_device_command (device,
