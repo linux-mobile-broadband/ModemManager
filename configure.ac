@@ -675,6 +675,7 @@ echo "
       qmi:                     ${with_qmi}
       qrtr:                    ${with_qrtr}
       systemd suspend/resume:  ${with_systemd_suspend_resume}
+      powerd suspend/resume:   ${with_powerd_suspend_resume}
       systemd journal:         ${with_systemd_journal}
       at command via dbus:     ${with_at_command_via_dbus}
 
