@@ -175,6 +175,39 @@ build-no-suspend-resume:
     - make check
     - make install
 
+build-suspend-resume-powerd:
+  stage: build
+  extends:
+  - .fdo.distribution-image@ubuntu
+  - .common_variables
+  only:
+    - merge_requests
+    - schedules
+  script:
+    - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
+    - pushd libmbim
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dbash_completion=false
+    - ninja -C build
+    - ninja -C build install
+    - popd
+    - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqrtr-glib.git
+    - pushd libqrtr-glib
+    - meson setup build --prefix=/usr -Dgtk_doc=false
+    - ninja -C build
+    - ninja -C build install
+    - popd
+    - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
+    - pushd libqmi
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dbash_completion=false -Dcollection=basic
+    - ninja -C build
+    - ninja -C build install
+    - popd
+    - NOCONFIGURE=1 ./autogen.sh
+    - ./configure --prefix=/usr --disable-introspection --without-systemd-suspend-resume --with-powerd-suspend-resume=yes
+    - make
+    - make check
+    - make install
+
 build-single-plugins:
   stage: build
   extends:
