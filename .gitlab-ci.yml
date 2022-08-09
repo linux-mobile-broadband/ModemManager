@@ -125,6 +125,23 @@ build-no-qmi-no-mbim:
     - make check
     - make install
 
+build-no-qmi-no-mbim-no-tests:
+  stage: build
+  extends:
+  - .fdo.distribution-image@ubuntu
+  - .common_variables
+  only:
+    - main
+    - merge_requests
+    - tags
+    - schedules
+  script:
+    - NOCONFIGURE=1 ./autogen.sh
+    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --without-qmi --without-mbim --without-tests
+    - make
+    - make check
+    - make install
+
 build-qmi-newest-commands:
   stage: build
   extends:
@@ -270,20 +287,3 @@ build-meson-release:
     - ninja -C build test
     - ninja -C build install
     - ninja -C build uninstall
-
-build-no-qmi-no-mbim-no-tests:
-  stage: build
-  extends:
-  - .fdo.distribution-image@ubuntu
-  - .common_variables
-  only:
-    - main
-    - merge_requests
-    - tags
-    - schedules
-  script:
-    - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --without-qmi --without-mbim --without-tests
-    - make
-    - make check
-    - make install
