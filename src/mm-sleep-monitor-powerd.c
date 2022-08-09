@@ -78,7 +78,6 @@ signal_cb (GDBusProxy  *proxy,
            gpointer     data)
 {
     MMSleepMonitor *self = data;
-    gboolean is_about_to_suspend;
 
     if (proxy == self->pd_proxy) {
         if (strcmp (signalname, "SuspendImminent") == 0) {
@@ -97,7 +96,6 @@ on_pd_proxy_acquired (GObject *object,
                       MMSleepMonitor *self)
 {
     GError *error = NULL;
-    char *owner;
 
     self->pd_proxy = g_dbus_proxy_new_for_bus_finish (res, &error);
     if (!self->pd_proxy) {
