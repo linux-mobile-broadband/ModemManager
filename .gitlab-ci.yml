@@ -272,7 +272,7 @@ build-default:
     - ninja -C build install
     - popd
     - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --enable-gtk-doc --enable-introspection --with-polkit=strict --with-suspend-resume=systemd --with-systemdsystemunitdir=/lib/systemd/system
+    - ./configure --prefix=/usr --enable-gtk-doc --enable-introspection --with-polkit=strict --with-systemd-suspend-resume --with-systemdsystemunitdir=/lib/systemd/system
     - make
     - make check
     - make install
