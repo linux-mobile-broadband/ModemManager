@@ -110,7 +110,7 @@ build_list_results (GVariant  *dictionaries,
     n = g_variant_iter_n_children (&iter);
 
     if (n > 0) {
-        g_autoptr(GVariant) dictionary = NULL;
+        GVariant* dictionary = NULL;
 
         while ((dictionary = g_variant_iter_next_value (&iter))) {
             MM3gppProfile     *profile = NULL;
@@ -123,6 +123,7 @@ build_list_results (GVariant  *dictionaries,
                     saved_error = g_steal_pointer (&inner_error);
             } else
                 profiles = g_list_append (profiles, profile);
+            g_variant_unref (dictionary);
         }
     }
 
