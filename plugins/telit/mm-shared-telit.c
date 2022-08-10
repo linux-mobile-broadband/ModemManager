@@ -134,6 +134,21 @@ mm_shared_telit_store_revision (MMSharedTelit *self,
     priv->software_package_version = g_strdup (revision);
 }
 
+void
+mm_shared_telit_get_bnd_parse_config (MMIfaceModem *self, MMTelitBNDParseConfig *config)
+{
+    Private *priv;
+
+    priv = get_private (MM_SHARED_TELIT (self));
+
+    config->modem_is_2g = mm_iface_modem_is_2g (self);
+    config->modem_is_3g = mm_iface_modem_is_3g (self);
+    config->modem_is_4g = mm_iface_modem_is_4g (self);
+    config->modem_alternate_3g_bands = priv->alternate_3g_bands;
+    config->modem_has_hex_format_4g_bands = is_bnd_4g_format_hex (MM_BASE_MODEM(self), priv->software_package_version);
+    config->modem_ext_4g_bands = priv->ext_4g_bands;
+}
+
 /*****************************************************************************/
 /* Load current mode (Modem interface) */
 
@@ -241,16 +256,13 @@ load_supported_bands_ready (MMBaseModem  *self,
         g_task_return_error (task, error);
     else {
         GArray *bands;
+        MMTelitBNDParseConfig config;
 
-        bands = mm_telit_parse_bnd_test_response (response,
-                                                  mm_iface_modem_is_2g (MM_IFACE_MODEM (self)),
-                                                  mm_iface_modem_is_3g (MM_IFACE_MODEM (self)),
-                                                  mm_iface_modem_is_4g (MM_IFACE_MODEM (self)),
-                                                  priv->alternate_3g_bands,
-                                                  is_bnd_4g_format_hex (self, priv->software_package_version),
-                                                  &priv->ext_4g_bands,
-                                                  self,
-                                                  &error);
+        mm_shared_telit_get_bnd_parse_config (MM_IFACE_MODEM (self), &config);
+
+        bands = mm_telit_parse_bnd_test_response (response, &config, self, &error);
+        /* update ext_4g_bands regardless the bands value */
+        priv->ext_4g_bands = config.modem_ext_4g_bands;
         if (!bands)
             g_task_return_error (task, error);
         else {
@@ -338,25 +350,17 @@ load_current_bands_ready (MMBaseModem  *self,
 {
     const gchar *response;
     GError      *error = NULL;
-    Private     *priv;
-
-    priv = get_private (MM_SHARED_TELIT (self));
 
     response = mm_base_modem_at_command_finish (self, res, &error);
     if (!response)
         g_task_return_error (task, error);
     else {
         GArray *bands;
+        MMTelitBNDParseConfig config;
 
-        bands = mm_telit_parse_bnd_query_response (response,
-                                                   mm_iface_modem_is_2g (MM_IFACE_MODEM (self)),
-                                                   mm_iface_modem_is_3g (MM_IFACE_MODEM (self)),
-                                                   mm_iface_modem_is_4g (MM_IFACE_MODEM (self)),
-                                                   priv->alternate_3g_bands,
-                                                   is_bnd_4g_format_hex (self, priv->software_package_version),
-                                                   priv->ext_4g_bands,
-                                                   self,
-                                                   &error);
+        mm_shared_telit_get_bnd_parse_config (MM_IFACE_MODEM (self), &config);
+
+        bands = mm_telit_parse_bnd_query_response (response, &config, self, &error);
         if (!bands)
             g_task_return_error (task, error);
         else
@@ -454,15 +458,16 @@ set_current_bands_at (MMIfaceModem *self,
 {
     GError  *error = NULL;
     gchar   *cmd;
-    Private *priv;
     GArray  *bands_array;
-
-    priv = get_private (MM_SHARED_TELIT (self));
+    MMTelitBNDParseConfig config;
 
     bands_array = g_task_get_task_data (task);
     g_assert (bands_array);
 
     if (bands_array->len == 1 && g_array_index (bands_array, MMModemBand, 0) == MM_MODEM_BAND_ANY) {
+        Private *priv;
+
+        priv = get_private (MM_SHARED_TELIT (self));
         if (!priv->supported_bands) {
             g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                      "Couldn't build ANY band settings: unknown supported bands");
@@ -472,13 +477,8 @@ set_current_bands_at (MMIfaceModem *self,
         bands_array = priv->supported_bands;
     }
 
-    cmd = mm_telit_build_bnd_request (bands_array,
-                                      mm_iface_modem_is_2g (self),
-                                      mm_iface_modem_is_3g (self),
-                                      mm_iface_modem_is_4g (self),
-                                      priv->alternate_3g_bands,
-                                      priv->ext_4g_bands,
-                                      &error);
+    mm_shared_telit_get_bnd_parse_config (self, &config);
+    cmd = mm_telit_build_bnd_request (bands_array, &config, &error);
     if (!cmd) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -783,3 +783,4 @@ mm_shared_telit_get_type (void)
 
     return shared_telit_type;
 }
+

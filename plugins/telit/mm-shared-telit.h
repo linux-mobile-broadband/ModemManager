@@ -25,6 +25,7 @@
 #include "mm-broadband-modem.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-location.h"
+#include "mm-modem-helpers-telit.h"
 
 #define MM_TYPE_SHARED_TELIT                   (mm_shared_telit_get_type ())
 #define MM_SHARED_TELIT(obj)                   (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SHARED_TELIT, MMSharedTelit))
@@ -101,4 +102,6 @@ gchar *   mm_shared_telit_modem_load_revision_finish    (MMIfaceModem *self,
 void      mm_shared_telit_store_revision                (MMSharedTelit *self,
                                                          const gchar   *revision);
 
+void      mm_shared_telit_get_bnd_parse_config          (MMIfaceModem          *self,
+                                                         MMTelitBNDParseConfig *config);
 #endif  /* MM_SHARED_TELIT_H */

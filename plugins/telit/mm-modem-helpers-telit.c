@@ -195,13 +195,9 @@ initialize_telit_3g_to_mm_band_masks (void)
 /* Set current bands helpers */
 
 gchar *
-mm_telit_build_bnd_request (GArray    *bands_array,
-                            gboolean   modem_is_2g,
-                            gboolean   modem_is_3g,
-                            gboolean   modem_is_4g,
-                            gboolean   modem_alternate_3g_bands,
-                            gboolean   modem_ext_4g_bands,
-                            GError   **error)
+mm_telit_build_bnd_request (GArray                 *bands_array,
+                            MMTelitBNDParseConfig  *config,
+                            GError                **error)
 {
     guint32        mask2g = 0;
     guint64        mask3g = 0;
@@ -214,11 +210,14 @@ mm_telit_build_bnd_request (GArray    *bands_array,
     gchar         *cmd;
     const guint64 *telit_3g_to_mm_band_mask;
     guint          telit_3g_to_mm_band_mask_n_elements;
+    gboolean       modem_is_2g = config->modem_is_2g;
+    gboolean       modem_is_3g = config->modem_is_3g;
+    gboolean       modem_is_4g = config->modem_is_4g;
 
     initialize_telit_3g_to_mm_band_masks ();
 
     /* Select correct 3G band mask */
-    if (modem_alternate_3g_bands) {
+    if (config->modem_alternate_3g_bands) {
         telit_3g_to_mm_band_mask = telit_3g_to_mm_band_mask_alternate;
         telit_3g_to_mm_band_mask_n_elements = G_N_ELEMENTS (telit_3g_to_mm_band_mask_alternate);
     } else {
@@ -318,24 +317,24 @@ mm_telit_build_bnd_request (GArray    *bands_array,
     else if (modem_is_2g && modem_is_3g && !modem_is_4g)
         cmd = g_strdup_printf ("#BND=%d,%" G_GINT64_FORMAT, flag2g, flag3g);
     else if (!modem_is_2g && !modem_is_3g && modem_is_4g) {
-        if (!modem_ext_4g_bands)
+        if (!config->modem_ext_4g_bands)
             cmd = g_strdup_printf ("#BND=0,0,%" G_GINT64_FORMAT, flag4g);
         else
             cmd = g_strdup_printf ("#BND=0,0,%" G_GINT64_MODIFIER "x" ",%" G_GINT64_MODIFIER "x", mask4g, mask4gext);
     } else if (!modem_is_2g && modem_is_3g && modem_is_4g) {
-        if (!modem_ext_4g_bands)
+        if (!config->modem_ext_4g_bands)
             cmd = g_strdup_printf ("#BND=0,%" G_GINT64_FORMAT ",%" G_GINT64_FORMAT, flag3g, flag4g);
         else
             cmd = g_strdup_printf ("#BND=0,%" G_GINT64_FORMAT ",%" G_GINT64_MODIFIER "x" ",%" G_GINT64_MODIFIER "x", flag3g, mask4g, mask4gext);
     } else if (modem_is_2g && !modem_is_3g && modem_is_4g) {
-        if (!modem_ext_4g_bands)
+        if (!config->modem_ext_4g_bands)
             cmd = g_strdup_printf ("#BND=%d,0,%" G_GINT64_FORMAT, flag2g, flag4g);
         else
             cmd = g_strdup_printf ("#BND=%d,0,%" G_GINT64_MODIFIER "x" ",%" G_GINT64_MODIFIER "x", flag2g, mask4g, mask4gext);
     } else if (modem_is_2g && modem_is_3g && modem_is_4g) {
-        if (!modem_ext_4g_bands)
+        if (!config->modem_ext_4g_bands)
             cmd = g_strdup_printf ("#BND=%d,%" G_GINT64_FORMAT ",%" G_GINT64_FORMAT, flag2g, flag3g, flag4g);
-      else
+        else
             cmd = g_strdup_printf ("#BND=%d,%" G_GINT64_FORMAT ",%" G_GINT64_MODIFIER "x" ",%" G_GINT64_MODIFIER "x", flag2g, flag3g, mask4g, mask4gext);
     } else
         g_assert_not_reached ();
@@ -690,16 +689,11 @@ bnd_response_has_ext_4g_bands (const gchar *response)
 #define MM_CURRENT_BANDS_4G_EXT     "(,\\s*(?P<Bands4GHex>[0-9A-F]+))?(,\\s*(?P<Bands4GExt>[0-9A-F]+))?"
 
 static GArray *
-common_parse_bnd_response (const gchar    *response,
-                           gboolean        modem_is_2g,
-                           gboolean        modem_is_3g,
-                           gboolean        modem_is_4g,
-                           gboolean        modem_alternate_3g_bands,
-                           gboolean        modem_has_hex_format_4g_bands,
-                           gboolean        modem_ext_4g_bands,
-                           LoadBandsType   load_type,
-                           gpointer        log_object,
-                           GError        **error)
+common_parse_bnd_response (const gchar            *response,
+                           MMTelitBNDParseConfig  *config,
+                           LoadBandsType           load_type,
+                           gpointer                log_object,
+                           GError                **error)
 {
     g_autoptr(GMatchInfo)  match_info = NULL;
     g_autoptr(GRegex)      r = NULL;
@@ -721,9 +715,9 @@ common_parse_bnd_response (const gchar    *response,
         [LOAD_BANDS_TYPE_CURRENT]   = "#BND:"MM_CURRENT_BANDS_2G MM_CURRENT_BANDS_3G MM_CURRENT_BANDS_4G_EXT,
     };
 
-    if (modem_ext_4g_bands)
+    if (config->modem_ext_4g_bands)
         load_bands_regex = load_bands_regex_4g_ext[load_type];
-    else if (modem_has_hex_format_4g_bands)
+    else if (config->modem_has_hex_format_4g_bands)
         load_bands_regex = load_bands_regex_4g_hex[load_type];
     else
         load_bands_regex = load_bands_regex_4g_dec[load_type];
@@ -745,16 +739,16 @@ common_parse_bnd_response (const gchar    *response,
 
     bands = g_array_new (TRUE, TRUE, sizeof (MMModemBand));
 
-    if (modem_is_2g && !telit_get_2g_mm_bands (match_info, log_object, &bands, &inner_error))
+    if (config->modem_is_2g && !telit_get_2g_mm_bands (match_info, log_object, &bands, &inner_error))
         goto out;
 
-    if (modem_is_3g && !telit_get_3g_mm_bands (match_info, log_object, modem_alternate_3g_bands, &bands, &inner_error))
+    if (config->modem_is_3g && !telit_get_3g_mm_bands (match_info, log_object, config->modem_alternate_3g_bands, &bands, &inner_error))
         goto out;
 
-    if (modem_is_4g) {
+    if (config->modem_is_4g) {
         gboolean ok;
 
-        ok = modem_ext_4g_bands?
+        ok = config->modem_ext_4g_bands?
             telit_get_ext_4g_mm_bands (match_info, &bands, &inner_error) :
             telit_get_4g_mm_bands (match_info, &bands, &inner_error);
         if (!ok)
@@ -771,43 +765,27 @@ out:
 }
 
 GArray *
-mm_telit_parse_bnd_query_response (const gchar  *response,
-                                   gboolean      modem_is_2g,
-                                   gboolean      modem_is_3g,
-                                   gboolean      modem_is_4g,
-                                   gboolean      modem_alternate_3g_bands,
-                                   gboolean      modem_has_hex_format_4g_bands,
-                                   gboolean      modem_ext_4g_bands,
-                                   gpointer      log_object,
-                                   GError      **error)
+mm_telit_parse_bnd_query_response (const gchar            *response,
+                                   MMTelitBNDParseConfig  *config,
+                                   gpointer                log_object,
+                                   GError                **error)
 {
     return common_parse_bnd_response (response,
-                                      modem_is_2g, modem_is_3g, modem_is_4g,
-                                      modem_alternate_3g_bands,
-                                      modem_has_hex_format_4g_bands,
-                                      modem_ext_4g_bands,
+                                      config,
                                       LOAD_BANDS_TYPE_CURRENT,
                                       log_object,
                                       error);
 }
 
 GArray *
-mm_telit_parse_bnd_test_response (const gchar  *response,
-                                  gboolean      modem_is_2g,
-                                  gboolean      modem_is_3g,
-                                  gboolean      modem_is_4g,
-                                  gboolean      modem_alternate_3g_bands,
-                                  gboolean      modem_has_hex_format_4g_bands,
-                                  gboolean     *modem_ext_4g_bands,
-                                  gpointer      log_object,
-                                  GError      **error)
+mm_telit_parse_bnd_test_response (const gchar            *response,
+                                  MMTelitBNDParseConfig  *config,
+                                  gpointer                log_object,
+                                  GError                **error)
 {
-    *modem_ext_4g_bands = bnd_response_has_ext_4g_bands (response);
+    config->modem_ext_4g_bands = bnd_response_has_ext_4g_bands (response);
     return common_parse_bnd_response (response,
-                                      modem_is_2g, modem_is_3g, modem_is_4g,
-                                      modem_alternate_3g_bands,
-                                      modem_has_hex_format_4g_bands,
-                                      *modem_ext_4g_bands,
+                                      config,
                                       LOAD_BANDS_TYPE_SUPPORTED,
                                       log_object,
                                       error);

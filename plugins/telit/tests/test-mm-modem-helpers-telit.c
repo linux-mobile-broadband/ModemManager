@@ -35,26 +35,21 @@
 
 typedef struct {
     const gchar *response;
-    gboolean     modem_is_2g;
-    gboolean     modem_is_3g;
-    gboolean     modem_is_4g;
-    gboolean     modem_alternate_3g_bands;
-    gboolean     modem_has_4g_bands_hex_format;
-    gboolean     modem_ext_4g_bands;
+    MMTelitBNDParseConfig config;
     guint        mm_bands_len;
     MMModemBand  mm_bands [MAX_BANDS_LIST_LEN];
 } BndResponseTest;
 
 static BndResponseTest supported_band_mapping_tests [] = {
     {
-        "#BND: (0-3)", TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, 4,
+        "#BND: (0-3)", {TRUE, FALSE, FALSE, FALSE, FALSE, FALSE}, 4,
         { MM_MODEM_BAND_EGSM,
           MM_MODEM_BAND_DCS,
           MM_MODEM_BAND_PCS,
           MM_MODEM_BAND_G850 }
     },
     {
-        "#BND: (0-3),(0,2,5,6)", TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, 7,
+        "#BND: (0-3),(0,2,5,6)", {TRUE, TRUE, FALSE, FALSE, FALSE, FALSE}, 7,
         { MM_MODEM_BAND_EGSM,
           MM_MODEM_BAND_DCS,
           MM_MODEM_BAND_PCS,
@@ -64,7 +59,7 @@ static BndResponseTest supported_band_mapping_tests [] = {
           MM_MODEM_BAND_UTRAN_8 }
     },
     {
-        "#BND: (0,3),(0,2,5,6)", TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, 7,
+        "#BND: (0,3),(0,2,5,6)", {TRUE, TRUE, FALSE, FALSE, FALSE, FALSE}, 7,
         { MM_MODEM_BAND_EGSM,
           MM_MODEM_BAND_DCS,
           MM_MODEM_BAND_PCS,
@@ -74,7 +69,7 @@ static BndResponseTest supported_band_mapping_tests [] = {
           MM_MODEM_BAND_UTRAN_8 }
     },
     {
-        "#BND: (0,2),(0,2,5,6)", TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, 6,
+        "#BND: (0,2),(0,2,5,6)", {TRUE, TRUE, FALSE, FALSE, FALSE, FALSE}, 6,
         { MM_MODEM_BAND_EGSM,
           MM_MODEM_BAND_DCS,
           MM_MODEM_BAND_G850,
@@ -83,7 +78,7 @@ static BndResponseTest supported_band_mapping_tests [] = {
           MM_MODEM_BAND_UTRAN_8 }
     },
     {
-        "#BND: (0,2),(0-4,5,6)", TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, 7,
+        "#BND: (0,2),(0-4,5,6)", {TRUE, TRUE, FALSE, FALSE, FALSE, FALSE}, 7,
         { MM_MODEM_BAND_EGSM,
           MM_MODEM_BAND_DCS,
           MM_MODEM_BAND_G850,
@@ -93,7 +88,7 @@ static BndResponseTest supported_band_mapping_tests [] = {
           MM_MODEM_BAND_UTRAN_8 }
     },
     {
-        "#BND: (0-3),(0,2,5,6),(1-1)", TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, 8,
+        "#BND: (0-3),(0,2,5,6),(1-1)", {TRUE, TRUE, TRUE, FALSE, FALSE, FALSE}, 8,
         { MM_MODEM_BAND_EGSM,
           MM_MODEM_BAND_DCS,
           MM_MODEM_BAND_PCS,
@@ -104,7 +99,7 @@ static BndResponseTest supported_band_mapping_tests [] = {
           MM_MODEM_BAND_EUTRAN_1 }
     },
     {
-        "#BND: (0),(0),(1-3)", TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, 5,
+        "#BND: (0),(0),(1-3)", {TRUE, TRUE, TRUE, FALSE, FALSE, FALSE}, 5,
         { MM_MODEM_BAND_EGSM,
           MM_MODEM_BAND_DCS,
           MM_MODEM_BAND_UTRAN_1,
@@ -112,13 +107,13 @@ static BndResponseTest supported_band_mapping_tests [] = {
           MM_MODEM_BAND_EUTRAN_2 }
     },
     {
-        "#BND: (0),(0),(1-3)", FALSE, FALSE, TRUE, FALSE, FALSE, FALSE, 2,
+        "#BND: (0),(0),(1-3)", {FALSE, FALSE, TRUE, FALSE, FALSE, FALSE}, 2,
         { MM_MODEM_BAND_EUTRAN_1,
           MM_MODEM_BAND_EUTRAN_2 }
     },
     /* 3G alternate band settings: default */
     {
-        "#BND: (0),(0,2,5,6,12,25)", FALSE, TRUE, FALSE, FALSE, FALSE, FALSE, 5,
+        "#BND: (0),(0,2,5,6,12,25)", {FALSE, TRUE, FALSE, FALSE, FALSE, FALSE}, 5,
         { MM_MODEM_BAND_UTRAN_1,
           MM_MODEM_BAND_UTRAN_5,
           MM_MODEM_BAND_UTRAN_8,
@@ -127,7 +122,7 @@ static BndResponseTest supported_band_mapping_tests [] = {
     },
     /* 3G alternate band settings: alternate */
     {
-        "#BND: (0),(0,2,5,6,12,13)", FALSE, TRUE, FALSE, TRUE, FALSE, FALSE, 4,
+        "#BND: (0),(0,2,5,6,12,13)", {FALSE, TRUE, FALSE, TRUE, FALSE, FALSE}, 4,
         { MM_MODEM_BAND_UTRAN_1,
           MM_MODEM_BAND_UTRAN_3,
           MM_MODEM_BAND_UTRAN_5,
@@ -137,7 +132,7 @@ static BndResponseTest supported_band_mapping_tests [] = {
      * 168695967: 0xA0E189F: 0000 1010 0000 1110 0001 1000 1001 1111
      */
     {
-        "#BND: (0-5),(0),(1-168695967)", TRUE, FALSE, TRUE, FALSE, FALSE, FALSE, 17,
+        "#BND: (0-5),(0),(1-168695967)", {TRUE, FALSE, TRUE, FALSE, FALSE, FALSE}, 17,
         { MM_MODEM_BAND_EGSM,
           MM_MODEM_BAND_DCS,
           MM_MODEM_BAND_PCS,
@@ -158,7 +153,7 @@ static BndResponseTest supported_band_mapping_tests [] = {
     },
     /* 4G ext band settings: devices such as LN920 */
     {
-        "#BND: (0),(0),(1003100185A),(42)", FALSE, TRUE, TRUE, FALSE, TRUE, TRUE, 13,
+        "#BND: (0),(0),(1003100185A),(42)", {FALSE, TRUE, TRUE, FALSE, TRUE, TRUE}, 13,
         { MM_MODEM_BAND_UTRAN_1,
           MM_MODEM_BAND_EUTRAN_2,
           MM_MODEM_BAND_EUTRAN_4,
@@ -175,7 +170,7 @@ static BndResponseTest supported_band_mapping_tests [] = {
     },
     /* 4G band in hex format: devices such as LE910C1-EUX */
     {
-        "#BND: (0),(0,5,6,13,15,23),(80800C5)", TRUE, TRUE, TRUE, FALSE, TRUE, FALSE, 11,
+        "#BND: (0),(0,5,6,13,15,23),(80800C5)", {TRUE, TRUE, TRUE, FALSE, TRUE, FALSE}, 11,
         {
             MM_MODEM_BAND_EGSM,
             MM_MODEM_BAND_DCS,
@@ -199,20 +194,13 @@ test_parse_supported_bands_response (void)
     for (i = 0; i < G_N_ELEMENTS (supported_band_mapping_tests); i++) {
         GError *error = NULL;
         GArray *bands = NULL;
-        gboolean modem_ext_4g_bands;
 
         bands = mm_telit_parse_bnd_test_response (supported_band_mapping_tests[i].response,
-                                                  supported_band_mapping_tests[i].modem_is_2g,
-                                                  supported_band_mapping_tests[i].modem_is_3g,
-                                                  supported_band_mapping_tests[i].modem_is_4g,
-                                                  supported_band_mapping_tests[i].modem_alternate_3g_bands,
-                                                  supported_band_mapping_tests[i].modem_has_4g_bands_hex_format,
-                                                  &modem_ext_4g_bands,
+                                                  &supported_band_mapping_tests[i].config,
                                                   NULL,
                                                   &error);
         g_assert_no_error (error);
         g_assert (bands);
-        g_assert (supported_band_mapping_tests[i].modem_ext_4g_bands == modem_ext_4g_bands);
 
         mm_test_helpers_compare_bands (bands,
                                        supported_band_mapping_tests[i].mm_bands,
@@ -223,18 +211,18 @@ test_parse_supported_bands_response (void)
 
 static BndResponseTest current_band_mapping_tests [] = {
     {
-        "#BND: 0", TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, 2,
+        "#BND: 0", {TRUE, FALSE, FALSE, FALSE, FALSE, FALSE}, 2,
         { MM_MODEM_BAND_EGSM,
           MM_MODEM_BAND_DCS }
     },
     {
-        "#BND: 0,5", TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, 3,
+        "#BND: 0,5", {TRUE, TRUE, FALSE, FALSE, FALSE, FALSE}, 3,
         { MM_MODEM_BAND_EGSM,
           MM_MODEM_BAND_DCS,
           MM_MODEM_BAND_UTRAN_8 }
     },
     {
-        "#BND: 1,3", TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, 5,
+        "#BND: 1,3", {TRUE, TRUE, FALSE, FALSE, FALSE, FALSE}, 5,
         { MM_MODEM_BAND_EGSM,
           MM_MODEM_BAND_PCS,
           MM_MODEM_BAND_UTRAN_1,
@@ -242,38 +230,38 @@ static BndResponseTest current_band_mapping_tests [] = {
           MM_MODEM_BAND_UTRAN_5 }
     },
     {
-        "#BND: 2,7", TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, 3,
+        "#BND: 2,7", {TRUE, TRUE, FALSE, FALSE, FALSE, FALSE}, 3,
         { MM_MODEM_BAND_DCS,
           MM_MODEM_BAND_G850,
           MM_MODEM_BAND_UTRAN_4 }
     },
     {
-        "#BND: 3,0,1", TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, 4,
+        "#BND: 3,0,1", {TRUE, TRUE, TRUE, FALSE, FALSE, FALSE}, 4,
         { MM_MODEM_BAND_PCS,
           MM_MODEM_BAND_G850,
           MM_MODEM_BAND_UTRAN_1,
           MM_MODEM_BAND_EUTRAN_1 }
     },
     {
-        "#BND: 0,0,3", TRUE, FALSE, TRUE, FALSE, FALSE, FALSE, 4,
+        "#BND: 0,0,3", {TRUE, FALSE, TRUE, FALSE, FALSE, FALSE}, 4,
         { MM_MODEM_BAND_EGSM,
           MM_MODEM_BAND_DCS,
           MM_MODEM_BAND_EUTRAN_1,
           MM_MODEM_BAND_EUTRAN_2 }
     },
     {
-        "#BND: 0,0,3", FALSE, FALSE, TRUE, FALSE, FALSE, FALSE, 2,
+        "#BND: 0,0,3", {FALSE, FALSE, TRUE, FALSE, FALSE, FALSE}, 2,
         { MM_MODEM_BAND_EUTRAN_1,
           MM_MODEM_BAND_EUTRAN_2 }
     },
     /* 3G alternate band settings: default */
     {
-        "#BND: 0,12", FALSE, TRUE, FALSE, FALSE, FALSE, FALSE, 1,
+        "#BND: 0,12", {FALSE, TRUE, FALSE, FALSE, FALSE, FALSE}, 1,
         { MM_MODEM_BAND_UTRAN_6 }
     },
     /* 3G alternate band settings: alternate */
     {
-        "#BND: 0,12", FALSE, TRUE, FALSE, TRUE, FALSE, FALSE, 4,
+        "#BND: 0,12", {FALSE, TRUE, FALSE, TRUE, FALSE, FALSE}, 4,
         { MM_MODEM_BAND_UTRAN_1,
           MM_MODEM_BAND_UTRAN_3,
           MM_MODEM_BAND_UTRAN_5,
@@ -283,7 +271,7 @@ static BndResponseTest current_band_mapping_tests [] = {
      * 168695967: 0xA0E189F: 0000 1010 0000 1110 0001 1000 1001 1111
      */
     {
-        "#BND: 5,0,168695967", TRUE, FALSE, TRUE, FALSE, FALSE, FALSE, 17,
+        "#BND: 5,0,168695967", {TRUE, FALSE, TRUE, FALSE, FALSE, FALSE}, 17,
         { MM_MODEM_BAND_EGSM,
           MM_MODEM_BAND_DCS,
           MM_MODEM_BAND_PCS,
@@ -304,7 +292,7 @@ static BndResponseTest current_band_mapping_tests [] = {
     },
     /* 4G ext band settings: devices such as LN920 */
     {
-        "#BND: 0,0,1003100185A,42", FALSE, TRUE, TRUE, FALSE, FALSE, TRUE, 13,
+        "#BND: 0,0,1003100185A,42", {FALSE, TRUE, TRUE, FALSE, FALSE, TRUE}, 13,
         { MM_MODEM_BAND_UTRAN_1,
           MM_MODEM_BAND_EUTRAN_2,
           MM_MODEM_BAND_EUTRAN_4,
@@ -331,12 +319,7 @@ test_parse_current_bands_response (void)
         GArray *bands = NULL;
 
         bands = mm_telit_parse_bnd_query_response (current_band_mapping_tests[i].response,
-                                                   current_band_mapping_tests[i].modem_is_2g,
-                                                   current_band_mapping_tests[i].modem_is_3g,
-                                                   current_band_mapping_tests[i].modem_is_4g,
-                                                   current_band_mapping_tests[i].modem_alternate_3g_bands,
-                                                   supported_band_mapping_tests[i].modem_has_4g_bands_hex_format,
-                                                   current_band_mapping_tests[i].modem_ext_4g_bands,
+                                                   &current_band_mapping_tests[i].config,
                                                    NULL,
                                                    &error);
         g_assert_no_error (error);
@@ -362,12 +345,15 @@ test_common_bnd_cmd (const gchar *expected_cmd,
 {
     gchar  *cmd;
     GError *error = NULL;
+    MMTelitBNDParseConfig config = {
+        .modem_is_2g = modem_is_2g,
+        .modem_is_3g = modem_is_3g,
+        .modem_is_4g = modem_is_4g,
+        .modem_alternate_3g_bands = modem_alternate_3g_bands,
+        .modem_ext_4g_bands = modem_ext_4g_bands
+    };
 
-    cmd = mm_telit_build_bnd_request (bands_array,
-                                      modem_is_2g, modem_is_3g, modem_is_4g,
-                                      modem_alternate_3g_bands,
-                                      modem_ext_4g_bands,
-                                      &error);
+    cmd = mm_telit_build_bnd_request (bands_array, &config, &error);
     g_assert_no_error (error);
     g_assert_cmpstr (cmd, ==, expected_cmd);
     g_free (cmd);
@@ -386,11 +372,14 @@ test_common_bnd_cmd_error (gboolean     modem_is_2g,
 {
     gchar  *cmd;
     GError *error = NULL;
-
-    cmd = mm_telit_build_bnd_request (bands_array,
-                                      modem_is_2g, modem_is_3g, modem_is_4g,
-                                      FALSE, FALSE,
-                                      &error);
+    MMTelitBNDParseConfig config = {
+        .modem_is_2g = modem_is_2g,
+        .modem_is_3g = modem_is_3g,
+        .modem_is_4g = modem_is_4g,
+        .modem_alternate_3g_bands = FALSE,
+        .modem_ext_4g_bands = FALSE,
+    };
+    cmd = mm_telit_build_bnd_request (bands_array, &config, &error);
     g_assert_error (error, MM_CORE_ERROR, (gint)expected_error);
     g_assert (!cmd);
 }

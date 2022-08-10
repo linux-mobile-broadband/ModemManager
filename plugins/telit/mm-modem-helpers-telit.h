@@ -28,32 +28,27 @@ typedef enum {
     MM_TELIT_MODEL_LN920,
 } MMTelitModel;
 
+typedef struct {
+    gboolean      modem_is_2g;
+    gboolean      modem_is_3g;
+    gboolean      modem_is_4g;
+    gboolean      modem_alternate_3g_bands;
+    gboolean      modem_has_hex_format_4g_bands;
+    gboolean      modem_ext_4g_bands;
+} MMTelitBNDParseConfig;
+
 /* #BND response parsers and request builder */
-GArray *mm_telit_parse_bnd_query_response (const gchar  *response,
-                                           gboolean      modem_is_2g,
-                                           gboolean      modem_is_3g,
-                                           gboolean      modem_is_4g,
-                                           gboolean      modem_alternate_3g_bands,
-                                           gboolean      modem_has_hex_format_4g_bands,
-                                           gboolean      modem_ext_4g_bands,
-                                           gpointer      log_object,
-                                           GError      **error);
-GArray *mm_telit_parse_bnd_test_response  (const gchar  *response,
-                                           gboolean      modem_is_2g,
-                                           gboolean      modem_is_3g,
-                                           gboolean      modem_is_4g,
-                                           gboolean      modem_alternate_3g_bands,
-                                           gboolean      modem_has_hex_format_4g_bands,
-                                           gboolean     *modem_ext_4g_bands,
-                                           gpointer      log_object,
-                                           GError      **error);
-gchar  *mm_telit_build_bnd_request        (GArray       *bands_array,
-                                           gboolean      modem_is_2g,
-                                           gboolean      modem_is_3g,
-                                           gboolean      modem_is_4g,
-                                           gboolean      modem_alternate_3g_bands,
-                                           gboolean      modem_ext_4g_bands,
-                                           GError      **error);
+GArray *mm_telit_parse_bnd_query_response (const gchar            *response,
+                                           MMTelitBNDParseConfig  *config,
+                                           gpointer                log_object,
+                                           GError                **error);
+GArray *mm_telit_parse_bnd_test_response  (const gchar            *response,
+                                           MMTelitBNDParseConfig  *config,
+                                           gpointer                log_object,
+                                           GError                **error);
+gchar  *mm_telit_build_bnd_request        (GArray                 *bands_array,
+                                           MMTelitBNDParseConfig  *config,
+                                           GError                **error);
 
 /* #QSS? response parser */
 typedef enum { /*< underscore_name=mm_telit_qss_status >*/
