@@ -262,33 +262,24 @@ mm_broadband_modem_qmi_get_port_qmi_for_data (MMBroadbandModemQmi  *self,
 }
 
 static MMPortQmi *
-peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
-                        MMPort               *data,
-                        QmiSioPort           *out_sio_port,
-                        GError              **error)
+peek_port_qmi_for_data_mhi (MMBroadbandModemQmi  *self,
+                            MMPort               *data,
+                            QmiSioPort           *out_sio_port,
+                            GError              **error)
+{
+    return mm_broadband_modem_qmi_peek_port_qmi (self);
+}
+
+static MMPortQmi *
+peek_port_qmi_for_data_usb (MMBroadbandModemQmi  *self,
+                            MMPort               *data,
+                            QmiSioPort           *out_sio_port,
+                            GError              **error)
 {
     GList       *cdc_wdm_qmi_ports;
     GList       *l;
     const gchar *net_port_parent_path;
     MMPortQmi   *found = NULL;
-    const gchar *net_port_driver;
-
-    g_assert (MM_IS_BROADBAND_MODEM_QMI (self));
-    g_assert (mm_port_get_subsys (data) == MM_PORT_SUBSYS_NET);
-
-    net_port_driver = mm_kernel_device_get_driver (mm_port_peek_kernel_device (data));
-    if (g_strcmp0 (net_port_driver, "qmi_wwan") != 0 && g_strcmp0 (net_port_driver, "mhi_net")) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Unsupported QMI kernel driver for 'net/%s': %s",
-                     mm_port_get_device (data),
-                     net_port_driver);
-        return NULL;
-    }
-
-    if (!g_strcmp0 (net_port_driver, "mhi_net"))
-		return mm_broadband_modem_qmi_peek_port_qmi (self);
 
     net_port_parent_path = mm_kernel_device_get_interface_sysfs_path (mm_port_peek_kernel_device (data));
     if (!net_port_parent_path) {
@@ -325,6 +316,35 @@ peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
         *out_sio_port = QMI_SIO_PORT_NONE;
 
     return found;
+}
+
+
+static MMPortQmi *
+peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
+                        MMPort               *data,
+                        QmiSioPort           *out_sio_port,
+                        GError              **error)
+{
+    const gchar *net_port_driver;
+
+    g_assert (MM_IS_BROADBAND_MODEM_QMI (self));
+    g_assert (mm_port_get_subsys (data) == MM_PORT_SUBSYS_NET);
+
+    net_port_driver = mm_kernel_device_get_driver (mm_port_peek_kernel_device (data));
+
+    if (!g_strcmp0 (net_port_driver, "qmi_wwan"))
+        return peek_port_qmi_for_data_usb (self, data, out_sio_port, error);
+
+    if (!g_strcmp0 (net_port_driver, "mhi_net"))
+        return peek_port_qmi_for_data_mhi (self, data, out_sio_port, error);
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "Unsupported QMI kernel driver for 'net/%s': %s",
+                 mm_port_get_device (data),
+                 net_port_driver);
+    return NULL;
 }
 
 MMPortQmi *
