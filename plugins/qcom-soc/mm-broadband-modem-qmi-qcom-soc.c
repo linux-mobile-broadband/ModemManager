@@ -47,7 +47,6 @@ peek_port_qmi_for_data_bam_dmux (MMBroadbandModemQmi  *self,
                                  QmiSioPort           *out_sio_port,
                                  GError              **error)
 {
-    GList          *rpmsg_qmi_ports;
     MMPortQmi      *found = NULL;
     MMKernelDevice *net_port;
     gint            net_port_number;
@@ -66,24 +65,16 @@ peek_port_qmi_for_data_bam_dmux (MMBroadbandModemQmi  *self,
     }
 
     /* Find one QMI port, we don't care which one */
-    rpmsg_qmi_ports = mm_base_modem_find_ports (MM_BASE_MODEM (self),
-                                                MM_PORT_SUBSYS_UNKNOWN,
-                                                MM_PORT_TYPE_QMI);
-    if (!rpmsg_qmi_ports) {
+    found = mm_broadband_modem_qmi_peek_port_qmi (self);
+
+    if (!found)
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_NOT_FOUND,
                      "Couldn't find any QMI port for 'net/%s'",
                      mm_port_get_device (data));
-        return NULL;
-    }
-
-    /* Set outputs */
-    if (out_sio_port)
+    else if (out_sio_port)
         *out_sio_port = sio_port_per_port_number[net_port_number];
-    found = MM_PORT_QMI (rpmsg_qmi_ports->data);
-
-    g_list_free_full (rpmsg_qmi_ports, g_object_unref);
 
     return found;
 }
