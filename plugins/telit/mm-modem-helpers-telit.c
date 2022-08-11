@@ -208,22 +208,9 @@ mm_telit_build_bnd_request (GArray                 *bands_array,
     gint64         flag3g = -1;
     gint64         flag4g = -1;
     gchar         *cmd;
-    const guint64 *telit_3g_to_mm_band_mask;
-    guint          telit_3g_to_mm_band_mask_n_elements;
     gboolean       modem_is_2g = config->modem_is_2g;
     gboolean       modem_is_3g = config->modem_is_3g;
     gboolean       modem_is_4g = config->modem_is_4g;
-
-    initialize_telit_3g_to_mm_band_masks ();
-
-    /* Select correct 3G band mask */
-    if (config->modem_alternate_3g_bands) {
-        telit_3g_to_mm_band_mask = telit_3g_to_mm_band_mask_alternate;
-        telit_3g_to_mm_band_mask_n_elements = G_N_ELEMENTS (telit_3g_to_mm_band_mask_alternate);
-    } else {
-        telit_3g_to_mm_band_mask = telit_3g_to_mm_band_mask_default;
-        telit_3g_to_mm_band_mask_n_elements = G_N_ELEMENTS (telit_3g_to_mm_band_mask_default);
-    }
 
     for (i = 0; i < bands_array->len; i++) {
         MMModemBand band;
@@ -272,6 +259,19 @@ mm_telit_build_bnd_request (GArray                 *bands_array,
 
     /* Get 3G-specific telit value */
     if (mask3g) {
+        const guint64 *telit_3g_to_mm_band_mask;
+        guint          telit_3g_to_mm_band_mask_n_elements;
+
+        initialize_telit_3g_to_mm_band_masks ();
+
+        /* Select correct 3G band mask */
+        if (config->modem_alternate_3g_bands) {
+            telit_3g_to_mm_band_mask = telit_3g_to_mm_band_mask_alternate;
+            telit_3g_to_mm_band_mask_n_elements = G_N_ELEMENTS (telit_3g_to_mm_band_mask_alternate);
+        } else {
+            telit_3g_to_mm_band_mask = telit_3g_to_mm_band_mask_default;
+            telit_3g_to_mm_band_mask_n_elements = G_N_ELEMENTS (telit_3g_to_mm_band_mask_default);
+        }
         for (i = 0; i < telit_3g_to_mm_band_mask_n_elements; i++) {
             if (mask3g == telit_3g_to_mm_band_mask[i]) {
                 flag3g = i;
