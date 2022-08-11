@@ -248,14 +248,14 @@ mm_broadband_modem_qmi_peek_port_qmi (MMBroadbandModemQmi *self)
 MMPortQmi *
 mm_broadband_modem_qmi_get_port_qmi_for_data (MMBroadbandModemQmi  *self,
                                               MMPort               *data,
-                                              QmiSioPort           *out_sio_port,
+                                              MMQmiDataEndpoint    *out_endpoint,
                                               GError              **error)
 {
     MMPortQmi *qmi_port;
 
     g_assert (MM_IS_BROADBAND_MODEM_QMI (self));
 
-    qmi_port = mm_broadband_modem_qmi_peek_port_qmi_for_data (self, data, out_sio_port, error);
+    qmi_port = mm_broadband_modem_qmi_peek_port_qmi_for_data (self, data, out_endpoint, error);
     return (qmi_port ?
             MM_PORT_QMI (g_object_ref (qmi_port)) :
             NULL);
@@ -264,7 +264,7 @@ mm_broadband_modem_qmi_get_port_qmi_for_data (MMBroadbandModemQmi  *self,
 static MMPortQmi *
 peek_port_qmi_for_data_mhi (MMBroadbandModemQmi  *self,
                             MMPort               *data,
-                            QmiSioPort           *out_sio_port,
+                            MMQmiDataEndpoint    *out_endpoint,
                             GError              **error)
 {
     MMPortQmi *found = NULL;
@@ -277,8 +277,8 @@ peek_port_qmi_for_data_mhi (MMBroadbandModemQmi  *self,
                      MM_CORE_ERROR_NOT_FOUND,
                      "Couldn't find associated QMI port for 'net/%s'",
                      mm_port_get_device (data));
-    else if (out_sio_port)
-        *out_sio_port = QMI_SIO_PORT_NONE;
+    else if (out_endpoint)
+        mm_port_qmi_get_endpoint_info (found, out_endpoint);
 
     return found;
 }
@@ -286,7 +286,7 @@ peek_port_qmi_for_data_mhi (MMBroadbandModemQmi  *self,
 static MMPortQmi *
 peek_port_qmi_for_data_usb (MMBroadbandModemQmi  *self,
                             MMPort               *data,
-                            QmiSioPort           *out_sio_port,
+                            MMQmiDataEndpoint    *out_endpoint,
                             GError              **error)
 {
     GList       *cdc_wdm_qmi_ports;
@@ -325,8 +325,8 @@ peek_port_qmi_for_data_usb (MMBroadbandModemQmi  *self,
                      MM_CORE_ERROR_NOT_FOUND,
                      "Couldn't find associated QMI port for 'net/%s'",
                      mm_port_get_device (data));
-    else if (out_sio_port)
-        *out_sio_port = QMI_SIO_PORT_NONE;
+    else if (out_endpoint)
+        mm_port_qmi_get_endpoint_info (found, out_endpoint);
 
     return found;
 }
@@ -335,7 +335,7 @@ peek_port_qmi_for_data_usb (MMBroadbandModemQmi  *self,
 static MMPortQmi *
 peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
                         MMPort               *data,
-                        QmiSioPort           *out_sio_port,
+                        MMQmiDataEndpoint    *out_endpoint,
                         GError              **error)
 {
     const gchar *net_port_driver;
@@ -346,10 +346,10 @@ peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
     net_port_driver = mm_kernel_device_get_driver (mm_port_peek_kernel_device (data));
 
     if (!g_strcmp0 (net_port_driver, "qmi_wwan"))
-        return peek_port_qmi_for_data_usb (self, data, out_sio_port, error);
+        return peek_port_qmi_for_data_usb (self, data, out_endpoint, error);
 
     if (!g_strcmp0 (net_port_driver, "mhi_net"))
-        return peek_port_qmi_for_data_mhi (self, data, out_sio_port, error);
+        return peek_port_qmi_for_data_mhi (self, data, out_endpoint, error);
 
     g_set_error (error,
                  MM_CORE_ERROR,
@@ -363,12 +363,12 @@ peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
 MMPortQmi *
 mm_broadband_modem_qmi_peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
                                                MMPort               *data,
-                                               QmiSioPort           *out_sio_port,
+                                               MMQmiDataEndpoint    *out_endpoint,
                                                GError              **error)
 {
     g_assert (MM_BROADBAND_MODEM_QMI_GET_CLASS (self)->peek_port_qmi_for_data);
 
-    return MM_BROADBAND_MODEM_QMI_GET_CLASS (self)->peek_port_qmi_for_data (self, data, out_sio_port, error);
+    return MM_BROADBAND_MODEM_QMI_GET_CLASS (self)->peek_port_qmi_for_data (self, data, out_endpoint, error);
 }
 
 /*****************************************************************************/

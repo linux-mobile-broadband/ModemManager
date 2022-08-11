@@ -185,6 +185,14 @@ mm_port_qmi_get_endpoint_interface_number (MMPortQmi *self)
     return self->priv->endpoint_interface_number;
 }
 
+void
+mm_port_qmi_get_endpoint_info (MMPortQmi *self, MMQmiDataEndpoint *out_endpoint)
+{
+    out_endpoint->type = self->priv->endpoint_type;
+    out_endpoint->interface_number = self->priv->endpoint_interface_number;
+    out_endpoint->sio_port = QMI_SIO_PORT_NONE;
+}
+
 /*****************************************************************************/
 
 static void

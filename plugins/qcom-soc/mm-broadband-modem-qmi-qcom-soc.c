@@ -44,7 +44,7 @@ static const QmiSioPort sio_port_per_port_number[] = {
 static MMPortQmi *
 peek_port_qmi_for_data_bam_dmux (MMBroadbandModemQmi  *self,
                                  MMPort               *data,
-                                 QmiSioPort           *out_sio_port,
+                                 MMQmiDataEndpoint    *out_endpoint,
                                  GError              **error)
 {
     MMPortQmi      *found = NULL;
@@ -73,8 +73,13 @@ peek_port_qmi_for_data_bam_dmux (MMBroadbandModemQmi  *self,
                      MM_CORE_ERROR_NOT_FOUND,
                      "Couldn't find any QMI port for 'net/%s'",
                      mm_port_get_device (data));
-    else if (out_sio_port)
-        *out_sio_port = sio_port_per_port_number[net_port_number];
+    else if (out_endpoint) {
+        /* WDS Bind (Mux) Data Port must be called with the correct endpoint
+         * interface number/SIO port to make multiplexing work with BAM-DMUX */
+        out_endpoint->type = QMI_DATA_ENDPOINT_TYPE_BAM_DMUX;
+        out_endpoint->interface_number = net_port_number;
+        out_endpoint->sio_port = sio_port_per_port_number[net_port_number];
+    }
 
     return found;
 }
@@ -82,7 +87,7 @@ peek_port_qmi_for_data_bam_dmux (MMBroadbandModemQmi  *self,
 static MMPortQmi *
 peek_port_qmi_for_data_ipa (MMBroadbandModemQmi  *self,
                             MMPort               *data,
-                            QmiSioPort           *out_sio_port,
+                            MMQmiDataEndpoint    *out_endpoint,
                             GError              **error)
 {
     MMPortQmi *found = NULL;
@@ -99,8 +104,8 @@ peek_port_qmi_for_data_ipa (MMBroadbandModemQmi  *self,
                      MM_CORE_ERROR_NOT_FOUND,
                      "Couldn't find any QMI port for 'net/%s'",
                      mm_port_get_device (data));
-    else if (out_sio_port)
-        *out_sio_port = QMI_SIO_PORT_NONE;
+    else if (out_endpoint)
+        mm_port_qmi_get_endpoint_info (found, out_endpoint);
 
     return found;
 }
@@ -108,7 +113,7 @@ peek_port_qmi_for_data_ipa (MMBroadbandModemQmi  *self,
 static MMPortQmi *
 peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
                         MMPort               *data,
-                        QmiSioPort           *out_sio_port,
+                        MMQmiDataEndpoint    *out_endpoint,
                         GError              **error)
 {
     MMKernelDevice *net_port;
@@ -121,10 +126,10 @@ peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
     net_port_driver = mm_kernel_device_get_driver (net_port);
 
     if (g_strcmp0 (net_port_driver, "ipa") == 0)
-        return peek_port_qmi_for_data_ipa (self, data, out_sio_port, error);
+        return peek_port_qmi_for_data_ipa (self, data, out_endpoint, error);
 
     if (g_strcmp0 (net_port_driver, "bam-dmux") == 0)
-        return peek_port_qmi_for_data_bam_dmux (self, data, out_sio_port, error);
+        return peek_port_qmi_for_data_bam_dmux (self, data, out_endpoint, error);
 
     g_set_error (error,
                  MM_CORE_ERROR,

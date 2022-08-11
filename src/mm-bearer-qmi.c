@@ -492,8 +492,9 @@ typedef struct {
     ConnectStep  step;
     MMPort      *data;
     MMPortQmi   *qmi;
-    QmiSioPort   sio_port;
-    gboolean     sio_port_failed;
+
+    MMQmiDataEndpoint  endpoint;
+    gboolean           sio_port_failed;
 
     gint                  profile_id;
     MMBearerIpMethod      ip_method;
@@ -1820,12 +1821,12 @@ connect_context_step (GTask *task)
 
     case CONNECT_STEP_BIND_DATA_PORT_IPV4:
         /* If SIO port given, bind client to it */
-        if (!ctx->sio_port_failed && ctx->sio_port != QMI_SIO_PORT_NONE) {
+        if (!ctx->sio_port_failed && ctx->endpoint.sio_port != QMI_SIO_PORT_NONE) {
             g_autoptr(QmiMessageWdsBindDataPortInput) input = NULL;
 
-            mm_obj_dbg (self, "binding to data port: %s", qmi_sio_port_get_string (ctx->sio_port));
+            mm_obj_dbg (self, "binding to data port: %s", qmi_sio_port_get_string (ctx->endpoint.sio_port));
             input = qmi_message_wds_bind_data_port_input_new ();
-            qmi_message_wds_bind_data_port_input_set_data_port (input, ctx->sio_port, NULL);
+            qmi_message_wds_bind_data_port_input_set_data_port (input, ctx->endpoint.sio_port, NULL);
             qmi_client_wds_bind_data_port (ctx->client_ipv4,
                                            input,
                                            10,
@@ -1843,8 +1844,8 @@ connect_context_step (GTask *task)
             input = qmi_message_wds_bind_mux_data_port_input_new ();
             qmi_message_wds_bind_mux_data_port_input_set_endpoint_info (
                 input,
-                mm_port_qmi_get_endpoint_type (ctx->qmi),
-                mm_port_qmi_get_endpoint_interface_number (ctx->qmi),
+                ctx->endpoint.type,
+                ctx->endpoint.interface_number,
                 NULL);
             qmi_message_wds_bind_mux_data_port_input_set_mux_id (input, ctx->mux_id, NULL);
 
@@ -1956,12 +1957,12 @@ connect_context_step (GTask *task)
 
     case CONNECT_STEP_BIND_DATA_PORT_IPV6:
         /* If SIO port given, bind client to it */
-        if (!ctx->sio_port_failed && ctx->sio_port != QMI_SIO_PORT_NONE) {
+        if (!ctx->sio_port_failed && ctx->endpoint.sio_port != QMI_SIO_PORT_NONE) {
             g_autoptr(QmiMessageWdsBindDataPortInput) input = NULL;
 
-            mm_obj_dbg (self, "binding to data port: %s", qmi_sio_port_get_string (ctx->sio_port));
+            mm_obj_dbg (self, "binding to data port: %s", qmi_sio_port_get_string (ctx->endpoint.sio_port));
             input = qmi_message_wds_bind_data_port_input_new ();
-            qmi_message_wds_bind_data_port_input_set_data_port (input, ctx->sio_port, NULL);
+            qmi_message_wds_bind_data_port_input_set_data_port (input, ctx->endpoint.sio_port, NULL);
             qmi_client_wds_bind_data_port (ctx->client_ipv6,
                                            input,
                                            10,
@@ -1979,8 +1980,8 @@ connect_context_step (GTask *task)
             input = qmi_message_wds_bind_mux_data_port_input_new ();
             qmi_message_wds_bind_mux_data_port_input_set_endpoint_info (
                 input,
-                mm_port_qmi_get_endpoint_type (ctx->qmi),
-                mm_port_qmi_get_endpoint_interface_number (ctx->qmi),
+                ctx->endpoint.type,
+                ctx->endpoint.interface_number,
                 NULL);
             qmi_message_wds_bind_mux_data_port_input_set_mux_id (input, ctx->mux_id, NULL);
 
@@ -2257,7 +2258,6 @@ _connect (MMBaseBearer        *_self,
     ctx->self = g_object_ref (self);
     ctx->modem = g_object_ref (modem);
     ctx->mux_id = QMI_DEVICE_MUX_ID_UNBOUND;
-    ctx->sio_port = QMI_SIO_PORT_NONE;
     ctx->step = CONNECT_STEP_FIRST;
     ctx->ip_method = MM_BEARER_IP_METHOD_UNKNOWN;
     g_task_set_task_data (task, ctx, (GDestroyNotify)connect_context_free);
@@ -2272,7 +2272,7 @@ _connect (MMBaseBearer        *_self,
     }
 
     /* Each data port has a single QMI port associated */
-    ctx->qmi = mm_broadband_modem_qmi_get_port_qmi_for_data (MM_BROADBAND_MODEM_QMI (modem), ctx->data, &ctx->sio_port, &error);
+    ctx->qmi = mm_broadband_modem_qmi_get_port_qmi_for_data (MM_BROADBAND_MODEM_QMI (modem), ctx->data, &ctx->endpoint, &error);
     if (!ctx->qmi) {
         g_task_return_error (task, error);
         g_object_unref (task);
