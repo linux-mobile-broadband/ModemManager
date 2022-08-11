@@ -267,7 +267,20 @@ peek_port_qmi_for_data_mhi (MMBroadbandModemQmi  *self,
                             QmiSioPort           *out_sio_port,
                             GError              **error)
 {
-    return mm_broadband_modem_qmi_peek_port_qmi (self);
+    MMPortQmi *found = NULL;
+
+    found = mm_broadband_modem_qmi_peek_port_qmi (self);
+
+    if (!found)
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_NOT_FOUND,
+                     "Couldn't find associated QMI port for 'net/%s'",
+                     mm_port_get_device (data));
+    else if (out_sio_port)
+        *out_sio_port = QMI_SIO_PORT_NONE;
+
+    return found;
 }
 
 static MMPortQmi *
