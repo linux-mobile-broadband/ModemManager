@@ -43,11 +43,15 @@ typedef struct {
     /* threshold-based reporting */
     guint    rssi_threshold;
     gboolean error_rate_threshold;
+    /* info logging control */
+    GTimer   *info_log_timer;
 } Private;
 
 static void
 private_free (Private *priv)
 {
+    if (priv->info_log_timer)
+        g_timer_destroy (priv->info_log_timer);
     if (priv->timeout_source)
         g_source_remove (priv->timeout_source);
     g_slice_free (Private, priv);
@@ -77,6 +81,35 @@ mm_iface_modem_signal_bind_simple_status (MMIfaceModemSignal *self,
                                           MMSimpleStatus *status)
 {
 }
+
+/*****************************************************************************/
+
+/* Even if the signal refresh rate is higher than 300s, don't pollute the INFO
+ * level log with so many updates, force a reduction of the rate to once every
+ * 300s */
+#define SIGNAL_QUALITY_PRINT_RATE_SECS 300
+
+static void
+info_log_signal_quality (MMIfaceModemSignal *self,
+                         MMSignal           *info,
+                         const gchar        *rat)
+{
+    Private              *priv = NULL;
+    g_autofree gchar     *printable = NULL;
+    g_autoptr(GDateTime)  current_time = NULL;
+
+    priv = get_private (self);
+
+    if (G_UNLIKELY (!priv->info_log_timer))
+        priv->info_log_timer = g_timer_new ();
+
+    if (g_timer_elapsed (priv->info_log_timer, NULL) < SIGNAL_QUALITY_PRINT_RATE_SECS)
+        return;
+    g_timer_reset (priv->info_log_timer);
+
+    printable = mm_signal_get_string (info);
+    mm_obj_info (self, "%s: %s", rat, printable);
+};
 
 /*****************************************************************************/
 
@@ -119,24 +152,28 @@ internal_signal_update (MMIfaceModemSignal *self,
 
     if (gsm) {
         mm_obj_dbg (self, "gsm extended signal information updated");
+        info_log_signal_quality (self, gsm, "gsm");
         dict_gsm = mm_signal_get_dictionary (gsm);
     }
     mm_gdbus_modem_signal_set_gsm (MM_GDBUS_MODEM_SIGNAL (skeleton), dict_gsm);
 
     if (umts) {
         mm_obj_dbg (self, "umts extended signal information updated");
+        info_log_signal_quality (self, umts, "umts");
         dict_umts = mm_signal_get_dictionary (umts);
     }
     mm_gdbus_modem_signal_set_umts (MM_GDBUS_MODEM_SIGNAL (skeleton), dict_umts);
 
     if (lte) {
         mm_obj_dbg (self, "lte extended signal information updated");
+        info_log_signal_quality (self, lte, "lte");
         dict_lte = mm_signal_get_dictionary (lte);
     }
     mm_gdbus_modem_signal_set_lte (MM_GDBUS_MODEM_SIGNAL (skeleton), dict_lte);
 
     if (nr5g) {
         mm_obj_dbg (self, "5gnr extended signal information updated");
+        info_log_signal_quality (self, nr5g, "5gnr");
         dict_nr5g = mm_signal_get_dictionary (nr5g);
     }
     mm_gdbus_modem_signal_set_nr5g (MM_GDBUS_MODEM_SIGNAL (skeleton), dict_nr5g);
@@ -232,10 +269,10 @@ polling_restart (MMIfaceModemSignal *self)
     priv = get_private (self);
     polling_setup = (priv->enabled && priv->rate);
 
-    mm_obj_dbg (self, "%s extended signal information polling: interface %s, rate %u seconds",
-                polling_setup ? "setting up" : "cleaning up",
-                priv->enabled ? "enabled" : "disabled",
-                priv->rate);
+    if (polling_setup)
+        mm_obj_info (self, "setting up extended signal information polling: rate %u seconds", priv->rate);
+    else
+        mm_obj_dbg (self, "cleaning up extended signal information polling");
 
     /* Stop polling */
     if (!polling_setup) {

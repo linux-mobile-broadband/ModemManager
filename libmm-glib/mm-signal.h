@@ -106,6 +106,8 @@ void mm_signal_set_rsrp       (MMSignal *self, gdouble value);
 void mm_signal_set_snr        (MMSignal *self, gdouble value);
 void mm_signal_set_error_rate (MMSignal *self, gdouble value);
 
+gchar *mm_signal_get_string (MMSignal *self);
+
 #endif
 
 G_END_DECLS

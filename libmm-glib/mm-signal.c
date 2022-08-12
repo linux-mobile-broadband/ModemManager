@@ -364,6 +364,35 @@ mm_signal_set_error_rate (MMSignal *self,
     self->priv->error_rate = value;
 }
 
+/**
+ * mm_signal_get_string: (skip)
+ */
+gchar *
+mm_signal_get_string (MMSignal *self)
+{
+    GString *printable;
+
+    printable = g_string_new ("");
+    if (self->priv->ecio != MM_SIGNAL_UNKNOWN)
+        g_string_append_printf (printable, "Ec/Io: %3.0e dB", self->priv->ecio);
+    if (self->priv->error_rate != MM_SIGNAL_UNKNOWN)
+        g_string_append_printf (printable, "%serror rate: %f %%", printable->len ? ", " : "", self->priv->error_rate);
+    if (self->priv->rscp != MM_SIGNAL_UNKNOWN)
+        g_string_append_printf (printable, "%sRSCP: %f dBm", printable->len ? ", " : "", self->priv->rscp);
+    if (self->priv->rscp != MM_SIGNAL_UNKNOWN)
+        g_string_append_printf (printable, "%sRSRP: %f dBm", printable->len ? ", " : "", self->priv->rsrp);
+    if (self->priv->rsrq != MM_SIGNAL_UNKNOWN)
+        g_string_append_printf (printable, "%sRSRQ: %f dB", printable->len ? ", " : "", self->priv->rsrq);
+    if (self->priv->rssi != MM_SIGNAL_UNKNOWN)
+        g_string_append_printf (printable, "%sRSSI: %f dBm", printable->len ? ", " : "", self->priv->rssi);
+    if (self->priv->sinr != MM_SIGNAL_UNKNOWN)
+        g_string_append_printf (printable, "%sSINR: %f dB", printable->len ? ", " : "", self->priv->sinr);
+    if (self->priv->snr != MM_SIGNAL_UNKNOWN)
+        g_string_append_printf (printable, "%sSNR: %f dB", printable->len ? ", " : "", self->priv->snr);
+
+    return g_string_free (printable, FALSE);
+}
+
 /*****************************************************************************/
 
 /**
