@@ -68,4 +68,9 @@ gboolean mm_log_setup     (const gchar  *level,
                            GError      **error);
 void     mm_log_shutdown  (void);
 
+/* Helper used when printing a string that may be personal
+ * info. Depending on the settings, we may print it as-is,
+ * or otherwise provide a fallback string. */
+const gchar *mm_log_str_personal_info (const gchar *str);
+
 #endif  /* MM_LOG_H */

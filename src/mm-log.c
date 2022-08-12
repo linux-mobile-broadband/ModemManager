@@ -56,6 +56,7 @@ static guint32  log_level = MM_LOG_LEVEL_MSG | MM_LOG_LEVEL_WARN | MM_LOG_LEVEL_
 static GTimeVal rel_start = { 0, 0 };
 static int      logfd = -1;
 static gboolean append_log_level_text = TRUE;
+static gboolean personal_info = FALSE;
 
 static void (*log_backend) (const char *loc,
                             const char *func,
@@ -331,6 +332,8 @@ mm_log_setup (const gchar  *level,
     if (level && strlen (level) && !mm_log_set_level (level, error))
         return FALSE;
 
+    personal_info = show_personal_info;
+
     if (show_timestamps)
         ts_flags = TS_FLAG_WALL;
     else if (rel_timestamps)
@@ -399,4 +402,14 @@ mm_log_shutdown (void)
         closelog ();
     else
         close (logfd);
+}
+
+/******************************************************************************/
+
+const gchar *
+mm_log_str_personal_info (const gchar *str)
+{
+    static const gchar *hidden_personal_info = "###";
+
+    return personal_info ? str : hidden_personal_info;
 }
