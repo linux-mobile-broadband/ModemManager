@@ -4200,12 +4200,15 @@ complete_sim_swap_check (GTask       *task,
         g_assert_not_reached();
 
     if (g_strcmp0 (current, cached) != 0) {
-        mm_obj_msg (self, "SIM %s has changed: %s -> %s",
-                    str, cached ? cached : "<none>", current ? current : "<none>");
+        mm_obj_msg (self, "SIM %s has changed: '%s' -> '%s'",
+                    str,
+                    mm_log_str_personal_info (cached ? cached : ""),
+                    mm_log_str_personal_info (current ? current : ""));
         mm_iface_modem_process_sim_event (MM_IFACE_MODEM (self));
         ctx->step = SIM_SWAP_CHECK_STEP_LAST;
     } else {
-        mm_obj_dbg (self, "SIM %s has not changed", str);
+        mm_obj_info (self, "SIM %s has not changed: %s",
+                     str, mm_log_str_personal_info (current));
         ctx->step++;
     }
 
@@ -4354,7 +4357,7 @@ modem_check_for_sim_swap (MMIfaceModem        *self,
     GTask          *task;
     SimSwapContext *ctx;
 
-    mm_obj_dbg (self, "checking if SIM was swapped...");
+    mm_obj_info (self, "checking if SIM was swapped...");
 
     task = g_task_new (self, NULL, callback, user_data);
     ctx = g_slice_new0 (SimSwapContext);
