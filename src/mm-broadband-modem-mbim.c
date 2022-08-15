@@ -3361,8 +3361,7 @@ basic_connect_notification_connect (MMBroadbandModemMbim *self,
     if (!bearer_list)
         return;
 
-    if (mbim_uuid_to_context_type (context_type) == MBIM_CONTEXT_TYPE_INTERNET &&
-        activation_state == MBIM_ACTIVATION_STATE_DEACTIVATED) {
+    if (activation_state == MBIM_ACTIVATION_STATE_DEACTIVATED) {
         ReportDisconnectedStatusContext ctx;
         g_autoptr(GError)               connection_error = NULL;
 
