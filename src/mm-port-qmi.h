@@ -100,11 +100,6 @@ typedef enum {
     MM_PORT_QMI_FLAG_WDS_IPV6 = 2,
 } MMPortQmiFlag;
 
-/* When using the WDS service, we may not only want to have explicit different
- * clients for IPv4 or IPv6, but also for different mux ids as well, so that
- * different bearer objects never attempt to use the same WDS clients. */
-#define MM_PORT_QMI_FLAG_WITH_MUX_ID(flag, mux_id) ((mux_id << 8) | (flag & 0xFF))
-
 void     mm_port_qmi_allocate_client        (MMPortQmi            *self,
                                              QmiService            service,
                                              guint                 flag,

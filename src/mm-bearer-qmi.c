@@ -531,6 +531,14 @@ typedef struct {
     GError           *error_ipv6;
 } ConnectContext;
 
+/* When using the WDS service, we may not only want to have explicit different
+ * clients for IPv4 or IPv6, but also for different mux ids/endpoints as well,
+ * so that different bearer objects never attempt to use the same WDS clients. */
+#define MM_BEARER_QMI_PORT_FLAG(flag, ctx) \
+    (((ctx->endpoint.interface_number & 0xFF) << 24) | \
+     ((ctx->endpoint.type & 0xFF) << 16) | \
+     ((ctx->mux_id & 0xFF) << 8) | (flag & 0xFF))
+
 static void
 connect_context_free (ConnectContext *ctx)
 {
@@ -1434,12 +1442,12 @@ qmi_port_allocate_client_ready (MMPortQmi *qmi,
         ctx->client_ipv4 = QMI_CLIENT_WDS (mm_port_qmi_get_client (
                                                qmi,
                                                QMI_SERVICE_WDS,
-                                               MM_PORT_QMI_FLAG_WITH_MUX_ID (MM_PORT_QMI_FLAG_WDS_IPV4, ctx->mux_id)));
+                                               MM_BEARER_QMI_PORT_FLAG (MM_PORT_QMI_FLAG_WDS_IPV4, ctx)));
     else
         ctx->client_ipv6 = QMI_CLIENT_WDS (mm_port_qmi_get_client (
                                                qmi,
                                                QMI_SERVICE_WDS,
-                                               MM_PORT_QMI_FLAG_WITH_MUX_ID (MM_PORT_QMI_FLAG_WDS_IPV6, ctx->mux_id)));
+                                               MM_BEARER_QMI_PORT_FLAG (MM_PORT_QMI_FLAG_WDS_IPV6, ctx)));
 
     /* Keep on */
     ctx->step++;
@@ -1803,12 +1811,12 @@ connect_context_step (GTask *task)
 
         client = mm_port_qmi_get_client (ctx->qmi,
                                          QMI_SERVICE_WDS,
-                                         MM_PORT_QMI_FLAG_WITH_MUX_ID (MM_PORT_QMI_FLAG_WDS_IPV4, ctx->mux_id));
+                                         MM_BEARER_QMI_PORT_FLAG (MM_PORT_QMI_FLAG_WDS_IPV4, ctx));
         if (!client) {
             mm_obj_dbg (self, "allocating IPv4-specific WDS client (mux id %u)", ctx->mux_id);
             mm_port_qmi_allocate_client (ctx->qmi,
                                          QMI_SERVICE_WDS,
-                                         MM_PORT_QMI_FLAG_WITH_MUX_ID (MM_PORT_QMI_FLAG_WDS_IPV4, ctx->mux_id),
+                                         MM_BEARER_QMI_PORT_FLAG (MM_PORT_QMI_FLAG_WDS_IPV4, ctx),
                                          g_task_get_cancellable (task),
                                          (GAsyncReadyCallback)qmi_port_allocate_client_ready,
                                          task);
@@ -1939,12 +1947,12 @@ connect_context_step (GTask *task)
 
         client = mm_port_qmi_get_client (ctx->qmi,
                                          QMI_SERVICE_WDS,
-                                         MM_PORT_QMI_FLAG_WITH_MUX_ID (MM_PORT_QMI_FLAG_WDS_IPV6, ctx->mux_id));
+                                         MM_BEARER_QMI_PORT_FLAG (MM_PORT_QMI_FLAG_WDS_IPV6, ctx));
         if (!client) {
             mm_obj_dbg (self, "allocating IPv6-specific WDS client (mux id %u)", ctx->mux_id);
             mm_port_qmi_allocate_client (ctx->qmi,
                                          QMI_SERVICE_WDS,
-                                         MM_PORT_QMI_FLAG_WITH_MUX_ID (MM_PORT_QMI_FLAG_WDS_IPV6, ctx->mux_id),
+                                         MM_BEARER_QMI_PORT_FLAG (MM_PORT_QMI_FLAG_WDS_IPV6, ctx),
                                          g_task_get_cancellable (task),
                                          (GAsyncReadyCallback)qmi_port_allocate_client_ready,
                                          task);
