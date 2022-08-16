@@ -403,10 +403,12 @@ typedef enum { /*< underscore_name=mm_modem_mode >*/
  * @MM_MODEM_BAND_NGRAN_7: NGRAN band 7. Since 1.20.
  * @MM_MODEM_BAND_NGRAN_8: NGRAN band 8. Since 1.20.
  * @MM_MODEM_BAND_NGRAN_12: NGRAN band 12. Since 1.20.
+ * @MM_MODEM_BAND_NGRAN_13: NGRAN band 13. Since 1.20.
  * @MM_MODEM_BAND_NGRAN_14: NGRAN band 14. Since 1.20.
  * @MM_MODEM_BAND_NGRAN_18: NGRAN band 18. Since 1.20.
  * @MM_MODEM_BAND_NGRAN_20: NGRAN band 20. Since 1.20.
  * @MM_MODEM_BAND_NGRAN_25: NGRAN band 25. Since 1.20.
+ * @MM_MODEM_BAND_NGRAN_26: NGRAN band 26. Since 1.20.
  * @MM_MODEM_BAND_NGRAN_28: NGRAN band 28. Since 1.20.
  * @MM_MODEM_BAND_NGRAN_29: NGRAN band 29. Since 1.20.
  * @MM_MODEM_BAND_NGRAN_30: NGRAN band 30. Since 1.20.
@@ -592,10 +594,12 @@ typedef enum { /*< underscore_name=mm_modem_band >*/
     MM_MODEM_BAND_NGRAN_7 = 307,
     MM_MODEM_BAND_NGRAN_8 = 308,
     MM_MODEM_BAND_NGRAN_12 = 312,
+    MM_MODEM_BAND_NGRAN_13 = 313,
     MM_MODEM_BAND_NGRAN_14 = 314,
     MM_MODEM_BAND_NGRAN_18 = 318,
     MM_MODEM_BAND_NGRAN_20 = 320,
     MM_MODEM_BAND_NGRAN_25 = 325,
+    MM_MODEM_BAND_NGRAN_26 = 326,
     MM_MODEM_BAND_NGRAN_28 = 328,
     MM_MODEM_BAND_NGRAN_29 = 329,
     MM_MODEM_BAND_NGRAN_30 = 330,
