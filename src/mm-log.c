@@ -12,6 +12,7 @@
  *
  * Copyright (C) 2011-2020 Red Hat, Inc.
  * Copyright (C) 2020 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc.
  */
 
 #define _GNU_SOURCE
@@ -359,6 +360,7 @@ mm_log_setup (const gchar  *level,
                        NULL);
 
 #if defined WITH_QMI
+    qmi_utils_set_show_personal_info (show_personal_info);
     g_log_set_handler ("Qmi",
                        G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION,
                        log_handler,
