@@ -8508,7 +8508,6 @@ query_device_slot_mappings_ready (MbimDevice   *device,
     MMBroadbandModemMbim    *self;
     g_autoptr(MbimMessage)   response = NULL;
     GError                  *error = NULL;
-    g_autoptr(MbimMessage)   message = NULL;
     guint32                  map_count = 0;
     g_autoptr(MbimSlotArray) slot_mappings = NULL;
     LoadSimSlotsContext     *ctx;
@@ -8565,7 +8564,6 @@ query_device_caps_ready (MbimDevice   *device,
     MMBroadbandModemMbim   *self;
     g_autoptr(MbimMessage)  response = NULL;
     GError                 *error = NULL;
-    g_autoptr(MbimMessage)  message = NULL;
     guint32                 executor_index;
 
     self = g_task_get_source_object (task);
