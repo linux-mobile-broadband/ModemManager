@@ -1470,16 +1470,37 @@ mm_shared_qmi_load_current_modes_finish (MMIfaceModem  *self,
     return TRUE;
 }
 
+static MMModemMode
+filter_modes_by_supported_radio_interfaces (MMSharedQmi *self,
+                                            GArray      *supported_radio_interfaces,
+                                            MMModemMode  allowed_modes)
+{
+    MMModemMode modem_modes;
+    guint       i;
+
+    modem_modes = MM_MODEM_MODE_NONE;
+
+    for (i = 0; i < supported_radio_interfaces->len; i++)
+        modem_modes |= mm_modem_mode_from_qmi_radio_interface (g_array_index (supported_radio_interfaces, QmiDmsRadioInterface, i), self);
+
+    return allowed_modes & modem_modes;
+}
+
 static void
 get_technology_preference_ready (QmiClientNas *client,
                                  GAsyncResult *res,
                                  GTask        *task)
 {
+    MMSharedQmi                                *self;
+    Private                                    *priv;
     LoadCurrentModesResult                     *result = NULL;
     QmiMessageNasGetTechnologyPreferenceOutput *output = NULL;
     GError                                     *error = NULL;
     MMModemMode                                 allowed;
     QmiNasRadioTechnologyPreference             preference_mask;
+
+    self = g_task_get_source_object (task);
+    priv = get_private (self);
 
     output = qmi_client_nas_get_technology_preference_finish (client, res, &error);
     if (!output || !qmi_message_nas_get_technology_preference_output_get_result (output, &error)) {
@@ -1502,6 +1523,9 @@ get_technology_preference_ready (QmiClientNas *client,
         g_free (str);
         goto out;
     }
+
+    g_assert (priv->supported_radio_interfaces);
+    allowed = filter_modes_by_supported_radio_interfaces (self, priv->supported_radio_interfaces, allowed);
 
     /* We got a valid value from here */
     result = g_new (LoadCurrentModesResult, 1);
@@ -1572,6 +1596,9 @@ load_current_modes_system_selection_preference_ready (QmiClientNas *client,
         g_free (str);
         goto out;
     }
+
+    g_assert (priv->supported_radio_interfaces);
+    allowed = filter_modes_by_supported_radio_interfaces (self, priv->supported_radio_interfaces, allowed);
 
     /* We got a valid value from here */
     result = g_new (LoadCurrentModesResult, 1);
