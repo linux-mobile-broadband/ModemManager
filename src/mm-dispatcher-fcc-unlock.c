@@ -97,7 +97,6 @@ mm_dispatcher_fcc_unlock_run (MMDispatcherFccUnlock  *self,
         g_auto(GStrv)     argv = NULL;
         g_autofree gchar *path = NULL;
         g_autoptr(GFile)  file = NULL;
-        g_autoptr(GError) error = NULL;
         guint             j;
 
         path = g_build_path (G_DIR_SEPARATOR_S, enabled_dirs[i], filename, NULL);
