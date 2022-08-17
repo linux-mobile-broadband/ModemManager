@@ -10695,14 +10695,13 @@ check_activated_profile_cgact_query_ready (MMBaseModem  *self,
                                            GAsyncResult *res,
                                            GTask        *task)
 {
-    MM3gppProfile    *profile;
-    const gchar      *response;
-    GError           *error = NULL;
-    GList            *pdp_context_active_list = NULL;
-    GList            *l;
-    gint              profile_id;
-    gboolean          activated = FALSE;
-    g_autofree gchar *cmd = NULL;
+    MM3gppProfile *profile;
+    const gchar   *response;
+    GError        *error = NULL;
+    GList         *pdp_context_active_list = NULL;
+    GList         *l;
+    gint           profile_id;
+    gboolean       activated = FALSE;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (response)
