@@ -159,10 +159,7 @@ mm_sms_get_data (MMSms *self,
 
     data = mm_gdbus_sms_get_data (MM_GDBUS_SMS (self));
     return (data ?
-            g_variant_get_fixed_array (
-                mm_gdbus_sms_get_data (MM_GDBUS_SMS (self)),
-                data_len,
-                sizeof (guchar)):
+            g_variant_get_fixed_array (data, data_len, sizeof (guint8)) :
             NULL);
 }
 
@@ -183,30 +180,16 @@ guint8 *
 mm_sms_dup_data (MMSms *self,
                  gsize *data_len)
 {
-    guint8 *out;
-    GVariant *data_variant;
-    const guint8 *orig_data;
-    gsize orig_data_len = 0;
+    g_autoptr(GVariant) data = NULL;
 
     g_return_val_if_fail (MM_IS_SMS (self), NULL);
+    g_return_val_if_fail (data_len != NULL, NULL);
 
     /* Get a ref to ensure the variant is valid as long as we use it */
-    data_variant = mm_gdbus_sms_dup_data (MM_GDBUS_SMS (self));
-    if (!data_variant)
-        return NULL;
-
-    orig_data = (g_variant_get_fixed_array (
-                     mm_gdbus_sms_get_data (MM_GDBUS_SMS (self)),
-                     &orig_data_len,
-                     sizeof (guchar)));
-
-    out = g_new (guint8, orig_data_len);
-    memcpy (out, orig_data, orig_data_len);
-    g_variant_unref (data_variant);
-
-    if (data_len)
-        *data_len = orig_data_len;
-    return out;
+    data = mm_gdbus_sms_dup_data (MM_GDBUS_SMS (self));
+    return (data ?
+            g_memdup (g_variant_get_fixed_array (data, data_len, sizeof (guint8)), *data_len) :
+            NULL);
 }
 
 /*****************************************************************************/
