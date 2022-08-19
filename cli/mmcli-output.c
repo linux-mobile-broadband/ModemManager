@@ -355,6 +355,7 @@ output_item_free (OutputItem *item)
             g_free (((OutputItemListitem *)item)->prefix);
             g_free (((OutputItemListitem *)item)->value);
             g_free (((OutputItemListitem *)item)->extra);
+            g_slice_free (OutputItemListitem, (OutputItemListitem *)item);
             break;
         default:
             g_assert_not_reached ();
