@@ -4562,7 +4562,7 @@ basic_connect_notification_register_state (MMBroadbandModemMbim *self,
                 &provider_name,
                 NULL, /* roaming_text */
                 NULL, /* registration_flag */
-                NULL)) {
+                &error)) {
             mm_obj_warn (self, "failed processing register state indication: %s", error->message);
             return;
         }
