@@ -182,9 +182,9 @@ grab_port (MMPlugin *self,
 G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
-    static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
+    static const gchar *subsystems[] = { "tty", "net", "usbmisc", "wwan", NULL };
     static const gchar *vendor_strings[] = { "cinterion", "siemens", NULL };
-    static const guint16 vendor_ids[] = { 0x1e2d, 0x0681, 0 };
+    static const guint16 vendor_ids[] = { 0x1e2d, 0x0681, 0x1269, 0 };
     static const MMAsyncMethod custom_init = {
         .async  = G_CALLBACK (cinterion_custom_init),
         .finish = G_CALLBACK (cinterion_custom_init_finish),
