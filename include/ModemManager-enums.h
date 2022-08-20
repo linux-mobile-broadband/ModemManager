@@ -217,6 +217,8 @@ typedef enum { /*< underscore_name=mm_modem_state_change_reason >*/
  * @MM_MODEM_ACCESS_TECHNOLOGY_EVDOB: CDMA2000 EVDO revision B.
  * @MM_MODEM_ACCESS_TECHNOLOGY_LTE: LTE (ETSI 27.007: "E-UTRAN")
  * @MM_MODEM_ACCESS_TECHNOLOGY_5GNR: 5GNR (ETSI 27.007: "NG-RAN"). Since 1.14.
+ * @MM_MODEM_ACCESS_TECHNOLOGY_LTE_CAT_M: Cat-M (ETSI 23.401: LTE Category M1/M2). Since 1.20.
+ * @MM_MODEM_ACCESS_TECHNOLOGY_LTE_NB_IOT: NB IoT (ETSI 23.401: LTE Category NB1/NB2). Since 1.20.
  * @MM_MODEM_ACCESS_TECHNOLOGY_ANY: Mask specifying all access technologies.
  *
  * Describes various access technologies that a device uses when registered with
@@ -242,6 +244,8 @@ typedef enum { /*< underscore_name=mm_modem_access_technology >*/
     MM_MODEM_ACCESS_TECHNOLOGY_EVDOB       = 1 << 13,
     MM_MODEM_ACCESS_TECHNOLOGY_LTE         = 1 << 14,
     MM_MODEM_ACCESS_TECHNOLOGY_5GNR        = 1 << 15,
+    MM_MODEM_ACCESS_TECHNOLOGY_LTE_CAT_M   = 1 << 16,
+    MM_MODEM_ACCESS_TECHNOLOGY_LTE_NB_IOT  = 1 << 17,
     MM_MODEM_ACCESS_TECHNOLOGY_ANY         = 0xFFFFFFFF,
 } MMModemAccessTechnology;
 
