@@ -1665,6 +1665,7 @@ mm_bearer_ip_family_to_qmi_pdp_type (MMBearerIpFamily  ip_family,
     case MM_BEARER_IP_FAMILY_IPV4V6:
         *out_pdp_type =  QMI_WDS_PDP_TYPE_IPV4_OR_IPV6;
         return TRUE;
+    case MM_BEARER_IP_FAMILY_NON_IP:
     case MM_BEARER_IP_FAMILY_NONE:
     case MM_BEARER_IP_FAMILY_ANY:
     default:

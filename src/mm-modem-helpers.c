@@ -4067,6 +4067,8 @@ mm_3gpp_get_pdp_type_from_ip_family (MMBearerIpFamily family)
         return "IPV6";
     case MM_BEARER_IP_FAMILY_IPV4V6:
         return "IPV4V6";
+    case MM_BEARER_IP_FAMILY_NON_IP:
+        return "Non-IP";
     case MM_BEARER_IP_FAMILY_NONE:
     case MM_BEARER_IP_FAMILY_ANY:
     default:
@@ -4087,6 +4089,8 @@ mm_3gpp_get_ip_family_from_pdp_type (const gchar *pdp_type)
         return MM_BEARER_IP_FAMILY_IPV6;
     if (g_str_equal (pdp_type, "IPV4V6"))
         return MM_BEARER_IP_FAMILY_IPV4V6;
+    if (g_str_equal (pdp_type, "Non-IP"))
+        return MM_BEARER_IP_FAMILY_NON_IP;
     return MM_BEARER_IP_FAMILY_NONE;
 }
 

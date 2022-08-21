@@ -1223,7 +1223,8 @@ typedef enum { /*< underscore_name=mm_bearer_ip_method >*/
  * @MM_BEARER_IP_FAMILY_IPV4: IPv4.
  * @MM_BEARER_IP_FAMILY_IPV6: IPv6.
  * @MM_BEARER_IP_FAMILY_IPV4V6: IPv4 and IPv6.
- * @MM_BEARER_IP_FAMILY_ANY: Mask specifying all IP families.
+ * @MM_BEARER_IP_FAMILY_NON_IP: Non-IP Bearer. Since 1.20.
+ * @MM_BEARER_IP_FAMILY_ANY: Mask specifying all IP based families.
  *
  * Type of IP family to be used in a given Bearer.
  *
@@ -1234,7 +1235,8 @@ typedef enum { /*< underscore_name=mm_bearer_ip_family >*/
     MM_BEARER_IP_FAMILY_IPV4    = 1 << 0,
     MM_BEARER_IP_FAMILY_IPV6    = 1 << 1,
     MM_BEARER_IP_FAMILY_IPV4V6  = 1 << 2,
-    MM_BEARER_IP_FAMILY_ANY     = 0xFFFFFFFF
+    MM_BEARER_IP_FAMILY_NON_IP  = 1 << 3,
+    MM_BEARER_IP_FAMILY_ANY     = 0xFFFFFFF7
 } MMBearerIpFamily;
 
 /**
