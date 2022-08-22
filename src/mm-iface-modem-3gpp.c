@@ -300,7 +300,9 @@ get_consolidated_packet_service_state (MMIfaceModem3gpp *self)
     if (REG_STATE_IS_REGISTERED (priv->state_cs))
         return MM_MODEM_3GPP_PACKET_SERVICE_STATE_DETACHED;
 
-    return MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN;
+    /* If not registered in any of CS, PS, EPS or 5GS, then packet service
+     * domain is detached. */
+    return MM_MODEM_3GPP_PACKET_SERVICE_STATE_DETACHED;
 }
 
 static MMModem3gppRegistrationState
@@ -2072,17 +2074,19 @@ update_registration_state (MMIfaceModem3gpp             *self,
                            MMModem3gppRegistrationState  new_state,
                            gboolean                      deferrable)
 {
-    Private                      *priv;
-    MMModem3gppRegistrationState  old_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    Private                       *priv;
+    MMModem3gppRegistrationState   old_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    MMModem3gppPacketServiceState  old_packet_service_state = MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN;
 
     priv = get_private (self);
 
     g_object_get (self,
-                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, &old_state,
+                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE,   &old_state,
+                  MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE, &old_packet_service_state,
                   NULL);
 
     /* Only set new state if different */
-    if (new_state == old_state)
+    if (new_state == old_state && old_packet_service_state == get_consolidated_packet_service_state (self))
         return;
 
     if (REG_STATE_IS_REGISTERED (new_state)) {
