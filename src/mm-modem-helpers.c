@@ -3642,8 +3642,8 @@ mm_3gpp_parse_cgev_indication_pdp (const gchar  *str,
     g_autoptr(GRegex)      r = NULL;
     g_autoptr(GMatchInfo)  match_info = NULL;
     GError                *inner_error = NULL;
-    gchar                 *pdp_type = NULL;
-    gchar                 *pdp_addr = NULL;
+    g_autofree gchar      *pdp_type = NULL;
+    g_autofree gchar      *pdp_addr = NULL;
     guint                  cid = 0;
 
     g_assert (type == MM_3GPP_CGEV_REJECT   ||
@@ -3660,44 +3660,38 @@ mm_3gpp_parse_cgev_indication_pdp (const gchar  *str,
 
     str = mm_strip_tag (str, "+CGEV:");
     g_regex_match_full (r, str, strlen (str), 0, 0, &match_info, &inner_error);
-    if (inner_error)
-        goto out;
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
 
     if (!g_match_info_matches (match_info)) {
-        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't match response");
-        goto out;
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't match response");
+        return FALSE;
     }
 
     if (out_pdp_type && !(pdp_type = mm_get_string_unquoted_from_match_info (match_info, 1))) {
-        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing PDP type");
-        goto out;
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing PDP type");
+        return FALSE;
     }
 
     if (out_pdp_addr && !(pdp_addr = mm_get_string_unquoted_from_match_info (match_info, 2))) {
-        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing PDP addr");
-        goto out;
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing PDP addr");
+        return FALSE;
     }
 
     /* CID is optional */
     if (out_cid &&
         (g_match_info_get_match_count (match_info) >= 4) &&
         !mm_get_uint_from_match_info (match_info, 3, &cid)) {
-        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing CID");
-        goto out;
-    }
-
-out:
-    if (inner_error) {
-        g_free (pdp_type);
-        g_free (pdp_addr);
-        g_propagate_error (error, inner_error);
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing CID");
         return FALSE;
     }
 
     if (out_pdp_type)
-        *out_pdp_type = pdp_type;
+        *out_pdp_type = g_steal_pointer (&pdp_type);
     if (out_pdp_addr)
-        *out_pdp_addr = pdp_addr;
+        *out_pdp_addr = g_steal_pointer (&pdp_addr);
     if (out_cid)
         *out_cid = cid;
     return TRUE;
