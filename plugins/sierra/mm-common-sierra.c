@@ -480,7 +480,7 @@ mm_common_sierra_setup_ports (MMBroadbandModem *self)
 {
     MMPortSerialAt *ports[2];
     guint i;
-    GRegex *pacsp_regex;
+    g_autoptr(GRegex) pacsp_regex = NULL;
 
     pacsp_regex = g_regex_new ("\\r\\n\\+PACSP.*\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
@@ -505,8 +505,6 @@ mm_common_sierra_setup_ports (MMBroadbandModem *self)
             pacsp_regex,
             NULL, NULL, NULL);
     }
-
-    g_regex_unref (pacsp_regex);
 }
 
 /*****************************************************************************/

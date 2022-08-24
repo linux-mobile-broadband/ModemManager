@@ -190,7 +190,7 @@ gboolean
 mm_location_gps_raw_add_trace (MMLocationGpsRaw *self,
                                const gchar *trace)
 {
-    GMatchInfo *match_info = NULL;
+    g_autoptr(GMatchInfo) match_info = NULL;
 
     /* Current implementation works only with $GPGGA and $GNGGA traces */
     do {
@@ -267,8 +267,6 @@ mm_location_gps_raw_add_trace (MMLocationGpsRaw *self,
         self->priv->altitude = MM_LOCATION_ALTITUDE_UNKNOWN;
         mm_get_double_from_match_info (match_info, 9, &self->priv->altitude);
     }
-
-    g_match_info_free (match_info);
 
     return TRUE;
 }

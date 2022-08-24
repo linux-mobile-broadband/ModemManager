@@ -1129,15 +1129,19 @@ test_creg_match (const char *test,
                  RegTestData *data,
                  const CregResult *result)
 {
-    guint i;
-    GMatchInfo *info  = NULL;
-    MMModem3gppRegistrationState state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-    MMModemAccessTechnology access_tech = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
-    gulong lac = 0, ci = 0;
-    GError *error = NULL;
-    gboolean success, cgreg = FALSE, cereg = FALSE, c5greg = FALSE;
-    guint regex_num = 0;
-    GPtrArray *array;
+    g_autoptr(GMatchInfo)         info  = NULL;
+    guint                         i;
+    MMModem3gppRegistrationState  state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    MMModemAccessTechnology       access_tech = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    gulong                        lac = 0;
+    gulong                        ci = 0;
+    GError                       *error = NULL;
+    gboolean                      success;
+    gboolean                      cgreg = FALSE;
+    gboolean                      cereg = FALSE;
+    gboolean                      c5greg = FALSE;
+    guint                         regex_num = 0;
+    GPtrArray                    *array;
 
     g_assert (reply);
     g_assert (test);
@@ -1158,8 +1162,7 @@ test_creg_match (const char *test,
             regex_num = i;
             break;
         }
-        g_match_info_free (info);
-        info = NULL;
+        g_clear_pointer (&info, g_match_info_free);
     }
 
     g_debug ("  regex_num (%u) == result->regex_num (%u)",
@@ -1171,7 +1174,6 @@ test_creg_match (const char *test,
 
     success = mm_3gpp_parse_creg_response (info, NULL, &state, &lac, &ci, &access_tech, &cgreg, &cereg, &c5greg, &error);
 
-    g_match_info_free (info);
     g_assert (success);
     g_assert_no_error (error);
     g_assert_cmpuint (state, ==, result->state);
@@ -3351,10 +3353,10 @@ common_parse_cds (const gchar *str,
                   guint expected_pdu_len,
                   const gchar *expected_pdu)
 {
-    GMatchInfo *match_info;
-    GRegex *regex;
-    gchar *pdu_len_str;
-    gchar *pdu;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    g_autoptr(GRegex)      regex = NULL;
+    g_autofree gchar      *pdu_len_str = NULL;
+    g_autofree gchar      *pdu = NULL;
 
     regex = mm_3gpp_cds_regex_get ();
     g_regex_match (regex, str, 0, &match_info);
@@ -3368,12 +3370,6 @@ common_parse_cds (const gchar *str,
     g_assert (pdu != NULL);
 
     g_assert_cmpstr (pdu, ==, expected_pdu);
-
-    g_free (pdu);
-    g_free (pdu_len_str);
-
-    g_match_info_free (match_info);
-    g_regex_unref (regex);
 }
 
 static void
@@ -4143,15 +4139,15 @@ static const ClipUrcTest clip_urc_tests[] = {
 static void
 test_clip_indication (void)
 {
-    GRegex *r;
-    guint   i;
+    g_autoptr(GRegex) r = NULL;
+    guint             i;
 
     r = mm_voice_clip_regex_get ();
 
     for (i = 0; i < G_N_ELEMENTS (clip_urc_tests); i++) {
-        GMatchInfo *match_info = NULL;
-        gchar      *number;
-        guint       type;
+        g_autoptr(GMatchInfo)  match_info = NULL;
+        g_autofree gchar      *number = NULL;
+        guint                  type;
 
         g_assert (g_regex_match (r, clip_urc_tests[i].str, 0, &match_info));
         g_assert (g_match_info_matches (match_info));
@@ -4161,12 +4157,7 @@ test_clip_indication (void)
 
         g_assert (mm_get_uint_from_match_info (match_info, 2, &type));
         g_assert_cmpuint (type, ==, clip_urc_tests[i].type);
-
-        g_free (number);
-        g_match_info_free (match_info);
     }
-
-    g_regex_unref (r);
 }
 
 /*****************************************************************************/
@@ -4188,16 +4179,16 @@ static const CcwaUrcTest ccwa_urc_tests[] = {
 static void
 test_ccwa_indication (void)
 {
-    GRegex *r;
-    guint   i;
+    g_autoptr(GRegex) r = NULL;
+    guint             i;
 
     r = mm_voice_ccwa_regex_get ();
 
     for (i = 0; i < G_N_ELEMENTS (ccwa_urc_tests); i++) {
-        GMatchInfo *match_info = NULL;
-        gchar      *number;
-        guint       type;
-        guint       class;
+        g_autoptr(GMatchInfo)  match_info = NULL;
+        g_autofree gchar      *number = NULL;
+        guint                  type;
+        guint                  class;
 
         g_assert (g_regex_match (r, ccwa_urc_tests[i].str, 0, &match_info));
         g_assert (g_match_info_matches (match_info));
@@ -4210,12 +4201,7 @@ test_ccwa_indication (void)
 
         g_assert (mm_get_uint_from_match_info (match_info, 3, &class));
         g_assert_cmpuint (class, ==, ccwa_urc_tests[i].class);
-
-        g_free (number);
-        g_match_info_free (match_info);
     }
-
-    g_regex_unref (r);
 }
 
 /*****************************************************************************/

@@ -74,12 +74,12 @@ parse_response (MMPortSerial *port,
                 GByteArray **parsed_response,
                 GError **error)
 {
-    MMPortSerialGps *self = MM_PORT_SERIAL_GPS (port);
-    gboolean matches;
-    GMatchInfo *match_info;
-    gchar *str;
-    gint result_len;
-    guint i;
+    MMPortSerialGps       *self = MM_PORT_SERIAL_GPS (port);
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    gboolean               matches;
+    gchar                 *str;
+    gint                   result_len;
+    guint                  i;
 
     for (i = 0; i < response->len; i++) {
         /* If there is any content before the first $,
@@ -109,8 +109,6 @@ parse_response (MMPortSerial *port,
             g_match_info_next (match_info, NULL);
         }
     }
-
-    g_match_info_free (match_info);
 
     if (!matches)
         return MM_PORT_SERIAL_RESPONSE_NONE;

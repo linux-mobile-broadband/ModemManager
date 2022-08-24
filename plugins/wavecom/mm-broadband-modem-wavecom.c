@@ -1223,9 +1223,9 @@ modem_power_off (MMIfaceModem *self,
 static void
 setup_ports (MMBroadbandModem *self)
 {
-    gpointer parser;
-    MMPortSerialAt *primary;
-    GRegex *regex;
+    gpointer           parser;
+    MMPortSerialAt    *primary;
+    g_autoptr(GRegex)  regex = NULL;
 
     /* Call parent's setup ports first always */
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_wavecom_parent_class)->setup_ports (self);
@@ -1242,7 +1242,6 @@ setup_ports (MMBroadbandModem *self)
                          G_REGEX_RAW | G_REGEX_OPTIMIZE,
                          0, NULL);
     mm_serial_parser_v1_set_custom_regex (parser, regex, NULL);
-    g_regex_unref (regex);
 
     mm_port_serial_at_set_response_parser (MM_PORT_SERIAL_AT (primary),
                                            mm_serial_parser_v1_parse,

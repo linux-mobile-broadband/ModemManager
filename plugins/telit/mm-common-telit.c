@@ -112,12 +112,12 @@ cache_port_mode (MMPortProbe *probe,
                  MMDevice    *device,
                  const gchar *reply)
 {
-    GRegex *r = NULL;
-    GRegexCompileFlags flags = G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW;
-    GMatchInfo *match_info = NULL;
-    GError *error = NULL;
-    gboolean ret = FALSE;
-    guint portcfg_current;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GRegexCompileFlags     flags = G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW;
+    GError                *error = NULL;
+    gboolean               ret = FALSE;
+    guint                  portcfg_current;
 
     /* #PORTCFG: <requested>,<active> */
     r = g_regex_new ("#PORTCFG:\\s*(\\d+),(\\d+)", flags, 0, NULL);
@@ -173,9 +173,7 @@ cache_port_mode (MMPortProbe *probe,
     ret = TRUE;
 
 out:
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-    if (error != NULL) {
+    if (error) {
         mm_obj_dbg (probe, "error while matching #PORTCFG: %s", error->message);
         g_error_free (error);
     }

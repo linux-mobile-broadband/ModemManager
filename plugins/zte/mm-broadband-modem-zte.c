@@ -339,22 +339,20 @@ load_current_modes_finish (MMIfaceModem *self,
                            MMModemMode *preferred,
                            GError **error)
 {
-    const gchar *response;
-    GMatchInfo *match_info = NULL;
-    GRegex *r;
-    gint cm_mode = -1;
-    gint pref_acq = -1;
-    gboolean result;
-    GError *match_error = NULL;
+    const gchar           *response;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    g_autoptr(GRegex)      r = NULL;
+    gint                   cm_mode = -1;
+    gint                   pref_acq = -1;
+    GError                *match_error = NULL;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
     if (!response)
         return FALSE;
 
-    r = g_regex_new ("\\+ZSNT:\\s*(\\d),(\\d),(\\d)", G_REGEX_UNGREEDY, 0, error);
+    r = g_regex_new ("\\+ZSNT:\\s*(\\d),(\\d),(\\d)", G_REGEX_UNGREEDY, 0, NULL);
     g_assert (r != NULL);
 
-    result = FALSE;
     if (!g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &match_error)) {
         if (match_error)
             g_propagate_error (error, match_error);
@@ -364,7 +362,7 @@ load_current_modes_finish (MMIfaceModem *self,
                          MM_CORE_ERROR_FAILED,
                          "Couldn't parse +ZSNT response: '%s'",
                          response);
-        goto done;
+        return FALSE;
     }
 
     if (!mm_get_int_from_match_info (match_info, 1, &cm_mode) ||
@@ -376,11 +374,10 @@ load_current_modes_finish (MMIfaceModem *self,
                      MM_CORE_ERROR_FAILED,
                      "Failed to parse the allowed mode response: '%s'",
                      response);
-        goto done;
+        return FALSE;
     }
 
     /* Correctly parsed! */
-    result = TRUE;
     if (cm_mode == 0) {
         /* Both 2G, 3G and LTE allowed. For LTE modems, no 2G/3G preference supported. */
         if (pref_acq == 0 || mm_iface_modem_is_3gpp_lte (self)) {
@@ -410,12 +407,7 @@ load_current_modes_finish (MMIfaceModem *self,
     } else
         g_assert_not_reached ();
 
-done:
-    g_match_info_free (match_info);
-    if (r)
-        g_regex_unref (r);
-
-    return result;
+    return TRUE;
 }
 
 static void

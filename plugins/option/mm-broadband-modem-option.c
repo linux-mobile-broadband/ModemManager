@@ -362,12 +362,10 @@ static gboolean
 parse_ossys_response (const gchar *response,
                       MMModemAccessTechnology *access_technology)
 {
-    MMModemAccessTechnology current = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
-    const gchar *p;
-    GRegex *r;
-    GMatchInfo *match_info;
-    gchar *str;
-    gboolean success = FALSE;
+    MMModemAccessTechnology  current = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    const gchar             *p;
+    g_autoptr(GRegex)        r = NULL;
+    g_autoptr(GMatchInfo)    match_info = NULL;
 
     p = mm_strip_tag (response, "_OSSYS:");
     r = g_regex_new ("(\\d),(\\d)", G_REGEX_UNGREEDY, 0, NULL);
@@ -375,17 +373,15 @@ parse_ossys_response (const gchar *response,
 
     g_regex_match (r, p, 0, &match_info);
     if (g_match_info_matches (match_info)) {
+        g_autofree gchar *str = NULL;
+
         str = g_match_info_fetch (match_info, 2);
         if (str && ossys_to_mm (str[0], &current)) {
             *access_technology = current;
-            success = TRUE;
-        }
-        g_free (str);
+            return TRUE;
+       }
     }
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
-    return success;
+    return FALSE;
 }
 
 static void
@@ -445,12 +441,10 @@ static gboolean
 parse_octi_response (const gchar *response,
                      MMModemAccessTechnology *access_technology)
 {
-    MMModemAccessTechnology current = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
-    const gchar *p;
-    GRegex *r;
-    GMatchInfo *match_info;
-    gchar *str;
-    gboolean success = FALSE;
+    MMModemAccessTechnology  current = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    const gchar             *p;
+    g_autoptr(GRegex)        r = NULL;
+    g_autoptr(GMatchInfo)    match_info = NULL;
 
     p = mm_strip_tag (response, "_OCTI:");
     r = g_regex_new ("(\\d),(\\d)", G_REGEX_UNGREEDY, 0, NULL);
@@ -458,17 +452,15 @@ parse_octi_response (const gchar *response,
 
     g_regex_match (r, p, 0, &match_info);
     if (g_match_info_matches (match_info)) {
+        g_autofree gchar *str = NULL;
+
         str = g_match_info_fetch (match_info, 2);
         if (str && octi_to_mm (str[0], &current)) {
             *access_technology = current;
-            success = TRUE;
+            return TRUE;
         }
-        g_free (str);
     }
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
-    return success;
+    return FALSE;
 }
 
 static void

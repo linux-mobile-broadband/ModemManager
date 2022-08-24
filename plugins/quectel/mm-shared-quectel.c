@@ -440,8 +440,8 @@ mm_shared_quectel_setup_sim_hot_swap (MMIfaceModem        *self,
     Private           *priv;
     MMPortSerialAt    *ports[2];
     GTask             *task;
-    GRegex            *pattern;
     guint              i;
+    g_autoptr(GRegex)  pattern = NULL;
     g_autoptr(GError)  error = NULL;
 
     priv = get_private (MM_SHARED_QUECTEL (self));
@@ -464,7 +464,6 @@ mm_shared_quectel_setup_sim_hot_swap (MMIfaceModem        *self,
                 NULL);
     }
 
-    g_regex_unref (pattern);
     mm_obj_dbg (self, "+QUSIM detection set up");
 
     if (!mm_broadband_modem_sim_hot_swap_ports_context_init (MM_BROADBAND_MODEM (self), &error))

@@ -624,7 +624,7 @@ load_current_modes_finish (MMIfaceModem *self,
                            MMModemMode *preferred,
                            GError **error)
 {
-    LoadCurrentModesResult *result;
+    g_autofree LoadCurrentModesResult *result = NULL;
 
     result = g_task_propagate_pointer (G_TASK (res), error);
     if (!result)
@@ -632,7 +632,6 @@ load_current_modes_finish (MMIfaceModem *self,
 
     *allowed = result->allowed;
     *preferred = result->preferred;
-    g_free (result);
     return TRUE;
 }
 
@@ -641,11 +640,11 @@ selrat_query_ready (MMBaseModem *self,
                     GAsyncResult *res,
                     GTask *task)
 {
-    LoadCurrentModesResult *result;
-    const gchar *response;
-    GError *error = NULL;
-    GRegex *r = NULL;
-    GMatchInfo *match_info = NULL;
+    g_autofree LoadCurrentModesResult *result = NULL;
+    const gchar                       *response;
+    GError                            *error = NULL;
+    g_autoptr(GRegex)                  r = NULL;
+    g_autoptr(GMatchInfo)              match_info = NULL;
 
     response = mm_base_modem_at_command_full_finish (self, res, &error);
     if (!response) {
@@ -727,15 +726,10 @@ selrat_query_ready (MMBaseModem *self,
                              "Could not parse allowed mode response: Response didn't match: '%s'",
                              response);
 
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
-    if (error) {
-        g_free (result);
+    if (error)
         g_task_return_error (task, error);
-    } else
-        g_task_return_pointer (task, result, g_free);
-
+    else
+        g_task_return_pointer (task, g_steal_pointer (&result), g_free);
     g_object_unref (task);
 }
 
@@ -1630,11 +1624,16 @@ parse_time (const gchar *response,
             const gchar *tag,
             GError **error)
 {
-    GRegex *r;
-    GMatchInfo *match_info = NULL;
-    GError *match_error = NULL;
-    guint year, month, day, hour, minute, second;
-    gchar *result = NULL;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *match_error = NULL;
+    guint                  year;
+    guint                  month;
+    guint                  day;
+    guint                  hour;
+    guint                  minute;
+    guint                  second;
+    gchar                 *result = NULL;
 
     r = g_regex_new (regex, 0, 0, NULL);
     g_assert (r != NULL);
@@ -1665,8 +1664,6 @@ parse_time (const gchar *response,
         }
     }
 
-    g_match_info_free (match_info);
-    g_regex_unref (r);
     return result;
 }
 

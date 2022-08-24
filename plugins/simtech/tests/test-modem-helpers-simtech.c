@@ -33,13 +33,13 @@ common_test_clcc_urc (const gchar      *urc,
                       const MMCallInfo *expected_call_info_list,
                       guint             expected_call_info_list_size)
 {
-    GError     *error = NULL;
-    GRegex     *clcc_regex = NULL;
-    gboolean    result;
-    GMatchInfo *match_info = NULL;
-    gchar      *str;
-    GList      *call_info_list = NULL;
-    GList      *l;
+    g_autoptr(GRegex)      clcc_regex = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    g_autofree gchar      *str = NULL;
+    GError                *error = NULL;
+    GList                 *call_info_list = NULL;
+    GList                 *l;
+    gboolean               result;
 
     clcc_regex = mm_simtech_get_clcc_urc_regex ();
 
@@ -83,10 +83,6 @@ common_test_clcc_urc (const gchar      *urc,
 
         g_assert (found);
     }
-
-    g_match_info_free (match_info);
-    g_regex_unref (clcc_regex);
-    g_free (str);
 
     mm_simtech_call_info_list_free (call_info_list);
 }
@@ -148,12 +144,12 @@ common_test_voice_call_urc (const gchar *urc,
                             gboolean     expected_start_or_stop,
                             guint        expected_duration)
 {
-    GError     *error = NULL;
-    gboolean    start_or_stop = FALSE; /* start = TRUE, stop = FALSE */
-    guint       duration = 0;
-    GRegex     *voice_call_regex = NULL;
-    gboolean    result;
-    GMatchInfo *match_info = NULL;
+    g_autoptr(GRegex)      voice_call_regex = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *error = NULL;
+    gboolean               start_or_stop = FALSE; /* start = TRUE, stop = FALSE */
+    guint                  duration = 0;
+    gboolean               result;
 
     voice_call_regex = mm_simtech_get_voice_call_urc_regex ();
 
@@ -168,9 +164,6 @@ common_test_voice_call_urc (const gchar *urc,
 
     g_assert_cmpuint (expected_start_or_stop, ==, start_or_stop);
     g_assert_cmpuint (expected_duration, ==, duration);
-
-    g_match_info_free (match_info);
-    g_regex_unref (voice_call_regex);
 }
 
 static void
@@ -197,11 +190,11 @@ static void
 common_test_missed_call_urc (const gchar *urc,
                              const gchar *expected_details)
 {
-    GError     *error = NULL;
-    gchar      *details = NULL;
-    GRegex     *missed_call_regex = NULL;
-    gboolean    result;
-    GMatchInfo *match_info = NULL;
+    g_autoptr(GRegex)      missed_call_regex = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    g_autofree gchar      *details = NULL;
+    GError                *error = NULL;
+    gboolean               result;
 
     missed_call_regex = mm_simtech_get_missed_call_urc_regex ();
 
@@ -215,10 +208,6 @@ common_test_missed_call_urc (const gchar *urc,
     g_assert (result);
 
     g_assert_cmpstr (expected_details, ==, details);
-    g_free (details);
-
-    g_match_info_free (match_info);
-    g_regex_unref (missed_call_regex);
 }
 
 static void
@@ -233,11 +222,11 @@ static void
 common_test_cring_urc (const gchar *urc,
                        const gchar *expected_type)
 {
-    GError     *error = NULL;
-    GRegex     *cring_regex = NULL;
-    GMatchInfo *match_info = NULL;
-    gchar      *type;
-    gboolean    result;
+    g_autoptr(GRegex)      cring_regex = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    g_autofree gchar      *type = NULL;
+    GError                *error = NULL;
+    gboolean               result;
 
     cring_regex = mm_simtech_get_cring_urc_regex ();
 
@@ -250,10 +239,6 @@ common_test_cring_urc (const gchar *urc,
     g_assert (type);
 
     g_assert_cmpstr (type, ==, expected_type);
-
-    g_match_info_free (match_info);
-    g_regex_unref (cring_regex);
-    g_free (type);
 }
 
 static void
@@ -274,11 +259,11 @@ static void
 common_test_rxdtmf_urc (const gchar *urc,
                         const gchar *expected_str)
 {
-    GError     *error = NULL;
-    GRegex     *rxdtmf_regex = NULL;
-    GMatchInfo *match_info = NULL;
-    gchar      *type;
-    gboolean    result;
+    g_autoptr(GRegex)      rxdtmf_regex = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    g_autofree gchar      *type = NULL;
+    GError                *error = NULL;
+    gboolean               result;
 
     rxdtmf_regex = mm_simtech_get_rxdtmf_urc_regex ();
 
@@ -291,10 +276,6 @@ common_test_rxdtmf_urc (const gchar *urc,
     g_assert (type);
 
     g_assert_cmpstr (type, ==, expected_str);
-
-    g_match_info_free (match_info);
-    g_regex_unref (rxdtmf_regex);
-    g_free (type);
 }
 
 static void

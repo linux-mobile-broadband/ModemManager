@@ -31,14 +31,14 @@ mm_ublox_parse_upincnt_response (const gchar  *response,
                                  guint        *out_puk2_attempts,
                                  GError      **error)
 {
-    GRegex     *r;
-    GMatchInfo *match_info;
-    GError     *inner_error = NULL;
-    guint       pin_attempts = 0;
-    guint       pin2_attempts = 0;
-    guint       puk_attempts = 0;
-    guint       puk2_attempts = 0;
-    gboolean    success = TRUE;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *inner_error = NULL;
+    guint                  pin_attempts = 0;
+    guint                  pin2_attempts = 0;
+    guint                  puk_attempts = 0;
+    guint                  puk2_attempts = 0;
+    gboolean               success = TRUE;
 
     g_assert (out_pin_attempts);
     g_assert (out_pin2_attempts);
@@ -78,9 +78,6 @@ mm_ublox_parse_upincnt_response (const gchar  *response,
 
 out:
 
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
     if (inner_error) {
         g_propagate_error (error, inner_error);
         return FALSE;
@@ -107,10 +104,10 @@ mm_ublox_parse_uusbconf_response (const gchar        *response,
                                   MMUbloxUsbProfile  *out_profile,
                                   GError            **error)
 {
-    GRegex *r;
-    GMatchInfo *match_info;
-    GError *inner_error = NULL;
-    MMUbloxUsbProfile profile = MM_UBLOX_USB_PROFILE_UNKNOWN;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *inner_error = NULL;
+    MMUbloxUsbProfile      profile = MM_UBLOX_USB_PROFILE_UNKNOWN;
 
     g_assert (out_profile != NULL);
 
@@ -127,7 +124,7 @@ mm_ublox_parse_uusbconf_response (const gchar        *response,
 
     g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
     if (!inner_error && g_match_info_matches (match_info)) {
-        gchar *profile_name;
+        g_autofree gchar *profile_name = NULL;
 
         profile_name = mm_get_string_unquoted_from_match_info (match_info, 2);
         if (profile_name && profile_name[0]) {
@@ -140,11 +137,7 @@ mm_ublox_parse_uusbconf_response (const gchar        *response,
                                            "Unknown USB profile: '%s'", profile_name);
         } else
             profile = MM_UBLOX_USB_PROFILE_BACK_COMPATIBLE;
-        g_free (profile_name);
     }
-
-    g_match_info_free (match_info);
-    g_regex_unref (r);
 
     if (inner_error) {
         g_propagate_error (error, inner_error);
@@ -169,10 +162,10 @@ mm_ublox_parse_ubmconf_response (const gchar            *response,
                                  MMUbloxNetworkingMode  *out_mode,
                                  GError                **error)
 {
-    GRegex *r;
-    GMatchInfo *match_info;
-    GError *inner_error = NULL;
-    MMUbloxNetworkingMode mode = MM_UBLOX_NETWORKING_MODE_UNKNOWN;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *inner_error = NULL;
+    MMUbloxNetworkingMode  mode = MM_UBLOX_NETWORKING_MODE_UNKNOWN;
 
     g_assert (out_mode != NULL);
 
@@ -203,9 +196,6 @@ mm_ublox_parse_ubmconf_response (const gchar            *response,
         }
     }
 
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
     if (inner_error) {
         g_propagate_error (error, inner_error);
         return FALSE;
@@ -234,15 +224,15 @@ mm_ublox_parse_uipaddr_response (const gchar  *response,
                                  gchar       **out_ipv6_link_local_address,
                                  GError      **error)
 {
-    GRegex     *r;
-    GMatchInfo *match_info;
-    GError     *inner_error = NULL;
-    guint       cid = 0;
-    gchar      *if_name = NULL;
-    gchar      *ipv4_address = NULL;
-    gchar      *ipv4_subnet = NULL;
-    gchar      *ipv6_global_address = NULL;
-    gchar      *ipv6_link_local_address = NULL;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *inner_error = NULL;
+    guint                  cid = 0;
+    gchar                 *if_name = NULL;
+    gchar                 *ipv4_address = NULL;
+    gchar                 *ipv4_subnet = NULL;
+    gchar                 *ipv6_global_address = NULL;
+    gchar                 *ipv6_link_local_address = NULL;
 
     /* Response may be e.g.:
      * +UIPADDR: 1,"ccinet0","5.168.120.13","255.255.255.0","",""
@@ -288,10 +278,6 @@ mm_ublox_parse_uipaddr_response (const gchar  *response,
         ipv6_link_local_address = mm_get_string_unquoted_from_match_info (match_info, 6);
 
 out:
-
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
     if (inner_error) {
         g_free (if_name);
         g_free (ipv4_address);
@@ -1550,11 +1536,11 @@ GArray *
 mm_ublox_parse_uact_response (const gchar  *response,
                               GError      **error)
 {
-    GRegex     *r;
-    GMatchInfo *match_info;
-    GError     *inner_error = NULL;
-    GArray     *nums = NULL;
-    GArray     *bands = NULL;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *inner_error = NULL;
+    GArray                *nums = NULL;
+    GArray                *bands = NULL;
 
     /*
      * AT+UACT?
@@ -1566,15 +1552,11 @@ mm_ublox_parse_uact_response (const gchar  *response,
 
     g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
     if (!inner_error && g_match_info_matches (match_info)) {
-        gchar *bandstr;
+        g_autofree gchar *bandstr = NULL;
 
         bandstr = mm_get_string_unquoted_from_match_info (match_info, 4);
         nums = mm_parse_uint_list (bandstr, &inner_error);
-        g_free (bandstr);
     }
-
-    g_match_info_free (match_info);
-    g_regex_unref (r);
 
     if (inner_error) {
         g_propagate_error (error, inner_error);
@@ -1632,16 +1614,16 @@ mm_ublox_parse_uact_test (const gchar  *response,
                           GArray      **bands4g_out,
                           GError      **error)
 {
-    GRegex       *r;
-    GMatchInfo   *match_info;
-    GError       *inner_error = NULL;
-    const gchar  *bands2g_str = NULL;
-    const gchar  *bands3g_str = NULL;
-    const gchar  *bands4g_str = NULL;
-    GArray       *bands2g = NULL;
-    GArray       *bands3g = NULL;
-    GArray       *bands4g = NULL;
-    gchar       **split = NULL;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    g_auto(GStrv)          split = NULL;
+    GError                *inner_error = NULL;
+    const gchar           *bands2g_str = NULL;
+    const gchar           *bands3g_str = NULL;
+    const gchar           *bands4g_str = NULL;
+    GArray                *bands2g = NULL;
+    GArray                *bands3g = NULL;
+    GArray                *bands4g = NULL;
 
     g_assert (bands2g_out && bands3g_out && bands4g_out);
 
@@ -1658,8 +1640,8 @@ mm_ublox_parse_uact_test (const gchar  *response,
         goto out;
 
     if (g_match_info_matches (match_info)) {
-        gchar *aux;
-        guint n_groups;
+        g_autofree gchar *aux = NULL;
+        guint             n_groups;
 
         aux  = mm_get_string_unquoted_from_match_info (match_info, 4);
         split = mm_split_string_groups (aux);
@@ -1670,7 +1652,6 @@ mm_ublox_parse_uact_test (const gchar  *response,
             bands3g_str = split[1];
         if (n_groups >= 3)
             bands4g_str = split[2];
-        g_free (aux);
     }
 
     if (!bands2g_str && !bands3g_str && !bands4g_str) {
@@ -1692,10 +1673,6 @@ mm_ublox_parse_uact_test (const gchar  *response,
     /* success */
 
 out:
-    g_strfreev (split);
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
     if (inner_error) {
         if (bands2g)
             g_array_unref (bands2g);
@@ -1760,13 +1737,13 @@ mm_ublox_parse_urat_read_response (const gchar  *response,
                                    MMModemMode  *out_preferred,
                                    GError      **error)
 {
-    GRegex      *r;
-    GMatchInfo  *match_info;
-    GError      *inner_error = NULL;
-    MMModemMode  allowed = MM_MODEM_MODE_NONE;
-    MMModemMode  preferred = MM_MODEM_MODE_NONE;
-    gchar       *allowed_str = NULL;
-    gchar       *preferred_str = NULL;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *inner_error = NULL;
+    MMModemMode            allowed = MM_MODEM_MODE_NONE;
+    MMModemMode            preferred = MM_MODEM_MODE_NONE;
+    g_autofree gchar      *allowed_str = NULL;
+    g_autofree gchar      *preferred_str = NULL;
 
     g_assert (out_allowed != NULL && out_preferred != NULL);
 
@@ -1821,13 +1798,6 @@ mm_ublox_parse_urat_read_response (const gchar  *response,
     }
 
 out:
-
-    g_free (allowed_str);
-    g_free (preferred_str);
-
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
     if (inner_error) {
         g_propagate_error (error, inner_error);
         return FALSE;
@@ -1981,14 +1951,14 @@ mm_ublox_parse_ugcntrd_response_for_cid (const gchar  *response,
                                          guint64      *out_total_rx_bytes,
                                          GError      **error)
 {
-    GRegex     *r;
-    GMatchInfo *match_info = NULL;
-    GError     *inner_error = NULL;
-    guint64     session_tx_bytes = 0;
-    guint64     session_rx_bytes = 0;
-    guint64     total_tx_bytes   = 0;
-    guint64     total_rx_bytes   = 0;
-    gboolean    matched = FALSE;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *inner_error = NULL;
+    guint64                session_tx_bytes = 0;
+    guint64                session_rx_bytes = 0;
+    guint64                total_tx_bytes   = 0;
+    guint64                total_rx_bytes   = 0;
+    gboolean               matched = FALSE;
 
     /* Response may be e.g.:
      *  +UGCNTRD: 31,2704,1819,2724,1839
@@ -2044,10 +2014,6 @@ mm_ublox_parse_ugcntrd_response_for_cid (const gchar  *response,
     }
 
 out:
-
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
     if (inner_error) {
         g_propagate_error (error, inner_error);
         return FALSE;

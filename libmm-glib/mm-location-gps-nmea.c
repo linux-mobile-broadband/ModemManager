@@ -54,9 +54,7 @@ static gboolean
 check_append_or_replace (MMLocationGpsNmea *self,
                          const gchar *trace)
 {
-    /* By default, replace */
-    gboolean append_or_replace = FALSE;
-    GMatchInfo *match_info = NULL;
+    g_autoptr(GMatchInfo) match_info = NULL;
 
     if (G_UNLIKELY (!self->priv->sequence_regex))
         self->priv->sequence_regex = g_regex_new ("\\$..(?:ALM|GSV|RTE|SFI),(\\d),(\\d).*",
@@ -69,11 +67,11 @@ check_append_or_replace (MMLocationGpsNmea *self,
 
         /* If we don't have the first element of a sequence, append */
         if (mm_get_uint_from_match_info (match_info, 2, &index) && index != 1)
-            append_or_replace = TRUE;
+            return TRUE;
     }
-    g_match_info_free (match_info);
 
-    return append_or_replace;
+    /* By default, replace */
+    return FALSE;
 }
 
 static gboolean

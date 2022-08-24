@@ -159,12 +159,12 @@ nwrat_query_ready (MMBaseModem *self,
                    GTask *task)
 {
     LoadCurrentModesResult *result;
-    GError *error = NULL;
-    const gchar *response;
-    GRegex *r;
-    GMatchInfo *match_info = NULL;
-    gint a = -1;
-    gint b = -1;
+    GError                 *error = NULL;
+    const gchar            *response;
+    g_autoptr(GRegex)       r = NULL;
+    g_autoptr(GMatchInfo)   match_info = NULL;
+    gint                    a = -1;
+    gint                    b = -1;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
@@ -187,8 +187,6 @@ nwrat_query_ready (MMBaseModem *self,
                                      "Couldn't match NWRAT reply: %s",
                                      response);
         g_object_unref (task);
-        g_match_info_free (match_info);
-        g_regex_unref (r);
         return;
     }
 
@@ -203,8 +201,6 @@ nwrat_query_ready (MMBaseModem *self,
             "Failed to parse mode/tech response '%s': invalid modes reported",
             response);
         g_object_unref (task);
-        g_match_info_free (match_info);
-        g_regex_unref (r);
         return;
     }
 
@@ -238,9 +234,6 @@ nwrat_query_ready (MMBaseModem *self,
         g_assert_not_reached ();
         break;
     }
-
-    g_match_info_free (match_info);
-    g_regex_unref (r);
 
     g_task_return_pointer (task, result, g_free);
     g_object_unref (task);
@@ -1396,13 +1389,18 @@ parse_nwltime_reply (const char *response,
                      MMNetworkTimezone **out_tz,
                      GError **error)
 {
-    GRegex *r;
-    GMatchInfo *match_info = NULL;
-    GError *match_error = NULL;
-    guint year, month, day, hour, minute, second;
-    gchar *result = NULL;
-    gint utc_offset = 0;
-    gboolean success = FALSE;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *match_error = NULL;
+    guint                  year;
+    guint                  month;
+    guint                  day;
+    guint                  hour;
+    guint                  minute;
+    guint                  second;
+    g_autofree gchar      *result = NULL;
+    gint                   utc_offset = 0;
+    gboolean               success = FALSE;
 
     /* Sample reply: 2013.3.27.15.47.19.2.-5 */
     r = g_regex_new ("(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\\.([\\-\\+\\d]+)$", 0, 0, NULL);
@@ -1429,7 +1427,6 @@ parse_nwltime_reply (const char *response,
             mm_get_uint_from_match_info (match_info, 5, &minute) &&
             mm_get_uint_from_match_info (match_info, 6, &second) &&
             mm_get_int_from_match_info (match_info, 8, &utc_offset)) {
-
             result = mm_new_iso8601_time (year, month, day, hour, minute, second,
                                           TRUE, utc_offset * 60, error);
             if (out_tz) {
@@ -1447,12 +1444,8 @@ parse_nwltime_reply (const char *response,
     }
 
     if (out_iso_8601)
-        *out_iso_8601 = result;
-    else
-        g_free (result);
+        *out_iso_8601 = g_steal_pointer (&result);
 
-    g_match_info_free (match_info);
-    g_regex_unref (r);
     return success;
 }
 

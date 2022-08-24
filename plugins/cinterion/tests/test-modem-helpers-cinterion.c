@@ -1192,18 +1192,17 @@ test_smong_response_no_match (void)
 /* Test ^SLCC URCs */
 
 static void
-common_test_slcc_urc (const gchar               *urc,
+common_test_slcc_urc (const gchar      *urc,
                       const MMCallInfo *expected_call_info_list,
-                      guint                      expected_call_info_list_size)
+                      guint             expected_call_info_list_size)
 {
-    GError     *error = NULL;
-    GRegex     *slcc_regex = NULL;
-    gboolean    result;
-    GMatchInfo *match_info = NULL;
-    gchar      *str;
-    GList      *call_info_list = NULL;
-    GList      *l;
-
+    g_autoptr(GRegex)      slcc_regex = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    g_autofree gchar      *str = NULL;
+    GError                *error = NULL;
+    GList                 *call_info_list = NULL;
+    GList                 *l;
+    gboolean               result;
 
     slcc_regex = mm_cinterion_get_slcc_regex ();
 
@@ -1230,8 +1229,8 @@ common_test_slcc_urc (const gchar               *urc,
 
     for (l = call_info_list; l; l = g_list_next (l)) {
         const MMCallInfo *call_info = (const MMCallInfo *)(l->data);
-        gboolean                   found = FALSE;
-        guint                      i;
+        gboolean          found = FALSE;
+        guint             i;
 
         g_debug ("call at index %u: direction %s, state %s, number %s",
                  call_info->index,
@@ -1247,10 +1246,6 @@ common_test_slcc_urc (const gchar               *urc,
 
         g_assert (found);
     }
-
-    g_match_info_free (match_info);
-    g_regex_unref (slcc_regex);
-    g_free (str);
 
     mm_cinterion_call_info_list_free (call_info_list);
 }
@@ -1322,12 +1317,12 @@ common_test_ctzu_urc (const gchar *urc,
                       gint         expected_offset,
                       gint         expected_dst_offset)
 {
-    GError            *error = NULL;
-    GRegex            *ctzu_regex = NULL;
-    gboolean           result;
-    GMatchInfo        *match_info = NULL;
-    gchar             *iso8601;
-    MMNetworkTimezone *tz = NULL;
+    g_autoptr(GRegex)      ctzu_regex = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    g_autofree gchar      *iso8601 = NULL;
+    GError                *error = NULL;
+    gboolean               result;
+    MMNetworkTimezone     *tz = NULL;
 
     ctzu_regex = mm_cinterion_get_ctzu_regex ();
 
@@ -1342,7 +1337,6 @@ common_test_ctzu_urc (const gchar *urc,
 
     g_assert (iso8601);
     g_assert_cmpstr (expected_iso8601, ==, iso8601);
-    g_free (iso8601);
 
     g_assert (tz);
     g_assert_cmpint (expected_offset, ==, mm_network_timezone_get_offset (tz));
@@ -1351,8 +1345,6 @@ common_test_ctzu_urc (const gchar *urc,
         g_assert_cmpuint ((guint)expected_dst_offset, ==, mm_network_timezone_get_dst_offset (tz));
 
     g_object_unref (tz);
-    g_match_info_free (match_info);
-    g_regex_unref (ctzu_regex);
 }
 
 static void

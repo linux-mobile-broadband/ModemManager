@@ -23,16 +23,15 @@ GList *
 mm_sierra_parse_scact_read_response (const gchar  *reply,
                                      GError      **error)
 {
-    GError     *inner_error = NULL;
-    GRegex     *r;
-    GMatchInfo *match_info;
-    GList      *list;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *inner_error = NULL;
+    GList                 *list = NULL;
 
     if (!reply || !reply[0])
         /* Nothing configured, all done */
         return NULL;
 
-    list = NULL;
     r = g_regex_new ("!SCACT:\\s*(\\d+),(\\d+)",
                      G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW, 0, &inner_error);
     g_assert (r);
@@ -66,9 +65,6 @@ mm_sierra_parse_scact_read_response (const gchar  *reply,
         g_match_info_next (match_info, &inner_error);
     }
 
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
     if (inner_error) {
         mm_3gpp_pdp_context_active_list_free (list);
         g_propagate_error (error, inner_error);
@@ -76,7 +72,5 @@ mm_sierra_parse_scact_read_response (const gchar  *reply,
         return NULL;
     }
 
-    list = g_list_sort (list, (GCompareFunc) mm_3gpp_pdp_context_active_cmp);
-
-    return list;
+    return g_list_sort (list, (GCompareFunc) mm_3gpp_pdp_context_active_cmp);
 }

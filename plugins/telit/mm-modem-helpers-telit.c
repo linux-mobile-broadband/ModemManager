@@ -701,11 +701,11 @@ common_parse_bnd_response (const gchar    *response,
                            gpointer        log_object,
                            GError        **error)
 {
-    GError     *inner_error = NULL;
-    GArray     *bands = NULL;
-    GMatchInfo *match_info = NULL;
-    GRegex     *r = NULL;
-    const gchar *load_bands_regex = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    g_autoptr(GRegex)      r = NULL;
+    GError                *inner_error = NULL;
+    GArray                *bands = NULL;
+    const gchar           *load_bands_regex = NULL;
 
     static const gchar *load_bands_regex_4g_hex[] = {
         [LOAD_BANDS_TYPE_SUPPORTED] = "#BND:"MM_SUPPORTED_BANDS_2G MM_SUPPORTED_BANDS_3G MM_SUPPORTED_BANDS_4G_HEX,
@@ -761,9 +761,6 @@ common_parse_bnd_response (const gchar    *response,
             goto out;
     }
 out:
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
     if (inner_error) {
         g_propagate_error (error, inner_error);
         g_clear_pointer (&bands, g_array_unref);

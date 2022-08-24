@@ -167,7 +167,7 @@ mm_serial_parser_v1_parse (gpointer   data,
                            GError   **error)
 {
     MMSerialParserV1 *parser = (MMSerialParserV1 *) data;
-    GMatchInfo *match_info;
+    GMatchInfo *match_info = NULL;
     GError *local_error = NULL;
     gboolean found = FALSE;
     char *str = NULL;
@@ -242,7 +242,7 @@ mm_serial_parser_v1_parse (gpointer   data,
             local_error = mm_mobile_equipment_error_for_code (atoi (str), log_object);
             goto done;
         }
-        g_match_info_free (match_info);
+        g_clear_pointer (&match_info, g_match_info_free);
     }
 
     /* Numeric CME errors */
@@ -255,7 +255,7 @@ mm_serial_parser_v1_parse (gpointer   data,
         local_error = mm_mobile_equipment_error_for_code (atoi (str), log_object);
         goto done;
     }
-    g_match_info_free (match_info);
+    g_clear_pointer (&match_info, g_match_info_free);
 
     /* Numeric CMS errors */
     found = g_regex_match_full (parser->regex_cms_error,
@@ -267,7 +267,7 @@ mm_serial_parser_v1_parse (gpointer   data,
         local_error = mm_message_error_for_code (atoi (str), log_object);
         goto done;
     }
-    g_match_info_free (match_info);
+    g_clear_pointer (&match_info, g_match_info_free);
 
     /* String CME errors */
     found = g_regex_match_full (parser->regex_cme_error_str,
@@ -279,7 +279,7 @@ mm_serial_parser_v1_parse (gpointer   data,
         local_error = mm_mobile_equipment_error_for_string (str, log_object);
         goto done;
     }
-    g_match_info_free (match_info);
+    g_clear_pointer (&match_info, g_match_info_free);
 
     /* String CMS errors */
     found = g_regex_match_full (parser->regex_cms_error_str,
@@ -291,7 +291,7 @@ mm_serial_parser_v1_parse (gpointer   data,
         local_error = mm_message_error_for_string (str, log_object);
         goto done;
     }
-    g_match_info_free (match_info);
+    g_clear_pointer (&match_info, g_match_info_free);
 
     /* Motorola EZX errors */
     found = g_regex_match_full (parser->regex_ezx_error,
@@ -303,7 +303,7 @@ mm_serial_parser_v1_parse (gpointer   data,
         local_error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN, log_object);
         goto done;
     }
-    g_match_info_free (match_info);
+    g_clear_pointer (&match_info, g_match_info_free);
 
     /* Last resort; unknown error */
     found = g_regex_match_full (parser->regex_unknown_error,
@@ -313,7 +313,7 @@ mm_serial_parser_v1_parse (gpointer   data,
         local_error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN, log_object);
         goto done;
     }
-    g_match_info_free (match_info);
+    g_clear_pointer (&match_info, g_match_info_free);
 
     /* Connection failures */
     found = g_regex_match_full (parser->regex_connect_failed,
@@ -341,7 +341,7 @@ mm_serial_parser_v1_parse (gpointer   data,
         local_error = mm_connection_error_for_code (code, log_object);
         goto done;
     }
-    g_match_info_free (match_info);
+    g_clear_pointer (&match_info, g_match_info_free);
 
     /* NA error */
     found = g_regex_match_full (parser->regex_na,
@@ -357,7 +357,8 @@ mm_serial_parser_v1_parse (gpointer   data,
 
 done:
     g_free (str);
-    g_match_info_free (match_info);
+    g_clear_pointer (&match_info, g_match_info_free);
+
     if (found)
         response_clean (response);
 

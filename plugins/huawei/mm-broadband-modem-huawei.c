@@ -627,12 +627,13 @@ load_unlock_retries_finish (MMIfaceModem *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    MMUnlockRetries *unlock_retries;
-    const gchar *result;
-    GRegex *r;
-    GMatchInfo *match_info = NULL;
-    GError *match_error = NULL;
-    guint i;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    MMUnlockRetries       *unlock_retries;
+    const gchar           *result;
+    GError                *match_error = NULL;
+    guint                  i;
+
     MMModemLock locks[4] = {
         MM_MODEM_LOCK_SIM_PUK,
         MM_MODEM_LOCK_SIM_PIN,
@@ -657,9 +658,6 @@ load_unlock_retries_finish (MMIfaceModem *self,
                          MM_CORE_ERROR_FAILED,
                          "Could not parse ^CPIN results: Response didn't match (%s)",
                          result);
-
-        g_match_info_free (match_info);
-        g_regex_unref (r);
         return NULL;
     }
 
@@ -682,9 +680,6 @@ load_unlock_retries_finish (MMIfaceModem *self,
 
         mm_unlock_retries_set (unlock_retries, locks[i], num);
     }
-
-    g_match_info_free (match_info);
-    g_regex_unref (r);
 
     return unlock_retries;
 }

@@ -67,13 +67,16 @@ load_unlock_retries_ready (MMBaseModem *self,
                            GAsyncResult *res,
                            GTask *task)
 {
-    const gchar *response;
-    GError *error = NULL;
-    GMatchInfo *match_info = NULL;
-    GError *match_error = NULL;
-    GRegex *r = NULL;
-    gint pin1, puk1, pin2, puk2;
-    MMUnlockRetries *retries;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    g_autoptr(GRegex)      r = NULL;
+    const gchar           *response;
+    GError                *error = NULL;
+    GError                *match_error = NULL;
+    gint                   pin1;
+    gint                   puk1;
+    gint                   pin2;
+    gint                   puk2;
+    MMUnlockRetries       *retries;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
@@ -91,14 +94,11 @@ load_unlock_retries_ready (MMBaseModem *self,
     g_assert (r != NULL);
 
     if (!g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &match_error)){
-        if (match_error) {
-            g_propagate_error (&error, match_error);
-        } else {
-            g_set_error (&error,
-                         MM_CORE_ERROR,
-                         MM_CORE_ERROR_FAILED,
-                         "Failed to match EPINC response: %s", response);
-        }
+        if (match_error)
+            g_task_return_error (task, match_error);
+        else
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                     "Failed to match EPINC response: %s", response);
         g_task_return_error (task, error);
     } else if (!mm_get_int_from_match_info (match_info, 1, &pin1) ||
                !mm_get_int_from_match_info (match_info, 2, &pin2) ||
@@ -120,9 +120,6 @@ load_unlock_retries_ready (MMBaseModem *self,
         g_task_return_pointer (task, retries, g_object_unref);
     }
     g_object_unref (task);
-
-    g_match_info_free (match_info);
-    g_regex_unref (r);
 }
 
 static void
@@ -178,14 +175,14 @@ get_supported_modes_ready (MMBaseModem *self,
                            GTask *task)
 
 {
-    const gchar *response;
-    GError *error = NULL;
-    GMatchInfo *match_info = NULL;
-    MMModemModeCombination mode;
-    GArray *combinations;
-    GRegex *r;
-    GError *match_error = NULL;
-    gint device_type;
+    g_autoptr(GMatchInfo)   match_info = NULL;
+    g_autoptr(GRegex)       r = NULL;
+    const gchar            *response;
+    GError                 *error = NULL;
+    MMModemModeCombination  mode;
+    GArray                 *combinations;
+    GError                 *match_error = NULL;
+    gint                    device_type;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
@@ -205,9 +202,6 @@ get_supported_modes_ready (MMBaseModem *self,
             g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                      "Failed to match EGMR response: %s", response);
         g_object_unref (task);
-
-        g_match_info_free (match_info);
-        g_regex_unref (r);
         return;
     }
 
@@ -216,9 +210,6 @@ get_supported_modes_ready (MMBaseModem *self,
                                  "Failed to parse the allowed mode response: '%s'",
                                  response);
         g_object_unref (task);
-
-        g_regex_unref (r);
-        g_match_info_free (match_info);
         return;
     }
 
@@ -271,9 +262,6 @@ get_supported_modes_ready (MMBaseModem *self,
     */
     g_task_return_pointer (task, combinations, (GDestroyNotify)g_array_unref);
     g_object_unref (task);
-
-    g_regex_unref (r);
-    g_match_info_free (match_info);
 }
 
 static void
@@ -307,17 +295,16 @@ load_current_modes_finish (MMIfaceModem *self,
                            MMModemMode *preferred,
                            GError **error)
 {
-    const gchar *response;
-    GMatchInfo *match_info = NULL;
-    GRegex *r;
-    gint erat_mode = -1;
-    gint erat_pref = -1;
-    GError *match_error = NULL;
-    gboolean result = FALSE;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    g_autoptr(GRegex)      r = NULL;
+    const gchar           *response;
+    gint                   erat_mode = -1;
+    gint                   erat_pref = -1;
+    GError                *match_error = NULL;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
     if (!response)
-        return result;
+        return FALSE;
 
     r = g_regex_new (
                 "\\+ERAT:\\s*[0-9]+,\\s*[0-9]+,\\s*([0-9]+),\\s*([0-9]+)",
@@ -329,30 +316,22 @@ load_current_modes_finish (MMIfaceModem *self,
     if (!g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &match_error)) {
         if (match_error)
             g_propagate_error (error, match_error);
-        else {
-            g_set_error (error,
-                         MM_CORE_ERROR,
-                         MM_CORE_ERROR_FAILED,
+        else
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                          "Couldn't parse +ERAT response: '%s'",
                          response);
-
-        }
-        goto done;
+        return FALSE;
     }
 
     if (!mm_get_int_from_match_info (match_info, 1, &erat_mode) ||
         !mm_get_int_from_match_info (match_info, 2, &erat_pref)) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "Failed to parse the ERAT response: m=%d p=%d",
                      erat_mode, erat_pref);
-            goto done;
+        return FALSE;
     }
 
     /* Correctly parsed! */
-    result = TRUE;
-
     switch (erat_mode) {
         case 0:
             *allowed = MM_MODEM_MODE_2G;
@@ -376,9 +355,8 @@ load_current_modes_finish (MMIfaceModem *self,
             *allowed = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G;
             break;
         default:
-            result = FALSE;
             mm_obj_dbg (self, "unsupported allowed mode reported in +ERAT: %d", erat_mode);
-            goto done;
+            return FALSE;
     }
 
     switch (erat_pref) {
@@ -395,17 +373,11 @@ load_current_modes_finish (MMIfaceModem *self,
             *preferred = MM_MODEM_MODE_4G;
             break;
         default:
-            result = FALSE;
             mm_obj_dbg (self, "unsupported preferred mode %d", erat_pref);
-            goto done;
+            return FALSE;
     }
 
-done:
-    if (r)
-        g_regex_unref (r);
-    g_match_info_free (match_info);
-
-    return result;
+    return TRUE;
 }
 
 static void

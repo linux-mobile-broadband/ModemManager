@@ -55,15 +55,17 @@ mm_mbm_parse_e2ipcfg_response (const gchar *response,
                                MMBearerIpConfig **out_ip6_config,
                                GError **error)
 {
-    MMBearerIpConfig **ip_config = NULL;
-    gboolean got_address = FALSE, got_gw = FALSE, got_dns = FALSE;
-    GRegex *r;
-    GMatchInfo *match_info = NULL;
-    GError *match_error = NULL;
-    gchar *dns[3] = { 0 };
-    guint dns_idx = 0;
-    int family = AF_INET;
-    MMBearerIpMethod method = MM_BEARER_IP_METHOD_STATIC;
+    MMBearerIpConfig     **ip_config = NULL;
+    gboolean               got_address = FALSE;
+    gboolean               got_gw = FALSE;
+    gboolean               got_dns = FALSE;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *match_error = NULL;
+    gchar                 *dns[3] = { 0 };
+    guint                  dns_idx = 0;
+    int                    family = AF_INET;
+    MMBearerIpMethod       method = MM_BEARER_IP_METHOD_STATIC;
 
     g_return_val_if_fail (out_ip4_config, FALSE);
     g_return_val_if_fail (out_ip6_config, FALSE);
@@ -108,14 +110,17 @@ mm_mbm_parse_e2ipcfg_response (const gchar *response,
                                  MM_CORE_ERROR_FAILED,
                                  "Couldn't match " E2IPCFG_TAG " reply");
         }
-        goto done;
+        return FALSE;
     }
 
     *ip_config = mm_bearer_ip_config_new ();
     mm_bearer_ip_config_set_method (*ip_config, method);
     while (g_match_info_matches (match_info)) {
-        char *id = g_match_info_fetch (match_info, 1);
-        char *str = g_match_info_fetch (match_info, 2);
+        g_autofree gchar *id = NULL;
+        g_autofree gchar *str = NULL;
+
+        id = g_match_info_fetch (match_info, 1);
+        str = g_match_info_fetch (match_info, 2);
 
         switch (atoi (id)) {
         case 1:
@@ -140,8 +145,6 @@ mm_mbm_parse_e2ipcfg_response (const gchar *response,
         default:
             break;
         }
-        g_free (id);
-        g_free (str);
         g_match_info_next (match_info, NULL);
     }
 
@@ -156,12 +159,10 @@ mm_mbm_parse_e2ipcfg_response (const gchar *response,
         *ip_config = NULL;
         g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                              "Got incomplete IP configuration from " E2IPCFG_TAG);
+        return FALSE;
     }
 
-done:
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-    return !!*ip_config;
+    return TRUE;
 }
 
 /*****************************************************************************/

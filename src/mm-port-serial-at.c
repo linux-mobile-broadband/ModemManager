@@ -269,8 +269,8 @@ parse_unsolicited (MMPortSerial *port, GByteArray *response)
 
     for (iter = self->priv->unsolicited_msg_handlers; iter; iter = iter->next) {
         MMAtUnsolicitedMsgHandler *handler = (MMAtUnsolicitedMsgHandler *) iter->data;
-        GMatchInfo *match_info;
-        gboolean matches;
+        g_autoptr(GMatchInfo)      match_info = NULL;
+        gboolean                   matches;
 
         if (!handler->enable)
             continue;
@@ -286,12 +286,10 @@ parse_unsolicited (MMPortSerial *port, GByteArray *response)
             }
         }
 
-        g_match_info_free (match_info);
-
         if (matches) {
             /* Remove matches */
-            char *str;
-            int result_len = response->len;
+            g_autofree gchar *str = NULL;
+            gint              result_len = response->len;
 
             str = g_regex_replace_eval (handler->regex,
                                         (const char *) response->data,
@@ -301,7 +299,6 @@ parse_unsolicited (MMPortSerial *port, GByteArray *response)
 
             g_byte_array_remove_range (response, 0, response->len);
             g_byte_array_append (response, (const guint8 *) str, result_len);
-            g_free (str);
         }
     }
 }

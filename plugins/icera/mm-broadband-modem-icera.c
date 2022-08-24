@@ -123,12 +123,12 @@ load_supported_modes_finish (MMIfaceModem *self,
                              GAsyncResult *res,
                              GError **error)
 {
-    GArray *combinations = NULL;
-    const gchar *response;
-    gchar **split = NULL;
-    GMatchInfo *match_info;
-    GRegex *r;
-    guint i;
+    GArray                 *combinations = NULL;
+    const gchar            *response;
+    gchar                 **split = NULL;
+    g_autoptr(GMatchInfo)   match_info = NULL;
+    g_autoptr(GRegex)       r = NULL;
+    guint                   i;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
     if (!response)
@@ -145,17 +145,12 @@ load_supported_modes_finish (MMIfaceModem *self,
 
     g_regex_match (r, response, 0, &match_info);
     if (g_match_info_matches (match_info)) {
-        gchar *aux;
+        g_autofree gchar *aux = NULL;
 
         aux = mm_get_string_unquoted_from_match_info (match_info, 1);
-        if (aux) {
+        if (aux)
             split = g_strsplit (aux, ",", -1);
-            g_free (aux);
-        }
     }
-
-    g_match_info_free (match_info);
-    g_regex_unref (r);
 
     if (!split) {
         g_set_error (error,
@@ -1122,11 +1117,12 @@ icera_band_to_mm (const char *icera)
 }
 
 static GSList *
-parse_bands (const gchar *response, guint32 *out_len)
+parse_bands (const gchar *response,
+             guint32     *out_len)
 {
-    GRegex *r;
-    GMatchInfo *info;
-    GSList *bands = NULL;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  info = NULL;
+    GSList                *bands = NULL;
 
     g_return_val_if_fail (out_len != NULL, NULL);
 
@@ -1163,8 +1159,6 @@ parse_bands (const gchar *response, guint32 *out_len)
         g_free (enabled);
         g_match_info_next (info, NULL);
     }
-    g_match_info_free (info);
-    g_regex_unref (r);
 
     return bands;
 }

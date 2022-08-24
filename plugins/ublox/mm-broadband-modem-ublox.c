@@ -1122,10 +1122,10 @@ static void
 ublox_setup_ciev_handler (MMIfaceModem *self,
                           guint simind_idx)
 {
-    GRegex *pattern;
-    gchar *ciev_regex;
-    MMPortSerialAt *primary_port;
-    MMPortSerialAt *secondary_port;
+    g_autoptr(GRegex)  pattern = NULL;
+    g_autofree gchar  *ciev_regex = NULL;
+    MMPortSerialAt    *primary_port;
+    MMPortSerialAt    *secondary_port;
 
     primary_port = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
     mm_obj_dbg (self, "setting up simind 'CIEV: %d' events handler", simind_idx);
@@ -1149,9 +1149,6 @@ ublox_setup_ciev_handler (MMIfaceModem *self,
             (MMPortSerialAtUnsolicitedMsgFn) ublox_ciev_unsolicited_handler,
             self,
             NULL);
-
-    g_regex_unref (pattern);
-    g_free (ciev_regex);
 }
 
 static void

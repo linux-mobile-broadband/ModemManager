@@ -120,12 +120,12 @@ load_current_modes_finish (MMIfaceModem *self,
                            MMModemMode *preferred,
                            GError **error)
 {
-    GRegex *r;
-    GMatchInfo *match_info;
-    const gchar *response;
-    gchar *str;
-    gint mode = -1;
-    GError *match_error = NULL;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    const gchar           *response;
+    gchar                 *str;
+    gint                   mode = -1;
+    GError                *match_error = NULL;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
     if (!response)
@@ -143,17 +143,12 @@ load_current_modes_finish (MMIfaceModem *self,
                          MM_CORE_ERROR_FAILED,
                          "Couldn't match +SYSSEL reply: %s", response);
         }
-
-        g_match_info_free (match_info);
-        g_regex_unref (r);
         return FALSE;
     }
 
     str = g_match_info_fetch (match_info, 3);
     mode = atoi (str);
     g_free (str);
-    g_match_info_free (match_info);
-    g_regex_unref (r);
 
     switch (mode) {
     case 0:

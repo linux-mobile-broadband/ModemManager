@@ -364,11 +364,11 @@ mm_xmm_parse_xact_query_response (const gchar             *response,
                                   GArray                 **bands_out,
                                   GError                 **error)
 {
-    GRegex     *r;
-    GMatchInfo *match_info;
-    GError     *inner_error = NULL;
-    GArray     *bands = NULL;
-    guint       i;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *inner_error = NULL;
+    GArray                *bands = NULL;
+    guint                  i;
 
     MMModemModeCombination mode = {
         .allowed   = MM_MODEM_MODE_NONE,
@@ -450,9 +450,6 @@ mm_xmm_parse_xact_query_response (const gchar             *response,
     /* success */
 
 out:
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
     if (inner_error) {
         if (bands)
             g_array_unref (bands);
@@ -609,17 +606,17 @@ mm_xmm_parse_xcesq_query_response (const gchar  *response,
                                    gint         *out_rssnr,
                                    GError      **error)
 {
-    GRegex     *r;
-    GMatchInfo *match_info;
-    GError     *inner_error = NULL;
-    guint       rxlev = 99;
-    guint       ber = 99;
-    guint       rscp = 255;
-    guint       ecn0 = 255;
-    guint       rsrq = 255;
-    guint       rsrp = 255;
-    gint        rssnr = 255;
-    gboolean    success = FALSE;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *inner_error = NULL;
+    guint                  rxlev = 99;
+    guint                  ber = 99;
+    guint                  rscp = 255;
+    guint                  ecn0 = 255;
+    guint                  rsrq = 255;
+    guint                  rsrp = 255;
+    gint                   rssnr = 255;
+    gboolean               success = FALSE;
 
     g_assert (out_rxlev);
     g_assert (out_ber);
@@ -672,9 +669,6 @@ mm_xmm_parse_xcesq_query_response (const gchar  *response,
     }
 
 out:
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
     if (inner_error) {
         g_propagate_error (error, inner_error);
         return FALSE;
@@ -959,11 +953,11 @@ mm_xmm_parse_xlcsslp_query_response (const gchar  *response,
                                      gchar       **supl_address,
                                      GError      **error)
 {
-    GRegex     *r;
-    GMatchInfo *match_info;
-    GError     *inner_error = NULL;
-    gchar      *address = NULL;
-    guint       port = 0;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *inner_error = NULL;
+    gchar                 *address = NULL;
+    guint                  port = 0;
 
     /*
      * E.g.:
@@ -996,9 +990,6 @@ mm_xmm_parse_xlcsslp_query_response (const gchar  *response,
     }
 
 out:
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
     if (inner_error) {
         g_propagate_error (error, inner_error);
         return FALSE;

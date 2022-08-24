@@ -39,8 +39,6 @@ mm_huawei_parse_ndisstatqry_response (const gchar *response,
                                       gboolean *ipv6_connected,
                                       GError **error)
 {
-    GRegex *r;
-    GMatchInfo *match_info;
     GError *inner_error = NULL;
 
     if (!response ||
@@ -71,6 +69,9 @@ mm_huawei_parse_ndisstatqry_response (const gchar *response,
 
     /* If multiple fields available, try first parsing method */
     if (strchr (response, ',')) {
+        g_autoptr(GRegex)     r = NULL;
+        g_autoptr(GMatchInfo) match_info = NULL;
+
         r = g_regex_new ("\\^NDISSTAT(?:QRY)?(?:Qry)?:\\s*(\\d),([^,]*),([^,]*),([^,\\r\\n]*)(?:\\r\\n)?"
                          "(?:\\^NDISSTAT:|\\^NDISSTATQRY:)?\\s*,?(\\d)?,?([^,]*)?,?([^,]*)?,?([^,\\r\\n]*)?(?:\\r\\n)?",
                          G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
@@ -108,12 +109,12 @@ mm_huawei_parse_ndisstatqry_response (const gchar *response,
                 ip_type_field += 4;
             }
         }
-
-        g_match_info_free (match_info);
-        g_regex_unref (r);
     }
     /* No separate IPv4/IPv6 info given just connected/not connected */
     else {
+        g_autoptr(GRegex)     r = NULL;
+        g_autoptr(GMatchInfo) match_info = NULL;
+
         r = g_regex_new ("\\^NDISSTAT(?:QRY)?(?:Qry)?:\\s*(\\d)(?:\\r\\n)?",
                          G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
                          0, NULL);
@@ -134,9 +135,6 @@ mm_huawei_parse_ndisstatqry_response (const gchar *response,
                 *ipv4_connected = (gboolean)connected;
             }
         }
-
-        g_match_info_free (match_info);
-        g_regex_unref (r);
     }
 
     if (!ipv4_available && !ipv6_available) {
@@ -208,10 +206,10 @@ mm_huawei_parse_dhcp_response (const char *reply,
                                guint *out_dns2,
                                GError **error)
 {
-    gboolean matched;
-    GRegex *r;
-    GMatchInfo *match_info = NULL;
-    GError *match_error = NULL;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    gboolean               matched;
+    GError                *match_error = NULL;
 
     g_assert (reply != NULL);
     g_assert (out_address != NULL);
@@ -257,8 +255,6 @@ mm_huawei_parse_dhcp_response (const char *reply,
         }
     }
 
-    g_match_info_free (match_info);
-    g_regex_unref (r);
     return matched;
 }
 
@@ -276,10 +272,10 @@ mm_huawei_parse_sysinfo_response (const char *reply,
                                   guint *out_sys_submode,
                                   GError **error)
 {
-    gboolean matched;
-    GRegex *r;
-    GMatchInfo *match_info = NULL;
-    GError *match_error = NULL;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    gboolean               matched;
+    GError                *match_error = NULL;
 
     g_assert (out_srv_status != NULL);
     g_assert (out_srv_domain != NULL);
@@ -323,8 +319,6 @@ mm_huawei_parse_sysinfo_response (const char *reply,
         }
     }
 
-    g_match_info_free (match_info);
-    g_regex_unref (r);
     return matched;
 }
 
@@ -341,10 +335,10 @@ mm_huawei_parse_sysinfoex_response (const char *reply,
                                     guint *out_sys_submode,
                                     GError **error)
 {
-    gboolean matched;
-    GRegex *r;
-    GMatchInfo *match_info = NULL;
-    GError *match_error = NULL;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    gboolean               matched;
+    GError                *match_error = NULL;
 
     g_assert (out_srv_status != NULL);
     g_assert (out_srv_domain != NULL);
@@ -387,8 +381,6 @@ mm_huawei_parse_sysinfoex_response (const char *reply,
         mm_get_uint_from_match_info (match_info, 8, out_sys_submode);
     }
 
-    g_match_info_free (match_info);
-    g_regex_unref (r);
     return matched;
 }
 
@@ -1189,17 +1181,23 @@ mm_huawei_parse_syscfgex_response (const gchar *response,
 /*****************************************************************************/
 /* ^NWTIME response parser */
 
-gboolean mm_huawei_parse_nwtime_response (const gchar *response,
-                                          gchar **iso8601p,
-                                          MMNetworkTimezone **tzp,
-                                          GError **error)
+gboolean
+mm_huawei_parse_nwtime_response (const gchar        *response,
+                                 gchar             **iso8601p,
+                                 MMNetworkTimezone **tzp,
+                                 GError            **error)
 {
-    GRegex *r;
-    GMatchInfo *match_info = NULL;
-    GError *match_error = NULL;
-    guint year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0, dt = 0;
-    gint tz = 0;
-    gboolean ret = FALSE;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *match_error = NULL;
+    guint                  year = 0;
+    guint                  month = 0;
+    guint                  day = 0;
+    guint                  hour = 0;
+    guint                  minute = 0;
+    guint                  second = 0;
+    guint                  dt = 0;
+    gint                   tz = 0;
 
     g_assert (iso8601p || tzp); /* at least one */
 
@@ -1211,75 +1209,72 @@ gboolean mm_huawei_parse_nwtime_response (const gchar *response,
             g_propagate_error (error, match_error);
             g_prefix_error (error, "Could not parse ^NWTIME results: ");
         } else {
-            g_set_error_literal (error,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
+            g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                  "Couldn't match ^NWTIME reply");
         }
-    } else {
-        /* Remember that g_match_info_get_match_count() includes match #0 */
-        g_assert (g_match_info_get_match_count (match_info) >= 9);
-
-        if (mm_get_uint_from_match_info (match_info, 1, &year) &&
-            mm_get_uint_from_match_info (match_info, 2, &month) &&
-            mm_get_uint_from_match_info (match_info, 3, &day) &&
-            mm_get_uint_from_match_info (match_info, 4, &hour) &&
-            mm_get_uint_from_match_info (match_info, 5, &minute) &&
-            mm_get_uint_from_match_info (match_info, 6, &second) &&
-            mm_get_int_from_match_info  (match_info, 7, &tz) &&
-            mm_get_uint_from_match_info (match_info, 8, &dt)) {
-
-            ret = TRUE;
-
-            /* adjust year */
-            if (year < 100)
-                year += 2000;
-            /*
-             * tz = timezone offset in 15 minute intervals
-             * dt = daylight adjustment, 0 = none, 1 = 1 hour, 2 = 2 hours
-             *      other values are marked reserved.
-             */
-            if (iso8601p) {
-                /* Return ISO-8601 format date/time string */
-                *iso8601p = mm_new_iso8601_time (year, month, day, hour,
-                                                 minute, second,
-                                                 TRUE, (tz * 15) + (dt * 60),
-                                                 error);
-                ret = (*iso8601p != NULL);
-            }
-            if (tzp) {
-                *tzp = mm_network_timezone_new ();
-                mm_network_timezone_set_offset (*tzp, tz * 15);
-                mm_network_timezone_set_dst_offset (*tzp, dt * 60);
-            }
-
-        } else {
-            g_set_error_literal (error,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "Failed to parse ^NWTIME reply");
-        }
+        return FALSE;
     }
 
-    g_match_info_free (match_info);
-    g_regex_unref (r);
+    /* Remember that g_match_info_get_match_count() includes match #0 */
+    g_assert (g_match_info_get_match_count (match_info) >= 9);
 
-    return ret;
+    if (mm_get_uint_from_match_info (match_info, 1, &year) &&
+        mm_get_uint_from_match_info (match_info, 2, &month) &&
+        mm_get_uint_from_match_info (match_info, 3, &day) &&
+        mm_get_uint_from_match_info (match_info, 4, &hour) &&
+        mm_get_uint_from_match_info (match_info, 5, &minute) &&
+        mm_get_uint_from_match_info (match_info, 6, &second) &&
+        mm_get_int_from_match_info  (match_info, 7, &tz) &&
+        mm_get_uint_from_match_info (match_info, 8, &dt)) {
+
+        /* adjust year */
+        if (year < 100)
+            year += 2000;
+        /*
+         * tz = timezone offset in 15 minute intervals
+         * dt = daylight adjustment, 0 = none, 1 = 1 hour, 2 = 2 hours
+         *      other values are marked reserved.
+         */
+        if (tzp) {
+            *tzp = mm_network_timezone_new ();
+            mm_network_timezone_set_offset (*tzp, tz * 15);
+            mm_network_timezone_set_dst_offset (*tzp, dt * 60);
+        }
+        if (iso8601p) {
+            /* Return ISO-8601 format date/time string */
+            *iso8601p = mm_new_iso8601_time (year, month, day, hour,
+                                             minute, second,
+                                             TRUE, (tz * 15) + (dt * 60),
+                                             error);
+            return (*iso8601p != NULL);
+        }
+
+        return TRUE;
+    }
+
+    g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                         "Failed to parse ^NWTIME reply");
+    return FALSE;
 }
 
 /*****************************************************************************/
 /* ^TIME response parser */
 
-gboolean mm_huawei_parse_time_response (const gchar *response,
-                                        gchar **iso8601p,
-                                        MMNetworkTimezone **tzp,
-                                        GError **error)
+gboolean
+mm_huawei_parse_time_response (const gchar        *response,
+                               gchar             **iso8601p,
+                               MMNetworkTimezone **tzp,
+                               GError            **error)
 {
-    GRegex *r;
-    GMatchInfo *match_info = NULL;
-    GError *match_error = NULL;
-    guint year, month, day, hour, minute, second;
-    gboolean ret = FALSE;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *match_error = NULL;
+    guint                  year = 0;
+    guint                  month = 0;
+    guint                  day = 0;
+    guint                  hour = 0;
+    guint                  minute = 0;
+    guint                  second = 0;
 
     g_assert (iso8601p || tzp); /* at least one */
 
@@ -1306,41 +1301,35 @@ gboolean mm_huawei_parse_time_response (const gchar *response,
                                  MM_CORE_ERROR_FAILED,
                                  "Couldn't match ^TIME reply");
         }
-    } else {
-        /* Remember that g_match_info_get_match_count() includes match #0 */
-        g_assert (g_match_info_get_match_count (match_info) >= 7);
-
-        if (mm_get_uint_from_match_info (match_info, 1, &year) &&
-            mm_get_uint_from_match_info (match_info, 2, &month) &&
-            mm_get_uint_from_match_info (match_info, 3, &day) &&
-            mm_get_uint_from_match_info (match_info, 4, &hour) &&
-            mm_get_uint_from_match_info (match_info, 5, &minute) &&
-            mm_get_uint_from_match_info (match_info, 6, &second)) {
-            ret = TRUE;
-
-            /* adjust year */
-            if (year < 100)
-                year += 2000;
-
-            /* Return ISO-8601 format date/time string */
-            if (iso8601p) {
-                *iso8601p = mm_new_iso8601_time (year, month, day, hour,
-                                                 minute, second, FALSE, 0,
-                                                 error);
-                ret = (*iso8601p != NULL);
-            }
-        } else {
-            g_set_error_literal (error,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "Failed to parse ^TIME reply");
-        }
+        return FALSE;
     }
 
-    g_match_info_free (match_info);
-    g_regex_unref (r);
+    /* Remember that g_match_info_get_match_count() includes match #0 */
+    g_assert (g_match_info_get_match_count (match_info) >= 7);
 
-    return ret;
+    if (mm_get_uint_from_match_info (match_info, 1, &year) &&
+        mm_get_uint_from_match_info (match_info, 2, &month) &&
+        mm_get_uint_from_match_info (match_info, 3, &day) &&
+        mm_get_uint_from_match_info (match_info, 4, &hour) &&
+        mm_get_uint_from_match_info (match_info, 5, &minute) &&
+        mm_get_uint_from_match_info (match_info, 6, &second)) {
+        /* adjust year */
+        if (year < 100)
+            year += 2000;
+
+        /* Return ISO-8601 format date/time string */
+        if (iso8601p) {
+            *iso8601p = mm_new_iso8601_time (year, month, day, hour,
+                                             minute, second, FALSE, 0,
+                                             error);
+            return (*iso8601p != NULL);
+        }
+        return TRUE;
+    }
+
+    g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                         "Failed to parse ^TIME reply");
+    return FALSE;
 }
 
 /*****************************************************************************/
@@ -1356,11 +1345,9 @@ mm_huawei_parse_hcsq_response (const gchar *response,
                                guint *out_value5,
                                GError **error)
 {
-    GRegex *r;
-    GMatchInfo *match_info = NULL;
-    GError *match_error = NULL;
-    gboolean ret = FALSE;
-    char *s;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *match_error = NULL;
 
     r = g_regex_new ("\\^HCSQ:\\s*\"?([a-zA-Z]*)\"?,(\\d+),?(\\d+)?,?(\\d+)?,?(\\d+)?,?(\\d+)?$", 0, 0, NULL);
     g_assert (r != NULL);
@@ -1370,27 +1357,24 @@ mm_huawei_parse_hcsq_response (const gchar *response,
             g_propagate_error (error, match_error);
             g_prefix_error (error, "Could not parse ^HCSQ results: ");
         } else {
-            g_set_error_literal (error,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
+            g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                  "Couldn't match ^HCSQ reply");
         }
-        goto done;
+        return FALSE;
     }
 
     /* Remember that g_match_info_get_match_count() includes match #0 */
     if (g_match_info_get_match_count (match_info) < 3) {
-        g_set_error_literal (error,
-                             MM_CORE_ERROR,
-                             MM_CORE_ERROR_FAILED,
+        g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                              "Not enough elements in ^HCSQ reply");
-        goto done;
+        return FALSE;
     }
 
     if (out_act) {
+        g_autofree gchar *s = NULL;
+
         s = g_match_info_fetch (match_info, 1);
         *out_act = mm_string_to_access_tech (s);
-        g_free (s);
     }
 
     if (out_value1)
@@ -1404,13 +1388,7 @@ mm_huawei_parse_hcsq_response (const gchar *response,
     if (out_value5)
         mm_get_uint_from_match_info (match_info, 6, out_value5);
 
-    ret = TRUE;
-
-done:
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
-    return ret;
+    return TRUE;
 }
 
 /*****************************************************************************/
@@ -1422,11 +1400,12 @@ mm_huawei_parse_cvoice_response (const gchar  *response,
                                  guint        *out_bits,
                                  GError      **error)
 {
-    GRegex *r;
-    GMatchInfo *match_info = NULL;
-    GError *match_error = NULL;
-    guint supported = 0, hz = 0, bits = 0;
-    gboolean ret = FALSE;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *match_error = NULL;
+    guint                  supported = 0;
+    guint                  hz = 0;
+    guint                  bits = 0;
 
     /* ^CVOICE: <0=supported,1=unsupported>,<hz>,<bits>,<unknown> */
     r = g_regex_new ("\\^CVOICE:\\s*(\\d)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)$", 0, 0, NULL);
@@ -1442,37 +1421,31 @@ mm_huawei_parse_cvoice_response (const gchar  *response,
                                  MM_CORE_ERROR_FAILED,
                                  "Couldn't match ^CVOICE reply");
         }
-    } else {
-        /* Remember that g_match_info_get_match_count() includes match #0 */
-        g_assert (g_match_info_get_match_count (match_info) >= 5);
-
-        if (mm_get_uint_from_match_info (match_info, 1, &supported) &&
-            mm_get_uint_from_match_info (match_info, 2, &hz) &&
-            mm_get_uint_from_match_info (match_info, 3, &bits)) {
-            if (supported == 0) {
-                if (out_hz)
-                    *out_hz = hz;
-                if (out_bits)
-                    *out_bits = bits;
-                ret = TRUE;
-            } else {
-                g_set_error_literal (error,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_UNSUPPORTED,
-                                     "^CVOICE not supported by this device");
-            }
-        } else {
-            g_set_error_literal (error,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "Failed to parse ^CVOICE reply");
-        }
+        return FALSE;
     }
 
-    g_match_info_free (match_info);
-    g_regex_unref (r);
+    /* Remember that g_match_info_get_match_count() includes match #0 */
+    g_assert (g_match_info_get_match_count (match_info) >= 5);
 
-    return ret;
+    if (mm_get_uint_from_match_info (match_info, 1, &supported) &&
+        mm_get_uint_from_match_info (match_info, 2, &hz) &&
+        mm_get_uint_from_match_info (match_info, 3, &bits)) {
+        if (supported == 0) {
+            if (out_hz)
+                *out_hz = hz;
+            if (out_bits)
+                *out_bits = bits;
+            return TRUE;
+        }
+
+        g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                             "^CVOICE not supported by this device");
+        return FALSE;
+    }
+
+    g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                         "Failed to parse ^CVOICE reply");
+    return FALSE;
 }
 
 /*****************************************************************************/

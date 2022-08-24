@@ -72,10 +72,10 @@ hstate_ready (MMIfaceModemCdma *self,
               GTask *task)
 {
     DetailedRegistrationStateResults *results;
-    GError *error = NULL;
-    const gchar *response;
-    GRegex *r;
-    GMatchInfo *match_info;
+    GError                           *error = NULL;
+    const gchar                      *response;
+    g_autoptr(GRegex)                 r = NULL;
+    g_autoptr(GMatchInfo)             match_info = NULL;
 
     results = g_task_get_task_data (task);
 
@@ -129,9 +129,6 @@ hstate_ready (MMIfaceModemCdma *self,
         }
     }
 
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
     g_task_return_pointer (task, g_memdup (results, sizeof (*results)), g_free);
     g_object_unref (task);
 }
@@ -142,10 +139,10 @@ state_ready (MMIfaceModemCdma *self,
              GTask *task)
 {
     DetailedRegistrationStateResults *results;
-    GError *error = NULL;
-    const gchar *response;
-    GRegex *r;
-    GMatchInfo *match_info;
+    GError                           *error = NULL;
+    const gchar                      *response;
+    g_autoptr(GRegex)                 r = NULL;
+    g_autoptr(GMatchInfo)             match_info = NULL;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
@@ -193,9 +190,6 @@ state_ready (MMIfaceModemCdma *self,
             }
         }
     }
-
-    g_match_info_free (match_info);
-    g_regex_unref (r);
 
     /* Try for EVDO state too */
     mm_base_modem_at_command (MM_BASE_MODEM (self),
@@ -261,9 +255,14 @@ reset (MMIfaceModem *self,
 static void
 setup_ports (MMBroadbandModem *self)
 {
-    MMPortSerialAt *ports[2];
-    GRegex *regex;
-    guint i;
+    MMPortSerialAt    *ports[2];
+    g_autoptr(GRegex)  active_regex = NULL;
+    g_autoptr(GRegex)  inactive_regex = NULL;
+    g_autoptr(GRegex)  dormant_regex = NULL;
+    g_autoptr(GRegex)  offline_regex = NULL;
+    g_autoptr(GRegex)  regreq_regex = NULL;
+    g_autoptr(GRegex)  authreq_regex = NULL;
+    guint              i;
 
     /* Call parent's setup ports first always */
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_anydata_parent_class)->setup_ports (self);
@@ -271,48 +270,37 @@ setup_ports (MMBroadbandModem *self)
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
     ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
 
+    /* Data call has connected */
+    active_regex = g_regex_new ("\\r\\n\\*ACTIVE:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    /* Data call disconnected */
+    inactive_regex = g_regex_new ("\\r\\n\\*INACTIVE:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    /* Modem is now dormant */
+    dormant_regex = g_regex_new ("\\r\\n\\*DORMANT:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    /* Network acquisition fail */
+    offline_regex = g_regex_new ("\\r\\n\\*OFFLINE:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    /* Registration fail */
+    regreq_regex = g_regex_new ("\\r\\n\\*REGREQ:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    /* Authentication fail */
+    authreq_regex = g_regex_new ("\\r\\n\\*AUTHREQ:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+
     /* Now reset the unsolicited messages  */
     for (i = 0; i < G_N_ELEMENTS (ports); i++) {
         if (!ports[i])
             continue;
 
         /* Data state notifications */
-
-        /* Data call has connected */
-        regex = g_regex_new ("\\r\\n\\*ACTIVE:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), regex, NULL, NULL, NULL);
-        g_regex_unref (regex);
-
-        /* Data call disconnected */
-        regex = g_regex_new ("\\r\\n\\*INACTIVE:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), regex, NULL, NULL, NULL);
-        g_regex_unref (regex);
-
-        /* Modem is now dormant */
-        regex = g_regex_new ("\\r\\n\\*DORMANT:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), regex, NULL, NULL, NULL);
-        g_regex_unref (regex);
+        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), active_regex, NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), inactive_regex, NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), dormant_regex, NULL, NULL, NULL);
 
         /* Abnormal state notifications
          *
          * FIXME: set 1X/EVDO registration state to UNKNOWN when these
          * notifications are received?
          */
-
-        /* Network acquisition fail */
-        regex = g_regex_new ("\\r\\n\\*OFFLINE:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), regex, NULL, NULL, NULL);
-        g_regex_unref (regex);
-
-        /* Registration fail */
-        regex = g_regex_new ("\\r\\n\\*REGREQ:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), regex, NULL, NULL, NULL);
-        g_regex_unref (regex);
-
-        /* Authentication fail */
-        regex = g_regex_new ("\\r\\n\\*AUTHREQ:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), regex, NULL, NULL, NULL);
-        g_regex_unref (regex);
+        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), offline_regex, NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), regreq_regex, NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), authreq_regex, NULL, NULL, NULL);
     }
 }
 

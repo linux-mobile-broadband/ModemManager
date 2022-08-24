@@ -554,14 +554,14 @@ mm_cinterion_parse_cnmi_test (const gchar *response,
                               GArray **supported_bfr,
                               GError **error)
 {
-    GRegex *r;
-    GMatchInfo *match_info;
-    GError *inner_error = NULL;
-    GArray *tmp_supported_mode = NULL;
-    GArray *tmp_supported_mt = NULL;
-    GArray *tmp_supported_bm = NULL;
-    GArray *tmp_supported_ds = NULL;
-    GArray *tmp_supported_bfr = NULL;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *inner_error = NULL;
+    GArray                *tmp_supported_mode = NULL;
+    GArray                *tmp_supported_mt = NULL;
+    GArray                *tmp_supported_bm = NULL;
+    GArray                *tmp_supported_ds = NULL;
+    GArray                *tmp_supported_bfr = NULL;
 
     if (!response) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Missing response");
@@ -576,57 +576,48 @@ mm_cinterion_parse_cnmi_test (const gchar *response,
     g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
     if (!inner_error && g_match_info_matches (match_info)) {
         if (supported_mode) {
-            gchar *str;
+            g_autofree gchar *str = NULL;
 
             str = mm_get_string_unquoted_from_match_info (match_info, 1);
             tmp_supported_mode = mm_parse_uint_list (str, &inner_error);
-            g_free (str);
             if (inner_error)
                 goto out;
         }
         if (supported_mt) {
-            gchar *str;
+            g_autofree gchar *str = NULL;
 
             str = mm_get_string_unquoted_from_match_info (match_info, 2);
             tmp_supported_mt = mm_parse_uint_list (str, &inner_error);
-            g_free (str);
             if (inner_error)
                 goto out;
         }
         if (supported_bm) {
-            gchar *str;
+            g_autofree gchar *str = NULL;
 
             str = mm_get_string_unquoted_from_match_info (match_info, 3);
             tmp_supported_bm = mm_parse_uint_list (str, &inner_error);
-            g_free (str);
             if (inner_error)
                 goto out;
         }
         if (supported_ds) {
-            gchar *str;
+            g_autofree gchar *str = NULL;
 
             str = mm_get_string_unquoted_from_match_info (match_info, 4);
             tmp_supported_ds = mm_parse_uint_list (str, &inner_error);
-            g_free (str);
             if (inner_error)
                 goto out;
         }
         if (supported_bfr) {
-            gchar *str;
+            g_autofree gchar *str = NULL;
 
             str = mm_get_string_unquoted_from_match_info (match_info, 5);
             tmp_supported_bfr = mm_parse_uint_list (str, &inner_error);
-            g_free (str);
             if (inner_error)
                 goto out;
         }
     }
 
 out:
-
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
     if (inner_error) {
         g_clear_pointer (&tmp_supported_mode, g_array_unref);
         g_clear_pointer (&tmp_supported_mt,   g_array_unref);
@@ -763,9 +754,9 @@ mm_cinterion_parse_sind_response (const gchar *response,
                                   guint *value,
                                   GError **error)
 {
-    GRegex *r;
-    GMatchInfo *match_info;
-    guint errors = 0;
+    g_autoptr(GRegex)     r = NULL;
+    g_autoptr(GMatchInfo) match_info = NULL;
+    guint                 errors = 0;
 
     if (!response) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Missing response");
@@ -787,9 +778,6 @@ mm_cinterion_parse_sind_response (const gchar *response,
             errors++;
     } else
         errors++;
-
-    g_match_info_free (match_info);
-    g_regex_unref (r);
 
     if (errors > 0) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Failed parsing ^SIND response");
@@ -836,8 +824,8 @@ mm_cinterion_parse_swwan_response (const gchar  *response,
                                    gpointer      log_object,
                                    GError      **error)
 {
-    GRegex                   *r;
-    GMatchInfo               *match_info;
+    g_autoptr(GRegex)         r = NULL;
+    g_autoptr(GMatchInfo)     match_info = NULL;
     GError                   *inner_error = NULL;
     MMBearerConnectionStatus  status;
 
@@ -882,9 +870,6 @@ mm_cinterion_parse_swwan_response (const gchar  *response,
         }
         g_match_info_next (match_info, &inner_error);
     }
-
-    g_match_info_free (match_info);
-    g_regex_unref (r);
 
     if (status == MM_BEARER_CONNECTION_STATUS_UNKNOWN)
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
@@ -1078,10 +1063,10 @@ mm_cinterion_parse_slcc_list (const gchar *str,
                               GList      **out_list,
                               GError     **error)
 {
-    GRegex     *r;
-    GList      *list = NULL;
-    GError     *inner_error = NULL;
-    GMatchInfo *match_info  = NULL;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GList                 *list = NULL;
+    GError                *inner_error = NULL;
 
     static const MMCallDirection cinterion_call_direction[] = {
         [0] = MM_CALL_DIRECTION_OUTGOING,
@@ -1158,9 +1143,6 @@ mm_cinterion_parse_slcc_list (const gchar *str,
     }
 
 out:
-    g_clear_pointer (&match_info, g_match_info_free);
-    g_regex_unref (r);
-
     if (inner_error) {
         mm_cinterion_call_info_list_free (list);
         g_propagate_error (error, inner_error);

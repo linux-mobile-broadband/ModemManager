@@ -153,7 +153,7 @@ get_detailed_registration_state_finish (MMIfaceModemCdma              *self,
                                         MMModemCdmaRegistrationState  *detailed_evdo_state,
                                         GError                       **error)
 {
-    DetailedRegistrationStateResults *results;
+    g_autofree DetailedRegistrationStateResults *results = NULL;
 
     results = g_task_propagate_pointer (G_TASK (res), error);
     if (!results)
@@ -161,7 +161,6 @@ get_detailed_registration_state_finish (MMIfaceModemCdma              *self,
 
     *detailed_cdma1x_state = results->detailed_cdma1x_state;
     *detailed_evdo_state   = results->detailed_evdo_state;
-    g_free (results);
     return TRUE;
 }
 
@@ -171,13 +170,13 @@ sysinfo_ready (MMBaseModem  *self,
                GTask        *task)
 
 {
-    DetailedRegistrationStateResults *ctx;
-    DetailedRegistrationStateResults *results;
-    const gchar                      *response;
-    GRegex                           *r;
-    GMatchInfo                       *match_info;
-    MMModemCdmaRegistrationState      reg_state;
-    guint                             val = 0;
+    DetailedRegistrationStateResults            *ctx;
+    g_autofree DetailedRegistrationStateResults *results = NULL;
+    const gchar                                 *response;
+    g_autoptr(GRegex)                            r = NULL;
+    g_autoptr(GMatchInfo)                        match_info = NULL;
+    MMModemCdmaRegistrationState                 reg_state;
+    guint                                        val = 0;
 
     ctx = g_task_get_task_data (task);
 
@@ -236,11 +235,8 @@ sysinfo_ready (MMBaseModem  *self,
         results->detailed_cdma1x_state = reg_state;
     }
 
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
 out:
-    g_task_return_pointer (task, results, NULL);
+    g_task_return_pointer (task, g_steal_pointer (&results), g_free);
     g_object_unref (task);
 }
 

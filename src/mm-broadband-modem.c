@@ -3169,9 +3169,9 @@ static void
 set_cgev_unsolicited_events_handlers (MMBroadbandModem *self,
                                       gboolean          enable)
 {
-    MMPortSerialAt *ports[2];
-    GRegex *cgev_regex;
-    guint i;
+    MMPortSerialAt    *ports[2];
+    g_autoptr(GRegex)  cgev_regex = NULL;
+    guint              i;
 
     cgev_regex = mm_3gpp_cgev_regex_get ();
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
@@ -3193,8 +3193,6 @@ set_cgev_unsolicited_events_handlers (MMBroadbandModem *self,
             enable ? self : NULL,
             NULL);
     }
-
-    g_regex_unref (cgev_regex);
 }
 
 static void
@@ -3245,9 +3243,9 @@ static void
 set_ciev_unsolicited_events_handlers (MMBroadbandModem *self,
                                       gboolean          enable)
 {
-    MMPortSerialAt *ports[2];
-    GRegex *ciev_regex;
-    guint i;
+    MMPortSerialAt    *ports[2];
+    g_autoptr(GRegex)  ciev_regex = NULL;
+    guint              i;
 
     ciev_regex = mm_3gpp_ciev_regex_get ();
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
@@ -3269,8 +3267,6 @@ set_ciev_unsolicited_events_handlers (MMBroadbandModem *self,
             enable ? self : NULL,
             NULL);
     }
-
-    g_regex_unref (ciev_regex);
 }
 
 static void
@@ -5160,20 +5156,20 @@ registration_status_check_ready (MMBroadbandModem *self,
                                  GAsyncResult     *res,
                                  GTask            *task)
 {
+    g_autoptr(GMatchInfo)         match_info = NULL;
     RunRegistrationChecksContext *ctx;
-    const gchar *response;
-    GError *error = NULL;
-    GMatchInfo *match_info = NULL;
-    guint i;
-    gboolean parsed;
-    gboolean cgreg = FALSE;
-    gboolean cereg = FALSE;
-    gboolean c5greg = FALSE;
-    MMModem3gppRegistrationState state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
-    gulong lac = 0;
-    gulong tac = 0;
-    gulong cid = 0;
+    const gchar                  *response;
+    GError                       *error = NULL;
+    guint                         i;
+    gboolean                      parsed;
+    gboolean                      cgreg = FALSE;
+    gboolean                      cereg = FALSE;
+    gboolean                      c5greg = FALSE;
+    MMModem3gppRegistrationState  state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    MMModemAccessTechnology       act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    gulong                        lac = 0;
+    gulong                        tac = 0;
+    gulong                        cid = 0;
 
     ctx = g_task_get_task_data (task);
 
@@ -5205,8 +5201,7 @@ registration_status_check_ready (MMBroadbandModem *self,
                            0,
                            &match_info))
             break;
-        g_match_info_free (match_info);
-        match_info = NULL;
+        g_clear_pointer (&match_info, g_match_info_free);
     }
 
     if (!match_info) {
@@ -5229,7 +5224,6 @@ registration_status_check_ready (MMBroadbandModem *self,
                                           &cereg,
                                           &c5greg,
                                           &error);
-    g_match_info_free (match_info);
 
     if (!parsed) {
         if (!error)
@@ -6306,10 +6300,10 @@ set_unsolicited_result_code_handlers (MMIfaceModem3gppUssd *self,
                                       GAsyncReadyCallback callback,
                                       gpointer user_data)
 {
-    MMPortSerialAt *ports[2];
-    GRegex *cusd_regex;
-    guint i;
-    GTask *task;
+    MMPortSerialAt    *ports[2];
+    g_autoptr(GRegex)  cusd_regex = NULL;
+    guint              i;
+    GTask             *task;
 
     cusd_regex = mm_3gpp_cusd_regex_get ();
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
@@ -6330,8 +6324,6 @@ set_unsolicited_result_code_handlers (MMIfaceModem3gppUssd *self,
             enable ? self : NULL,
             NULL);
     }
-
-    g_regex_unref (cusd_regex);
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_return_boolean (task, TRUE);
@@ -7233,11 +7225,11 @@ set_messaging_unsolicited_events_handlers (MMIfaceModemMessaging *self,
                                            GAsyncReadyCallback callback,
                                            gpointer user_data)
 {
-    MMPortSerialAt *ports[2];
-    GRegex *cmti_regex;
-    GRegex *cds_regex;
-    guint i;
-    GTask *task;
+    MMPortSerialAt    *ports[2];
+    g_autoptr(GRegex)  cmti_regex = NULL;
+    g_autoptr(GRegex)  cds_regex = NULL;
+    guint              i;
+    GTask             *task;
 
     cmti_regex = mm_3gpp_cmti_regex_get ();
     cds_regex = mm_3gpp_cds_regex_get ();
@@ -7266,9 +7258,6 @@ set_messaging_unsolicited_events_handlers (MMIfaceModemMessaging *self,
             enable ? self : NULL,
             NULL);
     }
-
-    g_regex_unref (cmti_regex);
-    g_regex_unref (cds_regex);
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_return_boolean (task, TRUE);
@@ -7486,11 +7475,11 @@ sms_text_part_list_ready (MMBroadbandModem *self,
                           GAsyncResult *res,
                           GTask *task)
 {
-    ListPartsContext *ctx;
-    GRegex *r;
-    GMatchInfo *match_info = NULL;
-    const gchar *response;
-    GError *error = NULL;
+    ListPartsContext      *ctx;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    const gchar           *response;
+    GError                *error = NULL;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
@@ -7510,8 +7499,6 @@ sms_text_part_list_ready (MMBroadbandModem *self,
                                  MM_CORE_ERROR_INVALID_ARGS,
                                  "Couldn't parse SMS list response");
         g_object_unref (task);
-        g_match_info_free (match_info);
-        g_regex_unref (r);
         return;
     }
 
@@ -7597,8 +7584,6 @@ sms_text_part_list_ready (MMBroadbandModem *self,
 next:
         g_match_info_next (match_info, NULL);
     }
-    g_match_info_free (match_info);
-    g_regex_unref (r);
 
     /* We consider all done */
     g_task_return_boolean (task, TRUE);
@@ -7929,9 +7914,9 @@ set_voice_in_call_unsolicited_events_handlers (MMBroadbandModem *self,
                                                PortsContext     *ports_ctx,
                                                gboolean          enable)
 {
-    MMPortSerialAt *ports[2];
-    GRegex         *in_call_event_regex;
-    guint           i;
+    MMPortSerialAt    *ports[2];
+    g_autoptr(GRegex) in_call_event_regex = NULL;
+    guint             i;
 
     in_call_event_regex = g_regex_new ("\\r\\n(NO CARRIER|BUSY|NO ANSWER|NO DIALTONE)(\\r)?\\r\\n$",
                                        G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
@@ -7954,8 +7939,6 @@ set_voice_in_call_unsolicited_events_handlers (MMBroadbandModem *self,
             enable ? self : NULL,
             NULL);
     }
-
-    g_regex_unref (in_call_event_regex);
 }
 
 static void
@@ -8146,13 +8129,13 @@ set_voice_unsolicited_events_handlers (MMIfaceModemVoice *self,
                                        GAsyncReadyCallback callback,
                                        gpointer user_data)
 {
-    MMPortSerialAt *ports[2];
-    GRegex *cring_regex;
-    GRegex *ring_regex;
-    GRegex *clip_regex;
-    GRegex *ccwa_regex;
-    guint i;
-    GTask *task;
+    MMPortSerialAt    *ports[2];
+    g_autoptr(GRegex)  cring_regex = NULL;
+    g_autoptr(GRegex)  ring_regex = NULL;
+    g_autoptr(GRegex)  clip_regex = NULL;
+    g_autoptr(GRegex)  ccwa_regex = NULL;
+    guint              i;
+    GTask             *task;
 
     cring_regex = mm_voice_cring_regex_get ();
     ring_regex  = mm_voice_ring_regex_get ();
@@ -8195,11 +8178,6 @@ set_voice_unsolicited_events_handlers (MMIfaceModemVoice *self,
             enable ? self : NULL,
             NULL);
     }
-
-    g_regex_unref (ccwa_regex);
-    g_regex_unref (clip_regex);
-    g_regex_unref (cring_regex);
-    g_regex_unref (ring_regex);
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_return_boolean (task, TRUE);
@@ -9264,8 +9242,8 @@ css_query_ready (MMIfaceModemCdma *self,
         band = 'Z';
         success = TRUE;
     } else {
-        GRegex *r;
-        GMatchInfo *match_info;
+        g_autoptr(GRegex)     r = NULL;
+        g_autoptr(GMatchInfo) match_info = NULL;
 
         /* Format is "<band_class>,<band>,<sid>" */
         r = g_regex_new ("\\s*([^,]*?)\\s*,\\s*([^,]*?)\\s*,\\s*(\\d+)", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
@@ -9296,9 +9274,6 @@ css_query_ready (MMIfaceModemCdma *self,
 
             success = TRUE;
         }
-
-        g_match_info_free (match_info);
-        g_regex_unref (r);
     }
 
     if (!success) {
@@ -10914,10 +10889,13 @@ static const gchar *secondary_init_sequence[] = {
 static void
 setup_ports (MMBroadbandModem *self)
 {
-    MMPortSerialAt *ports[2];
-    GRegex *regex;
-    GPtrArray *array;
-    guint i, j;
+    MMPortSerialAt    *ports[2];
+    g_autoptr(GRegex)  ciev_regex = NULL;
+    g_autoptr(GRegex)  cmti_regex = NULL;
+    g_autoptr(GRegex)  cusd_regex = NULL;
+    GPtrArray         *array;
+    guint              i;
+    guint              j;
 
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
     ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
@@ -10933,64 +10911,23 @@ setup_ports (MMBroadbandModem *self)
                       NULL);
 
     /* Cleanup all unsolicited message handlers in all AT ports */
-
-    /* Set up CREG unsolicited message handlers, with NULL callbacks */
     array = mm_3gpp_creg_regex_get (FALSE);
+    ciev_regex = mm_3gpp_ciev_regex_get ();
+    cmti_regex = mm_3gpp_cmti_regex_get ();
+    cusd_regex = mm_3gpp_cusd_regex_get ();
+
     for (i = 0; i < 2; i++) {
         if (!ports[i])
             continue;
 
-        for (j = 0; j < array->len; j++) {
-            mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]),
-                                                           (GRegex *)g_ptr_array_index (array, j),
-                                                           NULL,
-                                                           NULL,
-                                                           NULL);
-        }
+        for (j = 0; j < array->len; j++)
+            mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), (GRegex *)g_ptr_array_index (array, j), NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), ciev_regex, NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), cmti_regex, NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]), cusd_regex, NULL, NULL, NULL);
     }
+
     mm_3gpp_creg_regex_destroy (array);
-
-    /* Set up CIEV unsolicited message handler, with NULL callback */
-    regex = mm_3gpp_ciev_regex_get ();
-    for (i = 0; i < 2; i++) {
-        if (!ports[i])
-            continue;
-
-        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]),
-                                                       regex,
-                                                       NULL,
-                                                       NULL,
-                                                       NULL);
-    }
-    g_regex_unref (regex);
-
-    /* Set up CMTI unsolicited message handler, with NULL callback */
-    regex = mm_3gpp_cmti_regex_get ();
-    for (i = 0; i < 2; i++) {
-        if (!ports[i])
-            continue;
-
-        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]),
-                                                       regex,
-                                                       NULL,
-                                                       NULL,
-                                                       NULL);
-    }
-    g_regex_unref (regex);
-
-    /* Set up CUSD unsolicited message handler, with NULL callback */
-    regex = mm_3gpp_cusd_regex_get ();
-    for (i = 0; i < 2; i++) {
-        if (!ports[i])
-            continue;
-
-        mm_port_serial_at_add_unsolicited_msg_handler (MM_PORT_SERIAL_AT (ports[i]),
-                                                       regex,
-                                                       NULL,
-                                                       NULL,
-                                                       NULL);
-    }
-    g_regex_unref (regex);
 }
 
 /*****************************************************************************/

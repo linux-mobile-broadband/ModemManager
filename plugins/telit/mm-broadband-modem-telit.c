@@ -501,10 +501,10 @@ telit_qss_enable_ready (MMBaseModem *self,
                         GAsyncResult *res,
                         GTask *task)
 {
-    QssSetupContext *ctx;
-    MMPortSerialAt *port;
-    GError **error;
-    GRegex *pattern;
+    QssSetupContext    *ctx;
+    MMPortSerialAt     *port;
+    GError            **error;
+    g_autoptr(GRegex)   pattern = NULL;
 
     ctx = g_task_get_task_data (task);
 
@@ -530,7 +530,6 @@ telit_qss_enable_ready (MMBaseModem *self,
         (MMPortSerialAtUnsolicitedMsgFn)telit_qss_unsolicited_handler,
         self,
         NULL);
-    g_regex_unref (pattern);
 
 next_step:
     ctx->step++;
