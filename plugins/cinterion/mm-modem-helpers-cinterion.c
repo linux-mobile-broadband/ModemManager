@@ -556,12 +556,12 @@ mm_cinterion_parse_cnmi_test (const gchar *response,
 {
     g_autoptr(GRegex)      r = NULL;
     g_autoptr(GMatchInfo)  match_info = NULL;
+    g_autoptr(GArray)      tmp_supported_mode = NULL;
+    g_autoptr(GArray)      tmp_supported_mt = NULL;
+    g_autoptr(GArray)      tmp_supported_bm = NULL;
+    g_autoptr(GArray)      tmp_supported_ds = NULL;
+    g_autoptr(GArray)      tmp_supported_bfr = NULL;
     GError                *inner_error = NULL;
-    GArray                *tmp_supported_mode = NULL;
-    GArray                *tmp_supported_mt = NULL;
-    GArray                *tmp_supported_bm = NULL;
-    GArray                *tmp_supported_ds = NULL;
-    GArray                *tmp_supported_bfr = NULL;
 
     if (!response) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Missing response");
@@ -619,25 +619,20 @@ mm_cinterion_parse_cnmi_test (const gchar *response,
 
 out:
     if (inner_error) {
-        g_clear_pointer (&tmp_supported_mode, g_array_unref);
-        g_clear_pointer (&tmp_supported_mt,   g_array_unref);
-        g_clear_pointer (&tmp_supported_bm,   g_array_unref);
-        g_clear_pointer (&tmp_supported_ds,   g_array_unref);
-        g_clear_pointer (&tmp_supported_bfr,  g_array_unref);
         g_propagate_error (error, inner_error);
         return FALSE;
     }
 
     if (supported_mode)
-        *supported_mode = tmp_supported_mode;
+        *supported_mode = g_steal_pointer (&tmp_supported_mode);
     if (supported_mt)
-        *supported_mt = tmp_supported_mt;
+        *supported_mt = g_steal_pointer (&tmp_supported_mt);
     if (supported_bm)
-        *supported_bm = tmp_supported_bm;
+        *supported_bm = g_steal_pointer (&tmp_supported_bm);
     if (supported_ds)
-        *supported_ds = tmp_supported_ds;
+        *supported_ds = g_steal_pointer (&tmp_supported_ds);
     if (supported_bfr)
-        *supported_bfr = tmp_supported_bfr;
+        *supported_bfr = g_steal_pointer (&tmp_supported_bfr);
 
     return TRUE;
 }
