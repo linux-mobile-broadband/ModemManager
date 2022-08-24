@@ -162,7 +162,6 @@ load_supported_modes_finish (MMIfaceModem *self,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
                      "%%IPSYS=? response didn't match");
-        g_regex_unref (r);
         return NULL;
     }
 
