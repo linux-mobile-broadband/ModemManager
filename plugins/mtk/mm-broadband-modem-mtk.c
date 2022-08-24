@@ -199,14 +199,12 @@ get_supported_modes_ready (MMBaseModem *self,
     g_assert (r != NULL);
 
     if (!g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &match_error)) {
-        if (match_error) {
-            g_propagate_error (&error, match_error);
-        } else {
-            g_set_error (&error,
-                         MM_CORE_ERROR,
-                         MM_CORE_ERROR_FAILED,
-                         "Failed to match EGMR response: %s", response);
-        }
+        if (match_error)
+            g_task_return_error (task, error);
+        else
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                     "Failed to match EGMR response: %s", response);
+        g_object_unref (task);
 
         g_match_info_free (match_info);
         g_regex_unref (r);
@@ -214,11 +212,10 @@ get_supported_modes_ready (MMBaseModem *self,
     }
 
     if (!mm_get_int_from_match_info (match_info, 1, &device_type)) {
-        g_set_error (&error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Failed to parse the allowed mode response: '%s'",
-                     response);
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Failed to parse the allowed mode response: '%s'",
+                                 response);
+        g_object_unref (task);
 
         g_regex_unref (r);
         g_match_info_free (match_info);
