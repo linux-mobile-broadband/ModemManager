@@ -2335,13 +2335,13 @@ mm_3gpp_parse_cgcontrdp_response (const gchar  *response,
     GError                *inner_error = NULL;
     guint                  cid = 0;
     guint                  bearer_id = 0;
-    gchar                 *apn = NULL;
-    gchar                 *local_address_and_subnet = NULL;
-    gchar                 *local_address = NULL;
-    gchar                 *subnet = NULL;
-    gchar                 *gateway_address = NULL;
-    gchar                 *dns_primary_address = NULL;
-    gchar                 *dns_secondary_address = NULL;
+    g_autofree gchar      *apn = NULL;
+    g_autofree gchar      *local_address_and_subnet = NULL;
+    g_autofree gchar      *local_address = NULL;
+    g_autofree gchar      *subnet = NULL;
+    g_autofree gchar      *gateway_address = NULL;
+    g_autofree gchar      *dns_primary_address = NULL;
+    g_autofree gchar      *dns_secondary_address = NULL;
     guint                  field_format_extra_index = 0;
 
     /* Response may be e.g.:
@@ -2371,28 +2371,28 @@ mm_3gpp_parse_cgcontrdp_response (const gchar  *response,
     g_assert (r != NULL);
 
     g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
-    if (inner_error)
-        goto out;
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
 
     if (!g_match_info_matches (match_info)) {
-        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS, "Couldn't match +CGCONTRDP response");
-        goto out;
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS, "Couldn't match +CGCONTRDP response");
+        return FALSE;
     }
 
     if (out_cid && !mm_get_uint_from_match_info (match_info, 1, &cid)) {
-        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing cid");
-        goto out;
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing cid");
+        return FALSE;
     }
 
     if (out_bearer_id && !mm_get_uint_from_match_info (match_info, 2, &bearer_id)) {
-        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing bearer id");
-        goto out;
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing bearer id");
+        return FALSE;
     }
 
     /* Remaining strings are optional or empty allowed */
-
-    if (out_apn)
-        apn = mm_get_string_unquoted_from_match_info (match_info, 3);
+    apn = mm_get_string_unquoted_from_match_info (match_info, 3);
 
     /*
      * The +CGCONTRDP=[cid] response format before version TS 27.007 v9.4.0 had
@@ -2400,64 +2400,39 @@ mm_3gpp_parse_cgcontrdp_response (const gchar  *response,
      */
     local_address_and_subnet = mm_get_string_unquoted_from_match_info (match_info, 4);
     if (local_address_and_subnet && !split_local_address_and_subnet (local_address_and_subnet, &local_address, &subnet)) {
-        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing local address and subnet");
-        goto out;
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing local address and subnet");
+        return FALSE;
     }
+
     /* If we don't have a subnet in field 4, we're using the old format with subnet in an extra field */
     if (!subnet) {
-        if (out_subnet)
-            subnet = mm_get_string_unquoted_from_match_info (match_info, 5);
+        subnet = mm_get_string_unquoted_from_match_info (match_info, 5);
         field_format_extra_index = 1;
     }
 
-    if (out_gateway_address)
-        gateway_address = mm_get_string_unquoted_from_match_info (match_info, 5 + field_format_extra_index);
-
-    if (out_dns_primary_address)
-        dns_primary_address = mm_get_string_unquoted_from_match_info (match_info, 6 + field_format_extra_index);
-
-    if (out_dns_secondary_address)
-        dns_secondary_address = mm_get_string_unquoted_from_match_info (match_info, 7 + field_format_extra_index);
-
-out:
-    g_free (local_address_and_subnet);
-
-    if (inner_error) {
-        g_free (apn);
-        g_free (local_address);
-        g_free (subnet);
-        g_free (gateway_address);
-        g_free (dns_primary_address);
-        g_free (dns_secondary_address);
-        g_propagate_error (error, inner_error);
-        return FALSE;
-    }
+    gateway_address = mm_get_string_unquoted_from_match_info (match_info, 5 + field_format_extra_index);
+    dns_primary_address = mm_get_string_unquoted_from_match_info (match_info, 6 + field_format_extra_index);
+    dns_secondary_address = mm_get_string_unquoted_from_match_info (match_info, 7 + field_format_extra_index);
 
     if (out_cid)
         *out_cid = cid;
     if (out_bearer_id)
         *out_bearer_id = bearer_id;
     if (out_apn)
-        *out_apn = apn;
-
+        *out_apn = g_steal_pointer (&apn);
     /* Local address and subnet may always be retrieved, even if not requested
      * by the caller, as we need them to know which +CGCONTRDP=[cid] response is
      * being parsed. So make sure we free them if not needed. */
     if (out_local_address)
-        *out_local_address = local_address;
-    else
-        g_free (local_address);
+        *out_local_address = g_steal_pointer (&local_address);
     if (out_subnet)
-        *out_subnet = subnet;
-    else
-        g_free (subnet);
-
+        *out_subnet = g_steal_pointer (&subnet);
     if (out_gateway_address)
-        *out_gateway_address = gateway_address;
+        *out_gateway_address = g_steal_pointer (&gateway_address);
     if (out_dns_primary_address)
-        *out_dns_primary_address = dns_primary_address;
+        *out_dns_primary_address = g_steal_pointer (&dns_primary_address);
     if (out_dns_secondary_address)
-        *out_dns_secondary_address = dns_secondary_address;
+        *out_dns_secondary_address = g_steal_pointer (&dns_secondary_address);
     return TRUE;
 }
 
