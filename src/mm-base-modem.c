@@ -635,7 +635,7 @@ sync_ready (MMBaseModem  *self,
             GAsyncResult *res,
             GTask        *task)
 {
-    g_autoptr(GError) error = NULL;
+    GError *error = NULL;
 
     if (!MM_BASE_MODEM_GET_CLASS (self)->sync_finish (self, res, &error))
         g_task_return_error (task, error);
