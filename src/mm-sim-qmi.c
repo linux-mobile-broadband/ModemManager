@@ -571,8 +571,8 @@ uim_get_gid_ready (QmiClientUim *client,
                    GAsyncResult *res,
                    GTask        *task)
 {
-    GError *error = NULL;
-    GArray *read_result;
+    GError            *error = NULL;
+    g_autoptr(GArray)  read_result = NULL;
 
     read_result = uim_read_finish (client, res, &error);
     if (!read_result)
