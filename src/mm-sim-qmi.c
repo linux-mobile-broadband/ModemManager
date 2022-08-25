@@ -329,10 +329,10 @@ uim_get_iccid_ready (QmiClientUim *client,
                      GAsyncResult *res,
                      GTask        *task)
 {
-    GError *error = NULL;
-    GArray *read_result;
-    g_autofree gchar *raw_iccid = NULL;
-    gchar *iccid;
+    GError            *error = NULL;
+    g_autoptr(GArray)  read_result = NULL;
+    g_autofree gchar  *raw_iccid = NULL;
+    gchar             *iccid;
 
     read_result = uim_read_finish (client, res, &error);
     if (!read_result) {
@@ -344,14 +344,11 @@ uim_get_iccid_ready (QmiClientUim *client,
     raw_iccid = mm_utils_bin2hexstr ((const guint8 *) read_result->data, read_result->len);
     g_assert (raw_iccid);
     iccid = mm_3gpp_parse_iccid (raw_iccid, &error);
-    if (!iccid) {
+    if (!iccid)
         g_task_return_error (task, error);
-    } else {
+    else
         g_task_return_pointer (task, iccid, g_free);
-    }
     g_object_unref (task);
-
-    g_array_unref (read_result);
 }
 
 static void
@@ -447,9 +444,9 @@ uim_get_imsi_ready (QmiClientUim *client,
                     GAsyncResult *res,
                     GTask        *task)
 {
-    GError *error = NULL;
-    GArray *read_result;
-    gchar *imsi;
+    GError            *error = NULL;
+    g_autoptr(GArray)  read_result = NULL;
+    g_autofree gchar  *imsi = NULL;
 
     read_result = uim_read_finish (client, res, &error);
     if (!read_result) {
@@ -473,9 +470,6 @@ uim_get_imsi_ready (QmiClientUim *client,
          * decimal digits to obtain the IMSI. */
         g_task_return_pointer (task, g_strdup (imsi + 3), g_free);
     g_object_unref (task);
-
-    g_free (imsi);
-    g_array_unref (read_result);
 }
 
 static void
