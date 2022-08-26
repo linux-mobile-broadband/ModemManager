@@ -1349,6 +1349,8 @@ modem_load_supported_ip_families (MMIfaceModem *self,
 /*****************************************************************************/
 /* Load signal quality (Modem interface) */
 
+#define RSSI_MAX -30
+#define RSSI_MIN -125
 #define RSRP_MAX -44
 #define RSRP_MIN -140
 #define SNR_MAX 40
@@ -5660,6 +5662,12 @@ enable_unsolicited_events_context_free (EnableUnsolicitedEventsContext *ctx)
     g_free (ctx);
 }
 
+/* default rssi delta value */
+static const guint default_rssi_delta_dbm = 5;
+/* RSSI values go between -105 and -60 for 3GPP technologies,
+ * and from -105 to -90 in 3GPP2 technologies (approx). */
+static const gint8 default_thresholds_data_dbm[] = { -100, -97, -95, -92, -90, -85, -80, -75, -70, -65 };
+
 static gboolean
 common_enable_disable_unsolicited_events_finish (MMBroadbandModemQmi  *self,
                                                  GAsyncResult         *res,
@@ -5854,10 +5862,57 @@ config_signal_info_ready (QmiClientNas *client,
 }
 
 static void
+config_signal_info_v2_ready (QmiClientNas *client,
+                             GAsyncResult *res,
+                             GTask        *task)
+{
+    MMBroadbandModemQmi                              *self;
+    EnableUnsolicitedEventsContext                   *ctx;
+    g_autoptr(QmiMessageNasConfigSignalInfoV2Output)  output = NULL;
+    g_autoptr(QmiMessageNasConfigSignalInfoInput)     input = NULL;
+    g_autoptr(GError)                                 error = NULL;
+    g_autoptr(GArray)                                 thresholds = NULL;
+
+    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+
+    output = qmi_client_nas_config_signal_info_v2_finish (client, res, &error);
+    if (!output || !qmi_message_nas_config_signal_info_v2_output_get_result (output, &error)) {
+        if (g_error_matches (error,
+                             QMI_PROTOCOL_ERROR,
+                             QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND) ||
+            g_error_matches (error,
+                             QMI_PROTOCOL_ERROR,
+                             QMI_PROTOCOL_ERROR_NOT_SUPPORTED)) {
+            mm_obj_dbg (self, "couldn't config signal info using v2: '%s', falling back to config signal info using v1",
+                        error->message);
+
+            thresholds = g_array_sized_new (FALSE, FALSE, sizeof (gint8), G_N_ELEMENTS (default_thresholds_data_dbm));
+            g_array_append_vals (thresholds, default_thresholds_data_dbm, G_N_ELEMENTS (default_thresholds_data_dbm));
+            input = qmi_message_nas_config_signal_info_input_new ();
+            qmi_message_nas_config_signal_info_input_set_rssi_threshold (input, thresholds, NULL);
+            qmi_client_nas_config_signal_info (
+                ctx->client_nas,
+                input,
+                5,
+                NULL,
+                (GAsyncReadyCallback)config_signal_info_ready,
+                task);
+            return;
+        }
+        mm_obj_dbg (self, "couldn't config signal info: '%s'", error->message);
+    }
+
+    /* Keep on */
+    common_enable_disable_unsolicited_events_signal_info (task);
+}
+
+static void
 common_enable_disable_unsolicited_events_signal_info_config (GTask *task)
 {
-    EnableUnsolicitedEventsContext                *ctx;
-    g_autoptr(QmiMessageNasConfigSignalInfoInput)  input = NULL;
+    EnableUnsolicitedEventsContext                  *ctx;
+    g_autoptr(QmiMessageNasConfigSignalInfoV2Input)  input = NULL;
+    guint                                            delta;
 
     ctx = g_task_get_task_data (task);
 
@@ -5867,29 +5922,22 @@ common_enable_disable_unsolicited_events_signal_info_config (GTask *task)
         return;
     }
 
-    input = qmi_message_nas_config_signal_info_input_new ();
-
-    /* Prepare thresholds, separated 20 each */
-    {
-        /* RSSI values go between -105 and -60 for 3GPP technologies,
-         * and from -105 to -90 in 3GPP2 technologies (approx). */
-        static const gint8 thresholds_data[] = { -100, -97, -95, -92, -90, -85, -80, -75, -70, -65 };
-        g_autoptr(GArray)  thresholds = NULL;
-
-        thresholds = g_array_sized_new (FALSE, FALSE, sizeof (gint8), G_N_ELEMENTS (thresholds_data));
-        g_array_append_vals (thresholds, thresholds_data, G_N_ELEMENTS (thresholds_data));
-        qmi_message_nas_config_signal_info_input_set_rssi_threshold (
-            input,
-            thresholds,
-            NULL);
-    }
-
-    qmi_client_nas_config_signal_info (
+    /* delta in units of 0.1dBm */
+    delta = default_rssi_delta_dbm * 10;
+    input = qmi_message_nas_config_signal_info_v2_input_new ();
+    qmi_message_nas_config_signal_info_v2_input_set_cdma_rssi_delta (input, delta, NULL);
+    qmi_message_nas_config_signal_info_v2_input_set_hdr_rssi_delta (input, delta, NULL);
+    qmi_message_nas_config_signal_info_v2_input_set_gsm_rssi_delta (input, delta, NULL);
+    qmi_message_nas_config_signal_info_v2_input_set_wcdma_rssi_delta (input, delta, NULL);
+    qmi_message_nas_config_signal_info_v2_input_set_lte_rssi_delta (input, delta, NULL);
+    /* use RSRP for 5GNR*/
+    qmi_message_nas_config_signal_info_v2_input_set_nr5g_rsrp_delta (input, delta, NULL);
+    qmi_client_nas_config_signal_info_v2 (
         ctx->client_nas,
         input,
         5,
         NULL,
-        (GAsyncReadyCallback)config_signal_info_ready,
+        (GAsyncReadyCallback)config_signal_info_v2_ready,
         task);
 }
 
@@ -12724,6 +12772,172 @@ signal_load_values (MMIfaceModemSignal  *self,
 }
 
 /*****************************************************************************/
+/* Setup threshold values (Signal interface) */
+
+typedef struct {
+    QmiClientNas *client;
+    guint rssi_threshold;
+} SignalSetupThresholdsContext;
+
+static void
+signal_setup_thresholds_context_free (SignalSetupThresholdsContext *ctx)
+{
+    g_clear_object (&ctx->client);
+    g_slice_free (SignalSetupThresholdsContext, ctx);
+}
+
+static gboolean
+signal_setup_thresholds_finish (MMIfaceModemSignal  *self,
+                                GAsyncResult        *res,
+                                GError             **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+signal_setup_thresholds_config_signal_info_ready (QmiClientNas *client,
+                                                  GAsyncResult *res,
+                                                  GTask        *task)
+{
+    GError                                         *error = NULL;
+    g_autoptr(QmiMessageNasConfigSignalInfoOutput)  output = NULL;
+
+    output = qmi_client_nas_config_signal_info_finish (client, res, &error);
+    if (!output || !qmi_message_nas_config_signal_info_output_get_result (output, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+config_signal_info (GTask *task)
+{
+    SignalSetupThresholdsContext                  *ctx;
+    g_autoptr(QmiMessageNasConfigSignalInfoInput)  input = NULL;
+    g_autoptr(GArray)                              rssi_thresholds = NULL;
+
+    ctx = g_task_get_task_data (task);
+    input = qmi_message_nas_config_signal_info_input_new ();
+
+    if (ctx->rssi_threshold) {
+        gint8 threshold;
+
+        rssi_thresholds = g_array_new (FALSE, FALSE, sizeof (gint8));
+        threshold = RSSI_MIN;
+        while (RSSI_MIN <= threshold && threshold <= RSSI_MAX) {
+            g_array_append_val (rssi_thresholds, threshold);
+            threshold += ctx->rssi_threshold;
+        }
+    } else {
+        rssi_thresholds = g_array_sized_new (FALSE, FALSE, sizeof (gint8), G_N_ELEMENTS (default_thresholds_data_dbm));
+        g_array_append_vals (rssi_thresholds, default_thresholds_data_dbm, G_N_ELEMENTS (default_thresholds_data_dbm));
+    }
+    qmi_message_nas_config_signal_info_input_set_rssi_threshold (input, rssi_thresholds, NULL);
+    qmi_client_nas_config_signal_info (ctx->client,
+                                       input,
+                                       5,
+                                       NULL,
+                                       (GAsyncReadyCallback)signal_setup_thresholds_config_signal_info_ready,
+                                       task);
+}
+
+static void
+signal_setup_thresholds_config_signal_info_v2_ready (QmiClientNas *client,
+                                                     GAsyncResult *res,
+                                                     GTask        *task)
+{
+    MMBroadbandModemQmi                              *self;
+    GError                                           *error = NULL;
+    g_autoptr(QmiMessageNasConfigSignalInfoV2Output)  output = NULL;
+
+    self = g_task_get_source_object (task);
+
+    output = qmi_client_nas_config_signal_info_v2_finish (client, res, &error);
+    if (!output || !qmi_message_nas_config_signal_info_v2_output_get_result (output, &error)) {
+        if (g_error_matches (error,
+                             QMI_PROTOCOL_ERROR,
+                             QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND) ||
+            g_error_matches (error,
+                             QMI_PROTOCOL_ERROR,
+                             QMI_PROTOCOL_ERROR_NOT_SUPPORTED)) {
+            mm_obj_dbg (self, "couldn't config signal info using v2: '%s', falling back to config signal info using v1",
+                        error->message);
+            config_signal_info (task);
+            g_clear_error (&error);
+            return;
+        }
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+config_signal_info_v2 (GTask *task)
+{
+    SignalSetupThresholdsContext                    *ctx;
+    g_autoptr(QmiMessageNasConfigSignalInfoV2Input)  input = NULL;
+    guint                                            delta;
+
+    ctx = g_task_get_task_data (task);
+
+    /* delta in units of 0.1dBm */
+    delta = ctx->rssi_threshold ? ctx->rssi_threshold * 10 : default_rssi_delta_dbm * 10;
+    input = qmi_message_nas_config_signal_info_v2_input_new ();
+    qmi_message_nas_config_signal_info_v2_input_set_cdma_rssi_delta (input, delta, NULL);
+    qmi_message_nas_config_signal_info_v2_input_set_hdr_rssi_delta (input, delta, NULL);
+    qmi_message_nas_config_signal_info_v2_input_set_gsm_rssi_delta (input, delta, NULL);
+    qmi_message_nas_config_signal_info_v2_input_set_wcdma_rssi_delta (input, delta, NULL);
+    qmi_message_nas_config_signal_info_v2_input_set_lte_rssi_delta (input, delta, NULL);
+    /* use RSRP for 5GNR*/
+    qmi_message_nas_config_signal_info_v2_input_set_nr5g_rsrp_delta (input, delta, NULL);
+
+    qmi_client_nas_config_signal_info_v2 (ctx->client,
+                                          input,
+                                          5,
+                                          NULL,
+                                          (GAsyncReadyCallback)signal_setup_thresholds_config_signal_info_v2_ready,
+                                          task);
+}
+
+static void
+signal_setup_thresholds (MMIfaceModemSignal  *self,
+                         guint                rssi_threshold,
+                         gboolean             error_rate_threshold,
+                         GAsyncReadyCallback  callback,
+                         gpointer             user_data)
+{
+    GTask                        *task;
+    SignalSetupThresholdsContext *ctx;
+    QmiClient                    *client = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (error_rate_threshold) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "Setting error rate threshold not supported");
+        g_object_unref (task);
+        return;
+    }
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_NAS, &client,
+                                      callback, user_data))
+        return;
+
+    ctx = g_slice_new0 (SignalSetupThresholdsContext);
+    ctx->client = QMI_CLIENT_NAS (g_object_ref (client));
+    ctx->rssi_threshold = rssi_threshold;
+    g_task_set_task_data (task, ctx, (GDestroyNotify)signal_setup_thresholds_context_free);
+
+    config_signal_info_v2 (task);
+}
+
+/*****************************************************************************/
 /* Reset data interfaces during initialization */
 
 typedef struct {
@@ -13704,6 +13918,8 @@ iface_modem_signal_init (MMIfaceModemSignal *iface)
     iface->check_support_finish = signal_check_support_finish;
     iface->load_values = signal_load_values;
     iface->load_values_finish = signal_load_values_finish;
+    iface->setup_thresholds = signal_setup_thresholds;
+    iface->setup_thresholds_finish = signal_setup_thresholds_finish;
 }
 
 static void
