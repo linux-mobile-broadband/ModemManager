@@ -527,6 +527,25 @@ test_text_split_max_single_pdu_gsm7 (void)
 }
 
 static void
+test_text_split_max_single_pdu_gsm7_extended_chars (void)
+{
+    const gchar *text =
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901\\~[]{}^|€";
+    const gchar *expected [] = {
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901\\~[]{}^|€",
+        NULL
+    };
+
+    common_test_text_split (text, expected, MM_MODEM_CHARSET_GSM);
+}
+
+static void
 test_text_split_max_single_pdu_ucs2 (void)
 {
     /* NOTE: This chinese string contains 210 bytes when encoded in
@@ -578,6 +597,72 @@ test_text_split_two_pdu_gsm7 (void)
         "012345678901234567890123456789012",
         /* Second chunk */
         "34567890",
+        NULL
+    };
+
+    common_test_text_split (text, expected, MM_MODEM_CHARSET_GSM);
+}
+
+static void
+test_text_split_two_pdu_gsm7_extended_chars (void)
+{
+    const gchar *text =
+        "[123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "01234567890123456789012345678901234567890";
+    const gchar *expected [] = {
+        /* First chunk */
+        "[123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "01234567890123456789012345678901",
+        /* Second chunk */
+        "234567890",
+        NULL
+    };
+
+    common_test_text_split (text, expected, MM_MODEM_CHARSET_GSM);
+}
+
+static void
+test_text_split_two_pdu_gsm7_extended_chars_middle1 (void)
+{
+    const gchar *text =
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890[23456789";
+    const gchar *expected [] = {
+        /* First chunk */
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890[",
+        /* Second chunk */
+        "23456789",
+        NULL
+    };
+
+    common_test_text_split (text, expected, MM_MODEM_CHARSET_GSM);
+}
+
+static void
+test_text_split_two_pdu_gsm7_extended_chars_middle2 (void)
+{
+    const gchar *text =
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "01234567890123456789012345678901]3456789";
+    const gchar *expected [] = {
+        /* First chunk */
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "01234567890123456789012345678901",
+        /* Second chunk */
+        "]3456789",
         NULL
     };
 
@@ -653,15 +738,19 @@ int main (int argc, char **argv)
 
     g_test_add_func ("/MM/charsets/can-convert-to", test_charset_can_covert_to);
 
-    g_test_add_func ("/MM/charsets/text-split/gsm7/short",           test_text_split_short_gsm7);
-    g_test_add_func ("/MM/charsets/text-split/ucs2/short",           test_text_split_short_ucs2);
-    g_test_add_func ("/MM/charsets/text-split/utf16/short",          test_text_split_short_utf16);
-    g_test_add_func ("/MM/charsets/text-split/gsm7/max-single-pdu",  test_text_split_max_single_pdu_gsm7);
-    g_test_add_func ("/MM/charsets/text-split/ucs2/max-single-pdu",  test_text_split_max_single_pdu_ucs2);
-    g_test_add_func ("/MM/charsets/text-split/utf16/max-single-pdu", test_text_split_max_single_pdu_utf16);
-    g_test_add_func ("/MM/charsets/text-split/gsm7/two-pdu",         test_text_split_two_pdu_gsm7);
-    g_test_add_func ("/MM/charsets/text-split/ucs2/two-pdu",         test_text_split_two_pdu_ucs2);
-    g_test_add_func ("/MM/charsets/text-split/utf16/two-pdu",        test_text_split_two_pdu_utf16);
+    g_test_add_func ("/MM/charsets/text-split/gsm7/short",                          test_text_split_short_gsm7);
+    g_test_add_func ("/MM/charsets/text-split/ucs2/short",                          test_text_split_short_ucs2);
+    g_test_add_func ("/MM/charsets/text-split/utf16/short",                         test_text_split_short_utf16);
+    g_test_add_func ("/MM/charsets/text-split/gsm7/max-single-pdu",                 test_text_split_max_single_pdu_gsm7);
+    g_test_add_func ("/MM/charsets/text-split/gsm7/max-single-pdu-extended-chars",  test_text_split_max_single_pdu_gsm7_extended_chars);
+    g_test_add_func ("/MM/charsets/text-split/ucs2/max-single-pdu",                 test_text_split_max_single_pdu_ucs2);
+    g_test_add_func ("/MM/charsets/text-split/utf16/max-single-pdu",                test_text_split_max_single_pdu_utf16);
+    g_test_add_func ("/MM/charsets/text-split/gsm7/two-pdu",                        test_text_split_two_pdu_gsm7);
+    g_test_add_func ("/MM/charsets/text-split/gsm7/two-pdu-extended-chars",         test_text_split_two_pdu_gsm7_extended_chars);
+    g_test_add_func ("/MM/charsets/text-split/gsm7/two-pdu-extended-chars_mid1",    test_text_split_two_pdu_gsm7_extended_chars_middle1);
+    g_test_add_func ("/MM/charsets/text-split/gsm7/two-pdu-extended-chars_mid2",    test_text_split_two_pdu_gsm7_extended_chars_middle2);
+    g_test_add_func ("/MM/charsets/text-split/ucs2/two-pdu",                        test_text_split_two_pdu_ucs2);
+    g_test_add_func ("/MM/charsets/text-split/utf16/two-pdu",                       test_text_split_two_pdu_utf16);
 
     return g_test_run ();
 }
