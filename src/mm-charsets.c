@@ -281,6 +281,18 @@ utf8_to_gsm_ext_char (const gchar *utf8,
     return FALSE;
 }
 
+static guint8
+utf8_to_gsm_char (const gchar *utf8,
+                  guint32      len,
+                  guint8      *out_gsm)
+{
+    if (utf8_to_gsm_def_char (utf8, len, out_gsm))
+        return 1;
+    if (utf8_to_gsm_ext_char (utf8, len, out_gsm))
+        return 2;
+    return 0;
+}
+
 static guint8 *
 charset_gsm_unpacked_to_utf8 (const guint8  *gsm,
                               guint32        len,
@@ -980,29 +992,63 @@ util_split_text_gsm7 (const gchar *text,
                       gsize        text_len,
                       gpointer     log_object)
 {
-    gchar **out;
-    guint   n_chunks;
-    guint   i;
-    guint   j;
+    g_autoptr(GPtrArray)  chunks = NULL;
+    const gchar          *walker;
+    const char           *end;
+    const gchar          *chunk_start;
+    glong                 encoded_chunk_length;
+    glong                 total_encoded_chunk_length;
+
+    chunks = g_ptr_array_new_with_free_func ((GDestroyNotify)g_free);
+
+    walker = text;
+    chunk_start = text;
+    encoded_chunk_length = 0;
+    total_encoded_chunk_length = 0;
+    while (walker && *walker) {
+        guint8 symbol[2] = {0, 0};
+        glong  written_bytes = 0;
+
+        end = g_utf8_find_next_char (walker, NULL);
+        if (end == NULL) {
+            /* Find the string terminating NULL */
+            end = walker;
+            while (*++end);
+        }
+
+        written_bytes = utf8_to_gsm_char (walker, (end - walker), symbol);
+
+        /* If more than one chunk is needed, these have to be of 140 - 6 = 134
+         * bytes each, as additional space is needed for the UDH header.
+         * That means up to 153 input characters can be packed:
+         * 134 * 8 = 1072; 1072/7=153.14
+         */
+        if ((encoded_chunk_length + written_bytes) > 153) {
+            g_ptr_array_add (chunks, g_strndup (chunk_start, walker - chunk_start));
+            chunk_start = walker;
+            encoded_chunk_length = written_bytes;
+        } else
+            encoded_chunk_length += written_bytes;
+
+        total_encoded_chunk_length += written_bytes;
+        walker = g_utf8_next_char (walker);
+    }
 
     /* No splitting needed? */
-    if (text_len <= 160) {
+    if (total_encoded_chunk_length <= 160) {
+        gchar **out;
+
         out = g_new0 (gchar *, 2);
         out[0] = g_strdup (text);
         return out;
     }
 
-    /* Compute number of chunks needed */
-    n_chunks = text_len / 153;
-    if (text_len % 153 != 0)
-        n_chunks++;
+    /* Otherwise, we do need the splitted chunks. Add the last one
+     * with contents plus the last trailing NULL */
+    g_ptr_array_add (chunks, g_strndup (chunk_start, walker - chunk_start));
+    g_ptr_array_add (chunks, NULL);
 
-    /* Fill in all chunks */
-    out = g_new0 (gchar *, n_chunks + 1);
-    for (i = 0, j = 0; i < n_chunks; i++, j += 153)
-        out[i] = g_strndup (&text[j], 153);
-
-    return out;
+    return (gchar **) g_ptr_array_free (g_steal_pointer (&chunks), FALSE);
 }
 
 static gchar **
