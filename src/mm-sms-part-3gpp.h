@@ -44,9 +44,6 @@ guint       mm_sms_part_3gpp_encode_address   (const gchar   *address,
                                                guint8        *buf,
                                                gsize          buflen,
                                                gboolean       is_smsc);
-gchar      **mm_sms_part_3gpp_util_split_text (const gchar   *text,
-                                               MMSmsEncoding *encoding,
-                                               gpointer       log_object);
 GByteArray **mm_sms_part_3gpp_util_split_data (const guint8  *data,
                                                gsize          data_len);
 

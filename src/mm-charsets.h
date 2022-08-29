@@ -112,4 +112,15 @@ gchar *mm_modem_charset_str_to_utf8 (const gchar     *str,
 
 void mm_modem_charsets_init (void);
 
+
+/*
+ * Select appropriate encoding and split an UTF-8 encoded input string
+ * into N UTF-8 strings, so that each of the strings
+ * can be encoded into 'charset' and placed in a SMS part.
+ */
+gchar **mm_charset_util_split_text (const gchar    *text,
+                                    MMModemCharset *charset,
+                                    gpointer        log_object);
+
+
 #endif /* MM_CHARSETS_H */

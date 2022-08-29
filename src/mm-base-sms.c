@@ -112,6 +112,7 @@ generate_3gpp_submit_pdus (MMBaseSms *self,
     gsize data_len = 0;
 
     MMSmsEncoding encoding;
+    MMModemCharset charset;
     gchar **split_text = NULL;
     GByteArray **split_data = NULL;
 
@@ -129,7 +130,7 @@ generate_3gpp_submit_pdus (MMBaseSms *self,
     g_assert (!(text != NULL && data != NULL));
 
     if (text) {
-        split_text = mm_sms_part_3gpp_util_split_text (text, &encoding, self);
+        split_text = mm_charset_util_split_text (text, &charset, self);
         if (!split_text) {
             g_set_error (error,
                          MM_CORE_ERROR,
@@ -137,6 +138,7 @@ generate_3gpp_submit_pdus (MMBaseSms *self,
                          "Cannot generate PDUs: Error processing input text");
             return FALSE;
         }
+        encoding = (charset == MM_MODEM_CHARSET_GSM) ? MM_SMS_ENCODING_GSM7 : MM_SMS_ENCODING_UCS2;
         n_parts = g_strv_length (split_text);
     } else if (data) {
         encoding = MM_SMS_ENCODING_8BIT;

@@ -446,6 +446,188 @@ test_charset_can_covert_to (void)
     }
 }
 
+/********************* TEXT SPLIT TESTS *********************/
+
+static void
+common_test_text_split (const gchar *text,
+                        const gchar **expected,
+                        MMModemCharset expected_charset)
+{
+    gchar **out;
+    MMModemCharset out_charset = MM_MODEM_CHARSET_UNKNOWN;
+    guint i;
+
+    out = mm_charset_util_split_text (text, &out_charset, NULL);
+
+    g_assert (out != NULL);
+    g_assert (out_charset != MM_MODEM_CHARSET_UNKNOWN);
+
+    g_assert_cmpuint (g_strv_length (out), ==, g_strv_length ((gchar **)expected));
+
+    for (i = 0; out[i]; i++) {
+        g_assert_cmpstr (out[i], ==, expected[i]);
+    }
+
+    g_strfreev (out);
+}
+
+static void
+test_text_split_short_gsm7 (void)
+{
+    const gchar *text = "Hello";
+    const gchar *expected [] = {
+        "Hello",
+        NULL
+    };
+
+    common_test_text_split (text, expected, MM_MODEM_CHARSET_GSM);
+}
+
+static void
+test_text_split_short_ucs2 (void)
+{
+    const gchar *text = "你好"; /* (UTF-8) e4 bd a0 e5 a5 bd */
+    const gchar *expected [] = {
+        "你好",
+        NULL
+    };
+
+    common_test_text_split (text, expected, MM_MODEM_CHARSET_UTF16);
+}
+
+static void
+test_text_split_short_utf16 (void)
+{
+    const gchar *text = "😉"; /* U+1F609, winking face */
+    const gchar *expected [] = {
+        "😉",
+        NULL
+    };
+
+    common_test_text_split (text, expected, MM_MODEM_CHARSET_UTF16);
+}
+
+static void
+test_text_split_max_single_pdu_gsm7 (void)
+{
+    const gchar *text =
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789";
+    const gchar *expected [] = {
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789",
+        NULL
+    };
+
+    common_test_text_split (text, expected, MM_MODEM_CHARSET_GSM);
+}
+
+static void
+test_text_split_max_single_pdu_ucs2 (void)
+{
+    /* NOTE: This chinese string contains 210 bytes when encoded in
+     * UTF-8! But still, it can be placed into 140 bytes when in UCS-2
+     */
+    const gchar *text =
+        "你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好"
+        "你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好"
+        "你好你好你好";
+    const gchar *expected [] = {
+        "你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好"
+        "你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好"
+        "你好你好你好",
+        NULL
+    };
+
+    common_test_text_split (text, expected, MM_MODEM_CHARSET_UTF16);
+}
+
+static void
+test_text_split_max_single_pdu_utf16 (void)
+{
+    /* NOTE: this string contains 35 Bhaiksuki characters, each of
+     * them requiring 4 bytes both in UTF-8 and in UTF-16 (140 bytes
+     * in total). */
+    const gchar *text =
+        "𑰀𑰁𑰂𑰃𑰄𑰅𑰆𑰇𑰈𑰊𑰋𑰌𑰍𑰎𑰏𑰐𑰑𑰒𑰓𑰔𑰕𑰖𑰗𑰘𑰙𑰚𑰛𑰜𑰝𑰞𑰟𑰠𑰡𑰢𑰣";
+    const gchar *expected [] = {
+        "𑰀𑰁𑰂𑰃𑰄𑰅𑰆𑰇𑰈𑰊𑰋𑰌𑰍𑰎𑰏𑰐𑰑𑰒𑰓𑰔𑰕𑰖𑰗𑰘𑰙𑰚𑰛𑰜𑰝𑰞𑰟𑰠𑰡𑰢𑰣",
+        NULL
+    };
+
+    common_test_text_split (text, expected, MM_MODEM_CHARSET_UTF16);
+}
+
+static void
+test_text_split_two_pdu_gsm7 (void)
+{
+    const gchar *text =
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "01234567890123456789012345678901234567890";
+    const gchar *expected [] = {
+        /* First chunk */
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "0123456789012345678901234567890123456789"
+        "012345678901234567890123456789012",
+        /* Second chunk */
+        "34567890",
+        NULL
+    };
+
+    common_test_text_split (text, expected, MM_MODEM_CHARSET_GSM);
+}
+
+static void
+test_text_split_two_pdu_ucs2 (void)
+{
+    const gchar *text =
+        "你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好"
+        "你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好"
+        "你好你好你好好";
+    const gchar *expected [] = {
+        /* First chunk */
+        "你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好"
+        "你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好你好"
+        "你好你",
+        /* Second chunk */
+        "好你好好",
+        NULL
+    };
+
+    common_test_text_split (text, expected, MM_MODEM_CHARSET_UTF16);
+}
+
+static void
+test_text_split_two_pdu_utf16 (void)
+{
+    /* NOTE: this string contains 35 Bhaiksuki characters, each of
+     * them requiring 4 bytes both in UTF-8 and in UTF-16 (140 bytes
+     * in total) plus one ASCII char (encoded with 1 byte in UTF-8 and
+     * 2 bytes in UTF-16), making it a total of 142 bytes when in
+     * UTF-16 (so not fitting in one single PDU)
+     *
+     * When split in chunks, the last chunk will hold 2 Bhaiksuki
+     * characters plus the last ASCII one (9 bytes in UTF-16) so that
+     * the first chunk contains the leading 33 Bhaiksuki characters
+     * (132 characters, less than 134) */
+    const gchar *text =
+        "𑰀𑰁𑰂𑰃𑰄𑰅𑰆𑰇𑰈𑰊𑰋𑰌𑰍𑰎𑰏𑰐𑰑𑰒𑰓𑰔𑰕𑰖𑰗𑰘𑰙𑰚𑰛𑰜𑰝𑰞𑰟𑰠𑰡𑰢𑰣a";
+    const gchar *expected [] = {
+        "𑰀𑰁𑰂𑰃𑰄𑰅𑰆𑰇𑰈𑰊𑰋𑰌𑰍𑰎𑰏𑰐𑰑𑰒𑰓𑰔𑰕𑰖𑰗𑰘𑰙𑰚𑰛𑰜𑰝𑰞𑰟𑰠𑰡",
+        "𑰢𑰣a",
+        NULL
+    };
+
+    common_test_text_split (text, expected, MM_MODEM_CHARSET_UTF16);
+}
+
 int main (int argc, char **argv)
 {
     setlocale (LC_ALL, "");
@@ -470,6 +652,16 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/charsets/str-from-to/gsm-with-at",  test_str_gsm_to_from_utf8_with_at);
 
     g_test_add_func ("/MM/charsets/can-convert-to", test_charset_can_covert_to);
+
+    g_test_add_func ("/MM/charsets/text-split/gsm7/short",           test_text_split_short_gsm7);
+    g_test_add_func ("/MM/charsets/text-split/ucs2/short",           test_text_split_short_ucs2);
+    g_test_add_func ("/MM/charsets/text-split/utf16/short",          test_text_split_short_utf16);
+    g_test_add_func ("/MM/charsets/text-split/gsm7/max-single-pdu",  test_text_split_max_single_pdu_gsm7);
+    g_test_add_func ("/MM/charsets/text-split/ucs2/max-single-pdu",  test_text_split_max_single_pdu_ucs2);
+    g_test_add_func ("/MM/charsets/text-split/utf16/max-single-pdu", test_text_split_max_single_pdu_utf16);
+    g_test_add_func ("/MM/charsets/text-split/gsm7/two-pdu",         test_text_split_two_pdu_gsm7);
+    g_test_add_func ("/MM/charsets/text-split/ucs2/two-pdu",         test_text_split_two_pdu_ucs2);
+    g_test_add_func ("/MM/charsets/text-split/utf16/two-pdu",        test_text_split_two_pdu_utf16);
 
     return g_test_run ();
 }
