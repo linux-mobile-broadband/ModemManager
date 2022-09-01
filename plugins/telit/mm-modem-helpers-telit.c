@@ -915,7 +915,8 @@ mm_telit_model_from_revision (const gchar *revision)
         {"25.", MM_TELIT_MODEL_LE910C1},
         {"32.", MM_TELIT_MODEL_LM960},
         {"38.", MM_TELIT_MODEL_FN980},
-        {"40.", MM_TELIT_MODEL_LN920}
+        {"40.", MM_TELIT_MODEL_LN920},
+        {"45.00", MM_TELIT_MODEL_FN990},
     };
 
     if (!revision)
