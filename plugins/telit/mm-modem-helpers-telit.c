@@ -667,15 +667,6 @@ typedef enum {
     LOAD_BANDS_TYPE_CURRENT,
 } LoadBandsType;
 
-static gboolean
-bnd_response_has_ext_4g_bands (const gchar *response)
-{
-    g_auto(GStrv) tokens = NULL;
-
-    tokens = mm_split_string_groups (response);
-    return g_strv_length (tokens) == 4;
-}
-
 /* Regex tokens for #BND parsing */
 #define MM_SUPPORTED_BANDS_2G       "\\s*\\((?P<Bands2G>[0-9\\-,]*)\\)"
 #define MM_SUPPORTED_BANDS_3G       "(,\\s*\\((?P<Bands3G>[0-9\\-,]*)\\))?"
@@ -783,7 +774,6 @@ mm_telit_parse_bnd_test_response (const gchar            *response,
                                   gpointer                log_object,
                                   GError                **error)
 {
-    config->modem_ext_4g_bands = bnd_response_has_ext_4g_bands (response);
     return common_parse_bnd_response (response,
                                       config,
                                       LOAD_BANDS_TYPE_SUPPORTED,
