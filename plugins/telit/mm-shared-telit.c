@@ -58,8 +58,7 @@ private_free (Private *priv)
 }
 
 static gboolean
-is_bnd_4g_format_hex (MMBaseModem *self,
-                      const gchar *revision)
+is_bnd_4g_format_hex (const gchar *revision)
 {
     MMTelitModel model;    
 
@@ -145,7 +144,7 @@ mm_shared_telit_get_bnd_parse_config (MMIfaceModem *self, MMTelitBNDParseConfig 
     config->modem_is_3g = mm_iface_modem_is_3g (self);
     config->modem_is_4g = mm_iface_modem_is_4g (self);
     config->modem_alternate_3g_bands = priv->alternate_3g_bands;
-    config->modem_has_hex_format_4g_bands = is_bnd_4g_format_hex (MM_BASE_MODEM(self), priv->software_package_version);
+    config->modem_has_hex_format_4g_bands = is_bnd_4g_format_hex (priv->software_package_version);
     config->modem_ext_4g_bands = priv->ext_4g_bands;
 }
 
