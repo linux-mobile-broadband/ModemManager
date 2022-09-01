@@ -176,6 +176,10 @@ struct _MMBroadbandModemQmiPrivate {
     gboolean dsd_supported;
     gboolean dsd_data_rat_available;
     MMModem3gppRegistrationState system_info_ps_registration_state;
+    MMModemAccessTechnology access_tech;
+    guint16 location_area_code;
+    guint16 tracking_area_code;
+    guint32 cell_id;
 };
 
 /*****************************************************************************/
@@ -3955,6 +3959,10 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
     self->priv->system_info_ps_registration_state = ps_registration_state;
     consolidated_update_ps_registration_state (self, has_lte_info, has_nr5g_info);
 
+    self->priv->access_tech = act;
+    self->priv->location_area_code = lac;
+    self->priv->tracking_area_code = tac;
+    self->priv->cell_id = cid;
     mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), act);
     mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, tac, cid);
 }
@@ -4042,6 +4050,8 @@ common_process_system_status_3gpp (MMBroadbandModemQmi *self,
     /* Store DSD data RAT availability and update PS/EPS/5GS states accordingly */
     self->priv->dsd_data_rat_available = data_rat_available;
     consolidated_update_ps_registration_state (self, is_lte, is_nr5g);
+    mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), self->priv->access_tech);
+    mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), self->priv->location_area_code, self->priv->tracking_area_code, self->priv->cell_id);
 }
 
 static void
@@ -12984,6 +12994,7 @@ mm_broadband_modem_qmi_init (MMBroadbandModemQmi *self)
                                               MM_TYPE_BROADBAND_MODEM_QMI,
                                               MMBroadbandModemQmiPrivate);
     self->priv->system_info_ps_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    self->priv->access_tech = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
 }
 
 static void
