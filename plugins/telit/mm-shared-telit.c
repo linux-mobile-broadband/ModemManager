@@ -61,7 +61,15 @@ static gboolean
 is_bnd_4g_format_hex (MMBaseModem *self,
                       const gchar *revision)
 {
-    return mm_telit_model_from_revision (revision) == MM_TELIT_MODEL_LE910C1;
+    MMTelitModel model;    
+
+    model = mm_telit_model_from_revision (revision);
+
+    return (model == MM_TELIT_MODEL_FN980   ||
+            model == MM_TELIT_MODEL_LE910C1 ||
+            model == MM_TELIT_MODEL_LM940   ||
+            model == MM_TELIT_MODEL_LM960   ||
+            model == MM_TELIT_MODEL_LN920);
 }
 
 static void
