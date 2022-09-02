@@ -58,6 +58,19 @@ private_free (Private *priv)
 }
 
 static gboolean
+has_alternate_3g_bands (const gchar *revision)
+{
+    MMTelitModel model;
+
+    model = mm_telit_model_from_revision (revision);
+    return (model == MM_TELIT_MODEL_FN980 ||
+            model == MM_TELIT_MODEL_FN990 ||
+            model == MM_TELIT_MODEL_LM940 ||
+            model == MM_TELIT_MODEL_LM960 ||
+            model == MM_TELIT_MODEL_LN920);
+}
+
+static gboolean
 is_bnd_4g_format_hex (const gchar *revision)
 {
     MMTelitModel model;    
@@ -82,24 +95,6 @@ has_extended_4g_bands (const gchar *revision)
             model == MM_TELIT_MODEL_LN920);
 }
 
-static void
-initialize_alternate_3g_band (MMSharedTelit *self,
-                              Private       *priv)
-{
-    MMPort         *primary;
-    MMKernelDevice *port;
-
-    primary = MM_PORT (mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)));
-    if (primary) {
-        port = mm_port_peek_kernel_device (primary);
-
-        /* Lookup for the tag specifying that we're using the alternate 3G band mapping */
-        priv->alternate_3g_bands = mm_kernel_device_get_global_property_as_boolean (port, "ID_MM_TELIT_BND_ALTERNATE");
-        if (priv->alternate_3g_bands)
-            mm_obj_dbg (self, "telit modem using alternate 3G band mask setup");
-    }
-}
-
 static Private *
 get_private (MMSharedTelit *self)
 {
@@ -111,7 +106,6 @@ get_private (MMSharedTelit *self)
     priv = g_object_get_qdata (G_OBJECT (self), private_quark);
     if (!priv) {
         priv = g_slice_new0 (Private);
-        initialize_alternate_3g_band (self, priv);
 
         if (MM_SHARED_TELIT_GET_INTERFACE (self)->peek_parent_modem_interface)
             priv->iface_modem_parent = MM_SHARED_TELIT_GET_INTERFACE (self)->peek_parent_modem_interface (self);
@@ -141,6 +135,7 @@ mm_shared_telit_store_revision (MMSharedTelit *self,
     priv = get_private (MM_SHARED_TELIT (self));
     g_clear_pointer (&priv->software_package_version, g_free);
     priv->software_package_version = g_strdup (revision);
+    priv->alternate_3g_bands = has_alternate_3g_bands (revision);
     priv->ext_4g_bands = has_extended_4g_bands (revision);
 }
 

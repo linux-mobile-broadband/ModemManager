@@ -122,20 +122,6 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="7011", ENV{.MM_USBIFNUM}=="02", ENV{
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="7011", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="7011", ENV{.MM_USBIFNUM}=="04", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
 
-# LM940/960 use alternate settings for 3G band management
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1041", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1042", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1043", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
-
-# FN980 use alternate settings for 3G band management
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1050", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1051", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
-
-# LN920 use alternate settings for 3G band management
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1060", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1061", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
-
 # LM940/960 initial port delay
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{ID_MM_TELIT_PORT_DELAY}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1041", ENV{ID_MM_TELIT_PORT_DELAY}="1"
