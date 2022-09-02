@@ -4228,8 +4228,8 @@ typedef struct {
 } TestCcwa;
 
 static TestCcwa test_ccwa[] = {
-    { "+CCWA: 0,255", FALSE, FALSE }, /* all disabled */
-    { "+CCWA: 1,255", TRUE,  FALSE }, /* all enabled */
+    { "+CCWA: 0,255\r\n", FALSE, FALSE }, /* all disabled */
+    { "+CCWA: 1,255\r\n", TRUE,  FALSE }, /* all enabled */
     { "+CCWA: 0,1\r\n"
       "+CCWA: 0,4\r\n", FALSE,  FALSE }, /* voice and fax disabled */
     { "+CCWA: 1,1\r\n"
@@ -4304,7 +4304,7 @@ common_test_clcc_response (const gchar      *str,
 static void
 test_clcc_response_empty (void)
 {
-    const gchar *response = "";
+    const gchar *response = "\r\n";
 
     common_test_clcc_response (response, NULL, 0);
 }
@@ -4317,7 +4317,7 @@ test_clcc_response_single (void)
     };
 
     const gchar *response =
-        "+CLCC: 1,1,0,0,0,\"123456789\",161";
+        "+CLCC: 1,1,0,0,0,\"123456789\",161\r\n";
 
     common_test_clcc_response (response, expected_call_info_list, G_N_ELEMENTS (expected_call_info_list));
 }
@@ -4331,7 +4331,7 @@ test_clcc_response_single_long (void)
 
     /* NOTE: priority field is EMPTY */
     const gchar *response =
-        "+CLCC: 1,1,4,0,0,\"123456789\",129,\"\",,0";
+        "+CLCC: 1,1,4,0,0,\"123456789\",129,\"\",,0\r\n";
 
     common_test_clcc_response (response, expected_call_info_list, G_N_ELEMENTS (expected_call_info_list));
 }
