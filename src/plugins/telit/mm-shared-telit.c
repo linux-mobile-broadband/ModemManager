@@ -215,6 +215,18 @@ mm_shared_telit_load_current_modes_finish (MMIfaceModem *self,
     case 31:
         *allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
         return TRUE;
+    case 36:
+        *allowed = MM_MODEM_MODE_5G;
+        return TRUE;
+    case 37:
+        *allowed = (MM_MODEM_MODE_4G | MM_MODEM_MODE_5G);
+        return TRUE;
+    case 38:
+        *allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G | MM_MODEM_MODE_5G);
+        return TRUE;
+    case 40:
+        *allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_5G);
+        return TRUE;
     default:
         break;
     }
@@ -601,6 +613,8 @@ mm_shared_telit_set_current_modes (MMIfaceModem *self,
                 allowed |= MM_MODEM_MODE_3G;
             if (g_array_index (priv->supported_modes, MMModemMode, i) & MM_MODEM_MODE_4G)
                 allowed |= MM_MODEM_MODE_4G;
+            if (g_array_index (priv->supported_modes, MMModemMode, i) & MM_MODEM_MODE_5G)
+                allowed |= MM_MODEM_MODE_5G;
         }
     }
 
@@ -610,6 +624,8 @@ mm_shared_telit_set_current_modes (MMIfaceModem *self,
         ws46_mode = 22;
     else if (allowed == MM_MODEM_MODE_4G)
         ws46_mode = 28;
+    else if (allowed == MM_MODEM_MODE_5G)
+        ws46_mode = 36;
     else if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G)) {
         if (mm_iface_modem_is_3gpp_lte (self))
             ws46_mode = 29;
@@ -621,6 +637,12 @@ mm_shared_telit_set_current_modes (MMIfaceModem *self,
         ws46_mode = 31;
     else if (allowed == (MM_MODEM_MODE_2G  | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G))
         ws46_mode = 25;
+    else if (allowed == (MM_MODEM_MODE_3G | MM_MODEM_MODE_5G))
+        ws46_mode = 40;
+    else if (allowed == (MM_MODEM_MODE_4G | MM_MODEM_MODE_5G))
+        ws46_mode = 37;
+    else if (allowed == (MM_MODEM_MODE_3G |MM_MODEM_MODE_4G | MM_MODEM_MODE_5G))
+        ws46_mode = 38;
 
     /* Telit modems do not support preferred mode selection */
     if ((ws46_mode < 0) || (preferred != MM_MODEM_MODE_NONE)) {
