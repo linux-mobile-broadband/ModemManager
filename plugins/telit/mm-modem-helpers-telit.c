@@ -821,7 +821,7 @@ mm_telit_build_modes_list (void)
     MMModemModeCombination mode;
 
     /* Build list of combinations for 3GPP devices */
-    combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 7);
+    combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 11);
 
     /* 2G only */
     mode.allowed = MM_MODEM_MODE_2G;
@@ -849,6 +849,22 @@ mm_telit_build_modes_list (void)
     g_array_append_val (combinations, mode);
     /* 2G, 3G and 4G */
     mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 5G only */
+    mode.allowed = MM_MODEM_MODE_5G;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 3G and 5G */
+    mode.allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_5G);
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 4G and 5G */
+    mode.allowed = (MM_MODEM_MODE_4G | MM_MODEM_MODE_5G);
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 3G, 4G and 5G */
+    mode.allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G | MM_MODEM_MODE_5G);
     mode.preferred = MM_MODEM_MODE_NONE;
     g_array_append_val (combinations, mode);
 
