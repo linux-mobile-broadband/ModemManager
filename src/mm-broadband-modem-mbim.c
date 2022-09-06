@@ -954,7 +954,7 @@ load_supported_modes_mbim (GTask      *task,
     }
 
     /* Build all */
-    mask_all = mm_modem_mode_from_mbim_data_class (self->priv->caps_data_class);
+    mask_all = mm_modem_mode_from_mbim_data_class (self->priv->caps_data_class, self->priv->caps_custom_data_class);
     mode.allowed = mask_all;
     mode.preferred = MM_MODEM_MODE_NONE;
     all = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
@@ -1102,7 +1102,7 @@ register_state_current_modes_query_ready (MbimDevice   *device,
     }
 
     mode = g_new0 (MMModemModeCombination, 1);
-    mode->allowed = mm_modem_mode_from_mbim_data_class (preferred_data_classes);
+    mode->allowed = mm_modem_mode_from_mbim_data_class (preferred_data_classes, NULL);
     mode->preferred = MM_MODEM_MODE_NONE;
     g_task_return_pointer (task, mode, (GDestroyNotify)g_free);
     g_object_unref (task);
@@ -1189,8 +1189,8 @@ complete_pending_allowed_modes_action (MMBroadbandModemMbim *self,
         return;
 
     requested_data_classes = (MbimDataClass) GPOINTER_TO_UINT (g_task_get_task_data (self->priv->pending_allowed_modes_action));
-    requested_modes = mm_modem_mode_from_mbim_data_class (requested_data_classes);
-    preferred_modes = mm_modem_mode_from_mbim_data_class (preferred_data_classes);
+    requested_modes = mm_modem_mode_from_mbim_data_class (requested_data_classes, NULL);
+    preferred_modes = mm_modem_mode_from_mbim_data_class (preferred_data_classes, NULL);
 
     /* only early complete on success, as we don't know if they're going to be
      * intermediate indications emitted before the preference change is valid */
@@ -1254,8 +1254,8 @@ register_state_current_modes_set_ready (MbimDevice   *device,
         return;
     }
 
-    requested_modes = mm_modem_mode_from_mbim_data_class (requested_data_classes);
-    preferred_modes = mm_modem_mode_from_mbim_data_class (preferred_data_classes);
+    requested_modes = mm_modem_mode_from_mbim_data_class (requested_data_classes, NULL);
+    preferred_modes = mm_modem_mode_from_mbim_data_class (preferred_data_classes, NULL);
 
     if (requested_modes != preferred_modes) {
         g_autofree gchar *requested_modes_str = NULL;
@@ -1332,7 +1332,7 @@ modem_set_current_modes (MMIfaceModem        *_self,
 
         /* Limit ANY to the currently supported modes */
         if (allowed == MM_MODEM_MODE_ANY)
-            allowed = mm_modem_mode_from_mbim_data_class (self->priv->caps_data_class);
+            allowed = mm_modem_mode_from_mbim_data_class (self->priv->caps_data_class, self->priv->caps_custom_data_class);
 
         self->priv->requested_data_class = mm_mbim_data_class_from_modem_mode (allowed,
                                                                                mm_iface_modem_is_3gpp (_self),
