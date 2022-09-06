@@ -38,7 +38,8 @@ MMModem3gppRegistrationState mm_modem_3gpp_registration_state_from_mbim_register
 MbimDataClass mm_mbim_data_class_from_mbim_data_class_v3_and_subclass (MbimDataClassV3  data_class_v3,
                                                                        MbimDataSubclass data_subclass);
 
-MMModemMode mm_modem_mode_from_mbim_data_class (MbimDataClass data_class);
+MMModemMode mm_modem_mode_from_mbim_data_class (MbimDataClass  data_class,
+                                                const gchar   *caps_custom_data_class);
 
 MbimDataClass mm_mbim_data_class_from_modem_mode (MMModemMode modem_mode,
                                                   gboolean    is_3gpp,

@@ -129,7 +129,8 @@ mm_modem_3gpp_registration_state_from_mbim_register_state (MbimRegisterState sta
 /*****************************************************************************/
 
 MMModemMode
-mm_modem_mode_from_mbim_data_class (MbimDataClass data_class)
+mm_modem_mode_from_mbim_data_class (MbimDataClass  data_class,
+                                    const gchar   *caps_custom_data_class)
 {
     MMModemMode mask = MM_MODEM_MODE_NONE;
 
@@ -146,6 +147,11 @@ mm_modem_mode_from_mbim_data_class (MbimDataClass data_class)
     if (data_class & (MBIM_DATA_CLASS_5G_NSA |
                       MBIM_DATA_CLASS_5G_SA))
         mask |= MM_MODEM_MODE_5G;
+    /* Some modems (e.g. Telit FN990) reports MBIM custom data class "5G/TDS" */
+    if ((data_class & MBIM_DATA_CLASS_CUSTOM) && caps_custom_data_class) {
+        if (strstr (caps_custom_data_class, "5G"))
+            mask |= MM_MODEM_MODE_5G;
+    }
 
     /* 3GPP2... */
     if (data_class & MBIM_DATA_CLASS_1XRTT)
