@@ -97,7 +97,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_ALLOWED_VENDOR_IDS,     vendor_ids,
                       MM_PLUGIN_ALLOWED_VENDOR_STRINGS, vendor_strings,
                       MM_PLUGIN_ALLOWED_AT,             TRUE,
-                      MM_PLUGIN_ALLOWED_QCDM,           TRUE,
+                      MM_PLUGIN_REQUIRED_QCDM,          TRUE,
                       MM_PLUGIN_ALLOWED_QMI,            TRUE,
                       MM_PLUGIN_ALLOWED_MBIM,           TRUE,
                       NULL));
