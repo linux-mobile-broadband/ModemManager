@@ -584,7 +584,7 @@ check_uicc_open_channel_ready (MbimDevice   *device,
         ctx->step = ESIM_CHECK_STEP_LAST;
     } else if (status != UICC_STATUS_OK) {
         ctx->saved_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                        "UICC open channel failed");;
+                                        "UICC open channel failed");
         ctx->step = ESIM_CHECK_STEP_LAST;
     } else {
         /* channel is open, from now on we'll need to always explicitly close,
