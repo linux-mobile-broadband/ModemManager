@@ -77,8 +77,6 @@ mm_modem_lock_from_mbim_pin_type (MbimPinType pin_type)
         return MM_MODEM_LOCK_PH_SP_PIN;
     case MBIM_PIN_TYPE_CORPORATE_PIN:
         return MM_MODEM_LOCK_PH_CORP_PIN;
-    case MBIM_PIN_TYPE_SUBSIDY_PIN: /* TODO: Update MM lock list? */
-        break;
     case MBIM_PIN_TYPE_PUK1:
         return MM_MODEM_LOCK_SIM_PUK;
     case MBIM_PIN_TYPE_PUK2:
@@ -93,6 +91,9 @@ mm_modem_lock_from_mbim_pin_type (MbimPinType pin_type)
         return MM_MODEM_LOCK_PH_SP_PIN;
     case MBIM_PIN_TYPE_CORPORATE_PUK:
         return MM_MODEM_LOCK_PH_CORP_PUK;
+    case MBIM_PIN_TYPE_SUBSIDY_PIN:
+    case MBIM_PIN_TYPE_ADM:
+    case MBIM_PIN_TYPE_NEV:
     case MBIM_PIN_TYPE_UNKNOWN:
     case MBIM_PIN_TYPE_CUSTOM:
     default:
@@ -370,9 +371,11 @@ mm_modem_3gpp_facility_from_mbim_pin_type (MbimPinType pin_type)
     case MBIM_PIN_TYPE_CORPORATE_PIN:
     case MBIM_PIN_TYPE_CORPORATE_PUK:
         return MM_MODEM_3GPP_FACILITY_CORP_PERS;
+    case MBIM_PIN_TYPE_SUBSIDY_PIN:
+    case MBIM_PIN_TYPE_ADM:
+    case MBIM_PIN_TYPE_NEV:
     case MBIM_PIN_TYPE_UNKNOWN:
     case MBIM_PIN_TYPE_CUSTOM:
-    case MBIM_PIN_TYPE_SUBSIDY_PIN:
     default:
         return MM_MODEM_3GPP_FACILITY_NONE;
     }
