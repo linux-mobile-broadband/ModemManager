@@ -32,6 +32,8 @@
 #include "mm-modem-helpers-mbim.h"
 #include "mm-sim-mbim.h"
 
+#define MS_UICC_LOW_LEVEL_SUPPORTED_VERSION 0x01
+
 G_DEFINE_TYPE (MMSimMbim, mm_sim_mbim, MM_TYPE_BASE_SIM)
 
 struct _MMSimMbimPrivate {
@@ -43,6 +45,8 @@ struct _MMSimMbimPrivate {
     MMSimType          sim_type;
     MMSimEsimStatus    esim_status;
     MMSimRemovability  removability;
+    GByteArray        *application_id;
+    GError            *application_id_error;
 
     /* need to get notified when a full sync of the info
      * is needed, so that we clear the preloaded data. */
@@ -158,6 +162,8 @@ reset_subscriber_info (MMSimMbim *self)
     self->priv->sim_type = MM_SIM_TYPE_UNKNOWN;
     self->priv->esim_status = MM_SIM_ESIM_STATUS_UNKNOWN;
     self->priv->removability = MM_SIM_REMOVABILITY_UNKNOWN;
+    g_clear_pointer (&self->priv->application_id, g_byte_array_unref);
+    g_clear_error (&self->priv->application_id_error);
 }
 
 static gboolean
@@ -166,6 +172,70 @@ preload_subscriber_info_finish (MMSimMbim     *self,
                                 GError       **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+application_list_query_ready (MbimDevice   *device,
+                              GAsyncResult *res,
+                              GTask        *task)
+{
+    MMSimMbim                          *self;
+    g_autoptr(MbimMessage)              response = NULL;
+    guint32                             version;
+    guint32                             application_count;
+    guint32                             active_application_index;
+    g_autoptr(MbimUiccApplicationArray) applications = NULL;
+
+    self = g_task_get_source_object (task);
+
+    g_assert (!self->priv->application_id);
+    g_assert (!self->priv->application_id_error);
+
+    response = mbim_device_command_finish (device, res, &self->priv->application_id_error);
+    if (response &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &self->priv->application_id_error) &&
+        mbim_message_ms_uicc_low_level_access_application_list_response_parse (
+            response,
+            &version,
+            &application_count,
+            &active_application_index,
+            NULL, /* application_list_size_bytes */
+            &applications,
+            &self->priv->application_id_error)) {
+        mm_obj_dbg (self, "processed MS UICC low level access application list response");
+        if (version != MS_UICC_LOW_LEVEL_SUPPORTED_VERSION)
+            self->priv->application_id_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                            "Application list version %u is not supported",
+                                                            version);
+        else if (active_application_index >= application_count)
+            self->priv->application_id_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                            "Invalid active application index: %u >= %u",
+                                                            active_application_index, application_count);
+        else
+            self->priv->application_id = g_byte_array_append (g_byte_array_sized_new (applications[active_application_index]->application_id_size),
+                                                              applications[active_application_index]->application_id,
+                                                              applications[active_application_index]->application_id_size);
+    }
+
+    /* At this point we just complete, as all the info and errors have already
+     * been stored */
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+uicc_application_list (GTask      *task,
+                       MbimDevice *device)
+{
+    g_autoptr(MbimMessage) message = NULL;
+
+    message = mbim_message_ms_uicc_low_level_access_application_list_query_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)application_list_query_ready,
+                         task);
 }
 
 static void
@@ -244,10 +314,23 @@ subscriber_ready_status_ready (MbimDevice   *device,
             self->priv->iccid = mm_3gpp_parse_iccid (raw_iccid, &self->priv->iccid_error);
     }
 
-    /* At this point we just complete, as all the info and errors have already
-     * been stored */
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+    /* Go on to preload next contents */
+    uicc_application_list (task, device);
+}
+
+static void
+subscriber_ready_status (GTask      *task,
+                         MbimDevice *device)
+{
+    g_autoptr(MbimMessage) message = NULL;
+
+    message = mbim_message_subscriber_ready_status_query_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)subscriber_ready_status_ready,
+                         task);
 }
 
 static void
@@ -255,9 +338,8 @@ preload_subscriber_info (MMSimMbim           *self,
                          GAsyncReadyCallback  callback,
                          gpointer             user_data)
 {
-    GTask                  *task;
-    MbimDevice             *device;
-    g_autoptr(MbimMessage)  message = NULL;
+    GTask      *task;
+    MbimDevice *device;
 
     if (!peek_device (self, &device, callback, user_data))
         return;
@@ -281,13 +363,7 @@ preload_subscriber_info (MMSimMbim           *self,
 
 #endif
 
-    message = mbim_message_subscriber_ready_status_query_new (NULL);
-    mbim_device_command (device,
-                         message,
-                         10,
-                         NULL,
-                         (GAsyncReadyCallback)subscriber_ready_status_ready,
-                         task);
+    subscriber_ready_status (task, device);
 }
 
 /*****************************************************************************/
