@@ -1,4 +1,54 @@
 
+ModemManager 1.18.12
+-------------------------------------------
+
+ * This release fixes a few very critical issues that happpen when using a glib2
+   newer or equal than 2.73.2 (after the pcre1->pcre2 update):
+   ** Fix invalid EZX error parser regular expression, which makes the
+      daemon crash due to a double-free.
+   ** Fix unit tests failures in single-line tests using G_REGEX_NEWLINE_CRLF.
+
+ * Core:
+   ** Fix double GError free during quick sync in the base modem object.
+   ** Allow running the quick sync logic also with modem disabled, to allow
+      detecting SIM hot swaps that happened during suspension.
+
+ * MBIM:
+   ** Fix using the UIM service in the shared QMI logic.
+   ** Avoid making fatal the  'SIM not inserted' error while disconnecting.
+   ** Remove context type comparison on disconnection reports, which avoids
+      missing network-initiated disconnections on several different scenarios.
+   ** Fix dangling modem object references left when processing SIM slots.
+   ** Fix reporting the correct network availability when more than one included
+      in the modem provided bitmask.
+
+ * QMI:
+   ** Use the shared QMI interface in the SIM object instead of the QMI modem
+      class directly.
+
+ * 3GPP profile manager interface:
+   ** Do not override bearer profile properties during connection.
+   ** Do not try to deactivate unused profile.
+
+ * SMS:
+   ** Avoid decoding empty text messages.
+   ** Avoid clearing parts on send/store error.
+   ** Fix segfault when storing already sent messages.
+
+ * libmm-glib;
+   ** Fix memory leaks when listing connection profiles.
+
+ * mmcli:
+   ** Plug leak of OutputItemListItem items.
+
+ * Plugins:
+   ** sierra: disable +CPOL in the GL7600.
+   ** telit: add LE910Cx MBIM composition port hints.
+   ** telit: add port type hints for LN920 0x1060, 0x1061 compositions.
+   ** icera: fix double free on %%IPSYS=? response processing
+   ** mtk: fix task completion when loading supported modes.
+
+
 ModemManager 1.18.10
 -------------------------------------------
 
