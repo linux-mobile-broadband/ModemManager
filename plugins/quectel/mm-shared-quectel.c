@@ -56,6 +56,7 @@ typedef struct {
     FeatureSupport         qgps_supported;
     GRegex                *qgpsurc_regex;
     GRegex                *qlwurc_regex;
+    GRegex                *rdy_regex;
 } Private;
 
 static void
@@ -63,6 +64,7 @@ private_free (Private *priv)
 {
     g_regex_unref (priv->qgpsurc_regex);
     g_regex_unref (priv->qlwurc_regex);
+    g_regex_unref (priv->rdy_regex);
     g_slice_free (Private, priv);
 }
 
@@ -83,6 +85,11 @@ get_private (MMSharedQuectel *self)
         priv->qgps_supported    = FEATURE_SUPPORT_UNKNOWN;
         priv->qgpsurc_regex     = g_regex_new ("\\r\\n\\+QGPSURC:.*", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         priv->qlwurc_regex      = g_regex_new ("\\r\\n\\+QLWURC:.*", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        priv->rdy_regex         = g_regex_new ("\\r\\nRDY", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+
+        g_assert (priv->qgpsurc_regex);
+        g_assert (priv->qlwurc_regex);
+        g_assert (priv->rdy_regex);
 
         g_assert (MM_SHARED_QUECTEL_GET_INTERFACE (self)->peek_parent_broadband_modem_class);
         priv->broadband_modem_class_parent = MM_SHARED_QUECTEL_GET_INTERFACE (self)->peek_parent_broadband_modem_class (self);
@@ -96,6 +103,23 @@ get_private (MMSharedQuectel *self)
         g_object_set_qdata_full (G_OBJECT (self), private_quark, priv, (GDestroyNotify)private_free);
     }
     return priv;
+}
+
+/*****************************************************************************/
+/* RDY unsolicited event handler */
+
+static void
+rdy_handler (MMPortSerialAt *port,
+             GMatchInfo *match_info,
+             MMBroadbandModem *self)
+{
+    /* The RDY URC indicates a modem reset that may or may not go hand-in-hand
+     * with USB re-enumeration. For the latter case, we must make sure to
+     * re-synchronize modem and ModemManager states by re-probing.
+     */
+    mm_obj_warn (self, "modem reset detected, triggering reprobe");
+    mm_base_modem_set_reprobe (MM_BASE_MODEM (self), TRUE);
+    mm_base_modem_set_valid (MM_BASE_MODEM (self), FALSE);
 }
 
 /*****************************************************************************/
@@ -134,6 +158,14 @@ mm_shared_quectel_setup_ports (MMBroadbandModem *self)
             ports[i],
             priv->qlwurc_regex,
             NULL, NULL, NULL);
+
+        /* Handle RDY */
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            ports[i],
+            priv->rdy_regex,
+            (MMPortSerialAtUnsolicitedMsgFn)rdy_handler,
+            self,
+            NULL);
     }
 }
 
