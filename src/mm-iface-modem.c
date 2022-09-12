@@ -3006,16 +3006,20 @@ mm_iface_modem_set_current_bands (MMIfaceModem *self,
     g_free (bands_string);
 }
 
+/*****************************************************************************/
+
 typedef struct {
-    MmGdbusModem *skeleton;
+    MmGdbusModem          *skeleton;
     GDBusMethodInvocation *invocation;
-    MMIfaceModem *self;
-    GVariant *bands;
+    MMIfaceModem          *self;
+    GVariant              *bands;
+    gchar                 *bands_str;
 } HandleSetCurrentBandsContext;
 
 static void
 handle_set_current_bands_context_free (HandleSetCurrentBandsContext *ctx)
 {
+    g_free (ctx->bands_str);
     g_variant_unref (ctx->bands);
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
@@ -3024,17 +3028,19 @@ handle_set_current_bands_context_free (HandleSetCurrentBandsContext *ctx)
 }
 
 static void
-handle_set_current_bands_ready (MMIfaceModem *self,
-                                GAsyncResult *res,
+handle_set_current_bands_ready (MMIfaceModem                 *self,
+                                GAsyncResult                 *res,
                                 HandleSetCurrentBandsContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_iface_modem_set_current_bands_finish (self, res, &error))
+    if (!mm_iface_modem_set_current_bands_finish (self, res, &error)) {
+        mm_obj_warn (self, "failed setting current bands to '%s': %s", ctx->bands_str, error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else {
+    } else {
         /* Bands updated: explicitly refresh signal and access technology */
         mm_iface_modem_refresh_signal (self);
+        mm_obj_info (self, "current bands set to '%s'", ctx->bands_str);
         mm_gdbus_modem_complete_set_current_bands (ctx->skeleton, ctx->invocation);
     }
 
@@ -3042,12 +3048,12 @@ handle_set_current_bands_ready (MMIfaceModem *self,
 }
 
 static void
-handle_set_current_bands_auth_ready (MMBaseModem *self,
-                                     GAsyncResult *res,
+handle_set_current_bands_auth_ready (MMBaseModem                  *self,
+                                     GAsyncResult                 *res,
                                      HandleSetCurrentBandsContext *ctx)
 {
-    GArray *bands_array;
-    GError *error = NULL;
+    g_autoptr(GArray)  bands_array = NULL;
+    GError            *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -3061,22 +3067,24 @@ handle_set_current_bands_auth_ready (MMBaseModem *self,
     }
 
     bands_array = mm_common_bands_variant_to_garray (ctx->bands);
+    ctx->bands_str = mm_common_build_bands_string ((const MMModemBand *)bands_array->data, bands_array->len);
+
+    mm_obj_info (self, "processing user request to set current bands to '%s'...", ctx->bands_str);
     mm_iface_modem_set_current_bands (MM_IFACE_MODEM (self),
                                       bands_array,
                                       (GAsyncReadyCallback)handle_set_current_bands_ready,
                                       ctx);
-    g_array_unref (bands_array);
 }
 
 static gboolean
-handle_set_current_bands (MmGdbusModem *skeleton,
+handle_set_current_bands (MmGdbusModem          *skeleton,
                           GDBusMethodInvocation *invocation,
-                          GVariant *bands_variant,
-                          MMIfaceModem *self)
+                          GVariant              *bands_variant,
+                          MMIfaceModem          *self)
 {
     HandleSetCurrentBandsContext *ctx;
 
-    ctx = g_slice_new (HandleSetCurrentBandsContext);
+    ctx = g_slice_new0 (HandleSetCurrentBandsContext);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
