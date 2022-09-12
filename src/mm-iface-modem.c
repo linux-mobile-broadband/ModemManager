@@ -1238,7 +1238,7 @@ handle_set_primary_sim_slot_context_free (HandleSetPrimarySimSlotContext *ctx)
     g_clear_object (&ctx->skeleton);
     g_clear_object (&ctx->invocation);
     g_clear_object (&ctx->self);
-    g_free (ctx);
+    g_slice_free (HandleSetPrimarySimSlotContext, ctx);
 }
 
 static void
@@ -1252,16 +1252,17 @@ set_primary_sim_slot_ready (MMIfaceModem                   *self,
         /* If the implementation returns EXISTS, we're already in the requested SIM slot,
          * so we can safely return a success on the operation and skip the reprobing */
         if (!g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_EXISTS)) {
-            mm_obj_warn (self, "couldn't process primary SIM update request: %s", error->message);
+            mm_obj_warn (self, "failed setting primary SIM slot '%u': %s", ctx->requested_sim_slot, error->message);
             g_dbus_method_invocation_take_error (ctx->invocation, g_steal_pointer (&error));
             handle_set_primary_sim_slot_context_free (ctx);
             return;
         }
-        mm_obj_dbg (self, "ignoring SIM update request: %s", error->message);
+        mm_obj_dbg (self, "ignored request to set primary SIM slot '%u': already set", ctx->requested_sim_slot);
     } else {
         /* Notify about the SIM swap, which will disable and reprobe the device.
          * There is no need to update the PrimarySimSlot property, as this value will be
          * reloaded automatically during the reprobe. */
+        mm_obj_info (self, "primary SIM slot '%u' set", ctx->requested_sim_slot);
         mm_iface_modem_process_sim_event (self);
     }
 
@@ -1286,11 +1287,8 @@ handle_set_primary_sim_slot_auth_ready (MMBaseModem                    *self,
     /* If SIM switching is not implemented, report an error */
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_primary_sim_slot ||
         !MM_IFACE_MODEM_GET_INTERFACE (self)->set_primary_sim_slot_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot switch sim: "
-                                               "operation not supported");
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                               "Operation not supported");
         handle_set_primary_sim_slot_context_free (ctx);
         return;
     }
@@ -1298,14 +1296,13 @@ handle_set_primary_sim_slot_auth_ready (MMBaseModem                    *self,
     /* Validate SIM slot number */
     sim_slot_paths = mm_gdbus_modem_get_sim_slots (ctx->skeleton);
     if (!sim_slot_paths || (ctx->requested_sim_slot > g_strv_length ((gchar **)sim_slot_paths))) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_INVALID_ARGS,
-                                               "Cannot switch sim: requested SIM slot number is out of bounds");
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                               "Requested SIM slot number is out of bounds");
         handle_set_primary_sim_slot_context_free (ctx);
         return;
     }
 
+    mm_obj_info (self, "processing user request to set primary SIM slot '%u'...", ctx->requested_sim_slot);
     MM_IFACE_MODEM_GET_INTERFACE (self)->set_primary_sim_slot (MM_IFACE_MODEM (self),
                                                                ctx->requested_sim_slot,
                                                                (GAsyncReadyCallback)set_primary_sim_slot_ready,
@@ -1320,7 +1317,7 @@ handle_set_primary_sim_slot (MmGdbusModem          *skeleton,
 {
     HandleSetPrimarySimSlotContext *ctx;
 
-    ctx = g_new0 (HandleSetPrimarySimSlotContext, 1);
+    ctx = g_slice_new0 (HandleSetPrimarySimSlotContext);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
