@@ -189,7 +189,7 @@ mm_iface_modem_check_for_sim_swap (MMIfaceModem *self,
 
         /* Check that it's really the primary slot whose iccid or imsi has changed */
         if (primary_slot && primary_slot != slot_index) {
-            mm_obj_dbg (self, "checking for SIM swap ignored: status changed in slot %u, but primary is %u", slot_index, primary_slot);
+            mm_obj_info (self, "checking for SIM swap ignored: status changed in slot %u, but primary is %u", slot_index, primary_slot);
             g_task_return_boolean (task, TRUE);
             g_object_unref (task);
             return;
@@ -198,7 +198,7 @@ mm_iface_modem_check_for_sim_swap (MMIfaceModem *self,
 
     if (MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap &&
         MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap_finish) {
-        mm_obj_dbg (self, "start checking for SIM swap in slot %u", slot_index);
+        mm_obj_info (self, "start checking for SIM swap in slot %u", slot_index);
         MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap (
             self,
             iccid,
@@ -299,6 +299,8 @@ after_sim_event_disable_ready (MMBaseModem  *self,
 void
 mm_iface_modem_process_sim_event (MMIfaceModem *self)
 {
+    mm_obj_info (self, "Processing SIM event");
+
     if (MM_IFACE_MODEM_GET_INTERFACE (self)->cleanup_sim_hot_swap)
         MM_IFACE_MODEM_GET_INTERFACE (self)->cleanup_sim_hot_swap (self);
 
@@ -606,7 +608,11 @@ load_unlock_required_ready (MMIfaceModem *self,
         /* For the remaining ones, retry if possible */
         if (ctx->retries < ctx->max_retries) {
             ctx->retries++;
-            mm_obj_dbg (self, "retrying (%u) unlock required check", ctx->retries);
+            /* Rate limit how often we log with INFO level */
+            if (ctx->retries % 5)
+                mm_obj_dbg (self, "retrying (%u/%u) unlock required check", ctx->retries, ctx->max_retries);
+            else
+                mm_obj_info (self, "retrying (%u/%u) unlock required check", ctx->retries, ctx->max_retries);
 
             g_assert (ctx->timeout_id == 0);
             ctx->timeout_id = g_timeout_add_seconds (UNLOAD_REQUIRED_RETRY_TIMEOUT_SECS,
@@ -1500,7 +1506,7 @@ mm_iface_modem_update_access_technologies (MMIfaceModem *self,
         /* Log */
         old_access_tech_string = mm_modem_access_technology_build_string_from_mask (old_access_tech);
         new_access_tech_string = mm_modem_access_technology_build_string_from_mask (built_access_tech);
-        mm_obj_dbg (self, "access technology changed (%s -> %s)",
+        mm_obj_info (self, "access technology changed (%s -> %s)",
                     old_access_tech_string,
                     new_access_tech_string);
         g_free (old_access_tech_string);
@@ -3767,7 +3773,7 @@ internal_load_unlock_required_ready (MMIfaceModem *self,
             }
 
             /* For non 3GPP-capable devices, skip SIM errors */
-            mm_obj_dbg (self, "skipping SIM error in non 3GPP-capable device, assuming no lock is needed");
+            mm_obj_info (self, "skipping SIM error in non 3GPP-capable device, assuming no lock is needed");
             g_error_free (error);
             ctx->lock = MM_MODEM_LOCK_NONE;
         } else {
@@ -3837,7 +3843,7 @@ update_lock_info_context_step (GTask *task)
             }
 
             /* If no way to run after SIM unlock step, we're done */
-            mm_obj_dbg (self, "SIM is ready, and no need for the after SIM unlock step...");
+            mm_obj_info (self, "SIM is ready, and no need for the after SIM unlock step...");
         }
         ctx->step++;
         /* fall-through */
@@ -3968,7 +3974,7 @@ modem_after_power_up_ready (MMIfaceModem *self,
     g_assert (!ctx->saved_error);
     MM_IFACE_MODEM_GET_INTERFACE (self)->modem_after_power_up_finish (self, res, &ctx->saved_error);
     if (ctx->saved_error)
-        mm_obj_dbg (self, "failure running after power up step: %s", ctx->saved_error->message);
+        mm_obj_info (self, "failure running after power up step: %s", ctx->saved_error->message);
 
     ctx->step++;
     set_power_state_step (task);
@@ -4052,7 +4058,7 @@ requested_power_setup_ready (MMIfaceModem *self,
     ctx = g_task_get_task_data (task);
     g_assert (!ctx->saved_error);
     if (!ctx->requested_power_setup_finish (self, res, &ctx->saved_error))
-        mm_obj_dbg (self, "couldn't update power state: %s", ctx->saved_error->message);
+        mm_obj_info (self, "couldn't update power state: %s", ctx->saved_error->message);
 
     ctx->step++;
     set_power_state_step (task);
@@ -4142,7 +4148,7 @@ set_power_state_step (GTask *task)
             ctx->saved_error &&
             g_error_matches (ctx->saved_error, MM_CORE_ERROR, MM_CORE_ERROR_RETRY) &&
             !ctx->fcc_unlock_attempted) {
-            mm_obj_dbg (self, "attempting fcc unlock...");
+            mm_obj_dbg (self, "attempting FCC unlock...");
             g_clear_error (&ctx->saved_error);
             ctx->fcc_unlock_attempted = TRUE;
             fcc_unlock (task);
