@@ -2350,9 +2350,9 @@ handle_set_power_state (MmGdbusModem          *skeleton,
 /*****************************************************************************/
 
 typedef struct {
-    MmGdbusModem *skeleton;
+    MmGdbusModem          *skeleton;
     GDBusMethodInvocation *invocation;
-    MMIfaceModem *self;
+    MMIfaceModem          *self;
 } HandleResetContext;
 
 static void
@@ -2361,27 +2361,30 @@ handle_reset_context_free (HandleResetContext *ctx)
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
-    g_free (ctx);
+    g_slice_free (HandleResetContext, ctx);
 }
 
 static void
-handle_reset_ready (MMIfaceModem *self,
-                    GAsyncResult *res,
+handle_reset_ready (MMIfaceModem       *self,
+                    GAsyncResult       *res,
                     HandleResetContext *ctx)
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->reset_finish (self, res, &error))
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->reset_finish (self, res, &error)) {
+        mm_obj_warn (self, "failed requesting modem reset: %s", error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
+    } else {
+        mm_obj_info (self, "modem reset requested");
         mm_gdbus_modem_complete_reset (ctx->skeleton, ctx->invocation);
+    }
 
     handle_reset_context_free (ctx);
 }
 
 static void
-handle_reset_auth_ready (MMBaseModem *self,
-                         GAsyncResult *res,
+handle_reset_auth_ready (MMBaseModem        *self,
+                         GAsyncResult       *res,
                          HandleResetContext *ctx)
 {
     GError *error = NULL;
@@ -2393,29 +2396,27 @@ handle_reset_auth_ready (MMBaseModem *self,
     }
 
     /* If reseting is not implemented, report an error */
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->reset ||
-        !MM_IFACE_MODEM_GET_INTERFACE (self)->reset_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot reset the modem: operation not supported");
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->reset || !MM_IFACE_MODEM_GET_INTERFACE (self)->reset_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                               "Operation not supported");
         handle_reset_context_free (ctx);
         return;
     }
 
+    mm_obj_info (self, "processing user request to reset modem...");
     MM_IFACE_MODEM_GET_INTERFACE (self)->reset (MM_IFACE_MODEM (self),
                                                 (GAsyncReadyCallback)handle_reset_ready,
                                                 ctx);
 }
 
 static gboolean
-handle_reset (MmGdbusModem *skeleton,
+handle_reset (MmGdbusModem          *skeleton,
               GDBusMethodInvocation *invocation,
-              MMIfaceModem *self)
+              MMIfaceModem          *self)
 {
     HandleResetContext *ctx;
 
-    ctx = g_new (HandleResetContext, 1);
+    ctx = g_slice_new0 (HandleResetContext);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
