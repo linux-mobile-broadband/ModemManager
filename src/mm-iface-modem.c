@@ -2134,10 +2134,10 @@ mm_iface_modem_update_subsystem_state (MMIfaceModem *self,
 /*****************************************************************************/
 
 typedef struct {
-    MmGdbusModem *skeleton;
+    MmGdbusModem          *skeleton;
     GDBusMethodInvocation *invocation;
-    MMIfaceModem *self;
-    gboolean enable;
+    MMIfaceModem          *self;
+    gboolean               enable;
 } HandleEnableContext;
 
 static void
@@ -2146,26 +2146,32 @@ handle_enable_context_free (HandleEnableContext *ctx)
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
-    g_free (ctx);
+    g_slice_free (HandleEnableContext, ctx);
 }
 
 static void
-enable_ready (MMBaseModem *self,
-              GAsyncResult *res,
+enable_ready (MMBaseModem         *self,
+              GAsyncResult        *res,
               HandleEnableContext *ctx)
 {
     GError *error = NULL;
 
     if (ctx->enable) {
-        if (!mm_base_modem_enable_finish (self, res, &error))
+        if (!mm_base_modem_enable_finish (self, res, &error)) {
+            mm_obj_warn (self, "failed enabling modem: %s", error->message);
             g_dbus_method_invocation_take_error (ctx->invocation, error);
-        else
+        } else {
+            mm_obj_info (self, "enabled modem");
             mm_gdbus_modem_complete_enable (ctx->skeleton, ctx->invocation);
+        }
     } else {
-        if (!mm_base_modem_disable_finish (self, res, &error))
+        if (!mm_base_modem_disable_finish (self, res, &error)) {
+            mm_obj_warn (self, "failed disabling modem: %s", error->message);
             g_dbus_method_invocation_take_error (ctx->invocation, error);
-        else
+        } else {
+            mm_obj_info (self, "disabled modem");
             mm_gdbus_modem_complete_enable (ctx->skeleton, ctx->invocation);
+        }
     }
 
     handle_enable_context_free (ctx);
@@ -2189,25 +2195,28 @@ handle_enable_auth_ready (MMBaseModem *self,
         return;
     }
 
-    if (ctx->enable)
+    if (ctx->enable) {
+        mm_obj_info (self, "processing user request to enable modem...");
         mm_base_modem_enable (self,
                               (GAsyncReadyCallback)enable_ready,
                               ctx);
-    else
+    } else {
+        mm_obj_info (self, "processing user request to disable modem...");
         mm_base_modem_disable (self,
                                (GAsyncReadyCallback)enable_ready,
                                ctx);
+    }
 }
 
 static gboolean
-handle_enable (MmGdbusModem *skeleton,
+handle_enable (MmGdbusModem          *skeleton,
                GDBusMethodInvocation *invocation,
-               gboolean enable,
-               MMIfaceModem *self)
+               gboolean               enable,
+               MMIfaceModem          *self)
 {
     HandleEnableContext *ctx;
 
-    ctx = g_new (HandleEnableContext, 1);
+    ctx = g_slice_new0 (HandleEnableContext);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
