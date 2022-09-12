@@ -1345,7 +1345,7 @@ handle_get_cell_info_context_free (HandleGetCellInfoContext *ctx)
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
-    g_free (ctx);
+    g_slice_free (HandleGetCellInfoContext, ctx);
 }
 
 static GVariant *
@@ -1375,11 +1375,13 @@ get_cell_info_ready (MMIfaceModem             *self,
     GList  *info_list;
 
     info_list = MM_IFACE_MODEM_GET_INTERFACE (self)->get_cell_info_finish (self, res, &error);
-    if (error)
+    if (error) {
+        mm_obj_dbg (self, "failed retrieving cell info: %s", error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else {
+    } else {
         g_autoptr(GVariant) dict_array = NULL;
 
+        mm_obj_dbg (self, "cell info retrieved");
         dict_array = get_cell_info_build_result (info_list);
         mm_gdbus_modem_complete_get_cell_info (ctx->skeleton, ctx->invocation, dict_array);
     }
@@ -1415,6 +1417,7 @@ handle_get_cell_info_auth_ready (MMBaseModem              *self,
         return;
     }
 
+    mm_obj_info (self, "processing user request to retrieve cell info...");
     MM_IFACE_MODEM_GET_INTERFACE (self)->get_cell_info (ctx->self,
                                                         (GAsyncReadyCallback)get_cell_info_ready,
                                                         ctx);
@@ -1427,7 +1430,7 @@ handle_get_cell_info (MmGdbusModem          *skeleton,
 {
     HandleGetCellInfoContext *ctx;
 
-    ctx = g_new (HandleGetCellInfoContext, 1);
+    ctx = g_slice_new0 (HandleGetCellInfoContext);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
