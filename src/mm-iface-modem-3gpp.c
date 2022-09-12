@@ -1541,6 +1541,7 @@ after_set_load_nr5g_registration_settings_ready (MMIfaceModem3gpp               
 {
     GError                                *error = NULL;
     g_autoptr(MMNr5gRegistrationSettings)  new_settings = NULL;
+    g_autoptr(GVariant)                    dictionary = NULL;
 
     new_settings = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_nr5g_registration_settings_finish (self, res, &error);
     if (error) {
@@ -1549,19 +1550,19 @@ after_set_load_nr5g_registration_settings_ready (MMIfaceModem3gpp               
         return;
     }
 
-    mm_obj_dbg (self, "Updated 5GNR registration settings");
+    mm_obj_info (self, "5GNR registration settings updated");
 
     if (!mm_nr5g_registration_settings_cmp (new_settings, ctx->settings)) {
+        mm_obj_info (self, "requested and reloaded 5GNR registration settings don't match");
         g_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                                        "5GNR registration settings were not updated");
-    } else {
-        g_autoptr(GVariant) dictionary = NULL;
-
-        dictionary = mm_nr5g_registration_settings_get_dictionary (new_settings);
-        mm_gdbus_modem3gpp_set_nr5g_registration_settings (ctx->skeleton, dictionary);
-        mm_gdbus_modem3gpp_complete_set_nr5g_registration_settings (ctx->skeleton, ctx->invocation);
+        handle_set_nr5g_registration_settings_context_free (ctx);
+        return;
     }
 
+    dictionary = mm_nr5g_registration_settings_get_dictionary (new_settings);
+    mm_gdbus_modem3gpp_set_nr5g_registration_settings (ctx->skeleton, dictionary);
+    mm_gdbus_modem3gpp_complete_set_nr5g_registration_settings (ctx->skeleton, ctx->invocation);
     handle_set_nr5g_registration_settings_context_free (ctx);
 }
 
@@ -1573,6 +1574,7 @@ set_nr5g_registration_settings_ready (MMIfaceModem3gpp                         *
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_nr5g_registration_settings_finish (self, res, &error)) {
+        mm_obj_warn (self, "failed setting 5GNR registration settings: %s", error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_nr5g_registration_settings_context_free (ctx);
         return;
@@ -1588,6 +1590,7 @@ set_nr5g_registration_settings_ready (MMIfaceModem3gpp                         *
     }
 
     /* Assume we're ok */
+    mm_obj_info (self, "5GNR registration settings updated");
     mm_gdbus_modem3gpp_complete_set_nr5g_registration_settings (ctx->skeleton, ctx->invocation);
     handle_set_nr5g_registration_settings_context_free (ctx);
 }
@@ -1611,7 +1614,7 @@ set_nr5g_registration_settings_auth_ready (MMBaseModem                          
     if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_nr5g_registration_settings ||
         !MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_nr5g_registration_settings_finish) {
         g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot set 5GNR registration settings: operation not supported");
+                                               "Operation not supported");
         handle_set_nr5g_registration_settings_context_free (ctx);
         return;
     }
@@ -1623,21 +1626,24 @@ set_nr5g_registration_settings_auth_ready (MMBaseModem                          
         return;
     }
 
+    mm_obj_info (self, "processing user request to set 5GNR registration settings...");
+
     old_dictionary = mm_gdbus_modem3gpp_get_nr5g_registration_settings (ctx->skeleton);
     if (old_dictionary)
         old_settings = mm_nr5g_registration_settings_new_from_dictionary (old_dictionary, NULL);
 
     if (old_settings && mm_nr5g_registration_settings_cmp (ctx->settings, old_settings)) {
-        mm_obj_dbg (self, "Skipping 5GNR registration settings. Same configuration provided");
+        mm_obj_info (self, "skipped setting 5GNR registration settings: same configuration provided");
         mm_gdbus_modem3gpp_complete_set_nr5g_registration_settings (ctx->skeleton, ctx->invocation);
         handle_set_nr5g_registration_settings_context_free (ctx);
-    } else {
-        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_nr5g_registration_settings (
-            MM_IFACE_MODEM_3GPP (self),
-            ctx->settings,
-            (GAsyncReadyCallback)set_nr5g_registration_settings_ready,
-            ctx);
+        return;
     }
+
+    MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_nr5g_registration_settings (
+        MM_IFACE_MODEM_3GPP (self),
+        ctx->settings,
+        (GAsyncReadyCallback)set_nr5g_registration_settings_ready,
+        ctx);
 }
 
 static gboolean
