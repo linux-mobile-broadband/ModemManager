@@ -28,6 +28,7 @@
 #include "mm-bearer-list.h"
 #include "mm-private-boxed-types.h"
 #include "mm-log-object.h"
+#include "mm-log-helpers.h"
 #include "mm-context.h"
 #include "mm-dispatcher-fcc-unlock.h"
 #if defined WITH_QMI
@@ -884,11 +885,13 @@ mm_iface_modem_create_bearer (MMIfaceModem *self,
         task);
 }
 
+/*****************************************************************************/
+
 typedef struct {
-    MmGdbusModem *skeleton;
+    MmGdbusModem          *skeleton;
     GDBusMethodInvocation *invocation;
-    MMIfaceModem *self;
-    GVariant *dictionary;
+    MMIfaceModem          *self;
+    GVariant              *dictionary;
 } HandleCreateBearerContext;
 
 static void
@@ -898,37 +901,36 @@ handle_create_bearer_context_free (HandleCreateBearerContext *ctx)
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
-    g_free (ctx);
+    g_slice_free (HandleCreateBearerContext, ctx);
 }
 
 static void
-handle_create_bearer_ready (MMIfaceModem *self,
-                            GAsyncResult *res,
+handle_create_bearer_ready (MMIfaceModem              *self,
+                            GAsyncResult              *res,
                             HandleCreateBearerContext *ctx)
 {
-    MMBaseBearer *bearer;
-    GError *error = NULL;
+    g_autoptr(MMBaseBearer)  bearer = NULL;
+    GError                  *error = NULL;
 
     bearer = mm_iface_modem_create_bearer_finish (self, res, &error);
-    if (!bearer)
+    if (!bearer) {
+        mm_obj_warn (self, "failed creating bearer: %s", error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else {
-        mm_gdbus_modem_complete_create_bearer (ctx->skeleton,
-                                               ctx->invocation,
-                                               mm_base_bearer_get_path (bearer));
-        g_object_unref (bearer);
+    } else {
+        mm_obj_info (self, "created bearer: %s", mm_base_bearer_get_path (bearer));
+        mm_gdbus_modem_complete_create_bearer (ctx->skeleton, ctx->invocation, mm_base_bearer_get_path (bearer));
     }
 
     handle_create_bearer_context_free (ctx);
 }
 
 static void
-handle_create_bearer_auth_ready (MMBaseModem *self,
-                                 GAsyncResult *res,
+handle_create_bearer_auth_ready (MMBaseModem               *self,
+                                 GAsyncResult              *res,
                                  HandleCreateBearerContext *ctx)
 {
-    MMBearerProperties *properties;
-    GError *error = NULL;
+    g_autoptr(MMBearerProperties)  properties = NULL;
+    GError                        *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -948,23 +950,25 @@ handle_create_bearer_auth_ready (MMBaseModem *self,
         return;
     }
 
+    mm_obj_info (self, "processing user request to create bearer...");
+    mm_log_bearer_properties (self, MM_LOG_LEVEL_INFO, "  ", properties);
+
     mm_iface_modem_create_bearer (
         ctx->self,
         properties,
         (GAsyncReadyCallback)handle_create_bearer_ready,
         ctx);
-    g_object_unref (properties);
 }
 
 static gboolean
-handle_create_bearer (MmGdbusModem *skeleton,
+handle_create_bearer (MmGdbusModem          *skeleton,
                       GDBusMethodInvocation *invocation,
-                      GVariant *dictionary,
-                      MMIfaceModem *self)
+                      GVariant              *dictionary,
+                      MMIfaceModem          *self)
 {
     HandleCreateBearerContext *ctx;
 
-    ctx = g_new (HandleCreateBearerContext, 1);
+    ctx = g_slice_new0 (HandleCreateBearerContext);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
