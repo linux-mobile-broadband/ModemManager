@@ -3401,35 +3401,45 @@ mm_iface_modem_set_current_modes (MMIfaceModem *self,
                                                             task);
 }
 
+/*****************************************************************************/
+
 typedef struct {
-    MmGdbusModem *skeleton;
+    MmGdbusModem          *skeleton;
     GDBusMethodInvocation *invocation;
-    MMIfaceModem *self;
-    MMModemMode allowed;
-    MMModemMode preferred;
+    MMIfaceModem          *self;
+    MMModemMode            allowed;
+    MMModemMode            preferred;
+    gchar                 *allowed_str;
+    gchar                 *preferred_str;
 } HandleSetCurrentModesContext;
 
 static void
 handle_set_current_modes_context_free (HandleSetCurrentModesContext *ctx)
 {
+    g_free (ctx->preferred_str);
+    g_free (ctx->allowed_str);
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
-    g_free (ctx);
+    g_slice_free (HandleSetCurrentModesContext, ctx);
 }
 
 static void
-handle_set_current_modes_ready (MMIfaceModem *self,
-                                GAsyncResult *res,
+handle_set_current_modes_ready (MMIfaceModem                 *self,
+                                GAsyncResult                 *res,
                                 HandleSetCurrentModesContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_iface_modem_set_current_modes_finish (self, res, &error))
+    if (!mm_iface_modem_set_current_modes_finish (self, res, &error)) {
+        mm_obj_warn (self, "failed setting current modes to '%s' (preferred '%s'): %s",
+                     ctx->allowed_str, ctx->preferred_str, error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else {
+    } else {
         /* Modes updated: explicitly refresh signal and access technology */
         mm_iface_modem_refresh_signal (self);
+        mm_obj_info (self, "current modes set to '%s' (preferred '%s')",
+                     ctx->allowed_str, ctx->preferred_str);
         mm_gdbus_modem_complete_set_current_modes (ctx->skeleton, ctx->invocation);
     }
 
@@ -3437,8 +3447,8 @@ handle_set_current_modes_ready (MMIfaceModem *self,
 }
 
 static void
-handle_set_current_modes_auth_ready (MMBaseModem *self,
-                                     GAsyncResult *res,
+handle_set_current_modes_auth_ready (MMBaseModem                  *self,
+                                     GAsyncResult                 *res,
                                      HandleSetCurrentModesContext *ctx)
 {
     GError *error = NULL;
@@ -3454,6 +3464,10 @@ handle_set_current_modes_auth_ready (MMBaseModem *self,
         return;
     }
 
+    ctx->allowed_str = mm_modem_mode_build_string_from_mask (ctx->allowed);
+    ctx->preferred_str = mm_modem_mode_build_string_from_mask (ctx->preferred);
+    mm_obj_info (self, "processing user request to set current modes to '%s' (preferred '%s')...",
+                 ctx->allowed_str, ctx->preferred_str);
     mm_iface_modem_set_current_modes (MM_IFACE_MODEM (self),
                                       ctx->allowed,
                                       ctx->preferred,
@@ -3462,14 +3476,14 @@ handle_set_current_modes_auth_ready (MMBaseModem *self,
 }
 
 static gboolean
-handle_set_current_modes (MmGdbusModem *skeleton,
+handle_set_current_modes (MmGdbusModem          *skeleton,
                           GDBusMethodInvocation *invocation,
-                          GVariant *variant,
-                          MMIfaceModem *self)
+                          GVariant              *variant,
+                          MMIfaceModem          *self)
 {
     HandleSetCurrentModesContext *ctx;
 
-    ctx = g_new (HandleSetCurrentModesContext, 1);
+    ctx = g_slice_new0 (HandleSetCurrentModesContext);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
