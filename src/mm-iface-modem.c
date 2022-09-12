@@ -1203,12 +1203,12 @@ handle_delete_bearer (MmGdbusModem *skeleton,
 /*****************************************************************************/
 
 static gboolean
-handle_list_bearers (MmGdbusModem *skeleton,
+handle_list_bearers (MmGdbusModem          *skeleton,
                      GDBusMethodInvocation *invocation,
-                     MMIfaceModem *self)
+                     MMIfaceModem          *self)
 {
-    GStrv paths;
-    MMBearerList *list = NULL;
+    g_auto(GStrv)           paths = NULL;
+    g_autoptr(MMBearerList) list = NULL;
 
     if (mm_iface_modem_abort_invocation_if_state_not_reached (self, invocation, MM_MODEM_STATE_LOCKED))
         return TRUE;
@@ -1217,20 +1217,13 @@ handle_list_bearers (MmGdbusModem *skeleton,
                   MM_IFACE_MODEM_BEARER_LIST, &list,
                   NULL);
     if (!list) {
-        g_dbus_method_invocation_return_error (invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_FAILED,
+        g_dbus_method_invocation_return_error (invocation, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                                "Bearer list not found");
         return TRUE;
     }
 
     paths = mm_bearer_list_get_paths (list);
-    mm_gdbus_modem_complete_list_bearers (skeleton,
-                                          invocation,
-                                          (const gchar *const *)paths);
-
-    g_strfreev (paths);
-    g_object_unref (list);
+    mm_gdbus_modem_complete_list_bearers (skeleton, invocation, (const gchar *const *)paths);
     return TRUE;
 }
 
