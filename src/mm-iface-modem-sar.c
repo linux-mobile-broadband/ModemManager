@@ -80,10 +80,11 @@ enable_ready (MMIfaceModemSar     *self,
     GError *error = NULL;
     guint   power_level = 0;
 
-    if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->enable_finish (self, res, &power_level, &error))
+    if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->enable_finish (self, res, &power_level, &error)) {
+        mm_obj_warn (self, "failed %s SAR: %s", ctx->enable ? "enabling" : "disabling", error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else {
-        /* Update current features in the interface */
+    } else {
+        mm_obj_info (self, "%s SAR", ctx->enable ? "enabled" : "disabled");
         mm_gdbus_modem_sar_set_state (ctx->skeleton, ctx->enable);
         if (ctx->enable)
             mm_gdbus_modem_sar_set_power_level (ctx->skeleton, power_level);
@@ -123,8 +124,7 @@ handle_enable_auth_ready (MMBaseModem         *self,
         return;
     }
 
-    mm_obj_dbg (self, "%s SAR...", ctx->enable ? "Enabling" : "Disabling");
-
+    mm_obj_info (self, "processing user request to %s SAR...", ctx->enable ? "enable" : "disable");
     MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->enable (ctx->self,
                                                           ctx->enable,
                                                           (GAsyncReadyCallback)enable_ready,
@@ -180,8 +180,10 @@ set_power_level_ready (MMIfaceModemSar            *self,
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->set_power_level_finish (self, res, &error)) {
+        mm_obj_warn (self, "failed setting SAR power level to %u: %s", ctx->power_level, error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
+        mm_obj_info (self, "SAR power level set to %u", ctx->power_level);
         mm_gdbus_modem_sar_set_power_level (ctx->skeleton, ctx->power_level);
         mm_gdbus_modem_sar_complete_set_power_level (ctx->skeleton, ctx->invocation);
     }
@@ -228,7 +230,7 @@ handle_set_power_level_auth_ready (MMBaseModem                *self,
         return;
     }
 
-    mm_obj_dbg (self, "Set SAR power level to: '%d'", ctx->power_level);
+    mm_obj_info (self, "processing user request to set SAR power level to %u...", ctx->power_level);
     MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->set_power_level (
         ctx->self,
         ctx->power_level,
@@ -299,11 +301,11 @@ load_power_level_ready (MMIfaceModemSar *self,
                         GTask           *task)
 {
     InitializationContext *ctx;
-    GError *error = NULL;
-    guint   level;
+    GError                *error = NULL;
+    guint                  level;
 
     if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (self)->load_power_level_finish (self, res, &level, &error)) {
-        mm_obj_dbg (self, "SAR load power level failed: %s", error->message);
+        mm_obj_warn (self, "loading SAR power level failed: %s", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -323,11 +325,11 @@ load_state_ready (MMIfaceModemSar *self,
                   GTask           *task)
 {
     InitializationContext *ctx;
-    gboolean state;
-    GError *error = NULL;
+    gboolean               state;
+    GError                *error = NULL;
 
     if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (self)->load_state_finish (self, res, &state, &error)) {
-        mm_obj_dbg (self, "SAR load state failed: %s", error->message);
+        mm_obj_warn (self, "loading SAR state failed: %s", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -347,13 +349,12 @@ check_support_ready (MMIfaceModemSar *self,
                      GTask           *task)
 {
     InitializationContext *ctx;
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
 
     if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (self)->check_support_finish (self, res, &error)) {
         if (error) {
             /* This error shouldn't be treated as critical */
             mm_obj_dbg (self, "SAR support check failed: %s", error->message);
-            g_error_free (error);
         }
     } else {
         /* SAR is supported! */
@@ -435,7 +436,7 @@ interface_initialization_step (GTask *task)
         ctx->step++;
         /* fall through */
 
-    case INITIALIZATION_STEP_LOAD_STATE:
+     case INITIALIZATION_STEP_LOAD_STATE:
         if (MM_IFACE_MODEM_SAR_GET_INTERFACE (self)->load_state &&
             MM_IFACE_MODEM_SAR_GET_INTERFACE (self)->load_state_finish) {
             MM_IFACE_MODEM_SAR_GET_INTERFACE (self)->load_state (
