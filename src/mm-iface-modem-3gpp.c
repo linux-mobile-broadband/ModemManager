@@ -479,7 +479,7 @@ run_registration_checks_ready (MMIfaceModem3gpp *self,
 
     mm_iface_modem_3gpp_run_registration_checks_finish (MM_IFACE_MODEM_3GPP (self), res, &error);
     if (error) {
-        mm_obj_dbg (self, "3GPP registration check failed: %s", error->message);
+        mm_obj_info (self, "3GPP registration check failed: %s", error->message);
         register_in_network_context_complete_failed (task, error);
         return;
     }
@@ -489,7 +489,7 @@ run_registration_checks_ready (MMIfaceModem3gpp *self,
     /* If we got a final state and it's denied, we can assume the registration is
      * finished */
     if (current_registration_state == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED) {
-        mm_obj_dbg (self, "registration denied");
+        mm_obj_info (self, "registration denied");
         register_in_network_context_complete_failed (
             task,
             mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_NOT_ALLOWED, self));
@@ -503,7 +503,7 @@ run_registration_checks_ready (MMIfaceModem3gpp *self,
          * wouldn't be an explicit refresh triggered from the modem interface as
          * the modem never got un-registered during the sequence. */
         mm_iface_modem_refresh_signal (MM_IFACE_MODEM (ctx->self));
-        mm_obj_dbg (self, "currently registered in a 3GPP network");
+        mm_obj_info (self, "currently registered in a 3GPP network");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
@@ -511,7 +511,7 @@ run_registration_checks_ready (MMIfaceModem3gpp *self,
 
     /* Don't spend too much time waiting to get registered */
     if (g_timer_elapsed (ctx->timer, NULL) > ctx->max_registration_time) {
-        mm_obj_dbg (self, "3GPP registration check timed out");
+        mm_obj_info (self, "3GPP registration check timed out");
         register_in_network_context_complete_failed (
             task,
             mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT, self));
@@ -622,7 +622,7 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
             (g_strcmp0 (current_operator_code, ctx->operator_id) == 0) &&
             REG_STATE_IS_REGISTERED (reg_state) &&
             priv->manual_registration) {
-            mm_obj_dbg (self, "already registered manually in selected network '%s', manual registration not launched...",
+            mm_obj_info (self, "already registered manually in selected network '%s', manual registration not launched...",
                         current_operator_code);
             g_task_return_boolean (task, TRUE);
             g_object_unref (task);
@@ -630,7 +630,7 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
         }
 
         /* Manual registration to a new operator required */
-        mm_obj_dbg (self, "launching manual network registration (%s)...", ctx->operator_id);
+        mm_obj_info (self, "launching manual network registration in '%s'...", ctx->operator_id);
         g_free (priv->manual_registration_operator_id);
         priv->manual_registration_operator_id = g_strdup (ctx->operator_id);
         priv->manual_registration = TRUE;
@@ -642,7 +642,7 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
         if (!force_registration &&
             REG_STATE_IS_REGISTERED (reg_state) &&
             !priv->manual_registration) {
-            mm_obj_dbg (self, "already registered automatically in network '%s',"
+            mm_obj_info (self, "already registered automatically in network '%s',"
                         " automatic registration not launched...",
                         current_operator_code ? current_operator_code : "unknown");
             g_task_return_boolean (task, TRUE);
@@ -651,7 +651,7 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
         }
 
         /* Automatic registration to a new operator requested */
-        mm_obj_dbg (self, "launching automatic network registration...");
+        mm_obj_info (self, "launching automatic network registration...");
         g_clear_pointer (&priv->manual_registration_operator_id, g_free);
         priv->manual_registration = FALSE;
     }
@@ -1804,7 +1804,7 @@ load_operator_code_ready (MMIfaceModem3gpp *self,
     if (error) {
         mm_obj_warn (self, "couldn't load operator code: %s", error->message);
     } else if (!mm_3gpp_parse_operator_id (str, NULL, NULL, NULL, &error)) {
-        mm_obj_dbg (self, "unexpected operator code string '%s': %s", str, error->message);
+        mm_obj_warn (self, "unexpected operator code string '%s': %s", str, error->message);
         g_clear_pointer (&str, g_free);
     }
     g_clear_error (&error);
@@ -1988,7 +1988,7 @@ update_registration_reload_current_registration_info_ready (MMIfaceModem3gpp *se
 
     mm_obj_msg (self, "3GPP registration state changed (registering -> %s)",
                 mm_modem_3gpp_registration_state_get_string (new_state));
-    mm_obj_dbg (self, "consolidated registration state: cs '%s', ps '%s', eps '%s', 5gs '%s' --> '%s'",
+    mm_obj_info (self, "consolidated registration state: cs '%s', ps '%s', eps '%s', 5gs '%s' --> '%s'",
                 mm_modem_3gpp_registration_state_get_string (priv->state_cs),
                 mm_modem_3gpp_registration_state_get_string (priv->state_ps),
                 mm_modem_3gpp_registration_state_get_string (priv->state_eps),
@@ -2091,7 +2091,7 @@ update_registration_state (MMIfaceModem3gpp             *self,
     mm_obj_msg (self, "3GPP registration state changed (%s -> %s)",
                 mm_modem_3gpp_registration_state_get_string (old_state),
                 mm_modem_3gpp_registration_state_get_string (new_state));
-    mm_obj_dbg (self, "consolidated registration state: cs '%s', ps '%s', eps '%s', 5gs '%s' --> '%s'",
+    mm_obj_info (self, "consolidated registration state: cs '%s', ps '%s', eps '%s', 5gs '%s' --> '%s'",
                 mm_modem_3gpp_registration_state_get_string (priv->state_cs),
                 mm_modem_3gpp_registration_state_get_string (priv->state_ps),
                 mm_modem_3gpp_registration_state_get_string (priv->state_eps),
