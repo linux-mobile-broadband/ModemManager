@@ -28,6 +28,7 @@
 #include "mm-modem-helpers.h"
 #include "mm-error-helpers.h"
 #include "mm-log.h"
+#include "mm-log-helpers.h"
 
 #define SUBSYSTEM_3GPP "3gpp"
 
@@ -1122,79 +1123,36 @@ handle_set_initial_eps_bearer_settings_context_free (HandleSetInitialEpsBearerSe
 }
 
 static void
-log_initial_eps_bearer_settings (MMIfaceModem3gpp   *self,
-                                 MMBearerProperties *properties)
-{
-    const gchar         *apn;
-    MMBearerAllowedAuth  allowed_auth;
-    const gchar         *user;
-    const gchar         *password;
-    MMBearerIpFamily     ip_family;
-
-    apn = mm_bearer_properties_get_apn (properties);
-    if (apn)
-        mm_obj_dbg (self, "  APN: '%s'", apn);
-
-    allowed_auth = mm_bearer_properties_get_allowed_auth (properties);
-    if (allowed_auth != MM_BEARER_ALLOWED_AUTH_UNKNOWN) {
-        g_autofree gchar *allowed_auth_str = NULL;
-
-        allowed_auth_str = mm_bearer_allowed_auth_build_string_from_mask (allowed_auth);
-        mm_obj_dbg (self, "  allowed auth: '%s'", allowed_auth_str);
-    }
-
-    user = mm_bearer_properties_get_user (properties);
-    if (user)
-        mm_obj_dbg (self, "  user: '%s'", user);
-
-    password = mm_bearer_properties_get_password (properties);
-    if (password)
-        mm_obj_dbg (self, "  password: '%s'", password);
-
-    ip_family = mm_bearer_properties_get_ip_type (properties);
-    if (ip_family != MM_BEARER_IP_FAMILY_NONE) {
-        g_autofree gchar *ip_family_str = NULL;
-
-        ip_family_str = mm_bearer_ip_family_build_string_from_mask (ip_family);
-        mm_obj_dbg (self, "  ip family: '%s'", ip_family_str);
-    }
-}
-
-static void
 after_set_load_initial_eps_bearer_settings_ready (MMIfaceModem3gpp                         *self,
                                                   GAsyncResult                             *res,
                                                   HandleSetInitialEpsBearerSettingsContext *ctx)
 {
-    GError             *error = NULL;
-    MMBearerProperties *new_config;
+    GError                        *error = NULL;
+    g_autoptr(MMBearerProperties)  new_config = NULL;
+    g_autoptr(GVariant)            dictionary = NULL;
 
     new_config = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_settings_finish (self, res, &error);
     if (error) {
+        mm_obj_warn (self, "failed reloading initial EPS bearer settings after update: %s", error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_initial_eps_bearer_settings_context_free (ctx);
         return;
     }
 
-    mm_obj_dbg (self, "Updated initial EPS bearer settings:");
-    log_initial_eps_bearer_settings (self, new_config);
-
     if (!mm_bearer_properties_cmp (new_config, ctx->config, MM_BEARER_PROPERTIES_CMP_FLAGS_EPS)) {
-        mm_obj_dbg (self, "Requested initial EPS bearer settings:");
-        log_initial_eps_bearer_settings (self, ctx->config);
+        mm_obj_warn (self, "requested and reloaded initial EPS bearer settings don't match");
+        mm_obj_info (self, "reloaded initial EPS bearer settings:");
+        mm_log_bearer_properties (self, MM_LOG_LEVEL_INFO, "  ", new_config);
         g_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                                        "Initial EPS bearer settings were not updated");
-    } else {
-        GVariant *dictionary;
-
-        dictionary = mm_bearer_properties_get_dictionary (new_config);
-        mm_gdbus_modem3gpp_set_initial_eps_bearer_settings (ctx->skeleton, dictionary);
-        if (dictionary)
-            g_variant_unref (dictionary);
-        mm_gdbus_modem3gpp_complete_set_initial_eps_bearer_settings (ctx->skeleton, ctx->invocation);
+        handle_set_initial_eps_bearer_settings_context_free (ctx);
+        return;
     }
 
+    dictionary = mm_bearer_properties_get_dictionary (new_config);
+    mm_gdbus_modem3gpp_set_initial_eps_bearer_settings (ctx->skeleton, dictionary);
+    mm_gdbus_modem3gpp_complete_set_initial_eps_bearer_settings (ctx->skeleton, ctx->invocation);
     handle_set_initial_eps_bearer_settings_context_free (ctx);
-    g_object_unref (new_config);
 }
 
 static void
@@ -1205,10 +1163,13 @@ set_initial_eps_bearer_settings_ready (MMIfaceModem3gpp                         
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_initial_eps_bearer_settings_finish (self, res, &error)) {
+        mm_obj_warn (self, "failed setting initial EPS bearer settings: %s", error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_initial_eps_bearer_settings_context_free (ctx);
         return;
     }
+
+    mm_obj_info (self, "initial EPS bearer settings updated");
 
     if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_settings &&
         MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_settings_finish) {
@@ -1229,9 +1190,9 @@ set_initial_eps_bearer_settings_auth_ready (MMBaseModem                         
                                             GAsyncResult                             *res,
                                             HandleSetInitialEpsBearerSettingsContext *ctx)
 {
-    GError             *error = NULL;
-    MMBearerProperties *old_config = NULL;
-    GVariant           *old_dictionary;
+    GError                        *error = NULL;
+    GVariant                      *old_dictionary;
+    g_autoptr(MMBearerProperties)  old_config = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -1242,10 +1203,8 @@ set_initial_eps_bearer_settings_auth_ready (MMBaseModem                         
     /* If UE mode update is not implemented, report an error */
     if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_initial_eps_bearer_settings ||
         !MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_initial_eps_bearer_settings_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot set initial EPS bearer settings: operation not supported");
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                               "Operation not supported");
         handle_set_initial_eps_bearer_settings_context_free (ctx);
         return;
     }
@@ -1257,23 +1216,25 @@ set_initial_eps_bearer_settings_auth_ready (MMBaseModem                         
         return;
     }
 
+    mm_obj_info (self, "processing user request to set initial EPS bearer settings...");
+    mm_log_bearer_properties (self, MM_LOG_LEVEL_INFO, "  ", ctx->config);
+
     old_dictionary = mm_gdbus_modem3gpp_get_initial_eps_bearer_settings (ctx->skeleton);
     if (old_dictionary)
         old_config = mm_bearer_properties_new_from_dictionary (old_dictionary, NULL);
 
     if (old_config && mm_bearer_properties_cmp (ctx->config, old_config, MM_BEARER_PROPERTIES_CMP_FLAGS_EPS)) {
-        mm_obj_dbg (self, "Skipping initial eps bearer configuration. Same configuration provided");
+        mm_obj_info (self, "skipped setting initial EPS bearer settings: same configuration provided");
         mm_gdbus_modem3gpp_complete_set_initial_eps_bearer_settings (ctx->skeleton, ctx->invocation);
         handle_set_initial_eps_bearer_settings_context_free (ctx);
-    } else {
-        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_initial_eps_bearer_settings (
-            MM_IFACE_MODEM_3GPP (self),
-            ctx->config,
-            (GAsyncReadyCallback)set_initial_eps_bearer_settings_ready,
-            ctx);
+        return;
     }
 
-    g_clear_object (&old_config);
+    MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_initial_eps_bearer_settings (
+        MM_IFACE_MODEM_3GPP (self),
+        ctx->config,
+        (GAsyncReadyCallback)set_initial_eps_bearer_settings_ready,
+        ctx);
 }
 
 static gboolean
