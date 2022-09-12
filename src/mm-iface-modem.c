@@ -985,11 +985,11 @@ handle_create_bearer (MmGdbusModem          *skeleton,
 /*****************************************************************************/
 
 typedef struct {
-    MmGdbusModem *skeleton;
+    MmGdbusModem          *skeleton;
     GDBusMethodInvocation *invocation;
-    MMIfaceModem *self;
-    gchar *cmd;
-    guint timeout;
+    MMIfaceModem          *self;
+    gchar                 *cmd;
+    guint                  timeout;
 } HandleCommandContext;
 
 static void
@@ -999,31 +999,32 @@ handle_command_context_free (HandleCommandContext *ctx)
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
     g_free (ctx->cmd);
-    g_free (ctx);
+    g_slice_free (HandleCommandContext, ctx);
 }
 
 static void
-command_ready (MMIfaceModem *self,
-               GAsyncResult *res,
+command_ready (MMIfaceModem         *self,
+               GAsyncResult         *res,
                HandleCommandContext *ctx)
 {
-    GError *error = NULL;
+    GError      *error = NULL;
     const gchar *result;
 
-    result = MM_IFACE_MODEM_GET_INTERFACE (self)->command_finish (self,
-                                                                  res,
-                                                                  &error);
-    if (error)
+    result = MM_IFACE_MODEM_GET_INTERFACE (self)->command_finish (self, res, &error);
+    if (error) {
+        mm_obj_dbg (self, "failed running AT command '%s': %s", ctx->cmd, error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
+    } else {
+        mm_obj_dbg (self, "AT command '%s' run: %s", ctx->cmd, result);
         mm_gdbus_modem_complete_command (ctx->skeleton, ctx->invocation, result);
+    }
 
     handle_command_context_free (ctx);
 }
 
 static void
-handle_command_auth_ready (MMBaseModem *self,
-                           GAsyncResult *res,
+handle_command_auth_ready (MMBaseModem          *self,
+                           GAsyncResult         *res,
                            HandleCommandContext *ctx)
 {
     GError *error = NULL;
@@ -1037,28 +1038,22 @@ handle_command_auth_ready (MMBaseModem *self,
 #if ! defined WITH_AT_COMMAND_VIA_DBUS
     /* If we are not in Debug mode, report an error */
     if (!mm_context_get_debug ()) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNAUTHORIZED,
-                                               "Cannot send AT command to modem: "
-                                               "operation only allowed in debug mode");
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNAUTHORIZED,
+                                               "Operation only allowed in debug mode");
         handle_command_context_free (ctx);
         return;
     }
 #endif
 
     /* If command is not implemented, report an error */
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->command ||
-        !MM_IFACE_MODEM_GET_INTERFACE (self)->command_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot send AT command to modem: "
-                                               "operation not supported");
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->command || !MM_IFACE_MODEM_GET_INTERFACE (self)->command_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                               "Operation not supported");
         handle_command_context_free (ctx);
         return;
     }
 
+    mm_obj_dbg (self, "processing user request to run AT command '%s'...", ctx->cmd);
     MM_IFACE_MODEM_GET_INTERFACE (self)->command (ctx->self,
                                                   ctx->cmd,
                                                   ctx->timeout,
@@ -1067,15 +1062,15 @@ handle_command_auth_ready (MMBaseModem *self,
 }
 
 static gboolean
-handle_command (MmGdbusModem *skeleton,
+handle_command (MmGdbusModem          *skeleton,
                 GDBusMethodInvocation *invocation,
-                const gchar *cmd,
-                guint timeout,
-                MMIfaceModem *self)
+                const gchar           *cmd,
+                guint                  timeout,
+                MMIfaceModem          *self)
 {
     HandleCommandContext *ctx;
 
-    ctx = g_new (HandleCommandContext, 1);
+    ctx = g_slice_new0 (HandleCommandContext);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
