@@ -2526,15 +2526,17 @@ handle_factory_reset (MmGdbusModem *skeleton,
  */
 
 typedef struct {
-    MmGdbusModem *skeleton;
+    MmGdbusModem          *skeleton;
     GDBusMethodInvocation *invocation;
-    MMIfaceModem *self;
-    MMModemCapability capabilities;
+    MMIfaceModem          *self;
+    MMModemCapability      capabilities;
+    gchar                 *capabilities_str;
 } HandleSetCurrentCapabilitiesContext;
 
 static void
 handle_set_current_capabilities_context_free (HandleSetCurrentCapabilitiesContext *ctx)
 {
+    g_free (ctx->capabilities_str);
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
@@ -2542,17 +2544,19 @@ handle_set_current_capabilities_context_free (HandleSetCurrentCapabilitiesContex
 }
 
 static void
-set_current_capabilities_ready (MMIfaceModem *self,
-                                GAsyncResult *res,
+set_current_capabilities_ready (MMIfaceModem                        *self,
+                                GAsyncResult                        *res,
                                 HandleSetCurrentCapabilitiesContext *ctx)
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_capabilities_finish (self, res, &error))
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_capabilities_finish (self, res, &error)) {
+        mm_obj_warn (self, "failed setting current capabilities to '%s': %s", ctx->capabilities_str, error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else {
+    } else {
         /* Capabilities updated: explicitly refresh signal and access technology */
         mm_iface_modem_refresh_signal (self);
+        mm_obj_info (self, "current capabilities set to '%s'", ctx->capabilities_str);
         mm_gdbus_modem_complete_set_current_capabilities (ctx->skeleton, ctx->invocation);
     }
 
@@ -2560,15 +2564,14 @@ set_current_capabilities_ready (MMIfaceModem *self,
 }
 
 static void
-handle_set_current_capabilities_auth_ready (MMBaseModem *self,
-                                            GAsyncResult *res,
+handle_set_current_capabilities_auth_ready (MMBaseModem                         *self,
+                                            GAsyncResult                        *res,
                                             HandleSetCurrentCapabilitiesContext *ctx)
 {
-    GError *error = NULL;
-    gchar *capabilities_string;
-    GArray *supported;
-    gboolean matched = FALSE;
-    guint i;
+    GError            *error = NULL;
+    g_autoptr(GArray)  supported = NULL;
+    gboolean           matched = FALSE;
+    guint              i;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -2576,18 +2579,30 @@ handle_set_current_capabilities_auth_ready (MMBaseModem *self,
         return;
     }
 
+    /* Nothing to do if we already are in the requested setup */
+    if (mm_gdbus_modem_get_current_capabilities (ctx->skeleton) == ctx->capabilities) {
+        mm_gdbus_modem_complete_set_current_capabilities (ctx->skeleton, ctx->invocation);
+        handle_set_current_capabilities_context_free (ctx);
+        return;
+    }
+
+    /* If setting current capabilities is not implemented, report an error */
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_capabilities ||
+        !MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_capabilities_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                               "Setting current capabilities not supported");
+        handle_set_current_capabilities_context_free (ctx);
+        return;
+    }
+
     /* Get list of supported capabilities */
-    supported = mm_common_capability_combinations_variant_to_garray (
-        mm_gdbus_modem_get_supported_capabilities (ctx->skeleton));
+    supported = mm_common_capability_combinations_variant_to_garray (mm_gdbus_modem_get_supported_capabilities (ctx->skeleton));
 
     /* Don't allow capability switching if only one item given in the supported list */
     if (supported->len == 1) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                "Cannot change capabilities: only one combination supported");
         handle_set_current_capabilities_context_free (ctx);
-        g_array_unref (supported);
         return;
     }
 
@@ -2599,39 +2614,15 @@ handle_set_current_capabilities_auth_ready (MMBaseModem *self,
         if (supported_capability == ctx->capabilities)
                 matched = TRUE;
     }
-    g_array_unref (supported);
-
     if (!matched) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                "The given combination of capabilities is not supported");
         handle_set_current_capabilities_context_free (ctx);
         return;
     }
 
-    /* Check if we already are in the requested setup */
-    if (mm_gdbus_modem_get_current_capabilities (ctx->skeleton) == ctx->capabilities) {
-        /* Nothing to do */
-        mm_gdbus_modem_complete_set_current_capabilities (ctx->skeleton, ctx->invocation);
-        handle_set_current_capabilities_context_free (ctx);
-        return;
-    }
-
-    /* If setting current capabilities is not implemented, report an error */
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_capabilities ||
-        !MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_capabilities_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Setting current capabilities not supported");
-        handle_set_current_capabilities_context_free (ctx);
-        return;
-    }
-
-    capabilities_string = mm_modem_capability_build_string_from_mask (ctx->capabilities);
-    mm_obj_dbg (self, "setting new list of capabilities: %s", capabilities_string);
-    g_free (capabilities_string);
+    ctx->capabilities_str = mm_modem_capability_build_string_from_mask (ctx->capabilities);
+    mm_obj_info (self, "processing user request to set current capabilities to '%s'...", ctx->capabilities_str);
 
     MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_capabilities (
         MM_IFACE_MODEM (self),
@@ -2641,14 +2632,14 @@ handle_set_current_capabilities_auth_ready (MMBaseModem *self,
 }
 
 static gboolean
-handle_set_current_capabilities (MmGdbusModem *skeleton,
+handle_set_current_capabilities (MmGdbusModem          *skeleton,
                                  GDBusMethodInvocation *invocation,
-                                 guint capabilities,
-                                 MMIfaceModem *self)
+                                 guint                  capabilities,
+                                 MMIfaceModem          *self)
 {
     HandleSetCurrentCapabilitiesContext *ctx;
 
-    ctx = g_slice_new (HandleSetCurrentCapabilitiesContext);
+    ctx = g_slice_new0 (HandleSetCurrentCapabilitiesContext);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
