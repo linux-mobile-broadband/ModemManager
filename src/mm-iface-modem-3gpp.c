@@ -705,10 +705,10 @@ mm_iface_modem_3gpp_reregister_in_network (MMIfaceModem3gpp    *self,
 /*****************************************************************************/
 
 typedef struct {
-    MmGdbusModem3gpp *skeleton;
+    MmGdbusModem3gpp      *skeleton;
     GDBusMethodInvocation *invocation;
-    MMIfaceModem3gpp *self;
-    gchar *operator_id;
+    MMIfaceModem3gpp      *self;
+    gchar                 *operator_id;
 } HandleRegisterContext;
 
 static void
@@ -718,31 +718,40 @@ handle_register_context_free (HandleRegisterContext *ctx)
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
     g_free (ctx->operator_id);
-    g_free (ctx);
+    g_slice_free (HandleRegisterContext, ctx);
 }
 
 static void
-handle_register_ready (MMIfaceModem3gpp *self,
-                       GAsyncResult *res,
+handle_register_ready (MMIfaceModem3gpp      *self,
+                       GAsyncResult          *res,
                        HandleRegisterContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_iface_modem_3gpp_register_in_network_finish (self, res, &error))
+    if (!mm_iface_modem_3gpp_register_in_network_finish (self, res, &error)) {
+        if (ctx->operator_id && ctx->operator_id[0])
+            mm_obj_warn (self, "failed registering modem in '%s': %s", ctx->operator_id, error->message);
+        else
+            mm_obj_warn (self, "failed registering modem: %s", error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
+    } else {
+        if (ctx->operator_id && ctx->operator_id[0])
+            mm_obj_info (self, "modem registered in '%s'", ctx->operator_id);
+        else
+            mm_obj_info (self, "modem registered");
         mm_gdbus_modem3gpp_complete_register (ctx->skeleton, ctx->invocation);
+    }
 
     handle_register_context_free (ctx);
 }
 
 static void
-handle_register_auth_ready (MMBaseModem *self,
-                            GAsyncResult *res,
+handle_register_auth_ready (MMBaseModem           *self,
+                            GAsyncResult          *res,
                             HandleRegisterContext *ctx)
 {
-    MMModemState modem_state;
-    GError *error = NULL;
+    MMModemState  modem_state = MM_MODEM_STATE_UNKNOWN;
+    GError       *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -753,7 +762,6 @@ handle_register_auth_ready (MMBaseModem *self,
     g_assert (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network != NULL);
     g_assert (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network_finish != NULL);
 
-    modem_state = MM_MODEM_STATE_UNKNOWN;
     g_object_get (self,
                   MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
@@ -766,17 +774,18 @@ handle_register_auth_ready (MMBaseModem *self,
     case MM_MODEM_STATE_DISABLED:
     case MM_MODEM_STATE_DISABLING:
     case MM_MODEM_STATE_ENABLING:
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot register modem: "
-                                               "not yet enabled");
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                               "Device not yet enabled");
         handle_register_context_free (ctx);
         return;
 
     case MM_MODEM_STATE_ENABLED:
     case MM_MODEM_STATE_SEARCHING:
     case MM_MODEM_STATE_REGISTERED:
+        if (ctx->operator_id && ctx->operator_id[0])
+            mm_obj_info (self, "processing user request to register modem in '%s'...", ctx->operator_id);
+        else
+            mm_obj_info (self, "processing user request to register modem...");
         mm_iface_modem_3gpp_register_in_network (MM_IFACE_MODEM_3GPP (self),
                                                  ctx->operator_id,
                                                  FALSE, /* if already registered with same settings, do nothing */
@@ -788,11 +797,8 @@ handle_register_auth_ready (MMBaseModem *self,
     case MM_MODEM_STATE_DISCONNECTING:
     case MM_MODEM_STATE_CONNECTING:
     case MM_MODEM_STATE_CONNECTED:
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot register modem: "
-                                               "modem is connected");
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                               "Operation not allowed while modem is connected");
         handle_register_context_free (ctx);
         return;
 
@@ -802,14 +808,14 @@ handle_register_auth_ready (MMBaseModem *self,
 }
 
 static gboolean
-handle_register (MmGdbusModem3gpp *skeleton,
+handle_register (MmGdbusModem3gpp      *skeleton,
                  GDBusMethodInvocation *invocation,
-                 const gchar *operator_id,
-                 MMIfaceModem3gpp *self)
+                 const gchar           *operator_id,
+                 MMIfaceModem3gpp      *self)
 {
     HandleRegisterContext *ctx;
 
-    ctx = g_new (HandleRegisterContext, 1);
+    ctx = g_slice_new0 (HandleRegisterContext);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
