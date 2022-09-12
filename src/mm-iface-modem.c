@@ -2233,10 +2233,10 @@ handle_enable (MmGdbusModem          *skeleton,
 /*****************************************************************************/
 
 typedef struct {
-    MmGdbusModem *skeleton;
+    MmGdbusModem          *skeleton;
     GDBusMethodInvocation *invocation;
-    MMIfaceModem *self;
-    MMModemPowerState power_state;
+    MMIfaceModem          *self;
+    MMModemPowerState      power_state;
 } HandleSetPowerStateContext;
 
 static void
@@ -2249,26 +2249,29 @@ handle_set_power_state_context_free (HandleSetPowerStateContext *ctx)
 }
 
 static void
-set_power_state_ready (MMIfaceModem *self,
-                       GAsyncResult *res,
+set_power_state_ready (MMIfaceModem               *self,
+                       GAsyncResult               *res,
                        HandleSetPowerStateContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_iface_modem_set_power_state_finish (self, res, &error))
+    if (!mm_iface_modem_set_power_state_finish (self, res, &error)) {
+        mm_obj_warn (self, "failed setting power state '%s': %s", mm_modem_power_state_get_string (ctx->power_state), error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
+    } else {
+        mm_obj_info (self, "set power state '%s'", mm_modem_power_state_get_string (ctx->power_state));
         mm_gdbus_modem_complete_set_power_state (ctx->skeleton, ctx->invocation);
+    }
     handle_set_power_state_context_free (ctx);
 }
 
 static void
-handle_set_power_state_auth_ready (MMBaseModem *self,
-                                   GAsyncResult *res,
+handle_set_power_state_auth_ready (MMBaseModem                *self,
+                                   GAsyncResult               *res,
                                    HandleSetPowerStateContext *ctx)
 {
-    MMModemState modem_state;
-    GError *error = NULL;
+    MMModemState  modem_state;
+    GError       *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -2280,10 +2283,8 @@ handle_set_power_state_auth_ready (MMBaseModem *self,
     if (ctx->power_state != MM_MODEM_POWER_STATE_LOW &&
         ctx->power_state != MM_MODEM_POWER_STATE_ON &&
         ctx->power_state != MM_MODEM_POWER_STATE_OFF) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_INVALID_ARGS,
-                                               "Cannot set '%s' power state",
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                               "Unknown power state: '%s'",
                                                mm_modem_power_state_get_string (ctx->power_state));
         handle_set_power_state_context_free (ctx);
         return;
@@ -2295,14 +2296,11 @@ handle_set_power_state_auth_ready (MMBaseModem *self,
                   NULL);
 
     /* Going into LOW or ON only allowed in disabled and failed states */
-    if ((ctx->power_state == MM_MODEM_POWER_STATE_LOW ||
-         ctx->power_state == MM_MODEM_POWER_STATE_ON) &&
+    if ((ctx->power_state == MM_MODEM_POWER_STATE_LOW || ctx->power_state == MM_MODEM_POWER_STATE_ON) &&
         modem_state != MM_MODEM_STATE_FAILED &&
         modem_state != MM_MODEM_STATE_DISABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot set power state: not in disabled or failed state");
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                               "Must be in disabled or failed state");
         handle_set_power_state_context_free (ctx);
         return;
     }
@@ -2315,11 +2313,12 @@ handle_set_power_state_auth_ready (MMBaseModem *self,
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot set power state: modem either enabled or initializing");
+                                               "Modem either enabled or initializing");
         handle_set_power_state_context_free (ctx);
         return;
     }
 
+    mm_obj_info (self, "processing user request to set power state '%s'...", mm_modem_power_state_get_string (ctx->power_state));
     mm_iface_modem_set_power_state (MM_IFACE_MODEM (self),
                                     ctx->power_state,
                                     (GAsyncReadyCallback)set_power_state_ready,
@@ -2327,14 +2326,14 @@ handle_set_power_state_auth_ready (MMBaseModem *self,
 }
 
 static gboolean
-handle_set_power_state (MmGdbusModem *skeleton,
+handle_set_power_state (MmGdbusModem          *skeleton,
                         GDBusMethodInvocation *invocation,
-                        guint32 power_state,
-                        MMIfaceModem *self)
+                        guint32                power_state,
+                        MMIfaceModem          *self)
 {
     HandleSetPowerStateContext *ctx;
 
-    ctx = g_slice_new (HandleSetPowerStateContext);
+    ctx = g_slice_new0 (HandleSetPowerStateContext);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
