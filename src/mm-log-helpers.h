@@ -22,13 +22,17 @@
 
 #include "mm-log.h"
 
-void mm_log_bearer_properties (gpointer            log_object,
-                               MMLogLevel          level,
-                               const gchar        *prefix,
-                               MMBearerProperties *value);
-void mm_log_3gpp_profile      (gpointer            log_object,
-                               MMLogLevel          level,
-                               const gchar        *prefix,
-                               MM3gppProfile      *value);
+void mm_log_simple_connect_properties (gpointer                   log_object,
+                                       MMLogLevel                 level,
+                                       const gchar               *prefix,
+                                       MMSimpleConnectProperties *value);
+void mm_log_bearer_properties         (gpointer                   log_object,
+                                       MMLogLevel                 level,
+                                       const gchar               *prefix,
+                                       MMBearerProperties        *value);
+void mm_log_3gpp_profile              (gpointer                   log_object,
+                                       MMLogLevel                 level,
+                                       const gchar               *prefix,
+                                       MM3gppProfile             *value);
 
 #endif /* MM_LOG_HELPERS_H */

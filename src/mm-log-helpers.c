@@ -31,6 +31,21 @@ common_log_print_array (gpointer     log_object,
 }
 
 void
+mm_log_simple_connect_properties (gpointer                   log_object,
+                                  MMLogLevel                 level,
+                                  const gchar               *prefix,
+                                  MMSimpleConnectProperties *value)
+{
+    g_autoptr(GPtrArray) print_array = NULL;
+
+    if (!mm_log_check_level_enabled (level))
+      return;
+
+    print_array = mm_simple_connect_properties_print (value, mm_log_get_show_personal_info ());
+    common_log_print_array (log_object, level, prefix, print_array);
+}
+
+void
 mm_log_bearer_properties (gpointer            log_object,
                           MMLogLevel          level,
                           const gchar        *prefix,
