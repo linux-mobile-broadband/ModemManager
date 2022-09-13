@@ -1151,10 +1151,13 @@ delete_profile_ready (MMIfaceModem3gppProfileManager *self,
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_3GPP_PROFILE_MANAGER_GET_INTERFACE (self)->delete_profile_finish (self, res, &error))
+    if (!MM_IFACE_MODEM_3GPP_PROFILE_MANAGER_GET_INTERFACE (self)->delete_profile_finish (self, res, &error)) {
+        mm_obj_warn (self, "failed deleting 3GPP profile: %s", error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
+    } else {
+        mm_obj_info (self, "3GPP profile deleted");
         mm_gdbus_modem3gpp_profile_manager_complete_delete (ctx->skeleton, ctx->invocation);
+    }
     handle_delete_context_free (ctx);
 }
 
@@ -1233,6 +1236,9 @@ handle_delete_auth_ready (MMBaseModem         *self,
         handle_delete_context_free (ctx);
         return;
     }
+
+    mm_obj_info (self, "processing user request to delete 3GPP profile...");
+    mm_log_3gpp_profile (self, MM_LOG_LEVEL_INFO, "  ", profile);
 
     MM_IFACE_MODEM_3GPP_PROFILE_MANAGER_GET_INTERFACE (self)->delete_profile (
         MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self),
