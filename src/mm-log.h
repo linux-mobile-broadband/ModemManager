@@ -64,17 +64,18 @@ void _mm_log (gpointer     obj,
               const gchar *fmt,
               ...)  __attribute__((__format__ (__printf__, 6, 7)));
 
-gboolean mm_log_set_level           (const gchar  *level,
-                                     GError      **error);
-gboolean mm_log_setup               (const gchar  *level,
-                                     const gchar  *log_file,
-                                     gboolean      log_journal,
-                                     gboolean      show_ts,
-                                     gboolean      rel_ts,
-                                     gboolean      show_personal_info,
-                                     GError      **error);
-gboolean mm_log_check_level_enabled (MMLogLevel    level);
-void     mm_log_shutdown            (void);
+gboolean mm_log_set_level              (const gchar  *level,
+                                        GError      **error);
+gboolean mm_log_setup                  (const gchar  *level,
+                                        const gchar  *log_file,
+                                        gboolean      log_journal,
+                                        gboolean      show_ts,
+                                        gboolean      rel_ts,
+                                        gboolean      show_personal_info,
+                                        GError      **error);
+gboolean mm_log_check_level_enabled    (MMLogLevel    level);
+gboolean mm_log_get_show_personal_info (void);
+void     mm_log_shutdown               (void);
 
 /* Helper used when printing a string that may be personal
  * info. Depending on the settings, we may print it as-is,

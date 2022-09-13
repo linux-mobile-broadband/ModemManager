@@ -214,6 +214,12 @@ log_backend_systemd_journal (const char *loc,
 #endif
 
 gboolean
+mm_log_get_show_personal_info (void)
+{
+    return personal_info;
+}
+
+gboolean
 mm_log_check_level_enabled (MMLogLevel level)
 {
     return (log_level & level);
