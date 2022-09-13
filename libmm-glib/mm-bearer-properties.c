@@ -17,12 +17,14 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301 USA.
  *
- * Copyright (C) 2011-2021 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2011-2022 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2022 Google, Inc.
  */
 
 #include <string.h>
 
 #include "mm-errors-types.h"
+#include "mm-enums-types.h"
 #include "mm-common-helpers.h"
 #include "mm-bearer-properties.h"
 
@@ -931,6 +933,34 @@ mm_bearer_properties_cmp (MMBearerProperties         *a,
     if (a->priv->multiplex != b->priv->multiplex)
         return FALSE;
     return TRUE;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_bearer_properties_print: (skip)
+ */
+GPtrArray *
+mm_bearer_properties_print (MMBearerProperties *self,
+                            gboolean            show_personal_info)
+{
+    GPtrArray   *array;
+    const gchar *aux;
+
+    array = mm_3gpp_profile_print (self->priv->profile, show_personal_info);
+    if (self->priv->allow_roaming_set) {
+        aux = mm_common_str_boolean (self->priv->allow_roaming);
+        g_ptr_array_add (array, g_strdup_printf (PROPERTY_ALLOW_ROAMING ": %s", aux));
+    }
+    if (self->priv->multiplex != MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN) {
+        aux = mm_bearer_multiplex_support_get_string (self->priv->multiplex);
+        g_ptr_array_add (array, g_strdup_printf (PROPERTY_MULTIPLEX ": %s", aux));
+    }
+    if (self->priv->rm_protocol != MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
+        aux = mm_modem_cdma_rm_protocol_get_string (self->priv->rm_protocol);
+        g_ptr_array_add (array, g_strdup_printf (PROPERTY_RM_PROTOCOL ": %s", aux));
+    }
+    return array;
 }
 
 /*****************************************************************************/

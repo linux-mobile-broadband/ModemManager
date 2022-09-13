@@ -17,7 +17,8 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301 USA.o
  *
- * Copyright (C) 2011-2021 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2011-2022 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2022 Google, Inc.
  */
 
 #ifndef MM_BEARER_PROPERTIES_H
@@ -150,6 +151,9 @@ typedef enum {
 gboolean mm_bearer_properties_cmp (MMBearerProperties         *a,
                                    MMBearerProperties         *b,
                                    MMBearerPropertiesCmpFlags  flags);
+
+GPtrArray *mm_bearer_properties_print (MMBearerProperties *self,
+                                       gboolean            show_personal_info);
 
 #endif
 
