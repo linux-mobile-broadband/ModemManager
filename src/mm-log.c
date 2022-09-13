@@ -28,6 +28,8 @@
 
 #include <ModemManager.h>
 #include <mm-errors-types.h>
+#define _LIBMM_INSIDE_MM
+#include <libmm-glib.h>
 
 #if defined WITH_QMI
 #include <libqmi-glib.h>
@@ -421,7 +423,5 @@ mm_log_shutdown (void)
 const gchar *
 mm_log_str_personal_info (const gchar *str)
 {
-    static const gchar *hidden_personal_info = "###";
-
-    return personal_info ? str : hidden_personal_info;
+    return mm_common_str_personal_info (str, personal_info);
 }

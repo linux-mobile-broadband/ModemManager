@@ -1999,6 +1999,45 @@ mm_sms_delivery_state_get_string_extended (guint delivery_state)
 }
 
 /*****************************************************************************/
+
+const gchar *
+mm_common_str_boolean (gboolean value)
+{
+    return value ? "yes" : "no";
+}
+
+const gchar *
+mm_common_str_personal_info (const gchar *str,
+                             gboolean     show_personal_info)
+{
+    static const gchar *hidden_personal_info = "###";
+
+    return show_personal_info ? str : hidden_personal_info;
+}
+
+void
+mm_common_str_array_human_keys (GPtrArray *array)
+{
+    guint i;
+
+    /* Transforms from:
+     *   strings-as-keys: value...
+     * Into:
+     *   strings as keys: value...
+     */
+    for (i = 0; i < array->len; i++) {
+        gchar *str;
+        guint j;
+
+        str = g_ptr_array_index (array, i);
+        for (j = 0; str[j] && str[j] != ':'; j++) {
+            if (str[j] == '-')
+                str[j] = ' ';
+        }
+    }
+}
+
+/*****************************************************************************/
 /* DBus error handling */
 
 gboolean

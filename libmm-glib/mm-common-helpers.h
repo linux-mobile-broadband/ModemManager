@@ -165,6 +165,13 @@ GVariant *mm_common_oma_pending_network_initiated_sessions_garray_to_variant (GA
 GVariant *mm_common_build_oma_pending_network_initiated_sessions_default     (void);
 
 /******************************************************************************/
+
+const gchar *mm_common_str_boolean          (gboolean     value);
+const gchar *mm_common_str_personal_info    (const gchar *str,
+                                             gboolean     show_personal_info);
+void         mm_common_str_array_human_keys (GPtrArray   *array);
+
+/******************************************************************************/
 /* Common parsers */
 
 typedef gboolean (* MMParseKeyValueForeachFn)        (const gchar               *key,
