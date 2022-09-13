@@ -213,6 +213,12 @@ log_backend_systemd_journal (const char *loc,
 }
 #endif
 
+gboolean
+mm_log_check_level_enabled (MMLogLevel level)
+{
+    return (log_level & level);
+}
+
 void
 _mm_log (gpointer     obj,
          const gchar *module,
@@ -225,7 +231,7 @@ _mm_log (gpointer     obj,
     va_list  args;
     GTimeVal tv;
 
-    if (!(log_level & level))
+    if (!mm_log_check_level_enabled (level))
         return;
 
     if (g_once_init_enter (&msgbuf_once)) {
