@@ -815,12 +815,12 @@ handle_connect (MmGdbusModemSimple    *skeleton,
 /*****************************************************************************/
 
 typedef struct {
-    MMIfaceModemSimple *self;
-    MmGdbusModemSimple *skeleton;
+    MMIfaceModemSimple    *self;
+    MmGdbusModemSimple    *skeleton;
     GDBusMethodInvocation *invocation;
-    gchar *bearer_path;
-    GList *bearers;
-    MMBaseBearer *current;
+    gchar                 *bearer_path;
+    GList                 *bearers;
+    MMBaseBearer          *current;
 } DisconnectionContext;
 
 static void
@@ -830,22 +830,23 @@ disconnection_context_free (DisconnectionContext *ctx)
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
     g_free (ctx->bearer_path);
-    if (ctx->current)
-        g_object_unref (ctx->current);
+    g_clear_object (&ctx->current);
     g_list_free_full (ctx->bearers, g_object_unref);
-    g_free (ctx);
+    g_slice_free (DisconnectionContext, ctx);
 }
 
 static void disconnect_next_bearer (DisconnectionContext *ctx);
 
 static void
-disconnect_ready (MMBaseBearer *bearer,
-                  GAsyncResult *res,
+disconnect_ready (MMBaseBearer         *bearer,
+                  GAsyncResult         *res,
                   DisconnectionContext *ctx)
 {
     GError *error = NULL;
 
     if (!mm_base_bearer_disconnect_finish (bearer, res, &error)) {
+        mm_obj_warn (ctx->self, "failed to disconnect bearer '%s': %s",
+                     mm_base_bearer_get_path (bearer), error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         disconnection_context_free (ctx);
         return;
@@ -862,8 +863,8 @@ disconnect_next_bearer (DisconnectionContext *ctx)
 
     /* No more bearers? all done! */
     if (!ctx->bearers) {
-        mm_gdbus_modem_simple_complete_disconnect (ctx->skeleton,
-                                                   ctx->invocation);
+        mm_obj_info (ctx->self, "all requested bearers disconnected");
+        mm_gdbus_modem_simple_complete_disconnect (ctx->skeleton, ctx->invocation);
         disconnection_context_free (ctx);
         return;
     }
@@ -871,13 +872,14 @@ disconnect_next_bearer (DisconnectionContext *ctx)
     ctx->current = MM_BASE_BEARER (ctx->bearers->data);
     ctx->bearers = g_list_delete_link (ctx->bearers, ctx->bearers);
 
+    mm_obj_info (ctx->self, "disconnecting bearer '%s'...", mm_base_bearer_get_path (ctx->current));
     mm_base_bearer_disconnect (ctx->current,
                                (GAsyncReadyCallback)disconnect_ready,
                                ctx);
 }
 
 static void
-build_connected_bearer_list (MMBaseBearer *bearer,
+build_connected_bearer_list (MMBaseBearer         *bearer,
                              DisconnectionContext *ctx)
 {
     if (!ctx->bearer_path ||
@@ -886,13 +888,13 @@ build_connected_bearer_list (MMBaseBearer *bearer,
 }
 
 static void
-disconnect_auth_ready (MMBaseModem *self,
-                       GAsyncResult *res,
+disconnect_auth_ready (MMBaseModem          *self,
+                       GAsyncResult         *res,
                        DisconnectionContext *ctx)
 {
-    GError *error = NULL;
-    MMBearerList *list = NULL;
-    Private *priv;
+    g_autoptr(MMBearerList)  list = NULL;
+    GError                  *error = NULL;
+    Private                 *priv;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -921,13 +923,17 @@ disconnect_auth_ready (MMBaseModem *self,
         return;
     }
 
+    if (ctx->bearer_path)
+        mm_obj_info (self, "processing user request to disconnect modem: bearer '%s'", ctx->bearer_path);
+    else
+        mm_obj_info (self, "processing user request to disconnect modem: all bearers");
+
     mm_bearer_list_foreach (list,
                             (MMBearerListForeachFunc)build_connected_bearer_list,
                             ctx);
-    g_object_unref (list);
 
-    if (ctx->bearer_path &&
-        !ctx->bearers) {
+    if (ctx->bearer_path && !ctx->bearers) {
+        mm_obj_warn (self, "failed to disconnect bearer '%s': not found", ctx->bearer_path);
         g_dbus_method_invocation_return_error (
             ctx->invocation,
             MM_CORE_ERROR,
@@ -943,14 +949,14 @@ disconnect_auth_ready (MMBaseModem *self,
 }
 
 static gboolean
-handle_disconnect (MmGdbusModemSimple *skeleton,
+handle_disconnect (MmGdbusModemSimple    *skeleton,
                    GDBusMethodInvocation *invocation,
-                   const gchar *bearer_path,
-                   MMIfaceModemSimple *self)
+                   const gchar           *bearer_path,
+                   MMIfaceModemSimple    *self)
 {
     DisconnectionContext *ctx;
 
-    ctx = g_new0 (DisconnectionContext, 1);
+    ctx = g_slice_new0 (DisconnectionContext);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
@@ -962,11 +968,8 @@ handle_disconnect (MmGdbusModemSimple *skeleton,
      *
      * We will detect the '/' string and set the bearer path as NULL in the
      * context if so, and otherwise use the given input string as path */
-    if (g_strcmp0 (bearer_path, "/") != 0) {
-        mm_obj_dbg (self, "user request to disconnect modem (bearer '%s')", bearer_path);
+    if (g_strcmp0 (bearer_path, "/") != 0)
         ctx->bearer_path = g_strdup (bearer_path);
-    } else
-        mm_obj_dbg (self, "user request to disconnect modem (all bearers)");
 
     mm_base_modem_authorize (MM_BASE_MODEM (self),
                              invocation,
