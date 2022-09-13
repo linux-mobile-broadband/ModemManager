@@ -17,11 +17,13 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301 USA.
  *
- * Copyright (C) 2021 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2021-2022 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2022 Google, Inc.
  */
 
 #include <string.h>
 
+#include "mm-enums-types.h"
 #include "mm-errors-types.h"
 #include "mm-common-helpers.h"
 #include "mm-3gpp-profile.h"
@@ -934,6 +936,64 @@ mm_3gpp_profile_new_from_dictionary (GVariant  *dictionary,
     }
 
     return properties;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_3gpp_profile_print: (skip)
+ */
+GPtrArray *
+mm_3gpp_profile_print (MM3gppProfile *self,
+                       gboolean       show_personal_info)
+{
+    GPtrArray        *array;
+    g_autofree gchar *ip_type_str = NULL;
+    g_autofree gchar *apn_type_str = NULL;
+    g_autofree gchar *roaming_allowance_str = NULL;
+    g_autofree gchar *allowed_auth_str = NULL;
+    const gchar      *aux;
+
+    array = g_ptr_array_new_with_free_func ((GDestroyNotify)g_free);
+    if (self->priv->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN)
+        g_ptr_array_add (array, g_strdup_printf (PROPERTY_ID ": %d", self->priv->profile_id));
+    if (self->priv->profile_name)
+        g_ptr_array_add (array, g_strdup_printf (PROPERTY_NAME ": %s", self->priv->profile_name));
+    if (self->priv->enabled_set) {
+        aux = mm_common_str_boolean (self->priv->enabled);
+        g_ptr_array_add (array, g_strdup_printf (PROPERTY_ENABLED ": %s", aux));
+    }
+    if (self->priv->apn)
+        g_ptr_array_add (array, g_strdup_printf (PROPERTY_APN ": %s", self->priv->apn));
+    if (self->priv->ip_type != MM_BEARER_IP_FAMILY_NONE) {
+        ip_type_str = mm_bearer_ip_family_build_string_from_mask (self->priv->ip_type);
+        g_ptr_array_add (array, g_strdup_printf (PROPERTY_IP_TYPE ": %s", ip_type_str));
+    }
+    if (self->priv->apn_type != MM_BEARER_APN_TYPE_NONE) {
+        apn_type_str = mm_bearer_apn_type_build_string_from_mask (self->priv->apn_type);
+        g_ptr_array_add (array, g_strdup_printf (PROPERTY_APN_TYPE ": %s", apn_type_str));
+    }
+    if (self->priv->access_type_preference != MM_BEARER_ACCESS_TYPE_PREFERENCE_NONE) {
+        aux = mm_bearer_access_type_preference_get_string (self->priv->access_type_preference);
+        g_ptr_array_add (array, g_strdup_printf (PROPERTY_ACCESS_TYPE_PREFERENCE ": %s", aux));
+    }
+    if (self->priv->roaming_allowance != MM_BEARER_ROAMING_ALLOWANCE_NONE) {
+        roaming_allowance_str = mm_bearer_roaming_allowance_build_string_from_mask (self->priv->roaming_allowance);
+        g_ptr_array_add (array, g_strdup_printf (PROPERTY_ROAMING_ALLOWANCE ": %s", roaming_allowance_str));
+    }
+    if (self->priv->profile_source != MM_BEARER_PROFILE_SOURCE_UNKNOWN) {
+        aux = mm_bearer_profile_source_get_string (self->priv->profile_source);
+        g_ptr_array_add (array, g_strdup_printf (PROPERTY_SOURCE ": %s", aux));
+    }
+    if (self->priv->allowed_auth != MM_BEARER_ALLOWED_AUTH_NONE) {
+        allowed_auth_str = mm_bearer_allowed_auth_build_string_from_mask (self->priv->allowed_auth);
+        g_ptr_array_add (array, g_strdup_printf (PROPERTY_ALLOWED_AUTH ": %s", allowed_auth_str));
+    }
+    if (self->priv->user)
+        g_ptr_array_add (array, g_strdup_printf (PROPERTY_USER ": %s", mm_common_str_personal_info (self->priv->user, show_personal_info)));
+    if (self->priv->password)
+        g_ptr_array_add (array, g_strdup_printf (PROPERTY_PASSWORD ": %s", mm_common_str_personal_info (self->priv->password, show_personal_info)));
+    return array;
 }
 
 /*****************************************************************************/

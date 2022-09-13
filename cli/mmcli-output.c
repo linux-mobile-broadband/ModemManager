@@ -938,72 +938,17 @@ static void
 build_profile_human (GPtrArray     *array,
                      MM3gppProfile *profile)
 {
-    const gchar                  *aux;
-    MMBearerAllowedAuth           allowed_auth;
-    MMBearerIpFamily              ip_type;
-    MMBearerApnType               apn_type;
-    MMBearerAccessTypePreference  access_type_preference;
-    MMBearerRoamingAllowance      roaming_allowance;
-    MMBearerProfileSource         profile_source;
+    g_autoptr(GPtrArray) profile_print = NULL;
+    guint                i;
 
-    g_ptr_array_add (array, g_strdup_printf ("profile-id: %u", mm_3gpp_profile_get_profile_id (profile)));
-    g_ptr_array_add (array, g_strdup_printf ("  profile enabled: %s",
-                                             mm_3gpp_profile_get_enabled (profile) ? "yes" : "no"));
-
-    if ((aux = mm_3gpp_profile_get_profile_name (profile)) != NULL)
-        g_ptr_array_add (array, g_strdup_printf ("  profile name: %s", aux));
-
-    if ((aux = mm_3gpp_profile_get_apn (profile)) != NULL)
-        g_ptr_array_add (array, g_strdup_printf ("  apn: %s", aux));
-
-    allowed_auth = mm_3gpp_profile_get_allowed_auth (profile);
-    if (allowed_auth != MM_BEARER_ALLOWED_AUTH_NONE) {
-        g_autofree gchar *allowed_auth_str = NULL;
-
-        allowed_auth_str = mm_bearer_allowed_auth_build_string_from_mask (allowed_auth);
-        g_ptr_array_add (array, g_strdup_printf ("  allowed auth: %s", allowed_auth_str));
-    }
-
-    if ((aux = mm_3gpp_profile_get_user (profile)) != NULL)
-        g_ptr_array_add (array, g_strdup_printf ("  user: %s", aux));
-
-    if ((aux = mm_3gpp_profile_get_password (profile)) != NULL)
-        g_ptr_array_add (array, g_strdup_printf ("  password: %s", aux));
-
-    ip_type = mm_3gpp_profile_get_ip_type (profile);
-    if (ip_type != MM_BEARER_IP_FAMILY_NONE) {
-        g_autofree gchar *ip_type_str = NULL;
-
-        ip_type_str = mm_bearer_ip_family_build_string_from_mask (ip_type);
-        g_ptr_array_add (array, g_strdup_printf ("  ip type: %s", ip_type_str));
-    }
-
-    apn_type = mm_3gpp_profile_get_apn_type (profile);
-    if (apn_type != MM_BEARER_APN_TYPE_NONE) {
-        g_autofree gchar *apn_type_str = NULL;
-
-        apn_type_str = mm_bearer_apn_type_build_string_from_mask (apn_type);
-        g_ptr_array_add (array, g_strdup_printf ("  apn type: %s", apn_type_str));
-    }
-
-    access_type_preference = mm_3gpp_profile_get_access_type_preference (profile);
-    if (access_type_preference != MM_BEARER_ACCESS_TYPE_PREFERENCE_NONE) {
-        aux = mm_bearer_access_type_preference_get_string (access_type_preference);
-        g_ptr_array_add (array, g_strdup_printf ("  access type preference: %s", aux));
-    }
-
-    roaming_allowance = mm_3gpp_profile_get_roaming_allowance (profile);
-    if (roaming_allowance != MM_BEARER_ROAMING_ALLOWANCE_NONE) {
-        g_autofree gchar *roaming_allowance_str = NULL;
-
-        roaming_allowance_str = mm_bearer_roaming_allowance_build_string_from_mask (roaming_allowance);
-        g_ptr_array_add (array, g_strdup_printf ("  roaming allowance: %s", roaming_allowance_str));
-    }
-
-    profile_source = mm_3gpp_profile_get_profile_source (profile);
-    if (profile_source != MM_BEARER_PROFILE_SOURCE_UNKNOWN) {
-        aux = mm_bearer_profile_source_get_string (profile_source);
-        g_ptr_array_add (array, g_strdup_printf ("  profile source: %s", aux));
+    profile_print = mm_3gpp_profile_print (profile, TRUE);
+    mm_common_str_array_human_keys (profile_print);
+    for (i = 0; i < profile_print->len; i++) {
+        /* First string is profile id always, all the remaining ones will be
+         * indented some whitespaces right */
+        g_ptr_array_add (array, g_strdup_printf ("%s%s",
+                                                 i == 0 ? "" : "  ",
+                                                 (const gchar *)g_ptr_array_index (profile_print, i)));
     }
 }
 
@@ -1011,67 +956,17 @@ static void
 build_profile_keyvalue (GPtrArray     *array,
                         MM3gppProfile *profile)
 {
-    GString                      *str;
-    const gchar                  *aux;
-    MMBearerAllowedAuth           allowed_auth;
-    MMBearerIpFamily              ip_type;
-    MMBearerApnType               apn_type;
-    MMBearerAccessTypePreference  access_type_preference;
-    MMBearerRoamingAllowance      roaming_allowance;
+    g_autoptr(GPtrArray)  profile_print = NULL;
+    guint                 i;
+    GString              *str;
 
     str = g_string_new ("");
-    g_string_append_printf (str, "profile-id: %u", mm_3gpp_profile_get_profile_id (profile));
-
-    if ((aux = mm_3gpp_profile_get_profile_name (profile)) != NULL)
-        g_string_append_printf (str, ", profile-name: %s", aux);
-
-    if ((aux = mm_3gpp_profile_get_apn (profile)) != NULL)
-        g_string_append_printf (str, ", apn: %s", aux);
-
-    allowed_auth = mm_3gpp_profile_get_allowed_auth (profile);
-    if (allowed_auth != MM_BEARER_ALLOWED_AUTH_NONE) {
-        g_autofree gchar *allowed_auth_str = NULL;
-
-        allowed_auth_str = mm_bearer_allowed_auth_build_string_from_mask (allowed_auth);
-        g_string_append_printf (str, ", allowed-auth: %s", allowed_auth_str);
+    profile_print = mm_3gpp_profile_print (profile, TRUE);
+    for (i = 0; i < profile_print->len; i++) {
+        g_string_append_printf (str, "%s%s",
+                                i == 0 ? "" : ", ",
+                                (const gchar *)g_ptr_array_index (profile_print, i));
     }
-
-    if ((aux = mm_3gpp_profile_get_user (profile)) != NULL)
-        g_string_append_printf (str, ", user: %s", aux);
-
-    if ((aux = mm_3gpp_profile_get_password (profile)) != NULL)
-        g_string_append_printf (str, ", password: %s", aux);
-
-    ip_type = mm_3gpp_profile_get_ip_type (profile);
-    if (ip_type != MM_BEARER_IP_FAMILY_NONE) {
-        g_autofree gchar *ip_type_str = NULL;
-
-        ip_type_str = mm_bearer_ip_family_build_string_from_mask (ip_type);
-        g_string_append_printf (str, ", ip-type: %s", ip_type_str);
-    }
-
-    apn_type = mm_3gpp_profile_get_apn_type (profile);
-    if (apn_type != MM_BEARER_APN_TYPE_NONE) {
-        g_autofree gchar *apn_type_str = NULL;
-
-        apn_type_str = mm_bearer_apn_type_build_string_from_mask (apn_type);
-        g_string_append_printf (str, ", apn-type: %s", apn_type_str);
-    }
-
-    access_type_preference = mm_3gpp_profile_get_access_type_preference (profile);
-    if (access_type_preference != MM_BEARER_ACCESS_TYPE_PREFERENCE_NONE) {
-        aux = mm_bearer_access_type_preference_get_string (access_type_preference);
-        g_string_append_printf (str, ", access-type-preference: %s", aux);
-    }
-
-    roaming_allowance = mm_3gpp_profile_get_roaming_allowance (profile);
-    if (roaming_allowance != MM_BEARER_ROAMING_ALLOWANCE_NONE) {
-        g_autofree gchar *roaming_allowance_str = NULL;
-
-        roaming_allowance_str = mm_bearer_roaming_allowance_build_string_from_mask (roaming_allowance);
-        g_string_append_printf (str, ", roaming-allowance: %s", roaming_allowance_str);
-    }
-
     g_ptr_array_add (array, g_string_free (str, FALSE));
 }
 

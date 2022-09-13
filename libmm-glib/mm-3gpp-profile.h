@@ -17,7 +17,8 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301 USA.
  *
- * Copyright (C) 2021 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2021-2022 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2022 Google, Inc.
  */
 
 #ifndef MM_3GPP_PROFILE_H
@@ -151,6 +152,8 @@ gboolean mm_3gpp_profile_cmp (MM3gppProfile         *a,
                               GEqualFunc             cmp_apn,
                               MM3gppProfileCmpFlags  flags);
 
+GPtrArray *mm_3gpp_profile_print (MM3gppProfile *self,
+                                  gboolean       show_personal_info);
 #endif
 
 G_END_DECLS
