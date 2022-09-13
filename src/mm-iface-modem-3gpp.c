@@ -834,9 +834,9 @@ handle_register (MmGdbusModem3gpp      *skeleton,
 /*****************************************************************************/
 
 typedef struct {
-    MmGdbusModem3gpp *skeleton;
+    MmGdbusModem3gpp      *skeleton;
     GDBusMethodInvocation *invocation;
-    MMIfaceModem3gpp *self;
+    MMIfaceModem3gpp      *self;
 } HandleScanContext;
 
 static void
@@ -845,11 +845,12 @@ handle_scan_context_free (HandleScanContext *ctx)
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
-    g_free (ctx);
+    g_slice_free (HandleScanContext, ctx);
 }
 
 static GVariant *
-scan_networks_build_result (GList *info_list)
+build_scan_networks_result (MMIfaceModem3gpp *self,
+                            GList            *info_list)
 {
     GList *l;
     GVariantBuilder builder;
@@ -858,26 +859,30 @@ scan_networks_build_result (GList *info_list)
 
     for (l = info_list; l; l = g_list_next (l)) {
         MM3gppNetworkInfo *info = l->data;
+        g_autofree gchar  *access_tech_str = NULL;
 
         if (!info->operator_code) {
             g_warn_if_reached ();
             continue;
         }
 
-        g_variant_builder_open (&builder, G_VARIANT_TYPE ("a{sv}"));
+        /* log results as INFO */
+        access_tech_str = mm_modem_access_technology_build_string_from_mask (info->access_tech);
+        mm_obj_info (self, "  mccmnc: %s, status: %s, access tech: %s, long name: %s, short name: %s",
+                     info->operator_code,
+                     mm_modem_3gpp_network_availability_get_string (info->status),
+                     access_tech_str,
+                     info->operator_long ? info->operator_long : "n/a",
+                     info->operator_short ? info->operator_short : "n/a");
 
-        g_variant_builder_add (&builder, "{sv}",
-                               "operator-code", g_variant_new_string (info->operator_code));
-        g_variant_builder_add (&builder, "{sv}",
-                               "status", g_variant_new_uint32 (info->status));
-        g_variant_builder_add (&builder, "{sv}",
-                               "access-technology", g_variant_new_uint32 (info->access_tech));
+        g_variant_builder_open (&builder, G_VARIANT_TYPE ("a{sv}"));
+        g_variant_builder_add (&builder, "{sv}", "operator-code", g_variant_new_string (info->operator_code));
+        g_variant_builder_add (&builder, "{sv}", "status", g_variant_new_uint32 (info->status));
+        g_variant_builder_add (&builder, "{sv}", "access-technology", g_variant_new_uint32 (info->access_tech));
         if (info->operator_long)
-            g_variant_builder_add (&builder, "{sv}",
-                                   "operator-long", g_variant_new_string (info->operator_long));
+            g_variant_builder_add (&builder, "{sv}", "operator-long", g_variant_new_string (info->operator_long));
         if (info->operator_short)
-            g_variant_builder_add (&builder, "{sv}",
-                                   "operator-short", g_variant_new_string (info->operator_short));
+            g_variant_builder_add (&builder, "{sv}", "operator-short", g_variant_new_string (info->operator_short));
         g_variant_builder_close (&builder);
     }
 
@@ -885,33 +890,32 @@ scan_networks_build_result (GList *info_list)
 }
 
 static void
-handle_scan_ready (MMIfaceModem3gpp *self,
-                   GAsyncResult *res,
+handle_scan_ready (MMIfaceModem3gpp  *self,
+                   GAsyncResult      *res,
                    HandleScanContext *ctx)
 {
-    GError *error = NULL;
-    GList *info_list;
+    GError              *error = NULL;
+    GList               *info_list;
+    g_autoptr(GVariant)  dict_array = NULL;
 
     info_list = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->scan_networks_finish (self, res, &error);
-    if (error)
+    if (error) {
+        mm_obj_warn (self, "failed scanning networks: %s", error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else {
-        GVariant *dict_array;
-
-        dict_array = scan_networks_build_result (info_list);
-        mm_gdbus_modem3gpp_complete_scan (ctx->skeleton,
-                                          ctx->invocation,
-                                          dict_array);
-        g_variant_unref (dict_array);
+        handle_scan_context_free (ctx);
+        return;
     }
 
+    mm_obj_info (self, "network scan performed: %u found", g_list_length (info_list));
+    dict_array = build_scan_networks_result (self, info_list);
+    mm_gdbus_modem3gpp_complete_scan (ctx->skeleton, ctx->invocation, dict_array);
     mm_3gpp_network_info_list_free (info_list);
     handle_scan_context_free (ctx);
 }
 
 static void
-handle_scan_auth_ready (MMBaseModem *self,
-                        GAsyncResult *res,
+handle_scan_auth_ready (MMBaseModem       *self,
+                        GAsyncResult      *res,
                         HandleScanContext *ctx)
 {
     GError *error = NULL;
@@ -947,13 +951,13 @@ handle_scan_auth_ready (MMBaseModem *self,
 }
 
 static gboolean
-handle_scan (MmGdbusModem3gpp *skeleton,
+handle_scan (MmGdbusModem3gpp      *skeleton,
              GDBusMethodInvocation *invocation,
-             MMIfaceModem3gpp *self)
+             MMIfaceModem3gpp      *self)
 {
     HandleScanContext *ctx;
 
-    ctx = g_new (HandleScanContext, 1);
+    ctx = g_slice_new0 (HandleScanContext);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
