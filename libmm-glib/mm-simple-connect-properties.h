@@ -17,7 +17,8 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301 USA.
  *
- * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2011-2022 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2022 Google, Inc.
  */
 
 #ifndef MM_SIMPLE_CONNECT_PROPERTIES_H
@@ -120,6 +121,10 @@ MMSimpleConnectProperties *mm_simple_connect_properties_new_from_dictionary (GVa
 MMBearerProperties *mm_simple_connect_properties_get_bearer_properties (MMSimpleConnectProperties *self);
 
 GVariant *mm_simple_connect_properties_get_dictionary (MMSimpleConnectProperties *self);
+
+GPtrArray *mm_simple_connect_properties_print (MMSimpleConnectProperties *self,
+                                               gboolean                   show_personal_info);
+
 #endif
 
 

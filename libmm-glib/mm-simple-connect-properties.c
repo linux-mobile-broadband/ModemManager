@@ -17,7 +17,8 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301 USA.
  *
- * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2011-2022 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2022 Google, Inc.
  */
 
 #include <string.h>
@@ -726,6 +727,26 @@ mm_simple_connect_properties_new_from_dictionary (GVariant *dictionary,
     }
 
     return self;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_simple_connect_properties_print: (skip)
+ */
+GPtrArray *
+mm_simple_connect_properties_print (MMSimpleConnectProperties *self,
+                                    gboolean                   show_personal_info)
+{
+    GPtrArray *array;
+
+    array = mm_bearer_properties_print (self->priv->bearer_properties, show_personal_info);
+    if (self->priv->pin)
+        g_ptr_array_add (array, g_strdup_printf (PROPERTY_PIN ": %s", mm_common_str_personal_info (self->priv->pin, show_personal_info)));
+    if (self->priv->operator_id)
+        g_ptr_array_add (array, g_strdup_printf (PROPERTY_OPERATOR_ID ": %s", self->priv->operator_id));
+
+    return array;
 }
 
 /*****************************************************************************/
