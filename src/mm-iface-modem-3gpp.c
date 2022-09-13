@@ -1286,6 +1286,7 @@ typedef struct {
     MMIfaceModem3gpp      *self;
     GVariant              *dictionary;
     MMModem3gppFacility    facility;
+    gchar                 *facility_str;
     guint8                 slot;
     gchar                 *control_key;
 } HandleDisableFacilityLockContext;
@@ -1298,7 +1299,8 @@ handle_disable_facility_lock_context_free (HandleDisableFacilityLockContext *ctx
     g_object_unref (ctx->self);
     g_variant_unref (ctx->dictionary);
     g_free (ctx->control_key);
-    g_free (ctx);
+    g_free (ctx->facility_str);
+    g_slice_free (HandleDisableFacilityLockContext, ctx);
 }
 
 static void
@@ -1306,7 +1308,7 @@ update_lock_info_ready (MMIfaceModem                     *modem,
                         GAsyncResult                     *res,
                         HandleDisableFacilityLockContext *ctx)
 {
-    GError      *error = NULL;
+    GError *error = NULL;
 
     mm_iface_modem_update_lock_info_finish (modem, res, &error);
     if (error) {
@@ -1328,10 +1330,14 @@ handle_disable_facility_lock_ready (MMIfaceModem3gpp                 *self,
     GError              *error = NULL;
 
     if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->disable_facility_lock_finish (self, res, &error)) {
+        mm_obj_warn (self, "failed disabling facility lock '%s': %s",
+                     ctx->facility_str, error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_disable_facility_lock_context_free (ctx);
         return;
     }
+
+    mm_obj_info (self, "facility lock '%s' disabled", ctx->facility_str);
 
     /* Update the Enabled Facility Locks property in the DBus interface */
     facilities = mm_gdbus_modem3gpp_get_enabled_facility_locks (ctx->skeleton);
@@ -1361,20 +1367,16 @@ disable_facility_lock_auth_ready (MMBaseModem                      *self,
     /* If disable facility locks is not implemented, report an error */
     if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->disable_facility_lock ||
         !MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->disable_facility_lock_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot disable facility locks: operation not supported");
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                               "Operation not supported");
         handle_disable_facility_lock_context_free (ctx);
         return;
     }
 
     /* Parse properties dictionary */
     if (!g_variant_is_of_type (ctx->dictionary, G_VARIANT_TYPE ("(us)"))) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot disable facility locks: invalid parameters");
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                               "Invalid parameters");
         handle_disable_facility_lock_context_free (ctx);
         return;
     }
@@ -1394,14 +1396,15 @@ disable_facility_lock_auth_ready (MMBaseModem                      *self,
                                            MM_MODEM_3GPP_FACILITY_NET_SUB_PERS |
                                            MM_MODEM_3GPP_FACILITY_PROVIDER_PERS |
                                            MM_MODEM_3GPP_FACILITY_CORP_PERS))) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
                                                "Invalid type of facility lock to disable or empty key");
         handle_disable_facility_lock_context_free (ctx);
         return;
     }
 
+    ctx->facility_str = mm_modem_3gpp_facility_build_string_from_mask (ctx->facility);
+    mm_obj_info (self, "processing user request to disable facility lock '%s'...", ctx->facility_str);
+    mm_obj_info (self, "  control key: %s", mm_log_str_personal_info (ctx->control_key));
     MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->disable_facility_lock (
         MM_IFACE_MODEM_3GPP (self),
         ctx->facility,
@@ -1419,7 +1422,7 @@ handle_disable_facility_lock (MmGdbusModem3gpp      *skeleton,
 {
     HandleDisableFacilityLockContext *ctx;
 
-    ctx = g_new0 (HandleDisableFacilityLockContext, 1);
+    ctx = g_slice_new0 (HandleDisableFacilityLockContext);
     ctx->skeleton   = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self       = g_object_ref (self);
