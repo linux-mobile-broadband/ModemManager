@@ -26,6 +26,7 @@
 #include "mm-iface-modem-3gpp-profile-manager.h"
 #include "mm-base-modem.h"
 #include "mm-log-object.h"
+#include "mm-log-helpers.h"
 
 #define SUPPORT_CHECKED_TAG "3gpp-profile-manager-support-checked-tag"
 #define SUPPORTED_TAG       "3gpp-profile-manager-supported-tag"
@@ -907,36 +908,53 @@ handle_list_context_free (HandleListContext *ctx)
     g_slice_free (HandleListContext, ctx);
 }
 
+static GVariant *
+build_list_profiles_result (MMIfaceModem3gppProfileManager *self,
+                            GList                          *profiles)
+{
+    GVariantBuilder  builder;
+    GList           *l;
+    guint            i;
+
+    /* Build array of dicts */
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("aa{sv}"));
+    for (l = profiles, i = 0; l; l = g_list_next (l), i++) {
+        g_autoptr(GVariant)  dict = NULL;
+        MM3gppProfile       *profile;
+
+        profile = MM_3GPP_PROFILE (l->data);
+
+        mm_obj_info (self, "profile %u:", i);
+        mm_log_3gpp_profile (self, MM_LOG_LEVEL_INFO, "  ", profile);
+
+        dict = mm_3gpp_profile_get_dictionary (profile);
+        g_variant_builder_add_value (&builder, dict);
+    }
+
+    return g_variant_ref_sink (g_variant_builder_end (&builder));
+}
+
 static void
 list_profiles_ready (MMIfaceModem3gppProfileManager *self,
                      GAsyncResult                   *res,
                      HandleListContext              *ctx)
 {
-    GVariantBuilder  builder;
-    GError          *error = NULL;
-    GList           *profiles = NULL;
-    GList           *l;
+    GError              *error = NULL;
+    GList               *profiles = NULL;
+    g_autoptr(GVariant)  dict_array = NULL;
 
     if (!mm_iface_modem_3gpp_profile_manager_list_profiles_finish (self, res, &profiles, &error)) {
+        mm_obj_warn (self, "failed listing 3GPP profiles: %s", error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_list_context_free (ctx);
         return;
     }
 
-    /* Build array of dicts */
-    g_variant_builder_init (&builder, G_VARIANT_TYPE ("aa{sv}"));
-    for (l = profiles; l; l = g_list_next (l)) {
-        g_autoptr(GVariant) dict = NULL;
-
-        dict = mm_3gpp_profile_get_dictionary (MM_3GPP_PROFILE (l->data));
-        g_variant_builder_add_value (&builder, dict);
-    }
-
-    mm_gdbus_modem3gpp_profile_manager_complete_list (ctx->skeleton,
-                                                      ctx->invocation,
-                                                      g_variant_builder_end (&builder));
-    handle_list_context_free (ctx);
+    mm_obj_info (self, "listed 3GPP profiles: %u found", g_list_length (profiles));
+    dict_array = build_list_profiles_result (self, profiles);
+    mm_gdbus_modem3gpp_profile_manager_complete_list (ctx->skeleton, ctx->invocation, dict_array);
     mm_3gpp_profile_list_free (profiles);
+    handle_list_context_free (ctx);
 }
 
 static void
@@ -958,6 +976,8 @@ handle_list_auth_ready (MMBaseModem       *self,
         handle_list_context_free (ctx);
         return;
     }
+
+    mm_obj_info (self, "processing user request to list 3GPP profiles...");
 
     /* Don't call the class callback directly, use the common helper method
      * that is also used by other internal operations. */
