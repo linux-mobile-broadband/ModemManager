@@ -1033,16 +1033,21 @@ set_profile_ready (MMIfaceModem3gppProfileManager *self,
 {
     GError                   *error = NULL;
     g_autoptr(MM3gppProfile)  profile_stored = NULL;
+    g_autoptr(GVariant)       profile_dictionary = NULL;
 
     profile_stored = mm_iface_modem_3gpp_profile_manager_set_profile_finish (self, res, &error);
-    if (!profile_stored)
+    if (!profile_stored) {
+        mm_obj_warn (self, "failed setting 3GPP profile: %s", error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else {
-        g_autoptr(GVariant) profile_dictionary = NULL;
-
-        profile_dictionary = mm_3gpp_profile_get_dictionary (profile_stored);
-        mm_gdbus_modem3gpp_profile_manager_complete_set (ctx->skeleton, ctx->invocation, profile_dictionary);
+        handle_set_context_free (ctx);
+        return;
     }
+
+    mm_obj_info (self, "3GPP profile set:");
+    mm_log_3gpp_profile (self, MM_LOG_LEVEL_INFO, "  ", profile_stored);
+
+    profile_dictionary = mm_3gpp_profile_get_dictionary (profile_stored);
+    mm_gdbus_modem3gpp_profile_manager_complete_set (ctx->skeleton, ctx->invocation, profile_dictionary);
     handle_set_context_free (ctx);
 }
 
@@ -1081,6 +1086,9 @@ handle_set_auth_ready (MMBaseModem      *self,
         handle_set_context_free (ctx);
         return;
     }
+
+    mm_obj_info (self, "processing user request to set 3GPP profile...");
+    mm_log_3gpp_profile (self, MM_LOG_LEVEL_INFO, "  ", profile_requested);
 
     index_field = mm_gdbus_modem3gpp_profile_manager_get_index_field (ctx->skeleton);
 
