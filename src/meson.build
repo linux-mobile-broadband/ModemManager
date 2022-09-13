@@ -218,6 +218,7 @@ sources = files(
   'mm-iface-modem-simple.c',
   'mm-iface-modem-time.c',
   'mm-iface-modem-voice.c',
+  'mm-log-helpers.c',
   'mm-plugin.c',
   'mm-plugin-manager.c',
   'mm-port-probe.c',
