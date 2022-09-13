@@ -1459,10 +1459,16 @@ set_packet_service_state_ready (MMIfaceModem3gpp                *self,
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_packet_service_state_finish (self, res, &error))
+    if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_packet_service_state_finish (self, res, &error)) {
+        mm_obj_warn (self, "failed setting packet service state to '%s': %s",
+                     mm_modem_3gpp_packet_service_state_get_string (ctx->packet_service_state),
+                     error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
+    } else {
+        mm_obj_info (self, "packet service state set to '%s'",
+                     mm_modem_3gpp_packet_service_state_get_string (ctx->packet_service_state));
         mm_gdbus_modem3gpp_complete_set_packet_service_state (ctx->skeleton, ctx->invocation);
+    }
     handle_set_packet_service_state_context_free (ctx);
 }
 
@@ -1488,22 +1494,22 @@ set_packet_service_state_auth_ready (MMBaseModem                     *self,
 
     if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->set_packet_service_state ||
         !MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->set_packet_service_state_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                               "Explicit packet service attach/detach operation not supported");
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                               "Operation not supported");
         handle_set_packet_service_state_context_free (ctx);
         return;
     }
 
     if ((ctx->packet_service_state != MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED) &&
         (ctx->packet_service_state != MM_MODEM_3GPP_PACKET_SERVICE_STATE_DETACHED)) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
                                                "Invalid packet service state requested");
         handle_set_packet_service_state_context_free (ctx);
         return;
     }
 
+    mm_obj_info (self, "processing user request to set packet service state to '%s'...",
+                 mm_modem_3gpp_packet_service_state_get_string (ctx->packet_service_state));
     MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_packet_service_state (ctx->self,
                                                                         ctx->packet_service_state,
                                                                         (GAsyncReadyCallback)set_packet_service_state_ready,
@@ -1518,7 +1524,7 @@ handle_set_packet_service_state (MmGdbusModem3gpp              *skeleton,
 {
     HandlePacketServiceStateContext *ctx;
 
-    ctx = g_slice_new (HandlePacketServiceStateContext);
+    ctx = g_slice_new0 (HandlePacketServiceStateContext);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
