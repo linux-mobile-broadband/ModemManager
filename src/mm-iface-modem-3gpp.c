@@ -994,16 +994,23 @@ after_set_load_eps_ue_mode_operation_ready (MMIfaceModem3gpp                   *
 
     uemode = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_eps_ue_mode_operation_finish (self, res, &error);
     if (error) {
+        mm_obj_warn (self, "failed reloading EPS UE mode of operation after update to '%s': %s",
+                     mm_modem_3gpp_eps_ue_mode_operation_get_string (ctx->mode),
+                     error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_eps_ue_mode_operation_context_free (ctx);
         return;
     }
 
     if (uemode != ctx->mode) {
+        mm_obj_info (self, "requested (%s) and reloaded (%s) EPS UE mode of operation don't match",
+                     mm_modem_3gpp_eps_ue_mode_operation_get_string (ctx->mode),
+                     mm_modem_3gpp_eps_ue_mode_operation_get_string (uemode));
         g_dbus_method_invocation_return_error_literal (ctx->invocation,
                                                        MM_CORE_ERROR,
                                                        MM_CORE_ERROR_FAILED,
-                                                       "UE mode of operation for EPS wasn't updated");
+
+                                                       "EPS UE mode of operation wasn't updated");
         handle_set_eps_ue_mode_operation_context_free (ctx);
         return;
     }
@@ -1021,6 +1028,9 @@ handle_set_eps_ue_mode_operation_ready (MMIfaceModem3gpp                   *self
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_eps_ue_mode_operation_finish (self, res, &error)) {
+        mm_obj_warn (self, "failed setting EPS UE mode of operation to '%s': %s",
+                     mm_modem_3gpp_eps_ue_mode_operation_get_string (ctx->mode),
+                     error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_eps_ue_mode_operation_context_free (ctx);
         return;
@@ -1036,6 +1046,8 @@ handle_set_eps_ue_mode_operation_ready (MMIfaceModem3gpp                   *self
     }
 
     /* Assume we're ok */
+    mm_obj_info (self, "EPS UE mode of operation set to '%s'",
+                 mm_modem_3gpp_eps_ue_mode_operation_get_string (ctx->mode));
     mm_gdbus_modem3gpp_complete_set_eps_ue_mode_operation (ctx->skeleton, ctx->invocation);
     handle_set_eps_ue_mode_operation_context_free (ctx);
 }
@@ -1072,6 +1084,9 @@ handle_set_eps_ue_mode_operation_auth_ready (MMBaseModem                        
         return;
     }
 
+    mm_obj_info (self, "processing user request to set EPS UE mode of operation to '%s'...",
+                 mm_modem_3gpp_eps_ue_mode_operation_get_string (ctx->mode));
+
     MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_eps_ue_mode_operation (
         MM_IFACE_MODEM_3GPP (self),
         ctx->mode,
@@ -1087,7 +1102,7 @@ handle_set_eps_ue_mode_operation (MmGdbusModem3gpp      *skeleton,
 {
     HandleSetEpsUeModeOperationContext *ctx;
 
-    ctx = g_slice_new (HandleSetEpsUeModeOperationContext);
+    ctx = g_slice_new0 (HandleSetEpsUeModeOperationContext);
     ctx->skeleton   = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self       = g_object_ref (self);
