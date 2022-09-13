@@ -25,6 +25,10 @@
 void mm_log_bearer_properties (gpointer            log_object,
                                MMLogLevel          level,
                                const gchar        *prefix,
-                               MMBearerProperties *properties);
+                               MMBearerProperties *value);
+void mm_log_3gpp_profile      (gpointer            log_object,
+                               MMLogLevel          level,
+                               const gchar        *prefix,
+                               MM3gppProfile      *value);
 
 #endif /* MM_LOG_HELPERS_H */

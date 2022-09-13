@@ -15,21 +15,47 @@
 
 #include "mm-log-helpers.h"
 
+static void
+common_log_print_array (gpointer     log_object,
+                        MMLogLevel   level,
+                        const gchar *prefix,
+                        GPtrArray   *print_array)
+{
+    guint i;
+
+    mm_common_str_array_human_keys (print_array);
+    for (i = 0; i < print_array->len; i++) {
+        mm_obj_log (log_object, level, "%s%s", prefix,
+                    (const gchar *)g_ptr_array_index (print_array, i));
+    }
+}
+
 void
 mm_log_bearer_properties (gpointer            log_object,
                           MMLogLevel          level,
                           const gchar        *prefix,
-                          MMBearerProperties *properties)
+                          MMBearerProperties *value)
 {
-    g_autoptr(GPtrArray) properties_print = NULL;
-    guint                i;
+    g_autoptr(GPtrArray) print_array = NULL;
 
     if (!mm_log_check_level_enabled (level))
       return;
 
-    properties_print = mm_bearer_properties_print (properties, mm_log_get_show_personal_info ());
-    mm_common_str_array_human_keys (properties_print);
-    for (i = 0; i < properties_print->len; i++)
-        mm_obj_log (log_object, level, "%s%s", prefix,
-                    (const gchar *)g_ptr_array_index (properties_print, i));
+    print_array = mm_bearer_properties_print (value, mm_log_get_show_personal_info ());
+    common_log_print_array (log_object, level, prefix, print_array);
+}
+
+void
+mm_log_3gpp_profile (gpointer       log_object,
+                     MMLogLevel     level,
+                     const gchar   *prefix,
+                     MM3gppProfile *value)
+{
+    g_autoptr(GPtrArray) print_array = NULL;
+
+    if (!mm_log_check_level_enabled (level))
+      return;
+
+    print_array = mm_3gpp_profile_print (value, mm_log_get_show_personal_info ());
+    common_log_print_array (log_object, level, prefix, print_array);
 }
