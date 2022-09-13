@@ -487,26 +487,87 @@ device_caps_query_ready (MbimDevice *device,
     ctx  = g_task_get_task_data (task);
 
     response = mbim_device_command_finish (device, res, &error);
-    if (!response ||
-        !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
-        !mbim_message_device_caps_response_parse (
-            response,
-            NULL, /* device_type */
-            &self->priv->caps_cellular_class,
-            NULL, /* voice_class */
-            NULL, /* sim_class */
-            &self->priv->caps_data_class,
-            &self->priv->caps_sms,
-            NULL, /* ctrl_caps */
-            &self->priv->caps_max_sessions,
-            &self->priv->caps_custom_data_class,
-            &self->priv->caps_device_id,
-            &self->priv->caps_firmware_info,
-            &self->priv->caps_hardware_info,
-            &error)) {
+    if (!response || !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         goto out;
+    }
+
+    if (mbim_device_check_ms_mbimex_version (device, 3, 0)) {
+        MbimDataClassV3  data_class_v3;
+        MbimDataSubclass data_subclass;
+
+        if (!mbim_message_ms_basic_connect_extensions_v3_device_caps_response_parse (
+                response,
+                NULL, /* device_type */
+                &self->priv->caps_cellular_class,
+                NULL, /* voice_class */
+                NULL, /* sim_class */
+                &data_class_v3,
+                &self->priv->caps_sms,
+                NULL, /* ctrl_caps */
+                &data_subclass,
+                &self->priv->caps_max_sessions,
+                NULL, /* executor_index */
+                NULL, /* wcdma_band_class */
+                NULL, /* lte_band_class_array_size */
+                NULL, /* lte_band_class_array */
+                NULL, /* nr_band_class_array_size */
+                NULL, /* nr_band_class_array */
+                &self->priv->caps_custom_data_class,
+                &self->priv->caps_device_id,
+                &self->priv->caps_firmware_info,
+                &self->priv->caps_hardware_info,
+                &error)) {
+            g_task_return_error (task, error);
+            g_object_unref (task);
+            goto out;
+        }
+        /* Translate data class v3 to standard data class to simplify further usage of the field */
+        self->priv->caps_data_class = mm_mbim_data_class_from_mbim_data_class_v3_and_subclass (
+                                        data_class_v3,
+                                        data_subclass);
+    } else if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
+        if (!mbim_message_ms_basic_connect_extensions_device_caps_response_parse (
+                response,
+                NULL, /* device_type */
+                &self->priv->caps_cellular_class,
+                NULL, /* voice_class */
+                NULL, /* sim_class */
+                &self->priv->caps_data_class,
+                &self->priv->caps_sms,
+                NULL, /* ctrl_caps */
+                &self->priv->caps_max_sessions,
+                &self->priv->caps_custom_data_class,
+                &self->priv->caps_device_id,
+                &self->priv->caps_firmware_info,
+                &self->priv->caps_hardware_info,
+                NULL, /* executor_index */
+                &error)) {
+            g_task_return_error (task, error);
+            g_object_unref (task);
+            goto out;
+        }
+    } else {
+        if (!mbim_message_device_caps_response_parse (
+                response,
+                NULL, /* device_type */
+                &self->priv->caps_cellular_class,
+                NULL, /* voice_class */
+                NULL, /* sim_class */
+                &self->priv->caps_data_class,
+                &self->priv->caps_sms,
+                NULL, /* ctrl_caps */
+                &self->priv->caps_max_sessions,
+                &self->priv->caps_custom_data_class,
+                &self->priv->caps_device_id,
+                &self->priv->caps_firmware_info,
+                &self->priv->caps_hardware_info,
+                &error)) {
+            g_task_return_error (task, error);
+            g_object_unref (task);
+            goto out;
+        }
     }
 
     ctx->current_mbim = mm_modem_capability_from_mbim_device_caps (self->priv->caps_cellular_class,
@@ -530,7 +591,10 @@ load_current_capabilities_mbim (GTask *task)
     ctx = g_task_get_task_data (task);
 
     mm_obj_dbg (self, "loading current capabilities...");
-    message = mbim_message_device_caps_query_new (NULL);
+    if (mbim_device_check_ms_mbimex_version (ctx->device, 2, 0))
+        message = mbim_message_ms_basic_connect_extensions_device_caps_query_new (NULL);
+    else
+        message = mbim_message_device_caps_query_new (NULL);
     mbim_device_command (ctx->device,
                          message,
                          10,
