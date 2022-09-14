@@ -424,6 +424,7 @@ typedef enum { /*< underscore_name=mm_modem_mode >*/
  * @MM_MODEM_BAND_NGRAN_48: NGRAN band 48. Since 1.20.
  * @MM_MODEM_BAND_NGRAN_50: NGRAN band 50. Since 1.20.
  * @MM_MODEM_BAND_NGRAN_51: NGRAN band 51. Since 1.20.
+ * @MM_MODEM_BAND_NGRAN_53: NGRAN band 53. Since 1.20.
  * @MM_MODEM_BAND_NGRAN_65: NGRAN band 65. Since 1.20.
  * @MM_MODEM_BAND_NGRAN_66: NGRAN band 66. Since 1.20.
  * @MM_MODEM_BAND_NGRAN_70: NGRAN band 70. Since 1.20.
@@ -615,6 +616,7 @@ typedef enum { /*< underscore_name=mm_modem_band >*/
     MM_MODEM_BAND_NGRAN_48 = 348,
     MM_MODEM_BAND_NGRAN_50 = 350,
     MM_MODEM_BAND_NGRAN_51 = 351,
+    MM_MODEM_BAND_NGRAN_53 = 353,
     MM_MODEM_BAND_NGRAN_65 = 365,
     MM_MODEM_BAND_NGRAN_66 = 366,
     MM_MODEM_BAND_NGRAN_70 = 370,
