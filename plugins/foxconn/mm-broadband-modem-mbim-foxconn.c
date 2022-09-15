@@ -36,6 +36,7 @@
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 # include "mm-iface-modem-firmware.h"
 # include "mm-shared-qmi.h"
+# include "mm-log.h"
 #endif
 
 static void iface_modem_location_init (MMIfaceModemLocation *iface);
@@ -164,15 +165,19 @@ fox_get_firmware_version_ready (QmiClientFox *client,
 }
 
 static void
-firmware_load_update_settings (MMIfaceModemFirmware *self,
-                               GAsyncReadyCallback   callback,
-                               gpointer              user_data)
+mbim_port_allocate_qmi_client_ready (MMPortMbim     *mbim,
+                                     GAsyncResult   *res,
+                                     GTask          *task)
 {
-    GTask     *task;
-    QmiClient *fox_client = NULL;
-    QmiClient *dms_client = NULL;
+    MMIfaceModemFirmware *self;
+    QmiClient            *fox_client = NULL;
+    QmiClient            *dms_client = NULL;
+    g_autoptr(GError)     error = NULL;
 
-    task = g_task_new (self, NULL, callback, user_data);
+    self = g_task_get_source_object (task);
+
+    if (!mm_port_mbim_allocate_qmi_client_finish (mbim, res, &error))
+        mm_obj_dbg (self, "Allocate FOX client failed: %s", error->message);
 
     /* Try to get firmware version over fox service, if it failed to peek client, try dms service. */
     fox_client = mm_shared_qmi_peek_client (MM_SHARED_QMI (self), QMI_SERVICE_FOX, MM_PORT_QMI_FLAG_DEFAULT, NULL);
@@ -223,6 +228,24 @@ firmware_load_update_settings (MMIfaceModemFirmware *self,
     }
 
     g_assert_not_reached ();
+}
+
+static void
+firmware_load_update_settings (MMIfaceModemFirmware *self,
+                               GAsyncReadyCallback   callback,
+                               gpointer              user_data)
+{
+    GTask      *task;
+    MMPortMbim *mbim;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    mbim = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self));
+    mm_port_mbim_allocate_qmi_client (mbim,
+                                      QMI_SERVICE_FOX,
+                                      NULL,
+                                      (GAsyncReadyCallback)mbim_port_allocate_qmi_client_ready,
+                                      task);
 }
 
 #endif

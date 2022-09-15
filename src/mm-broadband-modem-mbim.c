@@ -2933,7 +2933,6 @@ static const QmiService qmi_services[] = {
     QMI_SERVICE_PDS,
     QMI_SERVICE_LOC,
     QMI_SERVICE_PDC,
-    QMI_SERVICE_FOX,
     QMI_SERVICE_UIM,
 };
 
