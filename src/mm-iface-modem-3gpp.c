@@ -424,11 +424,12 @@ register_in_network_context_complete_failed (GTask  *task,
 
     ctx = g_task_get_task_data (task);
 
-    mm_iface_modem_3gpp_update_cs_registration_state (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
-    mm_iface_modem_3gpp_update_ps_registration_state (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
+    mm_iface_modem_3gpp_update_cs_registration_state  (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
+    mm_iface_modem_3gpp_update_ps_registration_state  (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
     mm_iface_modem_3gpp_update_eps_registration_state (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
-    mm_iface_modem_3gpp_update_access_technologies (ctx->self, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
-    mm_iface_modem_3gpp_update_location (ctx->self, 0, 0, 0);
+    mm_iface_modem_3gpp_update_5gs_registration_state (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
+    mm_iface_modem_3gpp_update_access_technologies    (ctx->self, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+    mm_iface_modem_3gpp_update_location               (ctx->self, 0, 0, 0);
 
     g_task_return_error (task, error);
     g_object_unref (task);
