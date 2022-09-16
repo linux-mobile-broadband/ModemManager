@@ -92,6 +92,7 @@ has_extended_4g_bands (const gchar *revision)
     model = mm_telit_model_from_revision (revision);
     return (model == MM_TELIT_MODEL_FN980 ||
             model == MM_TELIT_MODEL_FN990 ||
+            model == MM_TELIT_MODEL_LM960 ||
             model == MM_TELIT_MODEL_LN920);
 }
 
