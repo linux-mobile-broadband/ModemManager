@@ -424,12 +424,14 @@ register_in_network_context_complete_failed (GTask  *task,
 
     ctx = g_task_get_task_data (task);
 
-    mm_iface_modem_3gpp_update_cs_registration_state  (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
-    mm_iface_modem_3gpp_update_ps_registration_state  (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
-    mm_iface_modem_3gpp_update_eps_registration_state (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
-    mm_iface_modem_3gpp_update_5gs_registration_state (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
-    mm_iface_modem_3gpp_update_access_technologies    (ctx->self, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
-    mm_iface_modem_3gpp_update_location               (ctx->self, 0, 0, 0);
+    mm_iface_modem_3gpp_update_cs_registration_state      (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE, TRUE);
+    mm_iface_modem_3gpp_update_ps_registration_state      (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE, TRUE);
+    mm_iface_modem_3gpp_update_eps_registration_state     (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE, TRUE);
+    mm_iface_modem_3gpp_update_5gs_registration_state     (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE, TRUE);
+    mm_iface_modem_3gpp_apply_deferred_registration_state (ctx->self);
+
+    mm_iface_modem_3gpp_update_access_technologies (ctx->self, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+    mm_iface_modem_3gpp_update_location            (ctx->self, 0, 0, 0);
 
     g_task_return_error (task, error);
     g_object_unref (task);
@@ -2072,8 +2074,7 @@ update_non_registered_state (MMIfaceModem3gpp             *self,
 
 static void
 update_registration_state (MMIfaceModem3gpp             *self,
-                           MMModem3gppRegistrationState  new_state,
-                           gboolean                      deferrable)
+                           MMModem3gppRegistrationState  new_state)
 {
     Private                       *priv;
     MMModem3gppRegistrationState   old_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
@@ -2140,7 +2141,8 @@ update_registration_state (MMIfaceModem3gpp             *self,
 
 void
 mm_iface_modem_3gpp_update_cs_registration_state (MMIfaceModem3gpp             *self,
-                                                  MMModem3gppRegistrationState  state)
+                                                  MMModem3gppRegistrationState  state,
+                                                  gboolean                      deferred)
 {
     Private  *priv;
     gboolean  supported = FALSE;
@@ -2154,12 +2156,15 @@ mm_iface_modem_3gpp_update_cs_registration_state (MMIfaceModem3gpp             *
 
     priv = get_private (self);
     priv->state_cs = state;
-    update_registration_state (self, get_consolidated_reg_state (self), TRUE);
+
+    if (!deferred)
+        mm_iface_modem_3gpp_apply_deferred_registration_state (self);
 }
 
 void
 mm_iface_modem_3gpp_update_ps_registration_state (MMIfaceModem3gpp             *self,
-                                                  MMModem3gppRegistrationState  state)
+                                                  MMModem3gppRegistrationState  state,
+                                                  gboolean                      deferred)
 {
     Private  *priv;
     gboolean  supported = FALSE;
@@ -2173,12 +2178,15 @@ mm_iface_modem_3gpp_update_ps_registration_state (MMIfaceModem3gpp             *
 
     priv = get_private (self);
     priv->state_ps = state;
-    update_registration_state (self, get_consolidated_reg_state (self), TRUE);
+
+    if (!deferred)
+        mm_iface_modem_3gpp_apply_deferred_registration_state (self);
 }
 
 void
 mm_iface_modem_3gpp_update_eps_registration_state (MMIfaceModem3gpp             *self,
-                                                   MMModem3gppRegistrationState  state)
+                                                   MMModem3gppRegistrationState  state,
+                                                   gboolean                      deferred)
 {
     Private  *priv;
     gboolean supported = FALSE;
@@ -2192,12 +2200,15 @@ mm_iface_modem_3gpp_update_eps_registration_state (MMIfaceModem3gpp             
 
     priv = get_private (self);
     priv->state_eps = state;
-    update_registration_state (self, get_consolidated_reg_state (self), TRUE);
+
+    if (!deferred)
+        mm_iface_modem_3gpp_apply_deferred_registration_state (self);
 }
 
 void
 mm_iface_modem_3gpp_update_5gs_registration_state (MMIfaceModem3gpp             *self,
-                                                   MMModem3gppRegistrationState  state)
+                                                   MMModem3gppRegistrationState  state,
+                                                   gboolean                      deferred)
 {
     Private  *priv;
     gboolean supported = FALSE;
@@ -2211,7 +2222,15 @@ mm_iface_modem_3gpp_update_5gs_registration_state (MMIfaceModem3gpp             
 
     priv = get_private (self);
     priv->state_5gs = state;
-    update_registration_state (self, get_consolidated_reg_state (self), TRUE);
+
+    if (!deferred)
+        mm_iface_modem_3gpp_apply_deferred_registration_state (self);
+}
+
+void
+mm_iface_modem_3gpp_apply_deferred_registration_state (MMIfaceModem3gpp *self)
+{
+    update_registration_state (self, get_consolidated_reg_state (self));
 }
 
 /*****************************************************************************/
@@ -2556,7 +2575,7 @@ interface_disabling_step (GTask *task)
         /* fall through */
 
     case DISABLING_STEP_REGISTRATION_STATE:
-        update_registration_state (self, MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, FALSE);
+        update_registration_state (self, MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
         mm_iface_modem_3gpp_update_access_technologies (self, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
         mm_iface_modem_3gpp_update_location (self, 0, 0, 0);
         ctx->step++;

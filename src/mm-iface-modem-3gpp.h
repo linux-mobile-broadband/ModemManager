@@ -321,16 +321,27 @@ void mm_iface_modem_3gpp_shutdown (MMIfaceModem3gpp *self);
 
 /* Objects implementing this interface can report new registration info,
  * access technologies and location.
+ *
  * This may happen when handling unsolicited registration messages, or when
- * the interface asks to run registration state checks. */
-void mm_iface_modem_3gpp_update_cs_registration_state (MMIfaceModem3gpp *self,
-                                                       MMModem3gppRegistrationState state);
-void mm_iface_modem_3gpp_update_ps_registration_state (MMIfaceModem3gpp *self,
-                                                       MMModem3gppRegistrationState state);
-void mm_iface_modem_3gpp_update_eps_registration_state (MMIfaceModem3gpp *self,
-                                                        MMModem3gppRegistrationState state);
-void mm_iface_modem_3gpp_update_5gs_registration_state (MMIfaceModem3gpp *self,
-                                                        MMModem3gppRegistrationState state);
+ * the interface asks to run registration state checks.
+ *
+ * The registration updates may be "deferred" so that they are applied all at
+ * the same time.
+ */
+void mm_iface_modem_3gpp_update_cs_registration_state      (MMIfaceModem3gpp             *self,
+                                                            MMModem3gppRegistrationState  state,
+                                                            gboolean                      deferred);
+void mm_iface_modem_3gpp_update_ps_registration_state      (MMIfaceModem3gpp             *self,
+                                                            MMModem3gppRegistrationState  state,
+                                                            gboolean                      deferred);
+void mm_iface_modem_3gpp_update_eps_registration_state     (MMIfaceModem3gpp             *self,
+                                                            MMModem3gppRegistrationState  state,
+                                                            gboolean                      deferred);
+void mm_iface_modem_3gpp_update_5gs_registration_state     (MMIfaceModem3gpp             *self,
+                                                            MMModem3gppRegistrationState  state,
+                                                            gboolean                      deferred);
+void mm_iface_modem_3gpp_apply_deferred_registration_state (MMIfaceModem3gpp             *self);
+
 void mm_iface_modem_3gpp_update_subscription_state (MMIfaceModem3gpp *self,
                                                     MMModem3gppSubscriptionState state);
 void mm_iface_modem_3gpp_update_access_technologies (MMIfaceModem3gpp *self,

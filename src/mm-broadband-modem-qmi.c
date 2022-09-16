@@ -3143,12 +3143,13 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
         else
             reg_state_3gpp = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
 
-        mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_3gpp);
-        mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_3gpp);
+        mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_3gpp, TRUE);
+        mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_3gpp, TRUE);
         if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self)))
-            mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_3gpp);
+            mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_3gpp, TRUE);
         if (mm_iface_modem_is_3gpp_5gnr (MM_IFACE_MODEM (self)))
-            mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_3gpp);
+            mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_3gpp, TRUE);
+        mm_iface_modem_3gpp_apply_deferred_registration_state (MM_IFACE_MODEM_3GPP (self));
 
         mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
         mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), 0, 0, 0);
@@ -3251,17 +3252,20 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
      * state as unknown, so that the "PS" one takes precedence when building
      * the consolidated registration state (otherwise we may be using some old cached
      * "EPS" state wrongly). */
-    mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), mm_cs_registration_state);
-    mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), mm_ps_registration_state);
+    mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), mm_cs_registration_state, TRUE);
+    mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), mm_ps_registration_state, TRUE);
     if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self)))
         mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self),
-                                                           (mm_access_technologies & MM_MODEM_ACCESS_TECHNOLOGY_LTE) ?
-                                                           mm_ps_registration_state : MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
+                                                           ((mm_access_technologies & MM_MODEM_ACCESS_TECHNOLOGY_LTE) ?
+                                                            mm_ps_registration_state : MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN),
+                                                           TRUE);
     /* Same thing for "5GS" state */
     if (mm_iface_modem_is_3gpp_5gnr (MM_IFACE_MODEM (self)))
         mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self),
-                                                           (mm_access_technologies & MM_MODEM_ACCESS_TECHNOLOGY_5GNR) ?
-                                                           mm_ps_registration_state : MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
+                                                           ((mm_access_technologies & MM_MODEM_ACCESS_TECHNOLOGY_5GNR) ?
+                                                            mm_ps_registration_state : MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN),
+                                                           TRUE);
+    mm_iface_modem_3gpp_apply_deferred_registration_state (MM_IFACE_MODEM_3GPP (self));
     mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), mm_access_technologies);
 
     /* Get 3GPP location LAC/TAC and CI */
@@ -3881,9 +3885,10 @@ consolidated_update_ps_registration_state (MMBroadbandModemQmi *self,
             g_assert_not_reached ();
     }
 
-    mm_iface_modem_3gpp_update_ps_registration_state  (MM_IFACE_MODEM_3GPP (self), state_ps);
-    mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), is_eps ? state_ps : MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
-    mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self), is_5gs ? state_ps : MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
+    mm_iface_modem_3gpp_update_ps_registration_state  (MM_IFACE_MODEM_3GPP (self), state_ps, TRUE);
+    mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), is_eps ? state_ps : MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, TRUE);
+    mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self), is_5gs ? state_ps : MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, TRUE);
+    mm_iface_modem_3gpp_apply_deferred_registration_state (MM_IFACE_MODEM_3GPP (self));
 }
 
 static void
@@ -3952,9 +3957,9 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
         self->priv->current_operator_id = operator_id;
     }
 
-    /* Report new registration states */
-    mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), cs_registration_state);
-
+    /* Report new registration states.
+     * Note: consolidated_update_ps_registration_state() calls apply_deferred_registration_state() always */
+    mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), cs_registration_state, TRUE);
     /* Store PS system reg state and update PS/EPS/5GS states accordingly */
     self->priv->system_info_ps_registration_state = ps_registration_state;
     consolidated_update_ps_registration_state (self, has_lte_info, has_nr5g_info);

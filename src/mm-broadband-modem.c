@@ -4827,21 +4827,21 @@ registration_state_changed (MMPortSerialAt *port,
      *  - CEREG/C5GREG always reports TAC
      */
     if (cgreg)
-        mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), state);
+        mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), state, FALSE);
     else if (cereg) {
         tac = lac;
         lac = 0;
-        mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), state);
+        mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), state, FALSE);
     } else if (c5greg) {
         tac = lac;
         lac = 0;
-        mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self), state);
+        mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self), state, FALSE);
     } else {
         if (act == MM_MODEM_ACCESS_TECHNOLOGY_LTE) {
             tac = lac;
             lac = 0;
         }
-        mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), state);
+        mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), state, FALSE);
     }
 
     /* Only update access technologies from CREG/CGREG response if the modem
@@ -5248,7 +5248,7 @@ registration_status_check_ready (MMBroadbandModem *self,
             mm_obj_dbg (self, "got PS registration state when checking EPS registration state");
         else if (ctx->running_5gs)
             mm_obj_dbg (self, "got PS registration state when checking 5GS registration state");
-        mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), state);
+        mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), state, FALSE);
     } else if (cereg) {
         tac = lac;
         lac = 0;
@@ -5258,7 +5258,7 @@ registration_status_check_ready (MMBroadbandModem *self,
             mm_obj_dbg (self, "got EPS registration state when checking PS registration state");
         else if (ctx->running_5gs)
             mm_obj_dbg (self, "got EPS registration state when checking 5GS registration state");
-        mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), state);
+        mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), state, FALSE);
     } else if (c5greg) {
         tac = lac;
         lac = 0;
@@ -5268,7 +5268,7 @@ registration_status_check_ready (MMBroadbandModem *self,
             mm_obj_dbg (self, "got 5GS registration state when checking PS registration state");
         else if (ctx->running_eps)
             mm_obj_dbg (self, "got 5GS registration state when checking EPS registration state");
-        mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self), state);
+        mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self), state, FALSE);
     } else {
         if (act == MM_MODEM_ACCESS_TECHNOLOGY_LTE) {
             tac = lac;
@@ -5280,7 +5280,7 @@ registration_status_check_ready (MMBroadbandModem *self,
             mm_obj_dbg (self, "got CS registration state when checking EPS registration state");
         else if (ctx->running_5gs)
             mm_obj_dbg (self, "got CS registration state when checking 5GS registration state");
-        mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), state);
+        mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), state, FALSE);
     }
 
     mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), act);

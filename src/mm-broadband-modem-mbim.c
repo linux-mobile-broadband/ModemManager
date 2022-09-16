@@ -4484,12 +4484,13 @@ update_registration_info (MMBroadbandModemMbim *self,
         if (available_data_classes & (MBIM_DATA_CLASS_5G_NSA | MBIM_DATA_CLASS_5G_SA))
             reg_state_5gs = reg_state;
 
-        mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_cs);
-        mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_ps);
+        mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_cs, TRUE);
+        mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_ps, TRUE);
         if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self)))
-            mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_eps);
+            mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_eps, TRUE);
         if (mm_iface_modem_is_3gpp_5gnr (MM_IFACE_MODEM (self)))
-            mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_5gs);
+            mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_5gs, TRUE);
+        mm_iface_modem_3gpp_apply_deferred_registration_state (MM_IFACE_MODEM_3GPP (self));
 
         /* request to reload operator info explicitly, so that the new
          * operator name and code is propagated to the DBus interface */
