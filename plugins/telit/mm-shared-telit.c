@@ -34,6 +34,8 @@
 /*****************************************************************************/
 /* Private data context */
 
+#define TELIT_LM940_EXT_LTE_BND_SW_REVISION "24.01.516"
+
 #define PRIVATE_TAG "shared-telit-private-tag"
 static GQuark private_quark;
 
@@ -73,7 +75,7 @@ has_alternate_3g_bands (const gchar *revision)
 static gboolean
 is_bnd_4g_format_hex (const gchar *revision)
 {
-    MMTelitModel model;    
+    MMTelitModel model;
 
     model = mm_telit_model_from_revision (revision);
 
@@ -90,6 +92,9 @@ has_extended_4g_bands (const gchar *revision)
     MMTelitModel model;
 
     model = mm_telit_model_from_revision (revision);
+    if (model == MM_TELIT_MODEL_LM940)
+        return mm_telit_software_revision_cmp (revision, TELIT_LM940_EXT_LTE_BND_SW_REVISION) >= MM_TELIT_SW_REV_CMP_EQUAL;
+
     return (model == MM_TELIT_MODEL_FN980 ||
             model == MM_TELIT_MODEL_FN990 ||
             model == MM_TELIT_MODEL_LM960 ||

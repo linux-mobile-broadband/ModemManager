@@ -919,3 +919,49 @@ mm_telit_model_from_revision (const gchar *revision)
 
     return MM_TELIT_MODEL_DEFAULT;
 }
+
+static MMTelitSwRevCmp lm9x0_software_revision_cmp (const gchar *revision_a,
+                                                    const gchar *revision_b)
+{
+    /* LM940 and LM960 share the same software revision format
+     * WW.XY.ABC[-ZZZZ], where WW is the chipset code and C the major version.
+     * If WW is the same, the other values X, Y, A and B are also the same, so
+     * we can limit the comparison to C only. ZZZZ is the minor version (it
+     * includes if version is beta, test, or alpha), but at this stage we are
+     * not interested in compare it. */
+    guint chipset_a, chipset_b;
+    guint major_a, major_b;
+    guint x, y, a, b;
+
+    g_return_val_if_fail (
+        sscanf (revision_a, "%2u.%1u%1u.%1u%1u%1u", &chipset_a, &x, &y, &a, &b, &major_a) == 6,
+        MM_TELIT_SW_REV_CMP_INVALID);
+    g_return_val_if_fail (
+        sscanf (revision_b, "%2u.%1u%1u.%1u%1u%1u", &chipset_b, &x, &y, &a, &b, &major_b) == 6,
+        MM_TELIT_SW_REV_CMP_INVALID);
+
+    if (chipset_a != chipset_b)
+        return MM_TELIT_SW_REV_CMP_INVALID;
+    if (major_a > major_b)
+        return MM_TELIT_SW_REV_CMP_NEWER;
+    if (major_a < major_b)
+        return MM_TELIT_SW_REV_CMP_OLDER;
+    return MM_TELIT_SW_REV_CMP_EQUAL;
+}
+
+MMTelitSwRevCmp mm_telit_software_revision_cmp (const gchar *revision_a,
+                                                const gchar *revision_b)
+{
+    MMTelitModel model_a;
+    MMTelitModel model_b;
+
+    model_a = mm_telit_model_from_revision (revision_a);
+    model_b = mm_telit_model_from_revision (revision_b);
+
+    if ((model_a == MM_TELIT_MODEL_LM940 || model_a == MM_TELIT_MODEL_LM960) &&
+        (model_b == MM_TELIT_MODEL_LM940 || model_b == MM_TELIT_MODEL_LM960)) {
+        return lm9x0_software_revision_cmp (revision_a, revision_b);
+    }
+
+    return MM_TELIT_SW_REV_CMP_UNSUPPORTED;
+}

@@ -646,6 +646,35 @@ test_telit_parse_swpkgv_response (void)
     }
 }
 
+static void
+test_telit_compare_software_revision_string (void)
+{
+    struct {
+        const char *revision_a;
+        const char *revision_b;
+        MMTelitSwRevCmp expected;
+    } tt [] = {
+        {"24.01.514", "24.01.514", MM_TELIT_SW_REV_CMP_EQUAL},
+        {"24.01.514", "24.01.513", MM_TELIT_SW_REV_CMP_NEWER},
+        {"24.01.513", "24.01.514", MM_TELIT_SW_REV_CMP_OLDER},
+        {"32.00.013", "24.01.514", MM_TELIT_SW_REV_CMP_INVALID},
+        {"32.00.014", "32.00.014", MM_TELIT_SW_REV_CMP_EQUAL},
+        {"32.00.014", "32.00.013", MM_TELIT_SW_REV_CMP_NEWER},
+        {"32.00.013", "32.00.014", MM_TELIT_SW_REV_CMP_OLDER},
+        {"38.00.000", "38.00.000", MM_TELIT_SW_REV_CMP_UNSUPPORTED},
+        /* LM9x0 Minor version (e.g. beta, test, alpha) value is currently
+         * ignored because not required by any implemented feature. */
+        {"24.01.516-B123", "24.01.516-B134", MM_TELIT_SW_REV_CMP_EQUAL},
+    };
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (tt); i++) {
+        g_assert_cmpint (tt[i].expected,
+                         ==,
+                         mm_telit_software_revision_cmp (tt[i].revision_a, tt[i].revision_b));
+    }
+}
+
 /******************************************************************************/
 
 int main (int argc, char **argv)
@@ -661,5 +690,6 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/telit/bands/current/set_bands/4g", test_telit_get_4g_bnd_flag);
     g_test_add_func ("/MM/telit/qss/query", test_telit_parse_qss_query);
     g_test_add_func ("/MM/telit/swpkv/parse_response", test_telit_parse_swpkgv_response);
+    g_test_add_func ("/MM/telit/revision/compare", test_telit_compare_software_revision_string);
     return g_test_run ();
 }

@@ -38,6 +38,14 @@ typedef struct {
     gboolean      modem_ext_4g_bands;
 } MMTelitBNDParseConfig;
 
+typedef enum {
+    MM_TELIT_SW_REV_CMP_INVALID,
+    MM_TELIT_SW_REV_CMP_UNSUPPORTED,
+    MM_TELIT_SW_REV_CMP_OLDER,
+    MM_TELIT_SW_REV_CMP_EQUAL,
+    MM_TELIT_SW_REV_CMP_NEWER,
+} MMTelitSwRevCmp;
+
 /* #BND response parsers and request builder */
 GArray *mm_telit_parse_bnd_query_response (const gchar            *response,
                                            MMTelitBNDParseConfig  *config,
@@ -75,5 +83,8 @@ GArray *mm_telit_build_modes_list (void);
 gchar *mm_telit_parse_swpkgv_response (const gchar *response);
 
 MMTelitModel mm_telit_model_from_revision (const gchar *revision);
+
+MMTelitSwRevCmp mm_telit_software_revision_cmp (const gchar *reference,
+                                                const gchar *revision);
 
 #endif  /* MM_MODEM_HELPERS_TELIT_H */
