@@ -188,7 +188,7 @@ set_power_level_ready (MMIfaceModemSar            *self,
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->enable_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->set_power_level_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
         mm_gdbus_modem_sar_set_power_level (ctx->skeleton, ctx->power_level);
