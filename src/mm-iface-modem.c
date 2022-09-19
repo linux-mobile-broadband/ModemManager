@@ -5905,17 +5905,28 @@ interface_initialization_step (GTask *task)
         ctx->step++;
         /* fall-through */
 
-    case INITIALIZATION_STEP_UNLOCK_REQUIRED:
-        /* Only check unlock required if we were previously not unlocked */
-        if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE) {
-            mm_iface_modem_update_lock_info (self,
-                                             MM_MODEM_LOCK_UNKNOWN, /* ask */
-                                             (GAsyncReadyCallback)modem_update_lock_info_ready,
-                                             task);
-            return;
+    case INITIALIZATION_STEP_UNLOCK_REQUIRED: {
+        g_autoptr(MMBaseSim) sim = NULL;
+
+        g_object_get (self,
+                      MM_IFACE_MODEM_SIM, &sim,
+                      NULL);
+        /* If the current SIM is an eSIM without profiles, we ignore
+         * unlock required. */
+        if (sim && mm_base_sim_is_esim_without_profiles (sim))
+            mm_obj_dbg (self, "not unlock required: eSIM without profiles");
+        else {
+            /* Only check unlock required if we were previously not unlocked */
+            if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE) {
+                mm_iface_modem_update_lock_info (self,
+                                                 MM_MODEM_LOCK_UNKNOWN, /* ask */
+                                                 (GAsyncReadyCallback)modem_update_lock_info_ready,
+                                                 task);
+                return;
+            }
         }
         ctx->step++;
-        /* fall-through */
+    } /* fall-through */
 
     case INITIALIZATION_STEP_SIM:
         /* If the modem doesn't need any SIM (not implemented by plugin, or not
