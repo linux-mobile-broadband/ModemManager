@@ -96,7 +96,6 @@ void     mm_iface_modem_sar_shutdown           (MMIfaceModemSar *self);
 void     mm_iface_modem_sar_bind_simple_status (MMIfaceModemSar*self,
                                                 MMSimpleStatus *status);
 
-gboolean mm_iface_modem_get_sar_state              (MMIfaceModemSar *self);
-guint    mm_iface_modem_sar_get_power_level        (MMIfaceModemSar *self);
+guint    mm_iface_modem_sar_get_power_level    (MMIfaceModemSar *self);
 
 #endif /* MM_IFACE_MODEM_SAR_H */

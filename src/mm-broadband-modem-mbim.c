@@ -8308,17 +8308,6 @@ sar_set_power_level (MMIfaceModemSar    *_self,
     if (!peek_device (self, &device, callback, user_data))
         return;
 
-    if (!mm_iface_modem_get_sar_state (_self)) {
-        g_task_report_new_error (self,
-                                 callback,
-                                 user_data,
-                                 sar_set_power_level,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_WRONG_STATE,
-                                 "Couldn't set power level of SAR, because the SAR is disabled");
-        return;
-    }
-
     /*
      * the value 0xFFFFFFFF means all antennas
      * the backoff index set to the input power level

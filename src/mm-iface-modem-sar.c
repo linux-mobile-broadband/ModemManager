@@ -35,24 +35,6 @@ mm_iface_modem_sar_bind_simple_status (MMIfaceModemSar *self,
 {
 }
 
-gboolean
-mm_iface_modem_get_sar_state (MMIfaceModemSar *self)
-{
-    MmGdbusModemSar *skeleton = NULL;
-    gboolean         state;
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_SAR_DBUS_SKELETON, &skeleton,
-                  NULL);
-
-    if (!skeleton)
-        return FALSE;
-
-    state  = mm_gdbus_modem_sar_get_state (skeleton);
-    g_object_unref (skeleton);
-    return state;
-}
-
 guint
 mm_iface_modem_sar_get_power_level (MMIfaceModemSar *self)
 {
@@ -218,6 +200,15 @@ handle_set_power_level_auth_ready (MMBaseModem                *self,
                                                MM_CORE_ERROR_UNSUPPORTED,
                                                "Cannot set SAR power level: "
                                                "operation not supported");
+        handle_set_power_level_context_free (ctx);
+        return;
+    }
+
+    if (!mm_gdbus_modem_sar_get_state (ctx->skeleton)) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot set SAR power level: SAR is disabled");
         handle_set_power_level_context_free (ctx);
         return;
     }
