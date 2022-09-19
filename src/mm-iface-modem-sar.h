@@ -48,6 +48,7 @@ struct _MMIfaceModemSar {
                      gpointer            user_data);
     gboolean (* enable_finish) (MMIfaceModemSar *self,
                                 GAsyncResult    *res,
+                                guint           *out_sar_power_level,
                                 GError         **error);
     /* Get SAR state (async) */
     void (* load_state) (MMIfaceModemSar    *self,

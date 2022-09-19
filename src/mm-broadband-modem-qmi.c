@@ -8468,9 +8468,18 @@ sar_load_power_level (MMIfaceModemSar     *self,
 static gboolean
 sar_enable_finish (MMIfaceModemSar *self,
                    GAsyncResult    *res,
+                   guint           *out_sar_power_level,
                    GError         **error)
 {
-     return g_task_propagate_boolean (G_TASK (res), error);
+    QmiSarRfState level;
+
+    if (!g_task_propagate_boolean (G_TASK (res), error))
+        return FALSE;
+
+    level = GPOINTER_TO_UINT (g_task_get_task_data (G_TASK (res)));
+    if (out_sar_power_level)
+        *out_sar_power_level = level;
+    return TRUE;
 }
 
 static void
@@ -8499,6 +8508,7 @@ sar_enable (MMIfaceModemSar     *self,
     g_autoptr(QmiMessageSarRfSetStateInput)  input = NULL;
     GTask                                   *task;
     QmiClient                               *client = NULL;
+    QmiSarRfState                            level;
 
     if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
                                       QMI_SERVICE_SAR, &client,
@@ -8507,9 +8517,10 @@ sar_enable (MMIfaceModemSar     *self,
 
     task = g_task_new (self, NULL, callback, user_data);
     input = qmi_message_sar_rf_set_state_input_new ();
-    qmi_message_sar_rf_set_state_input_set_state (input,
-                                                  enable ? QMI_SAR_ENABLE_POWER_INDEX : QMI_SAR_DISABLED_POWER_INDEX,
-                                                  NULL);
+
+    level = enable ? QMI_SAR_ENABLE_POWER_INDEX : QMI_SAR_DISABLED_POWER_INDEX;
+    qmi_message_sar_rf_set_state_input_set_state (input, level, NULL);
+    g_task_set_task_data (task, GUINT_TO_POINTER (level), NULL);
 
     qmi_client_sar_rf_set_state (
         QMI_CLIENT_SAR (client),

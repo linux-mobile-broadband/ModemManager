@@ -78,12 +78,15 @@ enable_ready (MMIfaceModemSar     *self,
               HandleEnableContext *ctx)
 {
     GError *error = NULL;
+    guint   power_level = 0;
 
-    if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->enable_finish (self, res, &error))
+    if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->enable_finish (self, res, &power_level, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         /* Update current features in the interface */
         mm_gdbus_modem_sar_set_state (ctx->skeleton, ctx->enable);
+        if (ctx->enable)
+            mm_gdbus_modem_sar_set_power_level (ctx->skeleton, power_level);
         mm_gdbus_modem_sar_complete_enable (ctx->skeleton, ctx->invocation);
     }
 
