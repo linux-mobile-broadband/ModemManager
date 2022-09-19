@@ -12962,6 +12962,7 @@ static const QmiService qmi_services[] = {
     QMI_SERVICE_PDC,
     QMI_SERVICE_VOICE,
     QMI_SERVICE_DSD,
+    QMI_SERVICE_SAR,
 };
 
 typedef struct {
