@@ -8518,7 +8518,15 @@ sar_enable (MMIfaceModemSar     *self,
     task = g_task_new (self, NULL, callback, user_data);
     input = qmi_message_sar_rf_set_state_input_new ();
 
-    level = enable ? QMI_SAR_ENABLE_POWER_INDEX : QMI_SAR_DISABLED_POWER_INDEX;
+    /* When enabling, try to set the last valid known power level used, instead
+     * of defaulting to level 1 */
+    if (enable) {
+        level = mm_iface_modem_sar_get_power_level (self);
+        if (level == QMI_SAR_DISABLED_POWER_INDEX)
+            level = QMI_SAR_ENABLE_POWER_INDEX;
+    } else
+        level = QMI_SAR_DISABLED_POWER_INDEX;
+
     qmi_message_sar_rf_set_state_input_set_state (input, level, NULL);
     g_task_set_task_data (task, GUINT_TO_POINTER (level), NULL);
 
