@@ -219,6 +219,12 @@ handle_set_power_level_auth_ready (MMBaseModem                *self,
         return;
     }
 
+    if (mm_gdbus_modem_sar_get_power_level (ctx->skeleton) == ctx->power_level) {
+        mm_gdbus_modem_sar_complete_set_power_level (ctx->skeleton, ctx->invocation);
+        handle_set_power_level_context_free (ctx);
+        return;
+    }
+
     mm_obj_dbg (self, "Set SAR power level to: '%d'", ctx->power_level);
     MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->set_power_level (
         ctx->self,
