@@ -114,6 +114,12 @@ handle_enable_auth_ready (MMBaseModem         *self,
         return;
     }
 
+    if (mm_gdbus_modem_sar_get_state (ctx->skeleton) == ctx->enable) {
+        mm_gdbus_modem_sar_complete_enable (ctx->skeleton, ctx->invocation);
+        handle_enable_context_free (ctx);
+        return;
+    }
+
     mm_obj_dbg (self, "%s SAR...", ctx->enable ? "Enabling" : "Disabling");
 
     MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->enable (ctx->self,
