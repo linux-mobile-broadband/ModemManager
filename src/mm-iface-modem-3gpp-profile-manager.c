@@ -699,8 +699,8 @@ mm_iface_modem_3gpp_profile_manager_set_profile (MMIfaceModem3gppProfileManager 
     ctx->requested = g_object_ref (requested_copy);
     ctx->index_field = g_strdup (index_field);
     ctx->strict = strict;
-    ctx->profile_id = mm_3gpp_profile_get_profile_id (requested);
-    ctx->apn_type = mm_3gpp_profile_get_apn_type (requested);
+    ctx->profile_id = mm_3gpp_profile_get_profile_id (ctx->requested);
+    ctx->apn_type = mm_3gpp_profile_get_apn_type (ctx->requested);
     ctx->apn_type_str = mm_bearer_apn_type_build_string_from_mask (ctx->apn_type);
     g_task_set_task_data (task, ctx, (GDestroyNotify)set_profile_context_free);
 
@@ -725,9 +725,9 @@ mm_iface_modem_3gpp_profile_manager_set_profile (MMIfaceModem3gppProfileManager 
         g_assert_not_reached ();
 
     /* normalize IP family right away */
-    ip_family = mm_3gpp_profile_get_ip_type (requested);
+    ip_family = mm_3gpp_profile_get_ip_type (ctx->requested);
     mm_3gpp_normalize_ip_family (&ip_family);
-    mm_3gpp_profile_set_ip_type (requested, ip_family);
+    mm_3gpp_profile_set_ip_type (ctx->requested, ip_family);
 
     set_profile_step (task);
 }
