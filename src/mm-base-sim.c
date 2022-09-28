@@ -12,7 +12,8 @@
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
  * Copyright (C) 2009 - 2011 Red Hat, Inc.
- * Copyright (C) 2011 Google, Inc.
+ * Copyright (C) 2011 - 2022 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2011 - 2022 Google, Inc.
  */
 
 #include <config.h>
@@ -2287,6 +2288,90 @@ load_operator_name (MMBaseSim *self,
 }
 
 /*****************************************************************************/
+/* GID1 and GID2 */
+
+static GByteArray *
+parse_gid (const gchar  *response,
+           GError      **error)
+{
+    guint             sw1 = 0;
+    guint             sw2 = 0;
+    g_autofree gchar *hex = NULL;
+
+    if (!mm_3gpp_parse_crsm_response (response, &sw1, &sw2, &hex, error))
+        return NULL;
+
+    if ((sw1 == 0x90 && sw2 == 0x00) ||
+        (sw1 == 0x91) ||
+        (sw1 == 0x92) ||
+        (sw1 == 0x9f)) {
+        guint8 *bin = NULL;
+        gsize   binlen = 0;
+
+        /* Convert hex string to binary */
+        bin = mm_utils_hexstr2bin (hex, -1, &binlen, error);
+        if (!bin) {
+            g_prefix_error (error, "SIM returned malformed response '%s': ", hex);
+            return NULL;
+        }
+
+        /* return as bytearray */
+        return g_byte_array_new_take (bin, binlen);
+    }
+
+    g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                 "SIM failed to handle CRSM request (sw1 %d sw2 %d)", sw1, sw2);
+    return NULL;
+}
+
+static GByteArray *
+common_load_gid_finish (MMBaseSim     *self,
+                        GAsyncResult  *res,
+                        GError       **error)
+{
+    g_autofree gchar *result = NULL;
+
+    result = g_task_propagate_pointer (G_TASK (res), error);
+    if (!result)
+        return NULL;
+
+    return parse_gid (result, error);
+}
+
+STR_REPLY_READY_FN (load_gid1)
+STR_REPLY_READY_FN (load_gid2)
+
+static void
+load_gid1 (MMBaseSim           *self,
+           GAsyncReadyCallback  callback,
+           gpointer             user_data)
+{
+    /* READ BINARY of EFgid1 */
+    mm_base_modem_at_command (
+        self->priv->modem,
+        "+CRSM=176,28478,0,0,15",
+        10,
+        FALSE,
+        (GAsyncReadyCallback)load_gid1_command_ready,
+        g_task_new (self, NULL, callback, user_data));
+}
+
+static void
+load_gid2 (MMBaseSim           *self,
+           GAsyncReadyCallback  callback,
+           gpointer             user_data)
+{
+    /* READ BINARY of EFgid2 */
+    mm_base_modem_at_command (
+        self->priv->modem,
+        "+CRSM=176,28479,0,0,15",
+        10,
+        FALSE,
+        (GAsyncReadyCallback)load_gid2_command_ready,
+        g_task_new (self, NULL, callback, user_data));
+}
+
+/*****************************************************************************/
 
 MMBaseSim *
 mm_base_sim_new_initialized (MMBaseModem *modem,
@@ -3059,6 +3144,10 @@ mm_base_sim_class_init (MMBaseSimClass *klass)
     klass->load_emergency_numbers_finish = load_emergency_numbers_finish;
     klass->load_preferred_networks = load_preferred_networks;
     klass->load_preferred_networks_finish = load_preferred_networks_finish;
+    klass->load_gid1 = load_gid1;
+    klass->load_gid1_finish = common_load_gid_finish;
+    klass->load_gid2 = load_gid2;
+    klass->load_gid2_finish = common_load_gid_finish;
     klass->set_preferred_networks = set_preferred_networks;
     klass->set_preferred_networks_finish = set_preferred_networks_finish;
     klass->send_pin = send_pin;
