@@ -931,7 +931,7 @@ common_read_binary_context_free (CommonReadBinaryContext *ctx)
 }
 
 static GByteArray *
-common_read_binary_finish (MMBaseSim     *self,
+common_read_binary_finish (MMSimMbim     *self,
                            GAsyncResult  *res,
                            GError       **error)
 {
@@ -1048,14 +1048,56 @@ common_read_binary (MMSimMbim           *self,
 }
 
 /*****************************************************************************/
-/* Read GID1 and GID2 */
+/* Read GID1 */
 
 static GByteArray *
 load_gid1_finish (MMBaseSim     *self,
                   GAsyncResult  *res,
                   GError       **error)
 {
-    return common_read_binary_finish (self, res, error);
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+parent_load_gid1_ready (MMBaseSim    *self,
+                        GAsyncResult *res,
+                        GTask        *task)
+{
+    g_autoptr(GError)  error = NULL;
+    GByteArray        *value;
+
+    value = MM_BASE_SIM_CLASS(mm_sim_mbim_parent_class)->load_gid1_finish (self, res, &error);
+    if (value) {
+        g_task_return_pointer (task, value, (GDestroyNotify)g_byte_array_unref);
+    } else {
+        mm_obj_dbg (self, "failed reading GID1 using AT: %s", error->message);
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Failed reading GID1 from SIM card");
+    }
+
+    g_object_unref (task);
+}
+
+static void
+common_read_binary_gid1_ready (MMSimMbim    *self,
+                               GAsyncResult *res,
+                               GTask        *task)
+{
+    g_autoptr(GError)  error = NULL;
+    GByteArray        *value;
+
+    value = common_read_binary_finish (self, res, &error);
+    if (value) {
+        g_task_return_pointer (task, value, (GDestroyNotify)g_byte_array_unref);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Fallback to parent implementation if possible */
+    mm_obj_dbg (self, "failed reading GID1 using MBIM: %s", error->message);
+    MM_BASE_SIM_CLASS(mm_sim_mbim_parent_class)->load_gid1 (MM_BASE_SIM (self),
+                                                            (GAsyncReadyCallback)parent_load_gid1_ready,
+                                                            task);
 }
 
 static void
@@ -1063,17 +1105,69 @@ load_gid1 (MMBaseSim           *self,
            GAsyncReadyCallback  callback,
            gpointer             user_data)
 {
-    const guint8 file_path[] = { 0x7F, 0xFF, 0x6F, 0x3E };
+    GTask        *task;
+    const guint8  file_path[] = { 0x7F, 0xFF, 0x6F, 0x3E };
 
-    common_read_binary (MM_SIM_MBIM (self), file_path, G_N_ELEMENTS (file_path), callback, user_data);
+    task = g_task_new (self, NULL, callback, user_data);
+
+    common_read_binary (MM_SIM_MBIM (self),
+                        file_path,
+                        G_N_ELEMENTS (file_path),
+                        (GAsyncReadyCallback)common_read_binary_gid1_ready,
+                        task);
 }
+
+/*****************************************************************************/
+/* Read GID2 */
 
 static GByteArray *
 load_gid2_finish (MMBaseSim     *self,
                   GAsyncResult  *res,
                   GError       **error)
 {
-    return common_read_binary_finish (self, res, error);
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+parent_load_gid2_ready (MMBaseSim    *self,
+                        GAsyncResult *res,
+                        GTask        *task)
+{
+    g_autoptr(GError)  error = NULL;
+    GByteArray        *value;
+
+    value = MM_BASE_SIM_CLASS(mm_sim_mbim_parent_class)->load_gid2_finish (self, res, &error);
+    if (value) {
+        g_task_return_pointer (task, value, (GDestroyNotify)g_byte_array_unref);
+    } else {
+        mm_obj_dbg (self, "failed reading GID2 using AT: %s", error->message);
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Failed reading GID2 from SIM card");
+    }
+
+    g_object_unref (task);
+}
+
+static void
+common_read_binary_gid2_ready (MMSimMbim    *self,
+                               GAsyncResult *res,
+                               GTask        *task)
+{
+    g_autoptr(GError)  error = NULL;
+    GByteArray        *value;
+
+    value = common_read_binary_finish (self, res, &error);
+    if (value) {
+        g_task_return_pointer (task, value, (GDestroyNotify)g_byte_array_unref);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Fallback to parent implementation if possible */
+    mm_obj_dbg (self, "failed reading GID2 using MBIM: %s", error->message);
+    MM_BASE_SIM_CLASS(mm_sim_mbim_parent_class)->load_gid2 (MM_BASE_SIM (self),
+                                                            (GAsyncReadyCallback)parent_load_gid2_ready,
+                                                            task);
 }
 
 static void
@@ -1081,9 +1175,16 @@ load_gid2 (MMBaseSim           *self,
            GAsyncReadyCallback  callback,
            gpointer             user_data)
 {
-    const guint8 file_path[] = { 0x7F, 0xFF, 0x6F, 0x3F };
+    GTask        *task;
+    const guint8  file_path[] = { 0x7F, 0xFF, 0x6F, 0x3F };
 
-    common_read_binary (MM_SIM_MBIM (self), file_path, G_N_ELEMENTS (file_path), callback, user_data);
+    task = g_task_new (self, NULL, callback, user_data);
+
+    common_read_binary (MM_SIM_MBIM (self),
+                        file_path,
+                        G_N_ELEMENTS (file_path),
+                        (GAsyncReadyCallback)common_read_binary_gid2_ready,
+                        task);
 }
 
 /*****************************************************************************/
