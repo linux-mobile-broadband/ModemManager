@@ -460,7 +460,7 @@ mm_voice_ring_regex_get (void)
     /* Example:
      * <CR><LF>RING<CR><LF>
      */
-    return g_regex_new ("\\r\\nRING\\r\\n",
+    return g_regex_new ("\\r\\nRING(?:\\r)?\\r\\n",
                         G_REGEX_RAW | G_REGEX_OPTIMIZE,
                         0,
                         NULL);
