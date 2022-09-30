@@ -3,21 +3,22 @@
 # This file is distributed under the same license as the Modem Manager package.
 #
 # Mario Blättermann <mario.blaettermann@gmail.com>, 2013.
+# Jürgen Benvenuti <gastornis@posteo.org>, 2022.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: ModemManager\n"
 "Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
 "ModemManager/issues\n"
-"POT-Creation-Date: 2022-07-16 14:32+0200\n"
-"PO-Revision-Date: 2014-01-06 21:23+0100\n"
-"Last-Translator: Mario Blättermann <mario.blaettermann@gmail.com>\n"
-"Language-Team: German <debian-l10n-german@lists.debian.org>\n"
+"POT-Creation-Date: 2022-09-09 15:25+0000\n"
+"PO-Revision-Date: 2022-09-10 21:20+0200\n"
+"Last-Translator: Jürgen Benvenuti <gastornis@posteo.org>\n"
+"Language-Team: German <gnome-de@gnome.org>\n"
 "Language: de\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: Poedit 1.5.4\n"
+"X-Generator: Poedit 3.1.1\n"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:13
 msgid "Control the Modem Manager daemon"
@@ -54,7 +55,6 @@ msgid "Send, save, modify, and delete text messages"
 msgstr "Textnachrichten senden, speichern, bearbeiten und löschen"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:41
-#, fuzzy
 msgid ""
 "System policy prevents sending or manipulating this device's text messages."
 msgstr ""
@@ -64,34 +64,32 @@ msgstr ""
 #: data/org.freedesktop.ModemManager1.policy.in.in:49
 msgid "Accept incoming voice calls or start outgoing voice calls."
 msgstr ""
+"Eingehende Sprachanrufe annehmen oder ausgehende Sprachanrufe beginnen."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:50
-#, fuzzy
 msgid "System policy prevents voice calls."
-msgstr "Die Systemrichtlinien verhindern die Steuerung von ModemManager."
+msgstr "Die Systemrichtlinien verhindern Sprachanrufe."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:58
 msgid "Query network time and timezone information"
-msgstr ""
+msgstr "Netzwerkzeit und Zeitzonen-Information abfragen"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:59
-#, fuzzy
 msgid "System policy prevents querying network time information."
 msgstr ""
-"Die Systemrichtlinien verhindern die Abfrage der Netzwerkinformationen und -"
-"dienste."
+"Die Systemrichtlinien verhindern die Abfrage der Netzwerkzeit-Information."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:67
 msgid "Enable and view geographic location and positioning information"
 msgstr ""
-"Informationen zum geografischen Standort und Positionierung aktivieren und "
-"anzeigen"
+"Informationen zum geografischen Standort und zur Positionierung aktivieren "
+"und anzeigen"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:68
 msgid ""
 "System policy prevents enabling or viewing geographic location information."
 msgstr ""
-"Die Systemrichtlinien verhindern das Aktivieren oder Ändern der "
+"Die Systemrichtlinien verhindern das Aktivieren oder Anzeigen der "
 "Informationen zum geografischen Standort."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:76
@@ -118,4 +116,4 @@ msgstr ""
 
 #: src/mm-sleep-monitor-systemd.c:125
 msgid "ModemManager needs to reset devices"
-msgstr ""
+msgstr "ModemManager muss Geräte zurücksetzen"
