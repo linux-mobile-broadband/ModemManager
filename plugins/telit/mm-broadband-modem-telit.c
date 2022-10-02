@@ -69,7 +69,6 @@ struct _MMBroadbandModemTelitPrivate {
     MMModemLocationSource enabled_sources;
 };
 
-
 typedef struct {
     MMModemLocationSource source;
     guint gps_enable_step;
@@ -1070,11 +1069,11 @@ modem_reset (MMIfaceModem *self,
 /* Load access technologies (Modem interface) */
 
 static gboolean
-load_access_technologies_finish (MMIfaceModem *self,
-                                 GAsyncResult *res,
+load_access_technologies_finish (MMIfaceModem            *self,
+                                 GAsyncResult            *res,
                                  MMModemAccessTechnology *access_technologies,
-                                 guint *mask,
-                                 GError **error)
+                                 guint                   *mask,
+                                 GError                 **error)
 {
     GVariant *result;
 
@@ -1088,6 +1087,106 @@ load_access_technologies_finish (MMIfaceModem *self,
     *access_technologies = (MMModemAccessTechnology) g_variant_get_uint32 (result);
     *mask = MM_MODEM_ACCESS_TECHNOLOGY_ANY;
     return TRUE;
+}
+
+static MMBaseModemAtResponseProcessorResult
+response_processor_cops_ignore_at_errors (MMBaseModem   *self,
+                                          gpointer       none,
+                                          const gchar   *command,
+                                          const gchar   *response,
+                                          gboolean       last_command,
+                                          const GError  *error,
+                                          GVariant     **result,
+                                          GError       **result_error)
+{
+    g_autoptr(GMatchInfo) match_info = NULL;
+    g_autoptr(GRegex) r = NULL;
+    guint actval = 0;
+    guint mode = 0;
+    guint vid;
+    guint pid;
+
+    *result = NULL;
+    *result_error = NULL;
+
+    if (error) {
+        /* Ignore AT errors (ie, ERROR or CMx ERROR) */
+        if (error->domain != MM_MOBILE_EQUIPMENT_ERROR || last_command) {
+            *result_error = g_error_copy (error);
+            return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE;
+        }
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
+    }
+
+    vid = mm_base_modem_get_vendor_id (self);
+    pid = mm_base_modem_get_product_id (self);
+
+    if (!(vid == 0x1bc7 && (pid == 0x110a || pid == 0x110b))) {
+        /* AcT for non-LPWA modems would be checked by other command */
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
+    }
+
+    r = g_regex_new ("\\+COPS:\\s*(\\d+),(\\d+),([^,]*)(?:,(\\d+))?(?:\\r\\n)?",
+                     0,
+                     0,
+                     NULL);
+    g_assert (r != NULL);
+
+    if (!g_regex_match (r, response, 0, &match_info)) {
+        g_set_error (result_error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Can't match +COPS? response: '%s'",
+                     response);
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE;
+    }
+
+    if (!mm_get_uint_from_match_info (match_info, 1, &mode)) {
+        g_set_error (result_error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Failed to parse mode in +COPS? response: '%s'",
+                     response);
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE;
+    }
+
+    if (mode == 2) {
+        g_set_error (result_error,
+                    MM_CORE_ERROR,
+                    MM_CORE_ERROR_FAILED,
+                    "Modem deregistered from the network: aborting AcT query");
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE;
+    }
+
+    if (!mm_get_uint_from_match_info (match_info, 4, &actval)) {
+        g_set_error (result_error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Failed to parse act in +COPS? response: '%s'",
+                     response);
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE;
+    }
+
+    switch (actval) {
+    case 0:
+        *result = g_variant_new_uint32 (MM_MODEM_ACCESS_TECHNOLOGY_GSM);
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
+    case 8:
+        *result = g_variant_new_uint32 (MM_MODEM_ACCESS_TECHNOLOGY_LTE_CAT_M);
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
+    case 9:
+        *result = g_variant_new_uint32 (MM_MODEM_ACCESS_TECHNOLOGY_LTE_NB_IOT);
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
+    default:
+        break;
+    }
+
+    g_set_error (result_error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "Failed to map act in +COPS? response: '%s'",
+                 response);
+    return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE;
 }
 
 static MMBaseModemAtResponseProcessorResult
@@ -1208,6 +1307,7 @@ response_processor_service_ignore_at_errors (MMBaseModem   *self,
 }
 
 static const MMBaseModemAtCommand access_tech_commands[] = {
+    { "+COPS?",    3, FALSE, response_processor_cops_ignore_at_errors },
     { "#PSNT?",    3, FALSE, response_processor_psnt_ignore_at_errors },
     { "+SERVICE?", 3, FALSE, response_processor_service_ignore_at_errors },
     { NULL }
