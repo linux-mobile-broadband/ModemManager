@@ -761,18 +761,18 @@ handle_register_auth_ready (MMBaseModem *self,
     switch (modem_state) {
     case MM_MODEM_STATE_FAILED:
     case MM_MODEM_STATE_UNKNOWN:
-    case MM_MODEM_STATE_LOCKED:
-        /* We should never have such request (interface wasn't exported yet) */
-        g_assert_not_reached ();
-        break;
-
     case MM_MODEM_STATE_INITIALIZING:
+    case MM_MODEM_STATE_LOCKED:
+    case MM_MODEM_STATE_DISABLED:
+    case MM_MODEM_STATE_DISABLING:
+    case MM_MODEM_STATE_ENABLING:
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
                                                "Cannot register modem: "
-                                               "device not fully initialized yet");
-        break;
+                                               "not yet enabled");
+        handle_register_context_free (ctx);
+        return;
 
     case MM_MODEM_STATE_ENABLED:
     case MM_MODEM_STATE_SEARCHING:
@@ -785,23 +785,6 @@ handle_register_auth_ready (MMBaseModem *self,
                                                  ctx);
         return;
 
-    case MM_MODEM_STATE_DISABLING:
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot register modem: "
-                                               "currently being disabled");
-        break;
-
-    case MM_MODEM_STATE_ENABLING:
-    case MM_MODEM_STATE_DISABLED:
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot register modem: "
-                                               "not yet enabled");
-        break;
-
     case MM_MODEM_STATE_DISCONNECTING:
     case MM_MODEM_STATE_CONNECTING:
     case MM_MODEM_STATE_CONNECTED:
@@ -810,13 +793,12 @@ handle_register_auth_ready (MMBaseModem *self,
                                                MM_CORE_ERROR_WRONG_STATE,
                                                "Cannot register modem: "
                                                "modem is connected");
-        break;
+        handle_register_context_free (ctx);
+        return;
 
     default:
         g_assert_not_reached ();
     }
-
-    handle_register_context_free (ctx);
 }
 
 static gboolean
@@ -925,7 +907,6 @@ handle_scan_auth_ready (MMBaseModem *self,
                         GAsyncResult *res,
                         HandleScanContext *ctx)
 {
-    MMModemState modem_state;
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
@@ -945,53 +926,17 @@ handle_scan_auth_ready (MMBaseModem *self,
         return;
     }
 
-    modem_state = MM_MODEM_STATE_UNKNOWN;
-    g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &modem_state,
-                  NULL);
-
-    switch (modem_state) {
-    case MM_MODEM_STATE_FAILED:
-    case MM_MODEM_STATE_UNKNOWN:
-    case MM_MODEM_STATE_LOCKED:
-        /* We should never have such request (interface wasn't exported yet) */
-        g_assert_not_reached ();
-        break;
-
-    case MM_MODEM_STATE_INITIALIZING:
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot scan networks: "
-                                               "device not fully initialized yet");
-        break;
-
-    case MM_MODEM_STATE_DISABLED:
-    case MM_MODEM_STATE_DISABLING:
-    case MM_MODEM_STATE_ENABLING:
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot scan networks: not enabled yet");
-        break;
-
-    case MM_MODEM_STATE_ENABLED:
-    case MM_MODEM_STATE_SEARCHING:
-    case MM_MODEM_STATE_REGISTERED:
-    case MM_MODEM_STATE_DISCONNECTING:
-    case MM_MODEM_STATE_CONNECTING:
-    case MM_MODEM_STATE_CONNECTED:
-        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->scan_networks (
-            MM_IFACE_MODEM_3GPP (self),
-            (GAsyncReadyCallback)handle_scan_ready,
-            ctx);
+    if (mm_iface_modem_abort_invocation_if_state_not_reached (MM_IFACE_MODEM (self),
+                                                              ctx->invocation,
+                                                              MM_MODEM_STATE_ENABLED)) {
+        handle_scan_context_free (ctx);
         return;
-
-    default:
-        g_assert_not_reached ();
     }
 
-    handle_scan_context_free (ctx);
+    MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->scan_networks (
+        MM_IFACE_MODEM_3GPP (self),
+        (GAsyncReadyCallback)handle_scan_ready,
+        ctx);
 }
 
 static gboolean
