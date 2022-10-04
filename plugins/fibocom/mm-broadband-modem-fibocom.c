@@ -24,12 +24,16 @@
 #include "mm-iface-modem-3gpp-profile-manager.h"
 #include "mm-log.h"
 
-static void iface_modem_init (MMIfaceModem *iface);
-static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void iface_modem_init                      (MMIfaceModem                   *iface);
+static void iface_modem_3gpp_init                 (MMIfaceModem3gpp               *iface);
+static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface);
+
+static MMIfaceModem3gppProfileManager *iface_modem_3gpp_profile_manager_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemFibocom, mm_broadband_modem_fibocom, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP_PROFILE_MANAGER, iface_modem_3gpp_profile_manager_init))
 
 typedef enum {
     FEATURE_SUPPORT_UNKNOWN,
@@ -590,6 +594,60 @@ modem_3gpp_set_initial_eps_bearer_settings (MMIfaceModem3gpp    *_self,
 }
 
 /*****************************************************************************/
+/* Deactivate profile (3GPP profile management interface) */
+
+static gboolean
+modem_3gpp_profile_manager_deactivate_profile_finish (MMIfaceModem3gppProfileManager  *self,
+                                                      GAsyncResult                    *res,
+                                                      GError                         **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+profile_manager_parent_deactivate_profile_ready (MMIfaceModem3gppProfileManager *self,
+                                                 GAsyncResult                   *res,
+                                                 GTask                          *task)
+{
+    GError *error = NULL;
+    if (iface_modem_3gpp_profile_manager_parent->deactivate_profile_finish(self, res, &error))
+        g_task_return_boolean (task, TRUE);
+    else
+        g_task_return_error (task, error);
+    g_object_unref (task);
+}
+
+static void
+modem_3gpp_profile_manager_deactivate_profile (MMIfaceModem3gppProfileManager *_self,
+                                               MM3gppProfile                  *profile,
+                                               GAsyncReadyCallback             callback,
+                                               gpointer                        user_data)
+{
+    MMBroadbandModemFibocom *self = MM_BROADBAND_MODEM_FIBOCOM (_self);
+    GTask                   *task;
+    gint                     profile_id;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    profile_id = mm_3gpp_profile_get_profile_id (profile);
+
+    if (self->priv->initial_eps_bearer_support == FEATURE_SUPPORTED) {
+        g_assert (self->priv->initial_eps_bearer_cid >= 0);
+        if (self->priv->initial_eps_bearer_cid == profile_id) {
+            mm_obj_dbg (self, "skipping profile deactivation (initial EPS bearer)");
+            g_task_return_boolean (task, TRUE);
+            g_object_unref (task);
+            return;
+        }
+    }
+
+    iface_modem_3gpp_profile_manager_parent->deactivate_profile (
+        _self,
+        profile,
+        (GAsyncReadyCallback) profile_manager_parent_deactivate_profile_ready,
+        task);
+}
+
+/*****************************************************************************/
 
 static void
 setup_ports (MMBroadbandModem *_self)
@@ -679,6 +737,15 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->load_initial_eps_bearer_settings_finish = modem_3gpp_load_initial_eps_bearer_settings_finish;
     iface->set_initial_eps_bearer_settings = modem_3gpp_set_initial_eps_bearer_settings;
     iface->set_initial_eps_bearer_settings_finish = modem_3gpp_set_initial_eps_bearer_settings_finish;
+}
+
+static void
+iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface)
+{
+    iface_modem_3gpp_profile_manager_parent = g_type_interface_peek_parent (iface);
+
+    iface->deactivate_profile = modem_3gpp_profile_manager_deactivate_profile;
+    iface->deactivate_profile_finish = modem_3gpp_profile_manager_deactivate_profile_finish;
 }
 
 static void
