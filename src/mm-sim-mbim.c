@@ -38,6 +38,7 @@ G_DEFINE_TYPE (MMSimMbim, mm_sim_mbim, MM_TYPE_BASE_SIM)
 
 struct _MMSimMbimPrivate {
     gboolean           preload;
+    GCancellable      *preload_cancellable;
     GError            *preload_error;
     gchar             *imsi;
     gchar             *iccid;
@@ -154,6 +155,11 @@ setup_modem_sync_monitor (MMSimMbim *self)
 static void
 reset_subscriber_info (MMSimMbim *self)
 {
+    /* Request to stop any ongoing preload attempt */
+    g_cancellable_cancel (self->priv->preload_cancellable);
+    g_clear_object (&self->priv->preload_cancellable);
+
+    /* And reset the info right away */
     self->priv->preload = FALSE;
     g_clear_error (&self->priv->preload_error);
     g_clear_pointer (&self->priv->imsi, g_free);
@@ -185,13 +191,21 @@ application_list_query_ready (MbimDevice   *device,
     guint32                             application_count;
     guint32                             active_application_index;
     g_autoptr(MbimUiccApplicationArray) applications = NULL;
+    g_autoptr(GError)                   error = NULL;
 
     self = g_task_get_source_object (task);
 
-    g_assert (!self->priv->application_id);
-    g_assert (!self->priv->application_id_error);
+    response = mbim_device_command_finish (device, res, &error);
 
-    response = mbim_device_command_finish (device, res, &self->priv->application_id_error);
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
+        return;
+    }
+
+    g_clear_pointer (&self->priv->application_id, g_byte_array_unref);
+    g_clear_error (&self->priv->application_id_error);
+    self->priv->application_id_error = g_steal_pointer (&error);
+
     if (response &&
         mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &self->priv->application_id_error) &&
         mbim_message_ms_uicc_low_level_access_application_list_response_parse (
@@ -219,6 +233,7 @@ application_list_query_ready (MbimDevice   *device,
 
     /* At this point we just complete, as all the info and errors have already
      * been stored */
+    g_clear_object (&self->priv->preload_cancellable);
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
@@ -246,15 +261,24 @@ subscriber_ready_status_ready (MbimDevice   *device,
     MMSimMbim              *self;
     g_autoptr(MbimMessage)  response = NULL;
     g_autofree gchar       *raw_iccid = NULL;
+    g_autoptr(GError)       error = NULL;
 
     self = g_task_get_source_object (task);
 
-    g_assert (!self->priv->preload_error);
-    g_assert (!self->priv->imsi);
-    g_assert (!self->priv->iccid);
-    g_assert (!self->priv->iccid_error);
+    response = mbim_device_command_finish (device, res, &error);
 
-    response = mbim_device_command_finish (device, res, &self->priv->preload_error);
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
+        return;
+    }
+
+    g_clear_error (&self->priv->preload_error);
+    g_clear_pointer (&self->priv->imsi, g_free);
+    g_clear_pointer (&self->priv->iccid, g_free);
+    g_clear_error (&self->priv->iccid_error);
+
+    self->priv->preload_error = g_steal_pointer (&error);
+
     if (response && mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &self->priv->preload_error)) {
         if (mbim_device_check_ms_mbimex_version (device, 3, 0)) {
             MbimSubscriberReadyStatusFlag flags = MBIM_SUBSCRIBER_READY_STATUS_FLAG_NONE;
@@ -338,13 +362,15 @@ preload_subscriber_info (MMSimMbim           *self,
                          GAsyncReadyCallback  callback,
                          gpointer             user_data)
 {
-    GTask      *task;
-    MbimDevice *device;
+    g_autoptr(GCancellable)  cancellable = NULL;
+    GTask                   *task;
+    MbimDevice              *device;
 
     if (!peek_device (self, &device, callback, user_data))
         return;
 
-    task = g_task_new (self, NULL, callback, user_data);
+    cancellable = g_cancellable_new ();
+    task = g_task_new (self, cancellable, callback, user_data);
 
     /* only preload one single time; the info of the SIM should not
      * change during runtime, unless we're handling hotplug events */
@@ -355,6 +381,8 @@ preload_subscriber_info (MMSimMbim           *self,
     }
     self->priv->preload = TRUE;
 
+    g_assert (!self->priv->preload_cancellable);
+    self->priv->preload_cancellable = g_steal_pointer (&cancellable);
 
 #if defined WITH_SUSPEND_RESUME
 
@@ -379,19 +407,21 @@ load_sim_identifier_finish (MMBaseSim     *_self,
     if (!preload_subscriber_info_finish (self, res, error))
         return NULL;
 
-    g_assert (self->priv->preload);
     if (self->priv->iccid_error) {
         g_propagate_error (error, g_error_copy (self->priv->iccid_error));
         return NULL;
     }
+
     if (self->priv->preload_error) {
         g_propagate_error (error, g_error_copy (self->priv->preload_error));
         return NULL;
     }
+
     if (!self->priv->iccid) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "SIM iccid not available");
         return NULL;
     }
+
     return g_strdup (self->priv->iccid);
 }
 
@@ -416,15 +446,16 @@ load_imsi_finish (MMBaseSim     *_self,
     if (!preload_subscriber_info_finish (self, res, error))
         return NULL;
 
-    g_assert (self->priv->preload);
     if (self->priv->preload_error) {
         g_propagate_error (error, g_error_copy (self->priv->preload_error));
         return NULL;
     }
+
     if (!self->priv->imsi) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "SIM imsi not available");
         return NULL;
     }
+
     return g_strdup (self->priv->imsi);
 }
 
@@ -435,7 +466,6 @@ load_imsi (MMBaseSim           *self,
 {
     preload_subscriber_info (MM_SIM_MBIM (self), callback, user_data);
 }
-
 
 /*****************************************************************************/
 /* Load SIM identifier */
@@ -450,11 +480,11 @@ load_sim_type_finish (MMBaseSim     *_self,
     if (!preload_subscriber_info_finish (self, res, error))
         return MM_SIM_TYPE_UNKNOWN;
 
-    g_assert (self->priv->preload);
     if (self->priv->preload_error) {
         g_propagate_error (error, g_error_copy (self->priv->preload_error));
         return MM_SIM_TYPE_UNKNOWN;
     }
+
     return self->priv->sim_type;
 }
 
@@ -479,11 +509,11 @@ load_esim_status_finish (MMBaseSim     *_self,
     if (!preload_subscriber_info_finish (self, res, error))
         return MM_SIM_ESIM_STATUS_UNKNOWN;
 
-    g_assert (self->priv->preload);
     if (self->priv->preload_error) {
         g_propagate_error (error, g_error_copy (self->priv->preload_error));
         return MM_SIM_ESIM_STATUS_UNKNOWN;
     }
+
     return self->priv->esim_status;
 }
 
@@ -508,11 +538,11 @@ load_removability_finish (MMBaseSim     *_self,
     if (!preload_subscriber_info_finish (self, res, error))
         return MM_SIM_REMOVABILITY_UNKNOWN;
 
-    g_assert (self->priv->preload);
     if (self->priv->preload_error) {
         g_propagate_error (error, g_error_copy (self->priv->preload_error));
         return MM_SIM_REMOVABILITY_UNKNOWN;
     }
+
     return self->priv->removability;
 }
 
@@ -986,8 +1016,6 @@ read_binary_subscriber_info_ready (MMSimMbim    *self,
         g_object_unref (task);
         return;
     }
-
-    g_assert (self->priv->preload);
 
     if (self->priv->application_id_error) {
         g_task_return_error (task, g_error_copy (self->priv->application_id_error));
