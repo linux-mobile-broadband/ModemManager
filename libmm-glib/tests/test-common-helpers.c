@@ -604,7 +604,8 @@ date_time_iso8601 (void)
     gchar *date = NULL;
     GError *error = NULL;
 
-    date = mm_new_iso8601_time_from_unix_time (1634307342);
+    date = mm_new_iso8601_time_from_unix_time (1634307342, &error);
+    g_assert_no_error (error);
     g_assert_cmpstr (date, ==, "2021-10-15T14:15:42Z");
     g_free (date);
 
@@ -633,6 +634,12 @@ date_time_iso8601 (void)
 
     /* No February 29 in 2021 */
     date = mm_new_iso8601_time (2021, 2, 29, 16, 15, 42, TRUE, 120, &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert_null (date);
+    g_clear_error (&error);
+
+    /* Too far into the future */
+    date = mm_new_iso8601_time_from_unix_time (G_MAXINT64, &error);
     g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
     g_assert_null (date);
     g_clear_error (&error);

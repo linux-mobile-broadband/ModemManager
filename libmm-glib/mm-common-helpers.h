@@ -208,16 +208,17 @@ gboolean  mm_get_double_from_match_info          (GMatchInfo  *match_info,
 gchar    *mm_get_string_unquoted_from_match_info (GMatchInfo  *match_info,
                                                   guint32      match_index);
 
-gchar    *mm_new_iso8601_time_from_unix_time     (guint64  timestamp);
-gchar    *mm_new_iso8601_time                    (guint    year,
-                                                  guint    month,
-                                                  guint    day,
-                                                  guint    hour,
-                                                  guint    minute,
-                                                  guint    second,
-                                                  gboolean have_offset,
-                                                  gint     offset_minutes,
-                                                  GError **error);
+gchar    *mm_new_iso8601_time_from_unix_time     (guint64    timestamp,
+                                                  GError   **error);
+gchar    *mm_new_iso8601_time                    (guint      year,
+                                                  guint      month,
+                                                  guint      day,
+                                                  guint      hour,
+                                                  guint      minute,
+                                                  guint      second,
+                                                  gboolean   have_offset,
+                                                  gint       offset_minutes,
+                                                  GError   **error);
 
 /******************************************************************************/
 /* Type checkers and conversion utilities */
