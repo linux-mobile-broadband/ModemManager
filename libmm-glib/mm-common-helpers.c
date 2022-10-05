@@ -1789,11 +1789,9 @@ mm_new_iso8601_time (guint    year,
     } else
         dt = g_date_time_new_utc (year, month, day, hour, minute, second);
 
-    if (dt == NULL) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_INVALID_ARGS,
-                     "Invalid input for date: got year:%u, month:%u, day:%u, hour:%u, minute:%u, second:%u",
+    if (!dt) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "Invalid date: year: %u, month: %u, day: %u, hour: %u, minute: %u, second: %u",
                      year, month, day, hour, minute, second);
         return NULL;
     }
