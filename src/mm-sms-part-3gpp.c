@@ -422,22 +422,21 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint         index,
         PDU_SIZE_CHECK (1, "cannot read SMSC address length");
         smsc_addr_size_bytes = pdu[offset++];
         if (smsc_addr_size_bytes > 0) {
-             PDU_SIZE_CHECK (offset + smsc_addr_size_bytes, "cannot read SMSC address");
-             /* SMSC may not be given in DELIVER PDUs */
-             address = sms_decode_address (&pdu[1], 2 * (smsc_addr_size_bytes - 1), error);
-             if (!address) {
-                     g_prefix_error (error, "Couldn't read SMSC address: ");
-                     mm_sms_part_free (sms_part);
-                     return NULL;
-             }
-             mm_sms_part_take_smsc (sms_part, g_steal_pointer (&address));
-             mm_obj_dbg (log_object, "  SMSC address parsed: '%s'", mm_sms_part_get_smsc (sms_part));
-             offset += smsc_addr_size_bytes;
+            PDU_SIZE_CHECK (offset + smsc_addr_size_bytes, "cannot read SMSC address");
+            /* SMSC may not be given in DELIVER PDUs */
+            address = sms_decode_address (&pdu[1], 2 * (smsc_addr_size_bytes - 1), error);
+            if (!address) {
+                g_prefix_error (error, "Couldn't read SMSC address: ");
+                mm_sms_part_free (sms_part);
+                return NULL;
+            }
+            mm_sms_part_take_smsc (sms_part, g_steal_pointer (&address));
+            mm_obj_dbg (log_object, "  SMSC address parsed: '%s'", mm_sms_part_get_smsc (sms_part));
+            offset += smsc_addr_size_bytes;
         } else
-              mm_obj_dbg (log_object, "  no SMSC address given");
+            mm_obj_dbg (log_object, "  no SMSC address given");
     } else
         mm_obj_dbg (log_object, "  This is a transfer-route message");
-
 
     /* ---------------------------------------------------------------------- */
     /* TP-MTI (1 byte) */
@@ -492,7 +491,6 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint         index,
         offset++;
     }
 
-
     /* ---------------------------------------------------------------------- */
     /* TP-DA or TP-OA or TP-RA
      * First byte represents the number of DIGITS in the number.
@@ -519,6 +517,7 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint         index,
 
     if (pdu_type == SMS_TP_MTI_SMS_DELIVER) {
         gchar *str = NULL;
+
         PDU_SIZE_CHECK (offset + 9,
                         "cannot read PID/DCS/Timestamp"); /* 1+1+7=9 */
 
@@ -534,8 +533,7 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint         index,
             mm_sms_part_free (sms_part);
             return NULL;
         }
-        mm_sms_part_take_timestamp (sms_part,
-                                    str);
+        mm_sms_part_take_timestamp (sms_part, str);
         offset += 7;
 
         tp_user_data_len_offset = offset;
@@ -577,9 +575,9 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint         index,
         }
 
         tp_user_data_len_offset = offset;
-    }
-    else if (pdu_type == SMS_TP_MTI_SMS_STATUS_REPORT) {
+    } else if (pdu_type == SMS_TP_MTI_SMS_STATUS_REPORT) {
         gchar *str = NULL;
+
         /* We have 2 timestamps in status report PDUs:
          *  first, the timestamp for when the PDU was received in the SMSC
          *  second, the timestamp for when the PDU was forwarded by the SMSC
