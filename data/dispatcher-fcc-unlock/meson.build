@@ -14,6 +14,7 @@ examples = files(
   '105b',
   '1199',
   '1eac',
+  '2c7c',
 )
 
 install_data(
@@ -29,6 +30,7 @@ vidpids = {
   '413c:81a3': '1199',
   '413c:81a8': '1199',
   '1eac:1001': '1eac',
+  '2c7c:030a': '2c7c',
 }
 
 ln_cmd = 'ln -fs @0@ ${DESTDIR}@1@'

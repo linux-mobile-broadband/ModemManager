@@ -11,6 +11,7 @@ fccunlockavailable_SCRIPTS = \
 	105b \
 	1199 \
 	1eac \
+	2c7c \
 	$(NULL)
 
 EXTRA_DIST = $(fccunlockavailable_SCRIPTS)
@@ -26,6 +27,7 @@ install-data-hook:
 	$(LN_S) -f 1199 413c:81a3; \
 	$(LN_S) -f 1199 413c:81a8; \
 	$(LN_S) -f 1eac 1eac:1001; \
+	$(LN_S) -f 2c7c 2c7c:030a; \
 	$(NULL)
 
 uninstall-hook:

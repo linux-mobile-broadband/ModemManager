@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# SPDX-License-Identifier: CC0-1.0
+# 2022 Leah Oswald <mail@leahoswald.de>
+#
+# Queltec EM05-G FCC unlock mechanism
+#
+
+# require program name and at least 2 arguments
+[ $# -lt 2 ] && exit 1
+
+# first argument is DBus path, not needed here
+shift
+
+# second and next arguments are control port names
+for PORT in "$@"; do
+  # match port name
+  echo "$PORT" | grep -q cdc-wdm && {
+    CDC_WDM_PORT=$PORT
+    break
+  }
+done
+
+# fail if no cdc-wdm port exposed
+[ -n "$CDC_WDM_PORT" ] || exit 2
+
+# run mbimcli operation
+mbimcli --device-open-proxy --device="/dev/$CDC_WDM_PORT" --quectel-set-radio-state=on
+exit $?
