@@ -3758,16 +3758,16 @@ internal_load_unlock_required_ready (MMIfaceModem *self,
             g_error_matches (error,
                              MM_MOBILE_EQUIPMENT_ERROR,
                              MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG)) {
-            /* SIM errors are only critical in 3GPP-only devices */
-            if (!mm_iface_modem_is_cdma (self)) {
+            /* SIM errors are only critical in 3GPP-capable devices */
+            if (mm_iface_modem_is_3gpp (self)) {
                 ctx->saved_error = error;
                 ctx->step = UPDATE_LOCK_INFO_CONTEXT_STEP_LAST;
                 update_lock_info_context_step (task);
                 return;
             }
 
-            /* For mixed 3GPP+3GPP2 devices, skip SIM errors */
-            mm_obj_dbg (self, "skipping SIM error in 3GPP2-capable device, assuming no lock is needed");
+            /* For non 3GPP-capable devices, skip SIM errors */
+            mm_obj_dbg (self, "skipping SIM error in non 3GPP-capable device, assuming no lock is needed");
             g_error_free (error);
             ctx->lock = MM_MODEM_LOCK_NONE;
         } else {
@@ -4778,48 +4778,6 @@ initialization_context_free (InitializationContext *ctx)
     }
 
 static void
-current_capabilities_internal_load_unlock_required_ready (MMIfaceModem *self,
-                                                          GAsyncResult *res,
-                                                          GTask *task)
-{
-    InitializationContext *ctx;
-    GError *error = NULL;
-
-    ctx = g_task_get_task_data (task);
-
-    internal_load_unlock_required_finish (self, res, &error);
-    if (error) {
-        /* These SIM errors indicate that there is NO valid SIM available. So,
-         * remove all 3GPP caps from the current capabilities */
-        if (g_error_matches (error,
-                             MM_MOBILE_EQUIPMENT_ERROR,
-                             MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED) ||
-            g_error_matches (error,
-                             MM_MOBILE_EQUIPMENT_ERROR,
-                             MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE) ||
-            g_error_matches (error,
-                             MM_MOBILE_EQUIPMENT_ERROR,
-                             MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG)) {
-            MMModemCapability caps;
-
-            mm_obj_dbg (self, "multimode device without SIM, no 3GPP capabilities");
-            caps = mm_gdbus_modem_get_current_capabilities (ctx->skeleton);
-            caps &= ~MM_MODEM_CAPABILITY_3GPP;
-
-            /* CDMA-EVDO must still be around */
-            g_assert (caps & MM_MODEM_CAPABILITY_CDMA_EVDO);
-            mm_gdbus_modem_set_current_capabilities (ctx->skeleton, caps);
-        }
-
-        g_error_free (error);
-    }
-
-    /* Keep on */
-    ctx->step++;
-    interface_initialization_step (task);
-}
-
-static void
 load_current_capabilities_ready (MMIfaceModem *self,
                                  GAsyncResult *res,
                                  GTask *task)
@@ -4871,21 +4829,7 @@ load_current_capabilities_ready (MMIfaceModem *self,
                       NULL);
     }
 
-    /* Update current caps right away, even if we may fix them during the
-     * multimode device check. No big deal in updating them twice, as we're not
-     * exposed in DBus yet. */
     mm_gdbus_modem_set_current_capabilities (ctx->skeleton, caps);
-
-    /* If the device is a multimode device (3GPP+3GPP2) check whether we have a
-     * SIM or not. */
-    if ((caps & MM_MODEM_CAPABILITY_CDMA_EVDO) && (caps & MM_MODEM_CAPABILITY_3GPP)) {
-        mm_obj_dbg (self, "checking if multimode device has a SIM...");
-        internal_load_unlock_required (
-            self,
-            (GAsyncReadyCallback)current_capabilities_internal_load_unlock_required_ready,
-            task);
-        return;
-    }
 
     ctx->step++;
     interface_initialization_step (task);
