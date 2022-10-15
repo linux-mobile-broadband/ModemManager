@@ -187,7 +187,7 @@ initialize_telit_3g_to_mm_band_masks (void)
 #define B4G_FLAG(band) (((guint64) 1) << (band - MM_MODEM_BAND_TELIT_4G_FIRST))
 
 #define MM_MODEM_BAND_TELIT_EXT_4G_FIRST MM_MODEM_BAND_EUTRAN_65
-#define MM_MODEM_BAND_TELIT_EXT_4G_LAST  MM_MODEM_BAND_EUTRAN_71
+#define MM_MODEM_BAND_TELIT_EXT_4G_LAST  MM_MODEM_BAND_EUTRAN_85
 
 #define B4G_FLAG_EXT(band) (((guint64) 1) << (band - MM_MODEM_BAND_TELIT_EXT_4G_FIRST))
 
