@@ -1,4 +1,173 @@
 
+ModemManager 1.20.0
+-------------------------------------------
+This is a new stable release of ModemManager.
+
+The following notes are directed to package maintainers:
+
+ * This version now requires:
+   ** libmbim >= 1.28.0 (for the optional MBIM support)
+   ** libqmi >= 1.32.0 (for the optional QMI support)
+
+ * There is no longer an upstream-provided source tarball, please use the signed
+   git tag '1.20.0' instead to refer to the sources of this release.
+
+ * This release supports meson as the primary build system. The GNU autotools
+   support is considered deprecated and will no longer be used in future major
+   releases. The 1.20.x releases will be the last ones including GNU autotools
+   support.
+
+The most important features and changes in this release are the following:
+
+ * API:
+   ** New 'Modem.Sar' interface to allow the host to manage the SAR power level.
+   ** New 'Modem.GetCellInfo()' method, that allows querying information about
+      the current serving and neighboring cells. Currently including
+      'cell-type' and 'serving' fields for all cell types, plus additional
+      type-specific fields:
+      *** CDMA: 'nid', 'sid', 'base-station-id', 'ref-pn' and 'pilot-strength'.
+      *** GSM: 'operator-id', 'lac', 'ci', 'timing-advance', 'arfcn',
+          'base-station-id' and 'rx-level'.
+      *** UMTS: 'operator-id', 'lac', 'ci', 'frequency-fdd-ul',
+          'frequency-fdd-dl', 'frequency-tdd', 'uarfcn', 'psc', 'rscp', 'ecio'
+          and 'path-loss'.
+      *** TDSCDMA: 'operator-id', 'lac', 'ci', 'uarfcn', 'cell-parameter-id',
+          'timing-advance', 'rscp' and 'path-loss'.
+      *** LTE: 'operator-id', 'tac', 'ci', 'physical-ci', 'earfcn', 'rsrp',
+          'rsrq' and 'timing-advance'.
+      *** 5GNR: 'operator-id', 'tac', 'ci', 'physical-ci', 'nrarfcn', 'rsrp',
+          'rsrq', 'sinr' and 'timing-advance'.
+   ** New 'access-type-preference', 'roaming-allowance', 'profile-name',
+      'profile-enabled' and 'profile-source' fields in the 'Bearer.Properties'
+      property, that can also be used in both 'Modem.Simple.Connect()' and
+      'Modem.CreateBearer()'.
+   ** New 'Modem.Modem3gpp.SetPacketServiceState()' method and
+      'Modem.Modem3gpp.PacketServiceState' property, which allow management the
+      explicit attach or detach to packet service on the current registered
+      network.
+   ** New 'Modem.Modem3gpp.SetNr5gRegistrationSettings()' method and
+      'Modem.Modem3gpp.Nr5gRegistrationSettings' property, to allow management
+      of 5G specific settings like 'mico-mode' or 'drx-cycle'.
+   ** New 'start-date', 'uplink-speed' and 'downlnk-speed' fields in the
+      'Bearer.Stats' property.
+   ** New 'Bearer.ReloadStatsSupported' property to indicate whether reloading
+      ongoing stats is supported or not.
+   ** New 'Modem.Modem3gppProfileManager.IndexField' property, to indicate which
+      field is to be used as unique index in the profile management operations.
+   ** New 'Sim.SimType', 'Sim.EsimStatus' and 'Sim.Removability' properties to
+      improve the management of eSIM related operations.
+   ** New 'Sim.Gid1' and 'Sim.Gid2' properties, which allow identifying SIM cards
+      that should have different settings applied.
+   ** New 'Modem.Signal.SetupThresholds() method, 'Modem.Signal.RssiThreshold'
+      and 'Modem.Signal.ErrorRateThreshold' to allow configuring thresholds so
+      that the modem emits indications whenever the signal quality values change
+      based on those thresholds. For RSSI a delta amount of dBm can be given,
+      and for error rate just a boolean to enable or disable the corresponding
+      event.
+   ** New 'error-rate' fields in the 'Modem.Signal.Cdma', 'Modem.Signal.Evdo',
+      'Modem.Signal.Gsm', 'Modem.Signal.Umts', 'Modem.Signal.Lte' and
+      'Modem.Signal.Nr5g' properties.
+
+ * Core:
+   ** Detecting an eSIM without an active profile in the current SIM slot will
+      lead to the modem being in Failed state, in the same way as if the slot
+      was for a physical SIM and no SIM was inserted.
+   ** Default amount of AT probing attempts is updated to 6, to cope with modems
+      that are slower to boot.
+   ** New '--test-mbimex-profile-management' option in the daemon, to enable
+      support for profile management operations using the Microsoft extensions.
+      This is an optional feature because it requires using the 'apn-type' field
+      as unique index, which not all users of the profile management API may
+      expect.
+   ** Implemented some initial support to automatically hide personal details
+      (e.g. phone numbers, SMS contents...) from logs, right now only applicable
+      to QMI and MBIM logs. Updated support for this feature will keep on being
+      integrated in future 1.20.x updates. The new '--log-personal-info' option
+      in the daemon allows to disable this feature completely.
+   ** Added new filter match option for subsystem vendor id, required in several
+      PCI based Qualcomm modules.
+   ** QCDM port probing will no longer automatically run for all plugins, only
+      in those that explicitly require it.
+   ** Implemented support for suspend/resume detection based on ChromeOS' powerd
+      daemon.
+   ** Added Cat-M and NB-IoT LPWA access technologies.
+
+ * Modem interface:
+   ** On 3GPP+3GPP2 multimode devices, a missing SIM card will now force the
+      modem into Failed state, as if it was a 3GPP-only device.
+
+ * Simple interface:
+   ** Explicitly wait for PS domain to be attached during a connection attempt.
+
+ * 3GPP interface:
+   ** Updated to report domain registration changes altogether whenever possible
+      (e.g. when using the QMI or MBIM protocols).
+
+ * MBIM:
+   ** Implemented support to use the Microsoft-defined MBIM extensions v2 and v3
+      whenever supported by the device. The ModemManager daemon will negotiate
+      which version to use with the modem, so that the highest version supported
+      is enabled. This negotiation applies to the whole device, so any other
+      user of the MBIM device will automatically start using the newly agreed
+      version.
+   ** Implemented current modes switching using MBIMEx v2.0 extensions.
+   ** Trigger explicit disconnection if a connection attempt fails.
+   ** Modem will be flagged as unusable if 10 consecutive MBIM requests timeout.
+   ** Enabled multiplex support for devices in the WWAN subsystem.
+
+ * QMI:
+   ** Updated logic to by default prefer 'Signal Info' over the deprecated
+      'Signal Strength' operations.
+   ** Updated logic to by default prefer 'System Info' over the deprecated
+      'Serving System' operations.
+   ** Updated power state transition logic to ensure the new state is reached
+      before returning success to the user.
+   ** Implemented support for the 'Modem3gppProfileManager.Updated' signal using
+      PDC refresh notifications.
+   ** Modem will be flagged as unusable if 10 consecutive QMI requests timeout.
+   ** Implemented DTMF support.
+   ** Implemented support for automatic SIM IMSI switch detection under certain
+      roaming scenarios.
+   ** Updated the logic to move the PS domain state to 'registered' based on the
+      DSD System Status indications.
+   ** Updated endpoint type detection logic to be based on the net driver.
+   ** Updated endpoint number selection to be based on the data port.
+   ** Updated connection logic to allocate separate WDS clients per endpoint.
+   ** Added support for PCO reporting.
+
+ * plugins:
+   ** quectel: Added FCC unlock support for the EM05-G.
+   ** telit: Band management updated to prefer using QMI whenever available, as
+      well as to detect the #BND command format automatically.
+   ** telit: Added support for LPWA modems.
+   ** fibocom: Implemented optional support to power down and up the modem
+      during the update of the initial EPS bearer settings.
+   ** fibocom: Implemented initial EPS bearer settings management in the MA510.
+   ** intel: New generic plugin for Intel PCI devices with vid 0x8086.
+   ** xmm: Prefer GNSS control ports explicitly tagged via udev tags.
+   ** foxconn: Use the new FOX QMI service to load firmware version.
+   ** cinterion: Added support for PCIe based devices.
+
+The following features which were backported to 1.18.x releases are also present
+in ModemManager 1.20.0:
+
+ * core: added support for external FCC unlock scripts that the user must
+   manually enable; automatic FCC unlocking will no longer happen.
+ * core: added support for connection/disconnection notification dispatcher
+   scripts, used primarily in the openwrt integration in order to report network
+   initiated disconnects.
+ * udev: fixed shell globing patterns in rules.
+ * sms: default send timeout updated to 5min.
+ * sms: merge WDP multipart CDMA WAP messages.
+ * qmi: fixed capabilities management in multimode 4G/5G devices.
+ * mbim: fixed network initiated disconnections by not comparing context type.
+ * qcom-soc: plugin enabled by default in build.
+ * foxconn: added support for T99W265 modems.
+ * fibocom: added support for FM101 modems.
+ * cinterion: added support for PLSx3w modems.
+ * telit: added support for new LE910S1, LE910Cx and LN920 compositions.
+
+
 ModemManager 1.18.0
 -------------------------------------------
 This is a new stable release of ModemManager.
@@ -85,15 +254,15 @@ The most important features and changes in this release are the following:
       'Simple.Connect()' and 'Modem.CreateBearer()' methods:
       *** 'multiplex': which allows the user to specify whether multiplexing
           should be avoided ('none'), whether it should be mandatory
-	  ('required') or whether it should be enabled if available or skipped
-	  if unavailable ('requested').
+          ('required') or whether it should be enabled if available or skipped
+          if unavailable ('requested').
       *** 'profile-id': which allows the user to request a connection attempt
           with an existing profile stored in the module.
       *** 'apn-type': which allows the user to specify the purpose of a given
           connection, e.g. the user could create a connection to an APN
-	  providing default internet connectivity and another one to an APN
-	  providing access to the MMS gateway. This setting may or may not be
-	  stored in the module itself, it depends on the type of module.
+          providing default internet connectivity and another one to an APN
+          providing access to the MMS gateway. This setting may or may not be
+          stored in the module itself, it depends on the type of module.
    ** New 'Multiplexed' boolean property in the Bearer object, specifying
       whether the bearer is connected through a multiplexed interface.
    ** New 'ConnectionError' property in the bearer object, specifying the last
