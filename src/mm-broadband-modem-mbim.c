@@ -155,6 +155,8 @@ struct _MMBroadbandModemMbimPrivate {
     MbimDataClass highest_available_data_class;
     MbimRegisterState reg_state;
     MbimPacketServiceState packet_service_state;
+    guint64 packet_service_uplink_speed;
+    guint64 packet_service_downlink_speed;
 
     MbimSubscriberReadyState last_ready_state;
 
@@ -4742,22 +4744,31 @@ basic_connect_notification_subscriber_ready_status (MMBroadbandModemMbim *self,
     }
 }
 
-typedef struct {
-    MMBroadbandModemMbim *self;
-    guint64               uplink_speed;
-    guint64               downlink_speed;
-} ReportSpeedsContext;
+/*****************************************************************************/
+/* Packet service updates */
+
+void
+mm_broadband_modem_mbim_get_speeds (MMBroadbandModemMbim *self,
+                                    guint64              *uplink_speed,
+                                    guint64              *downlink_speed)
+{
+    if (uplink_speed)
+        *uplink_speed = self->priv->packet_service_uplink_speed;
+    if (downlink_speed)
+        *downlink_speed = self->priv->packet_service_downlink_speed;
+}
 
 static void
-bearer_list_report_speeds (MMBaseBearer *bearer,
-                           gpointer      user_data)
+bearer_list_report_speeds (MMBaseBearer         *bearer,
+                           MMBroadbandModemMbim *self)
 {
-    ReportSpeedsContext *ctx = user_data;
+    if (!MM_IS_BEARER_MBIM (bearer))
+        return;
 
-    if (MM_IS_BEARER_MBIM (bearer)) {
-        mm_obj_dbg (ctx->self, "bearer '%s' speeds updated", mm_base_bearer_get_path (bearer));
-        mm_base_bearer_report_speeds (bearer, ctx->uplink_speed, ctx->downlink_speed);
-    }
+    mm_obj_dbg (self, "bearer '%s' speeds updated", mm_base_bearer_get_path (bearer));
+    mm_base_bearer_report_speeds (bearer,
+                                  self->priv->packet_service_uplink_speed,
+                                  self->priv->packet_service_downlink_speed);
 }
 
 static void
@@ -4869,19 +4880,15 @@ basic_connect_notification_packet_service (MMBroadbandModemMbim *self,
                                   g_strdup (self->priv->current_operator_name));
     }
 
+    self->priv->packet_service_uplink_speed = uplink_speed;
+    self->priv->packet_service_downlink_speed = downlink_speed;
     g_object_get (self,
                   MM_IFACE_MODEM_BEARER_LIST, &bearer_list,
                   NULL);
-    if (bearer_list) {
-        ReportSpeedsContext ctx = {
-            .uplink_speed = uplink_speed,
-            .downlink_speed = downlink_speed,
-        };
-
+    if (bearer_list)
         mm_bearer_list_foreach (bearer_list,
                                 (MMBearerListForeachFunc)bearer_list_report_speeds,
-                                &ctx);
-    }
+                                self);
 }
 
 static void

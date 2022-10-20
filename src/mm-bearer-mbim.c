@@ -251,8 +251,6 @@ typedef struct {
     MMPort                *data;
     MMBearerConnectResult *connect_result;
     MbimMessage           *abort_on_failure;
-    guint64                uplink_speed;
-    guint64                downlink_speed;
     /* settings to use */
     gint                   profile_id;
     gchar                 *apn;
@@ -362,6 +360,8 @@ ip_configuration_query_ready (MbimDevice   *device,
         g_autofree gchar            *ipv6configurationavailable_str = NULL;
         g_autoptr(MMBearerIpConfig)  ipv4_config = NULL;
         g_autoptr(MMBearerIpConfig)  ipv6_config = NULL;
+        guint64                      uplink_speed = 0;
+        guint64                      downlink_speed = 0;
 
         /* IPv4 info */
 
@@ -626,8 +626,10 @@ ip_configuration_query_ready (MbimDevice   *device,
         if (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN)
             mm_bearer_connect_result_set_profile_id (ctx->connect_result, ctx->profile_id);
 
-        mm_bearer_connect_result_set_uplink_speed (ctx->connect_result, ctx->uplink_speed);
-        mm_bearer_connect_result_set_downlink_speed (ctx->connect_result, ctx->downlink_speed);
+        /* Propagate speeds from modem object */
+        mm_broadband_modem_mbim_get_speeds (ctx->modem, &uplink_speed, &downlink_speed);
+        mm_bearer_connect_result_set_uplink_speed (ctx->connect_result, uplink_speed);
+        mm_bearer_connect_result_set_downlink_speed (ctx->connect_result, downlink_speed);
     }
 
     if (error) {
@@ -1004,10 +1006,6 @@ packet_service_set_ready (MbimDevice *device,
             return;
         }
     }
-
-    /* store speeds to include in the connection result later on */
-    ctx->uplink_speed = uplink_speed;
-    ctx->downlink_speed = downlink_speed;
 
     /* Keep on */
     ctx->step++;
