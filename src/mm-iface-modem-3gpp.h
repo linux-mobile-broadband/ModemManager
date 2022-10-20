@@ -392,6 +392,16 @@ gboolean mm_iface_modem_3gpp_reregister_in_network_finish (MMIfaceModem3gpp     
                                                            GAsyncResult         *res,
                                                            GError              **error);
 
+/* Allow requesting packet service explicitly */
+void     mm_iface_modem_3gpp_set_packet_service_state        (MMIfaceModem3gpp              *self,
+                                                              MMModem3gppPacketServiceState  packet_service_state,
+                                                              GAsyncReadyCallback            callback,
+                                                              gpointer                       user_data);
+gboolean mm_iface_modem_3gpp_set_packet_service_state_finish (MMIfaceModem3gpp              *self,
+                                                              GAsyncResult                  *res,
+                                                              GError                       **error);
+
+/* Allow waiting for packet service */
 void                          mm_iface_modem_3gpp_wait_for_packet_service_state        (MMIfaceModem3gpp              *self,
                                                                                         MMModem3gppPacketServiceState  final_state,
                                                                                         GAsyncReadyCallback            callback,
