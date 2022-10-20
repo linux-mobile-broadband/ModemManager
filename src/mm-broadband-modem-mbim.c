@@ -9021,7 +9021,10 @@ packet_service_set_ready (MbimDevice   *device,
     }
 
     if (error) {
-        g_task_return_error (task, g_steal_pointer (&error));
+        if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_NO_DEVICE_SUPPORT))
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED, "%s", error->message);
+        else
+            g_task_return_error (task, g_steal_pointer (&error));
         g_object_unref (task);
         return;
     }
