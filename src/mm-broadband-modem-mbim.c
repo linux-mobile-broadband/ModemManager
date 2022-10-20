@@ -8959,53 +8959,69 @@ packet_service_set_ready (MbimDevice   *device,
                           GAsyncResult *res,
                           GTask        *task)
 {
+    MMBroadbandModemMbim   *self;
     g_autoptr(MbimMessage)  response = NULL;
-    GError                 *error = NULL;
+    g_autoptr(GError)       error = NULL;
     MbimPacketServiceState  requested_packet_service_state;
     MbimPacketServiceState  packet_service_state;
+    guint32                 nw_error;
+
+    self = g_task_get_source_object (task);
 
     response = mbim_device_command_finish (device, res, &error);
-    if (!response || !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error)) {
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
+    if (response &&
+        (mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
+         error->code == MBIM_STATUS_ERROR_FAILURE)) {
+        g_autoptr(GError) inner_error = NULL;
 
-    if (mbim_device_check_ms_mbimex_version (device, 3, 0)) {
-        mbim_message_ms_basic_connect_v3_packet_service_response_parse (
-            response,
-            NULL, /* &nw_error */
-            &packet_service_state,
-            NULL, /* data_class_v3 */
-            NULL, /* uplink_speed */
-            NULL, /* downlink_speed */
-            NULL, /* frequency_range */
-            NULL, /* data_subclass */
-            NULL, /* tai */
-            &error);
-    } else if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
-        mbim_message_ms_basic_connect_v2_packet_service_response_parse (
-            response,
-            NULL, /* nw_error */
-            &packet_service_state,
-            NULL, /* data_class */
-            NULL, /* uplink_speed */
-            NULL, /* downlink_speed */
-            NULL, /* frequency_range */
-            &error);
-    } else {
-        mbim_message_packet_service_response_parse (
-            response,
-            NULL, /* nw_error */
-            &packet_service_state,
-            NULL, /* data_class */
-            NULL, /* uplink_speed */
-            NULL, /* downlink_speed */
-            &error);
+        if (mbim_device_check_ms_mbimex_version (device, 3, 0)) {
+            mbim_message_ms_basic_connect_v3_packet_service_response_parse (
+                response,
+                &nw_error,
+                &packet_service_state,
+                NULL, /* data_class_v3 */
+                NULL, /* uplink_speed */
+                NULL, /* downlink_speed */
+                NULL, /* frequency_range */
+                NULL, /* data_subclass */
+                NULL, /* tai */
+                &inner_error);
+        } else if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
+            mbim_message_ms_basic_connect_v2_packet_service_response_parse (
+                response,
+                &nw_error,
+                &packet_service_state,
+                NULL, /* data_class */
+                NULL, /* uplink_speed */
+                NULL, /* downlink_speed */
+                NULL, /* frequency_range */
+                &inner_error);
+        } else {
+            mbim_message_packet_service_response_parse (
+                response,
+                &nw_error,
+                &packet_service_state,
+                NULL, /* data_class */
+                NULL, /* uplink_speed */
+                NULL, /* downlink_speed */
+                &inner_error);
+        }
+
+        if (!inner_error) {
+            /* Prefer the NW error if available */
+            if (nw_error) {
+                g_clear_error (&error);
+                error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error, self);
+            }
+        } else {
+            /* Prefer the error from the result to the parsing error */
+            if (!error)
+                error = g_steal_pointer (&inner_error);
+        }
     }
 
     if (error) {
-        g_task_return_error (task, error);
+        g_task_return_error (task, g_steal_pointer (&error));
         g_object_unref (task);
         return;
     }
