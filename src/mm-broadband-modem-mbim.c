@@ -9064,7 +9064,7 @@ set_packet_service_state (MMIfaceModem3gpp              *self,
     message = mbim_message_packet_service_set_new (packet_service_action, NULL);
     mbim_device_command (device,
                          message,
-                         10,
+                         30,
                          NULL,
                          (GAsyncReadyCallback)packet_service_set_ready,
                          task);
