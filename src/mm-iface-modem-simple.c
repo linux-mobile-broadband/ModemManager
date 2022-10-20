@@ -210,6 +210,152 @@ register_in_3gpp_or_cdma_network (MMIfaceModemSimple *self,
 }
 
 /*****************************************************************************/
+/* Packet service attach in 3GPP network */
+
+typedef enum {
+    PACKET_SERVICE_ATTACH_IN_3GPP_NETWORK_STEP_FIRST,
+    PACKET_SERVICE_ATTACH_IN_3GPP_NETWORK_STEP_WAIT_BEFORE,
+    PACKET_SERVICE_ATTACH_IN_3GPP_NETWORK_STEP_SET,
+    PACKET_SERVICE_ATTACH_IN_3GPP_NETWORK_STEP_WAIT_AFTER,
+    PACKET_SERVICE_ATTACH_IN_3GPP_NETWORK_STEP_LAST,
+} PacketServiceAttachIn3gppNetworkStep;
+
+typedef struct {
+    PacketServiceAttachIn3gppNetworkStep  step;
+    GError                               *error;
+} PacketServiceAttachIn3gppNetworkContext;
+
+static void
+packet_service_attach_in_3gpp_network_context_free (PacketServiceAttachIn3gppNetworkContext *ctx)
+{
+    g_assert (!ctx->error);
+    g_slice_free (PacketServiceAttachIn3gppNetworkContext, ctx);
+}
+
+static gboolean
+packet_service_attach_in_3gpp_network_finish (MMIfaceModemSimple  *self,
+                                              GAsyncResult        *res,
+                                              GError             **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void packet_service_attach_in_3gpp_network_step (GTask *task);
+
+static void
+set_packet_service_state_ready (MMIfaceModem3gpp *self,
+                                GAsyncResult     *res,
+                                GTask            *task)
+{
+    PacketServiceAttachIn3gppNetworkContext *ctx;
+    g_autoptr(GError)                        error = NULL;
+
+    ctx = g_task_get_task_data (task);
+    g_assert (ctx->error);
+
+    if (!mm_iface_modem_3gpp_set_packet_service_state_finish (self, res, &error)) {
+        /* On an unsupported error, return the original wait failure; otherwise
+         * return the set error. */
+        if (!g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED)) {
+            g_error_free (ctx->error);
+            ctx->error = g_steal_pointer (&error);
+        }
+        /* Failures in the set are always fatal right away */
+        ctx->step = PACKET_SERVICE_ATTACH_IN_3GPP_NETWORK_STEP_LAST;
+    } else {
+        /* Retry if possible */
+        g_clear_error (&ctx->error);
+        ctx->step++;
+    }
+    packet_service_attach_in_3gpp_network_step (task);
+}
+
+static void
+wait_for_packet_service_state_ready (MMIfaceModem3gpp *self,
+                                     GAsyncResult     *res,
+                                     GTask            *task)
+{
+    PacketServiceAttachIn3gppNetworkContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+    g_assert (!ctx->error);
+
+    if (!mm_iface_modem_3gpp_wait_for_packet_service_state_finish (self, res, &ctx->error))
+        ctx->step++;
+    else
+        ctx->step = PACKET_SERVICE_ATTACH_IN_3GPP_NETWORK_STEP_LAST;
+    packet_service_attach_in_3gpp_network_step (task);
+}
+
+static void
+packet_service_attach_in_3gpp_network_step (GTask *task)
+{
+    PacketServiceAttachIn3gppNetworkContext *ctx;
+    MMIfaceModemSimple                      *self;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    switch (ctx->step) {
+        case PACKET_SERVICE_ATTACH_IN_3GPP_NETWORK_STEP_FIRST:
+            ctx->step++;
+            /* fall through */
+
+        case PACKET_SERVICE_ATTACH_IN_3GPP_NETWORK_STEP_WAIT_BEFORE:
+            g_assert (!ctx->error);
+            mm_iface_modem_3gpp_wait_for_packet_service_state (MM_IFACE_MODEM_3GPP (self),
+                                                               MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED,
+                                                               (GAsyncReadyCallback)wait_for_packet_service_state_ready,
+                                                               task);
+            return;
+
+        case PACKET_SERVICE_ATTACH_IN_3GPP_NETWORK_STEP_SET:
+            /* An explicit set will only be attempted if the packet service state wait failed */
+            g_assert (ctx->error);
+            mm_iface_modem_3gpp_set_packet_service_state (MM_IFACE_MODEM_3GPP (self),
+                                                          MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED,
+                                                          (GAsyncReadyCallback)set_packet_service_state_ready,
+                                                          task);
+            return;
+
+        case PACKET_SERVICE_ATTACH_IN_3GPP_NETWORK_STEP_WAIT_AFTER:
+            g_assert (!ctx->error);
+            mm_iface_modem_3gpp_wait_for_packet_service_state (MM_IFACE_MODEM_3GPP (self),
+                                                               MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED,
+                                                               (GAsyncReadyCallback)wait_for_packet_service_state_ready,
+                                                               task);
+            return;
+
+        case PACKET_SERVICE_ATTACH_IN_3GPP_NETWORK_STEP_LAST:
+            if (ctx->error)
+                g_task_return_error (task, g_steal_pointer (&ctx->error));
+            else
+                g_task_return_boolean (task, TRUE);
+            g_object_unref (task);
+            return;
+
+        default:
+            g_assert_not_reached ();
+    }
+}
+
+static void
+packet_service_attach_in_3gpp_network (MMIfaceModemSimple  *self,
+                                       GAsyncReadyCallback  callback,
+                                       gpointer             user_data)
+{
+    PacketServiceAttachIn3gppNetworkContext *ctx;
+    GTask                                   *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    ctx = g_slice_new0 (PacketServiceAttachIn3gppNetworkContext);
+    ctx->step = PACKET_SERVICE_ATTACH_IN_3GPP_NETWORK_STEP_FIRST;
+    g_task_set_task_data (task, ctx, (GDestroyNotify)packet_service_attach_in_3gpp_network_context_free);
+
+    packet_service_attach_in_3gpp_network_step (task);
+}
+
+/*****************************************************************************/
 
 typedef enum {
     CONNECTION_STEP_FIRST,
@@ -317,14 +463,14 @@ create_bearer_ready (MMIfaceModem      *self,
 }
 
 static void
-wait_for_packet_service_state_ready (MMIfaceModem3gpp  *self,
-                                     GAsyncResult      *res,
-                                     ConnectionContext *ctx)
+packet_service_attach_in_3gpp_network_ready (MMIfaceModemSimple *self,
+                                             GAsyncResult       *res,
+                                             ConnectionContext  *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_iface_modem_3gpp_wait_for_packet_service_state_finish (self, res, &error)) {
-        mm_obj_warn (ctx->self, "couldn't attach packet service: %s", error->message);
+    if (!packet_service_attach_in_3gpp_network_finish (self, res, &error)) {
+        mm_obj_warn (ctx->self, "packet service attach in 3GPP network failed: %s", error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         connection_context_free (ctx);
         return;
@@ -629,10 +775,10 @@ connection_step (ConnectionContext *ctx)
         mm_obj_msg (ctx->self, "simple connect state (%d/%d): wait to get packet service state attached",
                     ctx->step, CONNECTION_STEP_LAST);
         if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self))) {
-            mm_iface_modem_3gpp_wait_for_packet_service_state (MM_IFACE_MODEM_3GPP (ctx->self),
-                                                               MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED,
-                                                               (GAsyncReadyCallback)wait_for_packet_service_state_ready,
-                                                               ctx);
+            packet_service_attach_in_3gpp_network (
+                ctx->self,
+                (GAsyncReadyCallback)packet_service_attach_in_3gpp_network_ready,
+                ctx);
             return;
         }
         /* If not 3GPP, just go on */
