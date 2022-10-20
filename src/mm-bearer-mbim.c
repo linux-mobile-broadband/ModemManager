@@ -234,7 +234,6 @@ build_disconnect_message (MMBearerMbim *self,
 typedef enum {
     CONNECT_STEP_FIRST,
     CONNECT_STEP_LOAD_PROFILE_SETTINGS,
-    CONNECT_STEP_PACKET_SERVICE,
     CONNECT_STEP_SETUP_LINK,
     CONNECT_STEP_SETUP_LINK_MAIN_UP,
     CONNECT_STEP_CHECK_DISCONNECTED,
@@ -901,117 +900,6 @@ setup_link_ready (MMPortMbim    *mbim,
                                   task);
 }
 
-static void
-packet_service_set_ready (MbimDevice *device,
-                          GAsyncResult *res,
-                          GTask *task)
-{
-    MMBearerMbim           *self;
-    ConnectContext         *ctx;
-    GError                 *error = NULL;
-    g_autoptr(MbimMessage)  response = NULL;
-    guint32                 nw_error;
-    MbimPacketServiceState  packet_service_state;
-    MbimDataClass           data_class = 0;
-    MbimDataClassV3         data_class_v3 = 0;
-    MbimDataSubclass        data_subclass = 0;
-    guint64                 uplink_speed = 0;
-    guint64                 downlink_speed = 0;
-    MbimFrequencyRange      frequency_range = MBIM_FREQUENCY_RANGE_UNKNOWN;
-
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data (task);
-
-    response = mbim_device_command_finish (device, res, &error);
-    if (response &&
-        (mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
-         error->code == MBIM_STATUS_ERROR_FAILURE)) {
-        g_autoptr(GError) inner_error = NULL;
-
-        if (mbim_device_check_ms_mbimex_version (device, 3, 0)) {
-            mbim_message_ms_basic_connect_v3_packet_service_response_parse (
-                response,
-                &nw_error,
-                &packet_service_state,
-                &data_class_v3,
-                &uplink_speed,
-                &downlink_speed,
-                &frequency_range,
-                &data_subclass,
-                NULL, /* tai */
-                &inner_error);
-        } else if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
-            mbim_message_ms_basic_connect_v2_packet_service_response_parse (
-                response,
-                &nw_error,
-                &packet_service_state,
-                &data_class,
-                &uplink_speed,
-                &downlink_speed,
-                &frequency_range,
-                &inner_error);
-        } else {
-            mbim_message_packet_service_response_parse (
-                response,
-                &nw_error,
-                &packet_service_state,
-                &data_class,
-                &uplink_speed,
-                &downlink_speed,
-                &inner_error);
-        }
-
-        if (!inner_error) {
-            if (nw_error) {
-                g_clear_error (&error);
-                error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error, self);
-            } else {
-                g_autofree gchar *data_class_str = NULL;
-                g_autofree gchar *data_subclass_str = NULL;
-                g_autofree gchar *frequency_range_str = NULL;
-
-                if (data_class_v3) {
-                    data_class_str = mbim_data_class_v3_build_string_from_mask (data_class_v3);
-                    data_subclass_str = mbim_data_subclass_build_string_from_mask (data_subclass);
-                } else
-                    data_class_str = mbim_data_class_build_string_from_mask (data_class);
-
-                frequency_range_str = mbim_frequency_range_build_string_from_mask (frequency_range);
-                mm_obj_dbg (self, "packet service update:");
-                mm_obj_dbg (self, "           state: '%s'", mbim_packet_service_state_get_string (packet_service_state));
-                mm_obj_dbg (self, "      data class: '%s'", data_class_str);
-                if (data_subclass_str)
-                    mm_obj_dbg (self, "   data subclass: '%s'", data_subclass_str);
-                mm_obj_dbg (self, "          uplink: '%" G_GUINT64_FORMAT "' bps", uplink_speed);
-                mm_obj_dbg (self, "        downlink: '%" G_GUINT64_FORMAT "' bps", downlink_speed);
-                mm_obj_dbg (self, " frequency range: '%s'", frequency_range_str);
-            }
-        } else {
-            /* Prefer the error from the result to the parsing error */
-            if (!error)
-                error = g_steal_pointer (&inner_error);
-        }
-    }
-
-    if (error) {
-        /* Don't make NoDeviceSupport errors fatal; just try to keep on the
-         * connection sequence even with this error. */
-        if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_NO_DEVICE_SUPPORT)) {
-            mm_obj_dbg (self, "device doesn't support packet service attach");
-            g_error_free (error);
-        } else {
-            /* All other errors are fatal */
-            g_task_return_error (task, error);
-            g_object_unref (task);
-            return;
-        }
-    }
-
-    /* Keep on */
-    ctx->step++;
-    connect_context_step (task);
-}
-
 static gboolean
 load_settings_from_profile (MMBearerMbim    *self,
                             ConnectContext  *ctx,
@@ -1138,17 +1026,6 @@ connect_context_step (GTask *task)
         }
         ctx->step++;
         /* Fall through */
-
-    case CONNECT_STEP_PACKET_SERVICE:
-        mm_obj_dbg (self, "activating packet service...");
-        message = mbim_message_packet_service_set_new (MBIM_PACKET_SERVICE_ACTION_ATTACH, NULL);
-        mbim_device_command (mm_port_mbim_peek_device (ctx->mbim),
-                             message,
-                             30,
-                             g_task_get_cancellable (task),
-                             (GAsyncReadyCallback)packet_service_set_ready,
-                             task);
-        return;
 
     case CONNECT_STEP_SETUP_LINK:
         /* if a link prefix hint is available, it's because we should be doing
