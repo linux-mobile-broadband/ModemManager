@@ -1332,6 +1332,581 @@ test_supported_modes_generic_nr5g_lte_evdo (void)
 }
 
 /*****************************************************************************/
+/* System Info processor helper */
+
+static void
+common_test_registration_state_from_qmi_system_info (const guint8                 *data,
+                                                     gsize                         data_size,
+                                                     MMModem3gppRegistrationState  expected_registration_state_cs,
+                                                     MMModem3gppRegistrationState  expected_registration_state_ps,
+                                                     MMModem3gppRegistrationState  expected_registration_state_eps,
+                                                     MMModem3gppRegistrationState  expected_registration_state_5gs,
+                                                     guint16                       expected_lac,
+                                                     guint16                       expected_tac,
+                                                     guint32                       expected_cid,
+                                                     const gchar                  *expected_operator_id,
+                                                     MMModemAccessTechnology       expected_act)
+{
+    g_autoptr(GByteArray)                       buffer = NULL;
+    g_autoptr(GError)                           error = NULL;
+    g_autoptr(QmiMessage)                       message = NULL;
+    g_autoptr(QmiMessageNasGetSystemInfoOutput) output = NULL;
+    MMModem3gppRegistrationState                registration_state_cs = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    MMModem3gppRegistrationState                registration_state_ps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    MMModem3gppRegistrationState                registration_state_eps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    MMModem3gppRegistrationState                registration_state_5gs = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    guint16                                     lac = 0;
+    guint16                                     tac = 0;
+    guint32                                     cid = 0;
+    g_autofree gchar                           *operator_id = NULL;
+    MMModemAccessTechnology                     act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+
+    buffer = g_byte_array_append (g_byte_array_new (), data, data_size);
+    message = qmi_message_new_from_raw (buffer, &error);
+    g_assert_no_error (error);
+    g_assert (message);
+
+    output = qmi_message_nas_get_system_info_response_parse (message, &error);
+    g_assert_no_error (error);
+    g_assert (output);
+
+    mm_modem_registration_state_from_qmi_system_info (output, NULL,
+                                                      &registration_state_cs,
+                                                      &registration_state_ps,
+                                                      &registration_state_eps,
+                                                      &registration_state_5gs,
+                                                      &lac,
+                                                      &tac,
+                                                      &cid,
+                                                      &operator_id,
+                                                      &act,
+                                                      NULL); /* log_object */
+
+    g_assert_cmpuint (registration_state_cs, ==, expected_registration_state_cs);
+    g_assert_cmpuint (registration_state_ps, ==, expected_registration_state_ps);
+    g_assert_cmpuint (registration_state_eps, ==, expected_registration_state_eps);
+    g_assert_cmpuint (registration_state_5gs, ==, expected_registration_state_5gs);
+    g_assert_cmpuint (lac, ==, expected_lac);
+    g_assert_cmpuint (tac, ==, expected_tac);
+    g_assert_cmpuint (cid, ==, expected_cid);
+    g_assert_cmpstr (operator_id, ==, expected_operator_id);
+    g_assert_cmpuint (act, ==, expected_act);
+}
+
+static void
+test_registration_state_from_qmi_system_info_2g_searching (void)
+{
+    static const guint8 data[] = {
+        0x01, 0x19, 0x00, 0x80, /* marker (1 byte), qmux length (2 bytes), qmux flags (1 byte) */
+        0x03, /* service: NAS */
+        0x02, /* client id */
+        0x02, /* service flags */
+        0x01, 0x00, /* transaction */
+        0x4D, 0x00, /* message id */
+        0x0D, 0x00, /* all tlvs length */
+        /* TLV 0x02: Result */
+        0x02, /* tlv type */
+        0x04, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, 0x00,
+        /* TLV 0x12: GSM Service Status*/
+        0x12, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, /* [ service_status = 'none' true_service_status = 'none' preferred_data_path = 'no' ] */
+    };
+
+    common_test_registration_state_from_qmi_system_info (data, G_N_ELEMENTS (data),
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING, /* cs */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING, /* ps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN,   /* eps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN,   /* 5gs */
+                                                         0, /* lac */
+                                                         0, /* tac */
+                                                         0, /* cid */
+                                                         NULL, /* operator id */
+                                                         MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+}
+
+static void
+test_registration_state_from_qmi_system_info_2g_idle (void)
+{
+    static const guint8 data[] = {
+        0x01, 0x19, 0x00, 0x80, /* marker (1 byte), qmux length (2 bytes), qmux flags (1 byte) */
+        0x03, /* service: NAS */
+        0x02, /* client id */
+        0x02, /* service flags */
+        0x01, 0x00, /* transaction */
+        0x4D, 0x00, /* message id */
+        0x0D, 0x00, /* all tlvs length */
+        /* TLV 0x02: Result */
+        0x02, /* tlv type */
+        0x04, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, 0x00,
+        /* TLV 0x12: GSM Service Status*/
+        0x12, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x04, 0x00, 0x00, /* [ service_status = 'power-save' true_service_status = 'none' preferred_data_path = 'no' ] */
+    };
+
+    common_test_registration_state_from_qmi_system_info (data, G_N_ELEMENTS (data),
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,    /* cs */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,    /* ps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, /* eps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, /* 5gs */
+                                                         0, /* lac */
+                                                         0, /* tac */
+                                                         0, /* cid */
+                                                         NULL, /* operator id */
+                                                         MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+}
+
+static void
+test_registration_state_from_qmi_system_info_2g_cs_home (void)
+{
+    static const guint8 data[] = {
+        0x01, 0x3A, 0x00, 0x80, /* marker (1 byte), qmux length (2 bytes), qmux flags (1 byte) */
+        0x03, /* service: NAS */
+        0x02, /* client id */
+        0x02, /* service flags */
+        0x01, 0x00, /* transaction */
+        0x4D, 0x00, /* message id */
+        0x2E, 0x00, /* all tlvs length */
+        /* TLV 0x02: Result */
+        0x02, /* tlv type */
+        0x04, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, 0x00,
+        /* TLV 0x12: GSM Service Status*/
+        0x12, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x02, 0x00, 0x00, /* [ service_status = 'available' true_service_status = 'none' preferred_data_path = 'no' ] */
+        /* TLV 0x17: GSM System Info */
+        0x17, /* tlv type */
+        0x1E, 0x00, /* tlv size: 30 bytes */
+        /* [ domain_valid = 'yes' domain = 'cs' service_capability_valid = 'yes' service_capability = 'cs'
+         * roaming_status_valid = 'yes' roaming_status = 'off' forbidden_valid = 'yes' forbidden = 'no'
+         * lac_valid = 'yes' lac = '7' cid_valid = 'yes' cid = '105217' registration_reject_info_valid = 'no'
+         * registration_reject_domain = 'none' registration_reject_cause = 'none' network_id_valid = 'yes'
+         * mcc = '901' mnc = '701' egprs_support_valid = 'no' egprs_support = 'no' dtm_support_valid = 'no',
+         * dtm_support = 'no'] */
+        0x01, 0x01, 0x01, 0x01, 0x01, 0x00, 0x01, 0x00,
+        0x01, 0x07, 0x00, 0x01, 0x01, 0x9B, 0x01, 0x00,
+        0x00, 0x00, 0x00, 0x01, 0x39, 0x30, 0x31, 0x37,
+        0x30, 0xFF, 0x00, 0x00, 0x00, 0x00
+    };
+
+    common_test_registration_state_from_qmi_system_info (data, G_N_ELEMENTS (data),
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_HOME,    /* cs */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,    /* ps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, /* eps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, /* 5gs */
+                                                         7, /* lac */
+                                                         0, /* tac */
+                                                         0x019B01, /* cid */
+                                                         "90170", /* operator id */
+                                                         MM_MODEM_ACCESS_TECHNOLOGY_GSM);
+}
+
+static void
+test_registration_state_from_qmi_system_info_2g3g_searching (void)
+{
+    static const guint8 data[] = {
+        0x01, 0x1F, 0x00, 0x80, /* marker (1 byte), qmux length (2 bytes), qmux flags (1 byte) */
+        0x03, /* service: NAS */
+        0x02, /* client id */
+        0x02, /* service flags */
+        0x01, 0x00, /* transaction */
+        0x4D, 0x00, /* message id */
+        0x13, 0x00, /* all tlvs length */
+        /* TLV 0x02: Result */
+        0x02, /* tlv type */
+        0x04, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, 0x00,
+        /* TLV 0x12: GSM Service Status*/
+        0x12, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, /* [ service_status = 'none' true_service_status = 'none' preferred_data_path = 'no' ] */
+        /* TLV 0x13: WCDMA Service Status */
+        0x13, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, /* [ service_status = 'none' true_service_status = 'none' preferred_data_path = 'no' ] */
+    };
+
+    common_test_registration_state_from_qmi_system_info (data, G_N_ELEMENTS (data),
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING, /* cs */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING, /* ps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN,   /* eps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN,   /* 5gs */
+                                                         0, /* lac */
+                                                         0, /* tac */
+                                                         0, /* cid */
+                                                         NULL, /* operator id */
+                                                         MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+}
+
+static void
+test_registration_state_from_qmi_system_info_2g3g_idle (void)
+{
+    static const guint8 data[] = {
+        0x01, 0x1F, 0x00, 0x80, /* marker (1 byte), qmux length (2 bytes), qmux flags (1 byte) */
+        0x03, /* service: NAS */
+        0x02, /* client id */
+        0x02, /* service flags */
+        0x01, 0x00, /* transaction */
+        0x4D, 0x00, /* message id */
+        0x13, 0x00, /* all tlvs length */
+        /* TLV 0x02: Result */
+        0x02, /* tlv type */
+        0x04, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, 0x00,
+        /* TLV 0x12: GSM Service Status*/
+        0x12, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x04, 0x00, 0x00, /* [ service_status = 'power-save' true_service_status = 'none' preferred_data_path = 'no' ] */
+        /* TLV 0x13: WCDMA Service Status */
+        0x13, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x04, 0x00, 0x00, /* [ service_status = 'power-save' true_service_status = 'none' preferred_data_path = 'no' ] */
+    };
+
+    common_test_registration_state_from_qmi_system_info (data, G_N_ELEMENTS (data),
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,    /* cs */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,    /* ps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, /* eps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, /* 5gs */
+                                                         0, /* lac */
+                                                         0, /* tac */
+                                                         0, /* cid */
+                                                         NULL, /* operator id */
+                                                         MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+}
+
+static void
+test_registration_state_from_qmi_system_info_2g3g_ps_home (void)
+{
+    static const guint8 data[] = {
+        0x01, 0x43, 0x00, 0x80, /* marker (1 byte), qmux length (2 bytes), qmux flags (1 byte) */
+        0x03, /* service: NAS */
+        0x02, /* client id */
+        0x02, /* service flags */
+        0x01, 0x00, /* transaction */
+        0x4D, 0x00, /* message id */
+        0x37, 0x00, /* all tlvs length */
+        /* TLV 0x02: Result */
+        0x02, /* tlv type */
+        0x04, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, 0x00,
+        /* TLV 0x12: GSM Service Status*/
+        0x12, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, /* [ service_status = 'none' true_service_status = 'none' preferred_data_path = 'no' ] */
+        /* TLV 0x13: WCDMA Service Status */
+        0x13, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x02, 0x00, 0x00, /* [ service_status = 'available' true_service_status = 'none' preferred_data_path = 'no' ] */
+        /* TLV 0x18: WCDMA System Info */
+        0x18, /* tlv type */
+        0x21, 0x00, /* tlv size: 33 bytes */
+        /* [ domain_valid = 'yes' domain = 'ps' service_capability_valid = 'yes' service_capability = 'ps'
+         * roaming_status_valid = 'yes' roaming_status = 'off' forbidden_valid = 'yes' forbidden = 'no'
+         * lac_valid = 'yes' lac = '7' cid_valid = 'yes' cid = '105217' registration_reject_info_valid = 'no'
+         * registration_reject_domain = 'none' registration_reject_cause = 'none' network_id_valid = 'yes'
+         * mcc = '901' mnc = '701' hs_call_status_valid = 'no' hs_call_stauts = '' hs_service_valid = 'yes',
+         * primary_scrambling_code_valid = 'yes' primary_scrambling_code = '255'] */
+        0x01, 0x02, 0x01, 0x02, 0x01, 0x00, 0x01, 0x00,
+        0x01, 0x07, 0x00, 0x01, 0x01, 0x9B, 0x01, 0x00,
+        0x00, 0x00, 0x00, 0x01, 0x39, 0x30, 0x31, 0x37,
+        0x30, 0xFF, 0x01, 0x00, 0x01, 0x00, 0x01, 0xFF,
+        0x00
+    };
+
+    common_test_registration_state_from_qmi_system_info (data, G_N_ELEMENTS (data),
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING, /* cs (from GSM) */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_HOME,      /* ps (from UMTS) */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN,   /* eps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN,   /* 5gs */
+                                                         7, /* lac */
+                                                         0, /* tac */
+                                                         0x019B01, /* cid */
+                                                         "90170", /* operator id */
+                                                         MM_MODEM_ACCESS_TECHNOLOGY_UMTS);
+}
+
+static void
+test_registration_state_from_qmi_system_info_2g3g_csps_home (void)
+{
+    static const guint8 data[] = {
+        0x01, 0x43, 0x00, 0x80, /* marker (1 byte), qmux length (2 bytes), qmux flags (1 byte) */
+        0x03, /* service: NAS */
+        0x02, /* client id */
+        0x02, /* service flags */
+        0x01, 0x00, /* transaction */
+        0x4D, 0x00, /* message id */
+        0x37, 0x00, /* all tlvs length */
+        /* TLV 0x02: Result */
+        0x02, /* tlv type */
+        0x04, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, 0x00,
+        /* TLV 0x12: GSM Service Status*/
+        0x12, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, /* [ service_status = 'none' true_service_status = 'none' preferred_data_path = 'no' ] */
+        /* TLV 0x13: WCDMA Service Status */
+        0x13, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x02, 0x00, 0x00, /* [ service_status = 'available' true_service_status = 'none' preferred_data_path = 'no' ] */
+        /* TLV 0x18: WCDMA System Info */
+        0x18, /* tlv type */
+        0x21, 0x00, /* tlv size: 33 bytes */
+        /* [ domain_valid = 'yes' domain = 'cs-ps' service_capability_valid = 'yes' service_capability = 'cs-ps'
+         * roaming_status_valid = 'yes' roaming_status = 'off' forbidden_valid = 'yes' forbidden = 'no'
+         * lac_valid = 'yes' lac = '7' cid_valid = 'yes' cid = '105217' registration_reject_info_valid = 'no'
+         * registration_reject_domain = 'none' registration_reject_cause = 'none' network_id_valid = 'yes'
+         * mcc = '901' mnc = '701' hs_call_status_valid = 'no' hs_call_stauts = '' hs_service_valid = 'yes',
+         * primary_scrambling_code_valid = 'yes' primary_scrambling_code = '255'] */
+        0x01, 0x03, 0x01, 0x03, 0x01, 0x00, 0x01, 0x00,
+        0x01, 0x07, 0x00, 0x01, 0x01, 0x9B, 0x01, 0x00,
+        0x00, 0x00, 0x00, 0x01, 0x39, 0x30, 0x31, 0x37,
+        0x30, 0xFF, 0x01, 0x00, 0x01, 0x00, 0x01, 0xFF,
+        0x00
+    };
+
+    common_test_registration_state_from_qmi_system_info (data, G_N_ELEMENTS (data),
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_HOME,    /* cs */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_HOME,    /* ps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, /* eps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, /* 5gs */
+                                                         7, /* lac */
+                                                         0, /* tac */
+                                                         0x019B01, /* cid */
+                                                         "90170", /* operator id */
+                                                         MM_MODEM_ACCESS_TECHNOLOGY_UMTS);
+}
+
+static void
+test_registration_state_from_qmi_system_info_2g3g4g_searching (void)
+{
+    static const guint8 data[] = {
+        0x01, 0x25, 0x00, 0x80, /* marker (1 byte), qmux length (2 bytes), qmux flags (1 byte) */
+        0x03, /* service: NAS */
+        0x02, /* client id */
+        0x02, /* service flags */
+        0x01, 0x00, /* transaction */
+        0x4D, 0x00, /* message id */
+        0x19, 0x00, /* all tlvs length */
+        /* TLV 0x02: Result */
+        0x02, /* tlv type */
+        0x04, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, 0x00,
+        /* TLV 0x12: GSM Service Status*/
+        0x12, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, /* [ service_status = 'none' true_service_status = 'none' preferred_data_path = 'no' ] */
+        /* TLV 0x13: WCDMA Service Status */
+        0x13, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, /* [ service_status = 'none' true_service_status = 'none' preferred_data_path = 'no' ] */
+        /* TLV 0x14: LTE Service Status */
+        0x14, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, /* [ service_status = 'none' true_service_status = 'none' preferred_data_path = 'no' ] */
+    };
+
+    common_test_registration_state_from_qmi_system_info (data, G_N_ELEMENTS (data),
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING, /* cs */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING, /* ps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING, /* eps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN,   /* 5gs */
+                                                         0, /* lac */
+                                                         0, /* tac */
+                                                         0, /* cid */
+                                                         NULL, /* operator id */
+                                                         MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+}
+
+static void
+test_registration_state_from_qmi_system_info_2g3g4g_idle (void)
+{
+    static const guint8 data[] = {
+        0x01, 0x25, 0x00, 0x80, /* marker (1 byte), qmux length (2 bytes), qmux flags (1 byte) */
+        0x03, /* service: NAS */
+        0x02, /* client id */
+        0x02, /* service flags */
+        0x01, 0x00, /* transaction */
+        0x4D, 0x00, /* message id */
+        0x19, 0x00, /* all tlvs length */
+        /* TLV 0x02: Result */
+        0x02, /* tlv type */
+        0x04, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, 0x00,
+        /* TLV 0x12: GSM Service Status*/
+        0x12, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x04, 0x00, 0x00, /* [ service_status = 'power-save' true_service_status = 'none' preferred_data_path = 'no' ] */
+        /* TLV 0x13: WCDMA Service Status */
+        0x13, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x04, 0x00, 0x00, /* [ service_status = 'power-save' true_service_status = 'none' preferred_data_path = 'no' ] */
+        /* TLV 0x14: LTE Service Status */
+        0x14, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x04, 0x00, 0x00, /* [ service_status = 'power-save' true_service_status = 'none' preferred_data_path = 'no' ] */
+    };
+
+    common_test_registration_state_from_qmi_system_info (data, G_N_ELEMENTS (data),
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,    /* cs */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,    /* ps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,    /* eps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, /* 5gs */
+                                                         0, /* lac */
+                                                         0, /* tac */
+                                                         0, /* cid */
+                                                         NULL, /* operator id */
+                                                         MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+}
+
+static void
+test_registration_state_from_qmi_system_info_2g3g4g_eps_home (void)
+{
+    static const guint8 data[] = {
+        0x01, 0x45, 0x00, 0x80, /* marker (1 byte), qmux length (2 bytes), qmux flags (1 byte) */
+        0x03, /* service: NAS */
+        0x02, /* client id */
+        0x02, /* service flags */
+        0x01, 0x00, /* transaction */
+        0x4D, 0x00, /* message id */
+        0x39, 0x00, /* all tlvs length */
+        /* TLV 0x02: Result */
+        0x02, /* tlv type */
+        0x04, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, 0x00,
+        /* TLV 0x12: GSM Service Status*/
+        0x12, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, /* [ service_status = 'none' true_service_status = 'none' preferred_data_path = 'no' ] */
+        /* TLV 0x13: WCDMA Service Status */
+        0x13, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, /* [ service_status = 'none' true_service_status = 'none' preferred_data_path = 'no' ] */
+        /* TLV 0x14: LTE Service Status */
+        0x14, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x02, 0x00, 0x00, /* [ service_status = 'available' true_service_status = 'none' preferred_data_path = 'no' ] */
+        /* TLV 0x19: LTE System Info */
+        0x19, /* tlv type */
+        0x1D, 0x00, /* tlv size: 29 bytes */
+        /* [ domain_valid = 'yes' domain = 'ps' service_capability_valid = 'yes' service_capability = 'ps'
+         * roaming_status_valid = 'yes' roaming_status = 'off' forbidden_valid = 'yes' forbidden = 'no'
+         * lac_valid = 'no' lac = '65535' cid_valid = 'yes' cid = '105217' registration_reject_info_valid = 'no'
+         * registration_reject_domain = 'none' registration_reject_cause = 'none' network_id_valid = 'yes'
+         * mcc = '901' mnc = '701' tac_valid = 'yes' tac = '7' ] */
+        0x01, 0x02, 0x01, 0x02, 0x01, 0x00, 0x01, 0x00,
+        0x00, 0xFF, 0xFF, 0x01, 0x01, 0x9B, 0x01, 0x00,
+        0x00, 0x00, 0x00, 0x01, 0x39, 0x30, 0x31, 0x37,
+        0x30, 0xFF, 0x01, 0x07, 0x00,
+    };
+
+    common_test_registration_state_from_qmi_system_info (data, G_N_ELEMENTS (data),
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING, /* cs */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING, /* ps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_HOME, /* eps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, /* 5gs */
+                                                         0, /* lac */
+                                                         7, /* tac */
+                                                         0x019B01, /* cid */
+                                                         "90170", /* operator id */
+                                                         MM_MODEM_ACCESS_TECHNOLOGY_LTE);
+}
+
+static void
+test_registration_state_from_qmi_system_info_4g_eps_home (void)
+{
+    static const guint8 data[] = {
+        0x01, 0x39, 0x00, 0x80, /* marker (1 byte), qmux length (2 bytes), qmux flags (1 byte) */
+        0x03, /* service: NAS */
+        0x02, /* client id */
+        0x02, /* service flags */
+        0x01, 0x00, /* transaction */
+        0x4D, 0x00, /* message id */
+        0x2D, 0x00, /* all tlvs length */
+        /* TLV 0x02: Result */
+        0x02, /* tlv type */
+        0x04, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, 0x00,
+        /* TLV 0x14: LTE Service Status */
+        0x14, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x02, 0x00, 0x00, /* [ service_status = 'available' true_service_status = 'none' preferred_data_path = 'no' ] */
+        /* TLV 0x19: LTE System Info */
+        0x19, /* tlv type */
+        0x1D, 0x00, /* tlv size: 29 bytes */
+        /* [ domain_valid = 'yes' domain = 'ps' service_capability_valid = 'yes' service_capability = 'ps'
+         * roaming_status_valid = 'yes' roaming_status = 'off' forbidden_valid = 'yes' forbidden = 'no'
+         * lac_valid = 'no' lac = '65535' cid_valid = 'yes' cid = '105217' registration_reject_info_valid = 'no'
+         * registration_reject_domain = 'none' registration_reject_cause = 'none' network_id_valid = 'yes'
+         * mcc = '901' mnc = '701' tac_valid = 'yes' tac = '7' ] */
+        0x01, 0x02, 0x01, 0x02, 0x01, 0x00, 0x01, 0x00,
+        0x00, 0xFF, 0xFF, 0x01, 0x01, 0x9B, 0x01, 0x00,
+        0x00, 0x00, 0x00, 0x01, 0x39, 0x30, 0x31, 0x37,
+        0x30, 0xFF, 0x01, 0x07, 0x00,
+    };
+
+    common_test_registration_state_from_qmi_system_info (data, G_N_ELEMENTS (data),
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, /* cs */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, /* ps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_HOME,    /* eps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, /* 5gs */
+                                                         0, /* lac */
+                                                         7, /* tac */
+                                                         0x019B01, /* cid */
+                                                         "90170", /* operator id */
+                                                         MM_MODEM_ACCESS_TECHNOLOGY_LTE);
+}
+
+static void
+test_registration_state_from_qmi_system_info_5g_5gs_home (void)
+{
+    static const guint8 data[] = {
+        0x01, 0x39, 0x00, 0x80, /* marker (1 byte), qmux length (2 bytes), qmux flags (1 byte) */
+        0x03, /* service: NAS */
+        0x02, /* client id */
+        0x02, /* service flags */
+        0x01, 0x00, /* transaction */
+        0x4D, 0x00, /* message id */
+        0x2D, 0x00, /* all tlvs length */
+        /* TLV 0x02: Result */
+        0x02, /* tlv type */
+        0x04, 0x00, /* tlv size */
+        0x00, 0x00, 0x00, 0x00,
+        /* TLV 0x4A: 5GNR System Info */
+        0x4A, /* tlv type */
+        0x03, 0x00, /* tlv size */
+        0x02, 0x00, 0x00,
+        /* TLV 0x4B: 5GNR System Info */
+        0x4B, /* tlv type */
+        0x1D, 0x00, /* tlv size: 29 bytes */
+        /* [ domain_valid = 'yes' domain = 'ps' service_capability_valid = 'yes' service_capability = 'ps'
+         * roaming_status_valid = 'yes' roaming_status = 'off' forbidden_valid = 'yes' forbidden = 'no'
+         * lac_valid = 'no' lac = '65535' cid_valid = 'yes' cid = '105217' registration_reject_info_valid = 'no'
+         * registration_reject_domain = 'none' registration_reject_cause = 'none' network_id_valid = 'yes'
+         * mcc = '901' mnc = '701' tac_valid = 'yes' tac = '7' ] */
+        0x01, 0x02, 0x01, 0x02, 0x01, 0x00, 0x01, 0x00,
+        0x00, 0xFF, 0xFF, 0x01, 0x01, 0x9B, 0x01, 0x00,
+        0x00, 0x00, 0x00, 0x01, 0x39, 0x30, 0x31, 0x37,
+        0x30, 0xFF, 0x01, 0x07, 0x00,
+    };
+
+    common_test_registration_state_from_qmi_system_info (data, G_N_ELEMENTS (data),
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, /* cs */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, /* ps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, /* eps */
+                                                         MM_MODEM_3GPP_REGISTRATION_STATE_HOME,    /* 5gs */
+                                                         0, /* lac */
+                                                         7, /* tac */
+                                                         0x019B01, /* cid */
+                                                         "90170", /* operator id */
+                                                         MM_MODEM_ACCESS_TECHNOLOGY_5GNR);
+}
+
+/*****************************************************************************/
 
 int main (int argc, char **argv)
 {
@@ -1393,6 +1968,19 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/qmi/current-capabilities/generic/nr5g-lte-evdo",    test_current_capabilities_generic_nr5g_lte_evdo);
     g_test_add_func ("/MM/qmi/supported-capabilities/generic/nr5g-lte-evdo",  test_supported_capabilities_generic_nr5g_lte_evdo);
     g_test_add_func ("/MM/qmi/supported-modes/generic/nr5g-lte-evdo",         test_supported_modes_generic_nr5g_lte_evdo);
+
+    g_test_add_func ("/MM/qmi/registration-state-from-system-info/2g/searching",     test_registration_state_from_qmi_system_info_2g_searching);
+    g_test_add_func ("/MM/qmi/registration-state-from-system-info/2g/idle",          test_registration_state_from_qmi_system_info_2g_idle);
+    g_test_add_func ("/MM/qmi/registration-state-from-system-info/2g/cs-home",       test_registration_state_from_qmi_system_info_2g_cs_home);
+    g_test_add_func ("/MM/qmi/registration-state-from-system-info/2g3g/searching",   test_registration_state_from_qmi_system_info_2g3g_searching);
+    g_test_add_func ("/MM/qmi/registration-state-from-system-info/2g3g/idle",        test_registration_state_from_qmi_system_info_2g3g_idle);
+    g_test_add_func ("/MM/qmi/registration-state-from-system-info/2g3g/ps-home",     test_registration_state_from_qmi_system_info_2g3g_ps_home);
+    g_test_add_func ("/MM/qmi/registration-state-from-system-info/2g3g/csps-home",   test_registration_state_from_qmi_system_info_2g3g_csps_home);
+    g_test_add_func ("/MM/qmi/registration-state-from-system-info/2g3g4g/searching", test_registration_state_from_qmi_system_info_2g3g4g_searching);
+    g_test_add_func ("/MM/qmi/registration-state-from-system-info/2g3g4g/idle",      test_registration_state_from_qmi_system_info_2g3g4g_idle);
+    g_test_add_func ("/MM/qmi/registration-state-from-system-info/2g3g4g/eps-home",  test_registration_state_from_qmi_system_info_2g3g4g_eps_home);
+    g_test_add_func ("/MM/qmi/registration-state-from-system-info/4g/eps-home",      test_registration_state_from_qmi_system_info_4g_eps_home);
+    g_test_add_func ("/MM/qmi/registration-state-from-system-info/5g/5gs-home",      test_registration_state_from_qmi_system_info_5g_5gs_home);
 
     return g_test_run ();
 }
