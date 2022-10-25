@@ -4678,6 +4678,11 @@ basic_connect_notification_subscriber_ready_status (MMBroadbandModemMbim *self,
     g_autoptr(GError)        error = NULL;
     gboolean                 active_sim_event = FALSE;
 
+    if (self->priv->pending_sim_slot_switch_action) {
+        mm_obj_dbg (self, "ignoring slot status change");
+        return;
+    }
+
     if (mbim_device_check_ms_mbimex_version (device, 3, 0)) {
         if (!mbim_message_ms_basic_connect_v3_subscriber_ready_status_notification_parse (
                 notification,
@@ -4733,10 +4738,7 @@ basic_connect_notification_subscriber_ready_status (MMBroadbandModemMbim *self,
     self->priv->last_ready_state = ready_state;
 
     if (active_sim_event) {
-        if (self->priv->pending_sim_slot_switch_action)
-            mm_obj_dbg (self, "ignoring slot status change");
-        else
-            mm_iface_modem_process_sim_event (MM_IFACE_MODEM (self));
+        mm_iface_modem_process_sim_event (MM_IFACE_MODEM (self));
     }
 }
 
@@ -8771,7 +8773,6 @@ set_device_slot_mappings_ready (MbimDevice   *device,
     self = g_task_get_source_object (task);
 
     g_assert (self->priv->pending_sim_slot_switch_action);
-    self->priv->pending_sim_slot_switch_action = FALSE;
 
     /* the slot index in MM starts at 1 */
     slot_number = GPOINTER_TO_UINT (g_task_get_task_data (task)) - 1;
@@ -8783,6 +8784,7 @@ set_device_slot_mappings_ready (MbimDevice   *device,
             &map_count,
             &slot_mappings,
             &error)) {
+        self->priv->pending_sim_slot_switch_action = FALSE;
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -8791,9 +8793,13 @@ set_device_slot_mappings_ready (MbimDevice   *device,
     for (i = 0; i < map_count; i++) {
         if (i == self->priv->executor_index) {
             if (slot_number != slot_mappings[i]->slot) {
+                self->priv->pending_sim_slot_switch_action = FALSE;
                 g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
                                          "SIM slot switch to '%u' failed", slot_number);
             } else {
+                /* Keep pending_sim_slot_switch_action flag TRUE to cleanly ignore SIM related indications
+                 * during slot swithing, We don't want SIM related indications received trigger the update
+                 * of SimSlots property, which may not be what we want as the modem object is being shutdown */
                 self->priv->active_slot_index = slot_number + 1;
                 g_task_return_boolean (task, TRUE);
             }
@@ -8803,6 +8809,7 @@ set_device_slot_mappings_ready (MbimDevice   *device,
         }
     }
 
+    self->priv->pending_sim_slot_switch_action = FALSE;
     g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
                              "Can't find executor index '%u'", self->priv->executor_index);
     g_object_unref (task);
