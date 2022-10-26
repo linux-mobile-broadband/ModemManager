@@ -1001,6 +1001,85 @@ read_binary_query_ready (MbimDevice   *device,
 }
 
 static void
+file_status_query_ready (MbimDevice   *device,
+                         GAsyncResult *res,
+                         GTask        *task)
+{
+    g_autoptr(MbimMessage)   request = NULL;
+    g_autoptr(MbimMessage)   response = NULL;
+    MMSimMbim               *self;
+    CommonReadBinaryContext *ctx;
+    GError                  *error = NULL;
+    guint32                  file_item_count;
+    guint32                  file_item_size;
+    guint64                  read_size;
+
+    self = g_task_get_source_object (task);
+    ctx = (CommonReadBinaryContext *) g_task_get_task_data (task);
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response ||
+        !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
+        !mbim_message_ms_uicc_low_level_access_file_status_response_parse (
+            response,
+            NULL, /* version */
+            NULL, /* status_word_1 */
+            NULL, /* status_word_2 */
+            NULL, /* file_accessibility */
+            NULL, /* file_type */
+            NULL, /* file_structure */
+            &file_item_count,
+            &file_item_size,
+            NULL, /* access_condition_read */
+            NULL, /* access_condition_update */
+            NULL, /* access_condition_activate */
+            NULL, /* access_condition_deactivate */
+            &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!file_item_size || !file_item_count) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "file contents not available");
+        g_object_unref (task);
+        return;
+    }
+
+    /* Fail if we attempt to read too much. UICC operations can read up to
+     * 255 bytes at a time, and the SIM files we try to process are all
+     * (or at least should be) small. Use a 64bit value to avoid overflowing
+     * if the modem returns weird size/count values. */
+    read_size = file_item_size * file_item_count;
+    if (read_size > 255) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "file size too big: item size %u, item count %u",
+                                 file_item_size, file_item_count);
+        g_object_unref (task);
+        return;
+    }
+
+    request = mbim_message_ms_uicc_low_level_access_read_binary_query_new (MS_UICC_LOW_LEVEL_SUPPORTED_VERSION,
+                                                                           self->priv->application_id->len,
+                                                                           self->priv->application_id->data,
+                                                                           ctx->file_path->len,
+                                                                           ctx->file_path->data,
+                                                                           0,    /* read_offset */
+                                                                           (guint32)read_size,
+                                                                           NULL, /* local_pin */
+                                                                           0,    /* data_size */
+                                                                           NULL, /* data */
+                                                                           NULL);
+    mbim_device_command (ctx->device,
+                         request,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)read_binary_query_ready,
+                         task);
+}
+
+static void
 read_binary_subscriber_info_ready (MMSimMbim    *self,
                                    GAsyncResult *res,
                                    GTask        *task)
@@ -1030,22 +1109,18 @@ read_binary_subscriber_info_ready (MMSimMbim    *self,
         return;
     }
 
-    request = mbim_message_ms_uicc_low_level_access_read_binary_query_new (MS_UICC_LOW_LEVEL_SUPPORTED_VERSION,
+    request = mbim_message_ms_uicc_low_level_access_file_status_query_new (MS_UICC_LOW_LEVEL_SUPPORTED_VERSION,
                                                                            self->priv->application_id->len,
                                                                            self->priv->application_id->data,
                                                                            ctx->file_path->len,
                                                                            ctx->file_path->data,
-                                                                           0,    /* read_offset */
-                                                                           0,    /* read_size */
-                                                                           NULL, /* local_pin */
-                                                                           0,    /* data_size */
-                                                                           NULL, /* data */
                                                                            NULL);
+
     mbim_device_command (ctx->device,
                          request,
                          10,
                          NULL,
-                         (GAsyncReadyCallback)read_binary_query_ready,
+                         (GAsyncReadyCallback)file_status_query_ready,
                          task);
 }
 
