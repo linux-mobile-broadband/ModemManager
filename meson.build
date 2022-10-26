@@ -243,14 +243,14 @@ config_h.set('WITH_AT_COMMAND_VIA_DBUS', enable_at_command_via_dbus)
 # MBIM support (enabled by default)
 enable_mbim = get_option('mbim')
 if enable_mbim
-  mbim_glib_dep = dependency('mbim-glib', version: '>= 1.27.9')
+  mbim_glib_dep = dependency('mbim-glib', version: '>= 1.28.0')
 endif
 config_h.set('WITH_MBIM', enable_mbim)
 
 # QMI support (enabled by default)
 enable_qmi = get_option('qmi')
 if enable_qmi
-  qmi_glib_dep = dependency('qmi-glib', version: '>= 1.31.10')
+  qmi_glib_dep = dependency('qmi-glib', version: '>= 1.32.0')
 endif
 config_h.set('WITH_QMI', enable_qmi)
 
