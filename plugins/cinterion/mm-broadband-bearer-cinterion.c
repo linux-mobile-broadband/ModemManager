@@ -135,14 +135,34 @@ out:
     g_object_unref (task);
 }
 
+static gboolean
+swwan_check_status (GTask *task)
+{
+    MMBroadbandBearerCinterion *bearer;
+    g_autoptr(MMBaseModem)  modem = NULL;
+
+    bearer = g_task_get_source_object (task);
+    g_object_get (bearer,
+                  MM_BASE_BEARER_MODEM, &modem,
+                  NULL);
+    mm_base_modem_at_command (modem,
+                              "^SWWAN?",
+                              5,
+                              FALSE,
+                              (GAsyncReadyCallback) swwan_check_status_ready,
+                              task);
+
+    return G_SOURCE_REMOVE;
+}
+
 static void
 load_connection_status_by_cid (MMBroadbandBearerCinterion *bearer,
                                gint                        cid,
+                               gboolean                    delay,
                                GAsyncReadyCallback         callback,
                                gpointer                    user_data)
 {
-    GTask                  *task;
-    g_autoptr(MMBaseModem)  modem = NULL;
+    GTask *task;
 
     task = g_task_new (bearer, NULL, callback, user_data);
     if (cid == MM_3GPP_PROFILE_ID_UNKNOWN) {
@@ -154,16 +174,14 @@ load_connection_status_by_cid (MMBroadbandBearerCinterion *bearer,
 
     g_task_set_task_data (task, GUINT_TO_POINTER (cid), NULL);
 
-    g_object_get (bearer,
-                  MM_BASE_BEARER_MODEM, &modem,
-                  NULL);
-
-    mm_base_modem_at_command (modem,
-                              "^SWWAN?",
-                              5,
-                              FALSE,
-                              (GAsyncReadyCallback) swwan_check_status_ready,
-                              task);
+    /* Some modems require a delay before querying the SWWAN status
+     * This is only needed for step DIAL_3GPP_CONTEXT_STEP_VALIDATE_CONNECTION
+     * and DISCONNECT_3GPP_CONTEXT_STEP_CONNECTION_STATUS. */
+    if (delay) {
+        g_timeout_add_seconds (1, (GSourceFunc)swwan_check_status, task);
+    } else {
+        g_idle_add ((GSourceFunc)swwan_check_status, task);
+    }
 }
 
 static void
@@ -173,6 +191,7 @@ load_connection_status (MMBaseBearer        *bearer,
 {
     load_connection_status_by_cid (MM_BROADBAND_BEARER_CINTERION (bearer),
                                    mm_base_bearer_get_profile_id (bearer),
+                                   FALSE,
                                    callback,
                                    user_data);
 }
@@ -411,6 +430,7 @@ dial_3gpp_context_step (GTask *task)
                     ctx->step, DIAL_3GPP_CONTEXT_STEP_LAST, usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
         load_connection_status_by_cid (ctx->self,
                                        (gint) ctx->cid,
+                                       TRUE,
                                        (GAsyncReadyCallback) dial_connection_status_ready,
                                        task);
         return;
@@ -609,6 +629,7 @@ disconnect_3gpp_context_step (GTask *task)
                     usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
         load_connection_status_by_cid (MM_BROADBAND_BEARER_CINTERION (ctx->self),
                                        (gint) ctx->cid,
+                                       TRUE,
                                        (GAsyncReadyCallback) disconnect_connection_status_ready,
                                        task);
          return;
