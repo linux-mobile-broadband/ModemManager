@@ -3,7 +3,7 @@
 
 project(
   'ModemManager', 'c',
-  version: '1.19.900',
+  version: '1.20.0',
   license: 'GPL2',
   default_options: [
     'buildtype=debugoptimized',
@@ -40,9 +40,9 @@ mm_glib_pkgincludedir = mm_includedir / mm_glib_name
 # - Otherwise, increment c and zero r.
 #   - If the interface has grown (that is, the new library is compatible with old code), increment a.
 #   - If the interface has changed in an incompatible way (that is, functions have changed or been removed), then zero a.
-current = 8
+current = 9
 revision = 0
-age = 8
+age = 9
 mm_glib_version = '@0@.@1@.@2@'.format(current - age, age, revision)
 
 mm_gir_version = '1.0'
