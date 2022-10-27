@@ -124,4 +124,6 @@ libmm_generated_dep = declare_dependency(
   link_whole: libmm_generated,
 )
 
-subdir('tests')
+if enable_tests
+  subdir('tests')
+endif
