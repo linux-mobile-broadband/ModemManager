@@ -90,6 +90,7 @@ cc_args = cc.get_supported_arguments([
 
 # tests are enabled by default
 enable_tests = get_option('tests')
+config_h.set('WITH_TESTS', enable_tests)
 
 # strict flags to use in debug builds
 if get_option('buildtype').contains('debug')

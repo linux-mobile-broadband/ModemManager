@@ -41,7 +41,9 @@
 
 #include <mm-errors-types.h>
 #include <mm-gdbus-manager.h>
-#include <mm-gdbus-test.h>
+#if defined WITH_TESTS
+# include <mm-gdbus-test.h>
+#endif
 
 #include "mm-context.h"
 #include "mm-base-manager.h"
@@ -66,9 +68,11 @@ enum {
     PROP_CONNECTION,
     PROP_AUTO_SCAN,
     PROP_FILTER_POLICY,
-    PROP_ENABLE_TEST,
     PROP_PLUGIN_DIR,
     PROP_INITIAL_KERNEL_EVENTS,
+#if defined WITH_TESTS
+    PROP_ENABLE_TEST,
+#endif
     LAST_PROP
 };
 
@@ -79,8 +83,6 @@ struct _MMBaseManagerPrivate {
     gboolean auto_scan;
     /* Filter policy (mask of enabled rules) */
     MMFilterRule filter_policy;
-    /* Whether the test interface is enabled */
-    gboolean enable_test;
     /* Path to look for plugins */
     gchar *plugin_dir;
     /* Path to the list of initial kernel events */
@@ -99,8 +101,12 @@ struct _MMBaseManagerPrivate {
     /* The map of inhibited devices */
     GHashTable *inhibited_devices;
 
+#if defined WITH_TESTS
+    /* Whether the test interface is enabled */
+    gboolean enable_test;
     /* The Test interface support */
     MmGdbusTest *test_skeleton;
+#endif
 
 #if defined WITH_UDEV
     /* The UDev client */
@@ -1297,6 +1303,8 @@ handle_inhibit_device (MmGdbusOrgFreedesktopModemManager1 *manager,
 /*****************************************************************************/
 /* Test profile setup */
 
+#if defined WITH_TESTS
+
 static gboolean
 handle_set_profile (MmGdbusTest *skeleton,
                     GDBusMethodInvocation *invocation,
@@ -1358,6 +1366,8 @@ out:
     return TRUE;
 }
 
+#endif
+
 /*****************************************************************************/
 
 static gchar *
@@ -1374,7 +1384,9 @@ mm_base_manager_new (GDBusConnection  *connection,
                      gboolean          auto_scan,
                      MMFilterRule      filter_policy,
                      const gchar      *initial_kernel_events,
+#if defined WITH_TESTS
                      gboolean          enable_test,
+#endif
                      GError          **error)
 {
     g_return_val_if_fail (G_IS_DBUS_CONNECTION (connection), NULL);
@@ -1387,8 +1399,10 @@ mm_base_manager_new (GDBusConnection  *connection,
                            MM_BASE_MANAGER_AUTO_SCAN,             auto_scan,
                            MM_BASE_MANAGER_FILTER_POLICY,         filter_policy,
                            MM_BASE_MANAGER_INITIAL_KERNEL_EVENTS, initial_kernel_events,
-                           MM_BASE_MANAGER_ENABLE_TEST,           enable_test,
                            "version",                             MM_DIST_VERSION,
+#if defined WITH_TESTS
+                           MM_BASE_MANAGER_ENABLE_TEST,           enable_test,
+#endif
                            NULL);
 }
 
@@ -1415,11 +1429,13 @@ set_property (GObject      *object,
                 mm_obj_dbg (self, "stopping connection in object manager server");
                 g_dbus_object_manager_server_set_connection (self->priv->object_manager, NULL);
             }
+#if defined WITH_TESTS
             if (self->priv->test_skeleton &&
                 g_dbus_interface_skeleton_get_connection (G_DBUS_INTERFACE_SKELETON (self->priv->test_skeleton))) {
                 mm_obj_dbg (self, "stopping connection in test skeleton");
                 g_dbus_interface_skeleton_unexport (G_DBUS_INTERFACE_SKELETON (self->priv->test_skeleton));
             }
+#endif
         }
         break;
     }
@@ -1429,9 +1445,6 @@ set_property (GObject      *object,
     case PROP_FILTER_POLICY:
         self->priv->filter_policy = g_value_get_flags (value);
         break;
-    case PROP_ENABLE_TEST:
-        self->priv->enable_test = g_value_get_boolean (value);
-        break;
     case PROP_PLUGIN_DIR:
         g_free (self->priv->plugin_dir);
         self->priv->plugin_dir = g_value_dup_string (value);
@@ -1440,6 +1453,11 @@ set_property (GObject      *object,
         g_free (self->priv->initial_kernel_events);
         self->priv->initial_kernel_events = g_value_dup_string (value);
         break;
+#if defined WITH_TESTS
+    case PROP_ENABLE_TEST:
+        self->priv->enable_test = g_value_get_boolean (value);
+        break;
+#endif
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -1464,15 +1482,17 @@ get_property (GObject    *object,
     case PROP_FILTER_POLICY:
         g_value_set_flags (value, self->priv->filter_policy);
         break;
-    case PROP_ENABLE_TEST:
-        g_value_set_boolean (value, self->priv->enable_test);
-        break;
     case PROP_PLUGIN_DIR:
         g_value_set_string (value, self->priv->plugin_dir);
         break;
     case PROP_INITIAL_KERNEL_EVENTS:
         g_value_set_string (value, self->priv->initial_kernel_events);
         break;
+#if defined WITH_TESTS
+    case PROP_ENABLE_TEST:
+        g_value_set_boolean (value, self->priv->enable_test);
+        break;
+#endif
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -1498,8 +1518,10 @@ mm_base_manager_init (MMBaseManager *self)
     /* By default, enable autoscan */
     self->priv->auto_scan = TRUE;
 
+#if defined WITH_TESTS
     /* By default, no test interface */
     self->priv->enable_test = FALSE;
+#endif
 
     /* Setup Object Manager Server */
     self->priv->object_manager = g_dbus_object_manager_server_new (MM_DBUS_PATH);
@@ -1565,6 +1587,7 @@ initable_init (GInitable     *initable,
     g_dbus_object_manager_server_set_connection (self->priv->object_manager,
                                                  self->priv->connection);
 
+#if defined WITH_TESTS
     /* Setup the Test skeleton and export the interface */
     if (self->priv->enable_test) {
         self->priv->test_skeleton = mm_gdbus_test_skeleton_new ();
@@ -1578,6 +1601,7 @@ initable_init (GInitable     *initable,
                                                error))
             return FALSE;
     }
+#endif
 
     /* All good */
     return TRUE;
@@ -1613,8 +1637,10 @@ finalize (GObject *object)
     if (self->priv->object_manager)
         g_object_unref (self->priv->object_manager);
 
+#if defined WITH_TESTS
     if (self->priv->test_skeleton)
         g_object_unref (self->priv->test_skeleton);
+#endif
 
     if (self->priv->connection)
         g_object_unref (self->priv->connection);
@@ -1679,14 +1705,6 @@ mm_base_manager_class_init (MMBaseManagerClass *manager_class)
                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property
-        (object_class, PROP_ENABLE_TEST,
-         g_param_spec_boolean (MM_BASE_MANAGER_ENABLE_TEST,
-                               "Enable tests",
-                               "Enable the Test interface",
-                               FALSE,
-                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
-
-    g_object_class_install_property
         (object_class, PROP_PLUGIN_DIR,
          g_param_spec_string (MM_BASE_MANAGER_PLUGIN_DIR,
                               "Plugin directory",
@@ -1701,4 +1719,14 @@ mm_base_manager_class_init (MMBaseManagerClass *manager_class)
                               "Path to a file with the list of initial kernel events",
                               NULL,
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+#if defined WITH_TESTS
+    g_object_class_install_property
+        (object_class, PROP_ENABLE_TEST,
+         g_param_spec_boolean (MM_BASE_MANAGER_ENABLE_TEST,
+                               "Enable tests",
+                               "Enable the Test interface",
+                               FALSE,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+#endif
 }

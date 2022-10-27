@@ -45,7 +45,9 @@ gboolean     mm_context_get_log_personal_info       (void);
 
 /* Testing support */
 gboolean     mm_context_get_test_session           (void);
+#if defined WITH_TESTS
 gboolean     mm_context_get_test_enable            (void);
+#endif
 const gchar *mm_context_get_test_plugin_dir        (void);
 #if defined WITH_UDEV
 gboolean     mm_context_get_test_no_udev           (void);
