@@ -226,7 +226,9 @@ mm_context_get_log_personal_info (void)
 /* Test context */
 
 static gboolean  test_session;
+#if defined WITH_TESTS
 static gboolean  test_enable;
+#endif
 static gchar    *test_plugin_dir;
 #if defined WITH_UDEV
 static gboolean  test_no_udev;
@@ -249,11 +251,13 @@ static const GOptionEntry test_entries[] = {
         "Run in session DBus",
         NULL
     },
+#if defined WITH_TESTS
     {
         "test-enable", 0, 0, G_OPTION_ARG_NONE, &test_enable,
         "Enable the Test interface in the daemon",
         NULL
     },
+#endif
     {
         "test-plugin-dir", 0, 0, G_OPTION_ARG_FILENAME, &test_plugin_dir,
         "Path to look for plugins",
@@ -320,11 +324,13 @@ mm_context_get_test_session (void)
     return test_session;
 }
 
+#if defined WITH_TESTS
 gboolean
 mm_context_get_test_enable (void)
 {
     return test_enable;
 }
+#endif
 
 const gchar *
 mm_context_get_test_plugin_dir (void)

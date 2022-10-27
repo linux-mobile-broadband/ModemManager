@@ -97,7 +97,9 @@ bus_acquired_cb (GDBusConnection *connection,
                                    !mm_context_get_no_auto_scan (),
                                    mm_context_get_filter_policy (),
                                    mm_context_get_initial_kernel_events (),
+#if defined WITH_TESTS
                                    mm_context_get_test_enable (),
+#endif
                                    &error);
     if (!manager) {
         mm_warn ("could not create manager: %s", error->message);
