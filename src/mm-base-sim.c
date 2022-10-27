@@ -2843,9 +2843,9 @@ interface_initialization_step (GTask *task)
          * SIM type unknown) try to load it. */
         if (IS_ESIM_WITHOUT_PROFILES (self))
             mm_obj_dbg (self, "not loading GID2 in eSIM without profiles");
-        else if (mm_gdbus_sim_get_gid1 (MM_GDBUS_SIM (self)) == NULL &&
-                 MM_BASE_SIM_GET_CLASS (self)->load_gid1 &&
-                 MM_BASE_SIM_GET_CLASS (self)->load_gid1_finish) {
+        else if (mm_gdbus_sim_get_gid2 (MM_GDBUS_SIM (self)) == NULL &&
+                 MM_BASE_SIM_GET_CLASS (self)->load_gid2 &&
+                 MM_BASE_SIM_GET_CLASS (self)->load_gid2_finish) {
             MM_BASE_SIM_GET_CLASS (self)->load_gid2 (
                 self,
                 (GAsyncReadyCallback)init_load_gid2_ready,
