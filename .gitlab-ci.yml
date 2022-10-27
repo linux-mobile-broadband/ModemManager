@@ -50,11 +50,9 @@ build-no-qmi:
     - ninja -C build
     - ninja -C build install
     - popd
-    - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --without-qmi
-    - make
-    - make check
-    - make install
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dqmi=false -Dqrtr=false -Dmbim=true
+    - ninja -C build
+    - ninja -C build install
 
 build-qmi-qrtr-no-mbim:
   stage: build
@@ -79,11 +77,9 @@ build-qmi-qrtr-no-mbim:
     - ninja -C build
     - ninja -C build install
     - popd
-    - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr  --disable-gtk-doc --disable-introspection --without-mbim
-    - make
-    - make check
-    - make install
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dqmi=true -Dqrtr=true -Dmbim=false
+    - ninja -C build
+    - ninja -C build install
 
 build-qmi-no-qrtr-no-mbim:
   stage: build
@@ -102,11 +98,9 @@ build-qmi-no-qrtr-no-mbim:
     - ninja -C build
     - ninja -C build install
     - popd
-    - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --without-mbim
-    - make
-    - make check
-    - make install
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dqmi=true -Dqrtr=false -Dmbim=false
+    - ninja -C build
+    - ninja -C build install
 
 build-no-qmi-no-mbim:
   stage: build
@@ -119,11 +113,10 @@ build-no-qmi-no-mbim:
     - tags
     - schedules
   script:
-    - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --without-qmi --without-mbim
-    - make
-    - make check
-    - make install
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dqmi=false -Dqrtr=false -Dmbim=false
+    - ninja -C build
+    - ninja -C build test
+    - ninja -C build install
 
 build-no-qmi-no-mbim-no-tests:
   stage: build
@@ -136,11 +129,9 @@ build-no-qmi-no-mbim-no-tests:
     - tags
     - schedules
   script:
-    - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --without-qmi --without-mbim --without-tests
-    - make
-    - make check
-    - make install
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dqmi=false -Dqrtr=false -Dmbim=false -Dtests=false
+    - ninja -C build
+    - ninja -C build install
 
 build-no-suspend-resume:
   stage: build
@@ -169,11 +160,9 @@ build-no-suspend-resume:
     - ninja -C build
     - ninja -C build install
     - popd
-    - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --disable-introspection --without-systemd-suspend-resume --without-powerd-suspend-resume
-    - make
-    - make check
-    - make install
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dsystemd_suspend_resume=false -Dpowerd_suspend_resume=false
+    - ninja -C build
+    - ninja -C build install
 
 build-suspend-resume-powerd:
   stage: build
@@ -202,11 +191,9 @@ build-suspend-resume-powerd:
     - ninja -C build
     - ninja -C build install
     - popd
-    - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --disable-introspection --without-systemd-suspend-resume --with-powerd-suspend-resume=yes
-    - make
-    - make check
-    - make install
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dsystemd_suspend_resume=false -Dpowerd_suspend_resume=true
+    - ninja -C build
+    - ninja -C build install
 
 build-single-plugins:
   stage: build
@@ -244,59 +231,7 @@ build-single-plugins:
         ninja -C build_$plugin;
       done
 
-build-default:
-  stage: build
-  extends:
-  - .fdo.distribution-image@ubuntu
-  - .common_variables
-  only:
-    - merge_requests
-    - schedules
-  script:
-    - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
-    - pushd libmbim
-    - meson setup build --prefix=/usr -Dgtk_doc=false -Dbash_completion=false
-    - ninja -C build
-    - ninja -C build install
-    - popd
-    - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqrtr-glib.git
-    - pushd libqrtr-glib
-    - meson setup build --prefix=/usr -Dgtk_doc=false
-    - ninja -C build
-    - ninja -C build install
-    - popd
-    - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
-    - pushd libqmi
-    - meson setup build --prefix=/usr -Dgtk_doc=false -Dbash_completion=false -Dcollection=basic
-    - ninja -C build
-    - ninja -C build install
-    - popd
-    - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --enable-gtk-doc --enable-introspection --with-polkit=strict --with-systemd-suspend-resume --with-systemdsystemunitdir=/lib/systemd/system
-    - make
-    - make check
-    - make install
-    - make distcheck
-
-build-default-artifacts:
-  stage: build
-  extends:
-  - .fdo.distribution-image@ubuntu
-  - .common_variables
-  only:
-    - main
-    - tags
-  script:
-    - !reference [build-default, script]
-    - sha256sum $CI_PROJECT_NAME-*.tar.xz | awk '{print $1;}' > pkg_hash.txt
-  artifacts:
-    name: "$CI_PROJECT_NAME-$CI_COMMIT_SHORT_SHA"
-    paths:
-      - /builds/$CI_PROJECT_ROOT_NAMESPACE/$CI_PROJECT_NAME/$CI_PROJECT_NAME-*.tar.xz
-      - /builds/$CI_PROJECT_ROOT_NAMESPACE/$CI_PROJECT_NAME/pkg_hash.txt
-    expire_in: 2 days
-
-build-meson-release:
+build-release:
   stage: build
   extends:
   - .fdo.distribution-image@ubuntu
