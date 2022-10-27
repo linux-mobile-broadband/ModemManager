@@ -299,15 +299,23 @@ plugins_shared_reqs = {
   'xmm': true,
 }
 
+
+fibocom_shared_reqs = ['xmm']
+dell_shared_reqs = ['novatel', 'sierra', 'telit', 'xmm']
+if enable_mbim
+  fibocom_shared_reqs += ['fibocom']
+  dell_shared_reqs += ['foxconn']
+endif
+
 plugins_options_reqs = {
   'altair-lte': {'available': true, 'shared': []},
   'anydata': {'available': true, 'shared': []},
   'broadmobi': {'available': true, 'shared': []},
   'cinterion': {'available': true, 'shared': []},
-  'dell': {'available': true, 'shared': ['foxconn', 'novatel', 'sierra', 'telit', 'xmm']},
+  'dell': {'available': true, 'shared': dell_shared_reqs},
   'dlink': {'available': true, 'shared': []},
-  'fibocom': {'available': true, 'shared': ['fibocom', 'xmm']},
-  'foxconn': {'available': true, 'shared': ['foxconn']},
+  'fibocom': {'available': true, 'shared': fibocom_shared_reqs},
+  'foxconn': {'available': enable_mbim, 'shared': ['foxconn']},
   'generic': {'available': true, 'shared': []},
   'gosuncn': {'available': true, 'shared': []},
   'haier': {'available': true, 'shared': []},

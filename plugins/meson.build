@@ -315,12 +315,15 @@ if plugins_options['dell']
   plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
 
   incs = plugins_incs + [
-    foxconn_inc,
     novatel_inc,
     sierra_inc,
     telit_inc,
     xmm_inc,
   ]
+
+  if enable_mbim
+    incs += [foxconn_inc]
+  endif
 
   plugins += {'plugin-dell': {
     'plugin': true,
@@ -348,12 +351,16 @@ if plugins_options['fibocom']
   test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_FIBOCOM="@0@"'.format(plugins_dir / 'fibocom')]
   plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
 
+  incs = plugins_incs + [xmm_inc]
+
   sources = files(
     'fibocom/mm-broadband-bearer-fibocom-ecm.c',
     'fibocom/mm-broadband-modem-fibocom.c',
     'fibocom/mm-plugin-fibocom.c',
   )
   if enable_mbim
+    incs += [fibocom_inc]
+
     sources += files(
       'fibocom/mm-broadband-modem-mbim-xmm-fibocom.c',
       'fibocom/mm-broadband-modem-mbim-fibocom.c',
@@ -361,7 +368,7 @@ if plugins_options['fibocom']
   endif
   plugins += {'plugin-fibocom': {
     'plugin': true,
-    'module': {'sources': sources, 'include_directories': plugins_incs + [xmm_inc] + [fibocom_inc], 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="fibocom"']},
+    'module': {'sources': sources, 'include_directories': incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="fibocom"']},
   }}
 
   plugins_udev_rules += files('fibocom/77-mm-fibocom-port-types.rules')
