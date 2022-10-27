@@ -5,30 +5,35 @@ symbol_map = plugins_dir / 'symbol.map'
 ldflags = cc.get_supported_link_arguments('-Wl,--version-script,@0@'.format(symbol_map))
 
 # common service test support
-sources = files(
-  'tests/test-fixture.c',
-  'tests/test-helpers.c',
-  'tests/test-port-context.c',
-)
+plugins_common_test_dep = []
+if enable_tests
+  sources = files(
+    'tests/test-fixture.c',
+    'tests/test-helpers.c',
+    'tests/test-port-context.c',
+  )
 
-deps = [
-  libhelpers_dep,
-  libmm_test_generated_dep,
-]
+  deps = [
+    libhelpers_dep,
+    libmm_test_generated_dep
+  ]
 
-libmm_test_common = shared_library(
-  'mm-test-common',
-  sources: sources,
-  include_directories: top_inc,
-  dependencies: deps + [gio_unix_dep],
-  c_args: '-DTEST_SERVICES="@0@"'.format(build_root / 'data/tests'),
-)
+  libmm_test_common = shared_library(
+    'mm-test-common',
+    sources: sources,
+    include_directories: top_inc,
+    dependencies: deps + [gio_unix_dep],
+    c_args: '-DTEST_SERVICES="@0@"'.format(build_root / 'data/tests'),
+  )
 
-libmm_test_common_dep = declare_dependency(
-  include_directories: 'tests',
-  dependencies: deps,
-  link_with: libmm_test_common,
-)
+  libmm_test_common_dep = declare_dependency(
+    include_directories: 'tests',
+    dependencies: deps,
+    link_with: libmm_test_common,
+  )
+
+  plugins_common_test_dep += [ libmm_test_common_dep ]
+endif
 
 # plugins
 plugins = {}
@@ -205,7 +210,7 @@ if plugins_shared['telit']
     'plugin': false,
     'helper': {'sources': files('telit/mm-modem-helpers-telit.c'), 'include_directories': plugins_incs, 'c_args': common_c_args},
     'module': {'sources': sources + daemon_enums_sources, 'include_directories': plugins_incs + [telit_inc], 'c_args': common_c_args},
-    'test': {'sources': files('telit/tests/test-mm-modem-helpers-telit.c'), 'include_directories': telit_inc, 'dependencies': libmm_test_common_dep},
+    'test': {'sources': files('telit/tests/test-mm-modem-helpers-telit.c'), 'include_directories': telit_inc, 'dependencies': plugins_common_test_dep},
   }}
 endif
 
@@ -400,7 +405,7 @@ if plugins_options['generic']
   plugins += {'plugin-generic': {
     'plugin': true,
     'module': {'sources': files('generic/mm-plugin-generic.c'), 'include_directories': plugins_incs, 'c_args': '-DMM_MODULE_NAME="generic"'},
-    'test': {'sources': files('generic/tests/test-service-generic.c'), 'include_directories': include_directories('generic'), 'dependencies': libmm_test_common_dep, 'c_args': '-DCOMMON_GSM_PORT_CONF="@0@"'.format(plugins_dir / 'tests/gsm-port.conf')},
+    'test': {'sources': files('generic/tests/test-service-generic.c'), 'include_directories': include_directories('generic'), 'dependencies': plugins_common_test_dep, 'c_args': '-DCOMMON_GSM_PORT_CONF="@0@"'.format(plugins_dir / 'tests/gsm-port.conf')},
   }}
 endif
 
@@ -881,7 +886,7 @@ if plugins_options['ublox']
     'plugin': true,
     'helper': {'sources': files('ublox/mm-modem-helpers-ublox.c'), 'include_directories': plugins_incs, 'c_args': common_c_args},
     'module': {'sources': sources + daemon_enums_sources, 'include_directories': plugins_incs + [ublox_inc], 'c_args': common_c_args},
-    'test': {'sources': files('ublox/tests/test-modem-helpers-ublox.c'), 'include_directories': ublox_inc, 'dependencies': libmm_test_common_dep},
+    'test': {'sources': files('ublox/tests/test-modem-helpers-ublox.c'), 'include_directories': ublox_inc, 'dependencies': plugins_common_test_dep},
   }}
 
   plugins_udev_rules += files('ublox/77-mm-ublox-port-types.rules')
@@ -978,16 +983,18 @@ foreach plugin_name, plugin_data: plugins
     install_dir: mm_pkglibdir,
   )
 
-  if plugin_data.has_key('test')
-    test_unit = 'test-' + plugin_name
+  if enable_tests
+    if plugin_data.has_key('test')
+      test_unit = 'test-' + plugin_name
 
-    exe = executable(
-      test_unit,
-      link_with: libpluginhelpers,
-      kwargs: plugin_data['test'],
-    )
+      exe = executable(
+        test_unit,
+        link_with: libpluginhelpers,
+        kwargs: plugin_data['test'],
+      )
 
-    test(test_unit, exe)
+      test(test_unit, exe)
+    endif
   endif
 endforeach
 

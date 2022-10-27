@@ -246,10 +246,13 @@ daemon_enums_sources += gnome.mkenums(
 
 deps = [
   gmodule_dep,
-  libmm_test_generated_dep,
   libport_dep,
   libqcdm_dep,
 ]
+
+if enable_tests
+  deps += [libmm_test_generated_dep]
+endif
 
 c_args = [
   '-DMM_COMPILATION',
