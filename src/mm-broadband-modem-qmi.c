@@ -7026,7 +7026,6 @@ common_enable_disable_unsolicited_events_3gpp_profile_manager (MMBroadbandModemQ
 
     input = qmi_message_pdc_register_input_new ();
     qmi_message_pdc_register_input_set_enable_reporting (input, enable, NULL);
-    qmi_message_pdc_register_input_set_enable_refresh (input, enable, NULL);
     qmi_client_pdc_register (QMI_CLIENT_PDC (client),
                              input,
                              10,
