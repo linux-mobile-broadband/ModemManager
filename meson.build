@@ -109,6 +109,7 @@ if get_option('buildtype').contains('debug')
     '-Wjump-misses-init',
     '-Wlogical-op',
     '-Wnested-externs',
+    '-Wmaybe-uninitialized',
     '-Wmissing-declarations',
     '-Wmissing-format-attribute',
     '-Wmissing-include-dirs',
