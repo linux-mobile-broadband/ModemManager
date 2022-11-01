@@ -85,7 +85,7 @@ profile_manager_fail_if_connected_bearer (MMIfaceModem3gppProfileManager  *self,
             g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_CONNECTED,
                          "Cannot use profile %d: found an already connected bearer", profile_id);
         } else if (g_strcmp0 (index_field, "apn-type") == 0) {
-            g_autofree gchar *apn_type_str;
+            g_autofree gchar *apn_type_str = NULL;
 
             apn_type_str = mm_bearer_apn_type_build_string_from_mask (apn_type);
             g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_CONNECTED,
