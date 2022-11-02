@@ -65,14 +65,16 @@ struct _MMCellInfoLteClass {
 GType mm_cell_info_lte_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMCellInfoLte, g_object_unref)
 
-const gchar *mm_cell_info_lte_get_operator_id    (MMCellInfoLte *self);
-const gchar *mm_cell_info_lte_get_tac            (MMCellInfoLte *self);
-const gchar *mm_cell_info_lte_get_ci             (MMCellInfoLte *self);
-const gchar *mm_cell_info_lte_get_physical_ci    (MMCellInfoLte *self);
-guint        mm_cell_info_lte_get_earfcn         (MMCellInfoLte *self);
-gdouble      mm_cell_info_lte_get_rsrp           (MMCellInfoLte *self);
-gdouble      mm_cell_info_lte_get_rsrq           (MMCellInfoLte *self);
-guint        mm_cell_info_lte_get_timing_advance (MMCellInfoLte *self);
+const gchar      *mm_cell_info_lte_get_operator_id       (MMCellInfoLte *self);
+const gchar      *mm_cell_info_lte_get_tac               (MMCellInfoLte *self);
+const gchar      *mm_cell_info_lte_get_ci                (MMCellInfoLte *self);
+const gchar      *mm_cell_info_lte_get_physical_ci       (MMCellInfoLte *self);
+guint             mm_cell_info_lte_get_earfcn            (MMCellInfoLte *self);
+gdouble           mm_cell_info_lte_get_rsrp              (MMCellInfoLte *self);
+gdouble           mm_cell_info_lte_get_rsrq              (MMCellInfoLte *self);
+guint             mm_cell_info_lte_get_timing_advance    (MMCellInfoLte *self);
+MMServingCellType mm_cell_info_lte_get_serving_cell_type (MMCellInfoLte *self);
+guint             mm_cell_info_lte_get_bandwidth         (MMCellInfoLte *self);
 
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */
@@ -81,22 +83,26 @@ guint        mm_cell_info_lte_get_timing_advance (MMCellInfoLte *self);
     defined (_LIBMM_INSIDE_MMCLI) || \
     defined (LIBMM_GLIB_COMPILATION)
 
-void mm_cell_info_lte_set_operator_id    (MMCellInfoLte *self,
-                                          const gchar   *operator_id);
-void mm_cell_info_lte_set_tac            (MMCellInfoLte *self,
-                                          const gchar   *tac);
-void mm_cell_info_lte_set_ci             (MMCellInfoLte *self,
-                                          const gchar   *ci);
-void mm_cell_info_lte_set_physical_ci    (MMCellInfoLte *self,
-                                          const gchar   *ci);
-void mm_cell_info_lte_set_earfcn         (MMCellInfoLte *self,
-                                          guint          earfcn);
-void mm_cell_info_lte_set_rsrp           (MMCellInfoLte *self,
-                                          gdouble        rsrp);
-void mm_cell_info_lte_set_rsrq           (MMCellInfoLte *self,
-                                          gdouble        rsrq);
-void mm_cell_info_lte_set_timing_advance (MMCellInfoLte *self,
-                                          guint          earfcn);
+void mm_cell_info_lte_set_operator_id       (MMCellInfoLte     *self,
+                                             const gchar       *operator_id);
+void mm_cell_info_lte_set_tac               (MMCellInfoLte     *self,
+                                             const gchar       *tac);
+void mm_cell_info_lte_set_ci                (MMCellInfoLte     *self,
+                                             const gchar       *ci);
+void mm_cell_info_lte_set_physical_ci       (MMCellInfoLte     *self,
+                                             const gchar       *ci);
+void mm_cell_info_lte_set_earfcn            (MMCellInfoLte     *self,
+                                             guint              earfcn);
+void mm_cell_info_lte_set_rsrp              (MMCellInfoLte     *self,
+                                             gdouble            rsrp);
+void mm_cell_info_lte_set_rsrq              (MMCellInfoLte     *self,
+                                             gdouble            rsrq);
+void mm_cell_info_lte_set_timing_advance    (MMCellInfoLte     *self,
+                                             guint              earfcn);
+void mm_cell_info_lte_set_serving_cell_type (MMCellInfoLte     *self,
+                                             MMServingCellType  cell_type);
+void mm_cell_info_lte_set_bandwidth         (MMCellInfoLte     *self,
+                                             guint               bandwidth);
 
 MMCellInfo *mm_cell_info_lte_new_from_dictionary (GVariantDict *dict);
 

@@ -206,7 +206,7 @@
         GetCellInfo:
 
         Get information for available cells in different access technologies,
-        either serving or neighboring.
+        either serving or neighboring along with radio frequency information.
 
         An array of dictionaries is returned, where each dictionary reports information for
         one single cell.
@@ -538,6 +538,21 @@
                     Only applicable for the serving cell (i.e. "serving" must be TRUE).
                   </listitem>
                 </varlistentry>
+                <varlistentry><term><literal>"serving-cell-type"</literal></term>
+                  <listitem>
+                    A <link linkend="MMServingCellType">MMServingCellType</link> value indicating that the frequency
+                    information provided in this structure belongs to which servicing cell, given as an
+                    unsigned integer (signature <literal>"u"</literal>).
+                    Only applicable for the serving cell (i.e. "serving" must be TRUE). Since 1.22.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"bandwidth"</literal></term>
+                  <listitem>
+                    Bandwidth of the particular carrier in downlink, given as an unsigned integer
+                    (signature <literal>"u"</literal>). Only applicable for the serving cell
+                    (i.e. "serving" must be TRUE). Since 1.22.
+                  </listitem>
+                </varlistentry>
               </variablelist>
             </listitem>
           </varlistentry>
@@ -605,6 +620,21 @@
                     The timing advance, given as an unsigned integer value (signature
                     <literal>"u"</literal>).
                     Only applicable for the serving cell (i.e. "serving" must be TRUE).
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"serving-cell-type"</literal></term>
+                  <listitem>
+                    A <link linkend="MMServingCellType">MMServingCellType</link> value indicating that the frequency
+                    information provided in this structure belongs to which servicing cell, given as an
+                    unsigned integer (signature <literal>"u"</literal>).
+                    Only applicable for the serving cell (i.e. "serving" must be TRUE).  Since 1.22.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"bandwidth"</literal></term>
+                  <listitem>
+                    Bandwidth of the particular carrier in downlink, given as an unsigned integer
+                    (signature <literal>"u"</literal>). Only applicable for the serving cell
+                    (i.e. "serving" must be TRUE).  Since 1.22.
                   </listitem>
                 </varlistentry>
               </variablelist>

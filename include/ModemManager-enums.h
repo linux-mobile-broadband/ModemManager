@@ -1924,4 +1924,29 @@ typedef enum { /*< underscore_name=mm_bearer_profile_source >*/
     MM_BEARER_PROFILE_SOURCE_DEVICE   = 5,
 } MMBearerProfileSource;
 
+/*****************************************************************************/
+/* 'RF' enums */
+
+/**
+ * MMServingCellType:
+ * @MM_SERVING_CELL_TYPE_UNKNOWN: Unknown.
+ * @MM_SERVING_CELL_TYPE_PCELL: In LTE CA, this refers to the primary cell. In ENDC case, this is the primary cell of MCS. In 5G SA, this refers to primary cell of NR.
+ * @MM_SERVING_CELL_TYPE_SCELL: In LTE CA, this refers to the secondary cell. In ENDC case, this is the secondary cell of MCS. In 5G SA, this refers to secondary cell of NR.
+ * @MM_SERVING_CELL_TYPE_PSCELL: Refers to primary cell of secondary cell group (SCG).
+ * @MM_SERVING_CELL_TYPE_SSCELL: Refers to secondary cell of secondary cell group (SCG).
+ * @MM_SERVING_CELL_TYPE_INVALID: Indicates that the radio is off, all other values are invalid.
+ *
+ * Indicates the frequency information provided belongs to which serving cell.
+ *
+ * Since: 1.22
+ */
+typedef enum { /*< underscore_name=mm_serving_cell_type >*/
+    MM_SERVING_CELL_TYPE_UNKNOWN  = 0,
+    MM_SERVING_CELL_TYPE_PCELL    = 1,
+    MM_SERVING_CELL_TYPE_SCELL    = 2,
+    MM_SERVING_CELL_TYPE_PSCELL   = 3,
+    MM_SERVING_CELL_TYPE_SSCELL   = 4,
+    MM_SERVING_CELL_TYPE_INVALID  = 0xFFFFFFFF
+} MMServingCellType;
+
 #endif /*  _MODEMMANAGER_ENUMS_H_ */

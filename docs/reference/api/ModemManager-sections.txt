@@ -64,6 +64,7 @@ MMSimType
 MMSimEsimStatus
 MMSimRemovability
 MMCellType
+MMServingCellType
 </SECTION>
 
 <SECTION>

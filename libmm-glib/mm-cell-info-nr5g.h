@@ -65,15 +65,17 @@ struct _MMCellInfoNr5gClass {
 GType mm_cell_info_nr5g_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMCellInfoNr5g, g_object_unref)
 
-const gchar *mm_cell_info_nr5g_get_operator_id    (MMCellInfoNr5g *self);
-const gchar *mm_cell_info_nr5g_get_tac            (MMCellInfoNr5g *self);
-const gchar *mm_cell_info_nr5g_get_ci             (MMCellInfoNr5g *self);
-const gchar *mm_cell_info_nr5g_get_physical_ci    (MMCellInfoNr5g *self);
-guint        mm_cell_info_nr5g_get_nrarfcn        (MMCellInfoNr5g *self);
-gdouble      mm_cell_info_nr5g_get_rsrp           (MMCellInfoNr5g *self);
-gdouble      mm_cell_info_nr5g_get_rsrq           (MMCellInfoNr5g *self);
-gdouble      mm_cell_info_nr5g_get_sinr           (MMCellInfoNr5g *self);
-guint        mm_cell_info_nr5g_get_timing_advance (MMCellInfoNr5g *self);
+const gchar      *mm_cell_info_nr5g_get_operator_id       (MMCellInfoNr5g *self);
+const gchar      *mm_cell_info_nr5g_get_tac               (MMCellInfoNr5g *self);
+const gchar      *mm_cell_info_nr5g_get_ci                (MMCellInfoNr5g *self);
+const gchar      *mm_cell_info_nr5g_get_physical_ci       (MMCellInfoNr5g *self);
+guint             mm_cell_info_nr5g_get_nrarfcn           (MMCellInfoNr5g *self);
+gdouble           mm_cell_info_nr5g_get_rsrp              (MMCellInfoNr5g *self);
+gdouble           mm_cell_info_nr5g_get_rsrq              (MMCellInfoNr5g *self);
+gdouble           mm_cell_info_nr5g_get_sinr              (MMCellInfoNr5g *self);
+guint             mm_cell_info_nr5g_get_timing_advance    (MMCellInfoNr5g *self);
+MMServingCellType mm_cell_info_nr5g_get_serving_cell_type (MMCellInfoNr5g *self);
+guint             mm_cell_info_nr5g_get_bandwidth         (MMCellInfoNr5g *self);
 
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */
@@ -82,24 +84,28 @@ guint        mm_cell_info_nr5g_get_timing_advance (MMCellInfoNr5g *self);
     defined (_LIBMM_INSIDE_MMCLI) || \
     defined (LIBMM_GLIB_COMPILATION)
 
-void mm_cell_info_nr5g_set_operator_id    (MMCellInfoNr5g *self,
-                                           const gchar    *operator_id);
-void mm_cell_info_nr5g_set_tac            (MMCellInfoNr5g *self,
-                                           const gchar    *tac);
-void mm_cell_info_nr5g_set_ci             (MMCellInfoNr5g *self,
-                                           const gchar    *ci);
-void mm_cell_info_nr5g_set_physical_ci    (MMCellInfoNr5g *self,
-                                           const gchar    *ci);
-void mm_cell_info_nr5g_set_nrarfcn        (MMCellInfoNr5g *self,
-                                           guint           earfcn);
-void mm_cell_info_nr5g_set_rsrp           (MMCellInfoNr5g *self,
-                                           gdouble         rsrp);
-void mm_cell_info_nr5g_set_rsrq           (MMCellInfoNr5g *self,
-                                           gdouble         rsrq);
-void mm_cell_info_nr5g_set_sinr           (MMCellInfoNr5g *self,
-                                           gdouble         sinr);
-void mm_cell_info_nr5g_set_timing_advance (MMCellInfoNr5g *self,
-                                           guint           earfcn);
+void mm_cell_info_nr5g_set_operator_id       (MMCellInfoNr5g    *self,
+                                              const gchar       *operator_id);
+void mm_cell_info_nr5g_set_tac               (MMCellInfoNr5g    *self,
+                                              const gchar       *tac);
+void mm_cell_info_nr5g_set_ci                (MMCellInfoNr5g    *self,
+                                              const gchar       *ci);
+void mm_cell_info_nr5g_set_physical_ci       (MMCellInfoNr5g    *self,
+                                              const gchar       *ci);
+void mm_cell_info_nr5g_set_nrarfcn           (MMCellInfoNr5g    *self,
+                                              guint              earfcn);
+void mm_cell_info_nr5g_set_rsrp              (MMCellInfoNr5g    *self,
+                                              gdouble            rsrp);
+void mm_cell_info_nr5g_set_rsrq              (MMCellInfoNr5g    *self,
+                                              gdouble            rsrq);
+void mm_cell_info_nr5g_set_sinr              (MMCellInfoNr5g    *self,
+                                              gdouble            sinr);
+void mm_cell_info_nr5g_set_timing_advance    (MMCellInfoNr5g    *self,
+                                              guint              earfcn);
+void mm_cell_info_nr5g_set_serving_cell_type (MMCellInfoNr5g    *self,
+                                              MMServingCellType  cell_type);
+void mm_cell_info_nr5g_set_bandwidth         (MMCellInfoNr5g    *self,
+                                              guint              bandwidth);
 
 MMCellInfo *mm_cell_info_nr5g_new_from_dictionary (GVariantDict *dict);
 

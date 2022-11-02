@@ -36,15 +36,17 @@
 
 G_DEFINE_TYPE (MMCellInfoNr5g, mm_cell_info_nr5g, MM_TYPE_CELL_INFO)
 
-#define PROPERTY_OPERATOR_ID      "operator-id"
-#define PROPERTY_TAC              "tac"
-#define PROPERTY_CI               "ci"
-#define PROPERTY_PHYSICAL_CI      "physical-ci"
-#define PROPERTY_NRARFCN          "nrarfcn"
-#define PROPERTY_RSRP             "rsrp"
-#define PROPERTY_RSRQ             "rsrq"
-#define PROPERTY_SINR             "sinr"
-#define PROPERTY_TIMING_ADVANCE   "timing-advance"
+#define PROPERTY_OPERATOR_ID        "operator-id"
+#define PROPERTY_TAC                "tac"
+#define PROPERTY_CI                 "ci"
+#define PROPERTY_PHYSICAL_CI        "physical-ci"
+#define PROPERTY_NRARFCN            "nrarfcn"
+#define PROPERTY_RSRP               "rsrp"
+#define PROPERTY_RSRQ               "rsrq"
+#define PROPERTY_SINR               "sinr"
+#define PROPERTY_TIMING_ADVANCE     "timing-advance"
+#define PROPERTY_SERVING_CELL_TYPE  "serving-cell-type"
+#define PROPERTY_BANDWIDTH          "bandwidth"
 
 
 struct _MMCellInfoNr5gPrivate {
@@ -57,6 +59,8 @@ struct _MMCellInfoNr5gPrivate {
     gdouble  rsrq;
     gdouble  sinr;
     guint    timing_advance;
+    guint    serving_cell_type;
+    guint    bandwidth;
 };
 
 /*****************************************************************************/
@@ -326,6 +330,62 @@ mm_cell_info_nr5g_set_timing_advance (MMCellInfoNr5g *self,
     self->priv->timing_advance = timing_advance;
 }
 
+/**
+ * mm_cell_info_nr5g_get_serving_cell_type:
+ * @self: a #MMCellInfoNr5g.
+ *
+ * Get the serving cell type.
+ *
+ * Returns: the serving cell type, or %MM_SERVING_CELL_TYPE_INVALID if not available.
+ *
+ * Since: 1.22
+ */
+MMServingCellType
+mm_cell_info_nr5g_get_serving_cell_type (MMCellInfoNr5g *self)
+{
+    g_return_val_if_fail (MM_IS_CELL_INFO_NR5G (self), MM_SERVING_CELL_TYPE_INVALID);
+
+    return self->priv->serving_cell_type;
+}
+
+/**
+ * mm_cell_info_nr5g_set_serving_cell_type: (skip)
+ */
+void
+mm_cell_info_nr5g_set_serving_cell_type (MMCellInfoNr5g    *self,
+                                         MMServingCellType  cell_type)
+{
+    self->priv->serving_cell_type = cell_type;
+}
+
+/**
+ * mm_cell_info_nr5g_get_bandwidth:
+ * @self: a #MMCellInfoNr5g.
+ *
+ * Get the bandwidth of the particular carrier in downlink.
+ *
+ * Returns: the bandwidth, or %G_MAXUINT if not available.
+ *
+ * Since: 1.22
+ */
+guint
+mm_cell_info_nr5g_get_bandwidth (MMCellInfoNr5g *self)
+{
+    g_return_val_if_fail (MM_IS_CELL_INFO_NR5G (self), G_MAXUINT);
+
+    return self->priv->bandwidth;
+}
+
+/**
+ * mm_cell_info_nr5g_set_bandwidth: (skip)
+ */
+void
+mm_cell_info_nr5g_set_bandwidth (MMCellInfoNr5g *self,
+                                 guint           bandwidth)
+{
+    self->priv->bandwidth = bandwidth;
+}
+
 /*****************************************************************************/
 
 static GString *
@@ -336,15 +396,17 @@ build_string (MMCellInfo *_self)
 
     str = g_string_new (NULL);
 
-    MM_CELL_INFO_BUILD_STRING_APPEND ("operator id",    "%s",  operator_id,     NULL);
-    MM_CELL_INFO_BUILD_STRING_APPEND ("tac",            "%s",  tac,             NULL);
-    MM_CELL_INFO_BUILD_STRING_APPEND ("ci",             "%s",  ci,              NULL);
-    MM_CELL_INFO_BUILD_STRING_APPEND ("physical ci",    "%s",  physical_ci,     NULL);
-    MM_CELL_INFO_BUILD_STRING_APPEND ("nrarfcn",        "%u",  nrarfcn,         G_MAXUINT);
-    MM_CELL_INFO_BUILD_STRING_APPEND ("rsrp",           "%lf", rsrp,           -G_MAXDOUBLE);
-    MM_CELL_INFO_BUILD_STRING_APPEND ("rsrq",           "%lf", rsrq,           -G_MAXDOUBLE);
-    MM_CELL_INFO_BUILD_STRING_APPEND ("sinr",           "%lf", sinr,           -G_MAXDOUBLE);
-    MM_CELL_INFO_BUILD_STRING_APPEND ("timing advance", "%u",  timing_advance,  G_MAXUINT);
+    MM_CELL_INFO_BUILD_STRING_APPEND ("operator id",       "%s",  operator_id,        NULL);
+    MM_CELL_INFO_BUILD_STRING_APPEND ("tac",               "%s",  tac,                NULL);
+    MM_CELL_INFO_BUILD_STRING_APPEND ("ci",                "%s",  ci,                 NULL);
+    MM_CELL_INFO_BUILD_STRING_APPEND ("physical ci",       "%s",  physical_ci,        NULL);
+    MM_CELL_INFO_BUILD_STRING_APPEND ("nrarfcn",           "%u",  nrarfcn,            G_MAXUINT);
+    MM_CELL_INFO_BUILD_STRING_APPEND ("rsrp",              "%lf", rsrp,              -G_MAXDOUBLE);
+    MM_CELL_INFO_BUILD_STRING_APPEND ("rsrq",              "%lf", rsrq,              -G_MAXDOUBLE);
+    MM_CELL_INFO_BUILD_STRING_APPEND ("sinr",              "%lf", sinr,              -G_MAXDOUBLE);
+    MM_CELL_INFO_BUILD_STRING_APPEND ("timing advance",    "%u",  timing_advance,     G_MAXUINT);
+    MM_CELL_INFO_BUILD_STRING_APPEND ("serving cell type", "%u",  serving_cell_type,  MM_SERVING_CELL_TYPE_INVALID);
+    MM_CELL_INFO_BUILD_STRING_APPEND ("bandwidth",         "%u",  bandwidth,          G_MAXUINT);
 
     return str;
 }
@@ -362,15 +424,17 @@ get_dictionary (MMCellInfo *_self)
 
     dict = g_variant_dict_new (NULL);
 
-    MM_CELL_INFO_GET_DICTIONARY_INSERT (OPERATOR_ID,    operator_id,    string,  NULL);
-    MM_CELL_INFO_GET_DICTIONARY_INSERT (TAC,            tac,            string,  NULL);
-    MM_CELL_INFO_GET_DICTIONARY_INSERT (CI,             ci,             string,  NULL);
-    MM_CELL_INFO_GET_DICTIONARY_INSERT (PHYSICAL_CI,    physical_ci,    string,  NULL);
-    MM_CELL_INFO_GET_DICTIONARY_INSERT (NRARFCN,        nrarfcn,        uint32,  G_MAXUINT);
-    MM_CELL_INFO_GET_DICTIONARY_INSERT (RSRP,           rsrp,           double, -G_MAXDOUBLE);
-    MM_CELL_INFO_GET_DICTIONARY_INSERT (RSRQ,           rsrq,           double, -G_MAXDOUBLE);
-    MM_CELL_INFO_GET_DICTIONARY_INSERT (SINR,           sinr,           double, -G_MAXDOUBLE);
-    MM_CELL_INFO_GET_DICTIONARY_INSERT (TIMING_ADVANCE, timing_advance, uint32,  G_MAXUINT);
+    MM_CELL_INFO_GET_DICTIONARY_INSERT (OPERATOR_ID,       operator_id,       string,  NULL);
+    MM_CELL_INFO_GET_DICTIONARY_INSERT (TAC,               tac,               string,  NULL);
+    MM_CELL_INFO_GET_DICTIONARY_INSERT (CI,                ci,                string,  NULL);
+    MM_CELL_INFO_GET_DICTIONARY_INSERT (PHYSICAL_CI,       physical_ci,       string,  NULL);
+    MM_CELL_INFO_GET_DICTIONARY_INSERT (NRARFCN,           nrarfcn,           uint32,  G_MAXUINT);
+    MM_CELL_INFO_GET_DICTIONARY_INSERT (RSRP,              rsrp,              double, -G_MAXDOUBLE);
+    MM_CELL_INFO_GET_DICTIONARY_INSERT (RSRQ,              rsrq,              double, -G_MAXDOUBLE);
+    MM_CELL_INFO_GET_DICTIONARY_INSERT (SINR,              sinr,              double, -G_MAXDOUBLE);
+    MM_CELL_INFO_GET_DICTIONARY_INSERT (TIMING_ADVANCE,    timing_advance,    uint32,  G_MAXUINT);
+    MM_CELL_INFO_GET_DICTIONARY_INSERT (SERVING_CELL_TYPE, serving_cell_type, uint32,  MM_SERVING_CELL_TYPE_INVALID);
+    MM_CELL_INFO_GET_DICTIONARY_INSERT (BANDWIDTH,         bandwidth,         uint32,  G_MAXUINT);
 
     return dict;
 }
@@ -393,11 +457,13 @@ mm_cell_info_nr5g_new_from_dictionary (GVariantDict *dict)
         MM_CELL_INFO_NEW_FROM_DICTIONARY_STRING_SET (nr5g, CI,          ci);
         MM_CELL_INFO_NEW_FROM_DICTIONARY_STRING_SET (nr5g, PHYSICAL_CI, physical_ci);
 
-        MM_CELL_INFO_NEW_FROM_DICTIONARY_NUM_SET (nr5g, NRARFCN,        nrarfcn,        UINT32, uint32);
-        MM_CELL_INFO_NEW_FROM_DICTIONARY_NUM_SET (nr5g, RSRP,           rsrp,           DOUBLE, double);
-        MM_CELL_INFO_NEW_FROM_DICTIONARY_NUM_SET (nr5g, RSRQ,           rsrq,           DOUBLE, double);
-        MM_CELL_INFO_NEW_FROM_DICTIONARY_NUM_SET (nr5g, SINR,           sinr,           DOUBLE, double);
-        MM_CELL_INFO_NEW_FROM_DICTIONARY_NUM_SET (nr5g, TIMING_ADVANCE, timing_advance, UINT32, uint32);
+        MM_CELL_INFO_NEW_FROM_DICTIONARY_NUM_SET (nr5g, NRARFCN,           nrarfcn,           UINT32, uint32);
+        MM_CELL_INFO_NEW_FROM_DICTIONARY_NUM_SET (nr5g, RSRP,              rsrp,              DOUBLE, double);
+        MM_CELL_INFO_NEW_FROM_DICTIONARY_NUM_SET (nr5g, RSRQ,              rsrq,              DOUBLE, double);
+        MM_CELL_INFO_NEW_FROM_DICTIONARY_NUM_SET (nr5g, SINR,              sinr,              DOUBLE, double);
+        MM_CELL_INFO_NEW_FROM_DICTIONARY_NUM_SET (nr5g, TIMING_ADVANCE,    timing_advance,    UINT32, uint32);
+        MM_CELL_INFO_NEW_FROM_DICTIONARY_NUM_SET (nr5g, SERVING_CELL_TYPE, serving_cell_type, UINT32, uint32);
+        MM_CELL_INFO_NEW_FROM_DICTIONARY_NUM_SET (nr5g, BANDWIDTH,         bandwidth,         UINT32, uint32);
     }
 
     return MM_CELL_INFO (self);
@@ -409,11 +475,13 @@ static void
 mm_cell_info_nr5g_init (MMCellInfoNr5g *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_CELL_INFO_NR5G, MMCellInfoNr5gPrivate);
-    self->priv->nrarfcn = G_MAXUINT;
-    self->priv->rsrp = -G_MAXDOUBLE;
-    self->priv->rsrq = -G_MAXDOUBLE;
-    self->priv->sinr = -G_MAXDOUBLE;
-    self->priv->timing_advance = G_MAXUINT;
+    self->priv->nrarfcn           = G_MAXUINT;
+    self->priv->rsrp              = -G_MAXDOUBLE;
+    self->priv->rsrq              = -G_MAXDOUBLE;
+    self->priv->sinr              = -G_MAXDOUBLE;
+    self->priv->timing_advance    = G_MAXUINT;
+    self->priv->serving_cell_type = MM_SERVING_CELL_TYPE_INVALID;
+    self->priv->bandwidth         = G_MAXUINT;
 }
 
 static void
