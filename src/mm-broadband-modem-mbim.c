@@ -20,6 +20,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <math.h>
 
 #include "mm-modem-helpers-mbim.h"
 #include "mm-broadband-modem-mbim.h"
@@ -2323,9 +2324,34 @@ modem_reset (MMIfaceModem        *_self,
 /*****************************************************************************/
 /* Cell info retrieval */
 
+typedef enum {
+    GET_CELL_INFO_STEP_FIRST,
+    GET_CELL_INFO_STEP_RFIM,
+    GET_CELL_INFO_STEP_CELL_INFO,
+    GET_CELL_INFO_STEP_LAST
+} GetCellInfoStep;
+
+typedef struct {
+    GetCellInfoStep step;
+    GList           *rfim_info_list;
+    GList           *cell_info_list;
+    GError          *saved_error;
+} GetCellInfoContext;
+
+static void
+get_cell_info_context_free (GetCellInfoContext *ctx)
+{
+    mm_rfim_info_list_free (ctx->rfim_info_list);
+    g_assert (!ctx->saved_error);
+    g_free (ctx);
+}
+
+static void get_cell_info_step (MbimDevice *device,
+                                GTask      *task);
+
 static GList *
-modem_get_cell_info_finish (MMIfaceModem  *self,
-                            GAsyncResult  *res,
+modem_get_cell_info_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
                             GError       **error)
 {
     return g_task_propagate_pointer (G_TASK (res), error);
@@ -2365,13 +2391,16 @@ base_stations_info_query_ready (MbimDevice   *device,
     g_autoptr(MbimCellInfoServingNrArray)          nr_serving_cells = NULL;
     guint32                                        nr_neighboring_cells_count = 0;
     g_autoptr(MbimCellInfoNeighboringNrArray)      nr_neighboring_cells = NULL;
+    GetCellInfoContext                             *ctx;
 
     self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     response = mbim_device_command_finish (device, res, &error);
     if (!response || !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error)) {
-        g_task_return_error (task, error);
-        g_object_unref (task);
+        ctx->saved_error = error;
+        ctx->step = GET_CELL_INFO_STEP_LAST;
+        get_cell_info_step (device, task);
         return;
     }
 
@@ -2430,8 +2459,9 @@ base_stations_info_query_ready (MbimDevice   *device,
     }
 
     if (error) {
-        g_task_return_error (task, error);
-        g_object_unref (task);
+        ctx->saved_error = error;
+        ctx->step = GET_CELL_INFO_STEP_LAST;
+        get_cell_info_step (device, task);
         return;
     }
 
@@ -2577,18 +2607,33 @@ base_stations_info_query_ready (MbimDevice   *device,
     }
 
     if (lte_serving_cell) {
+        GList *l;
+
         info = mm_cell_info_lte_new_from_dictionary (NULL);
         mm_cell_info_set_serving (info, TRUE);
 
-        CELL_INFO_SET_STR        (lte_serving_cell->provider_id,                      lte_set_operator_id,    MM_CELL_INFO_LTE);
-        CELL_INFO_SET_HEXSTR     (lte_serving_cell->tac,              0xFFFFFFFF, "", lte_set_tac,            MM_CELL_INFO_LTE);
-        CELL_INFO_SET_HEXSTR     (lte_serving_cell->cell_id,          0xFFFFFFFF, "", lte_set_ci,             MM_CELL_INFO_LTE);
-        CELL_INFO_SET_HEXSTR     (lte_serving_cell->physical_cell_id, 0xFFFFFFFF, "", lte_set_physical_ci,    MM_CELL_INFO_LTE);
-        CELL_INFO_SET_UINT       (lte_serving_cell->earfcn,           0xFFFFFFFF,     lte_set_earfcn,         MM_CELL_INFO_LTE);
-        CELL_INFO_SET_INT_DOUBLE (lte_serving_cell->rsrp,             0xFFFFFFFF,     lte_set_rsrp,           MM_CELL_INFO_LTE);
-        CELL_INFO_SET_INT_DOUBLE (lte_serving_cell->rsrq,             0xFFFFFFFF,     lte_set_rsrq,           MM_CELL_INFO_LTE);
-        CELL_INFO_SET_UINT       (lte_serving_cell->timing_advance,   0xFFFFFFFF,     lte_set_timing_advance, MM_CELL_INFO_LTE);
+        CELL_INFO_SET_STR        (lte_serving_cell->provider_id,                         lte_set_operator_id,      MM_CELL_INFO_LTE);
+        CELL_INFO_SET_HEXSTR     (lte_serving_cell->tac,                 0xFFFFFFFF, "", lte_set_tac,              MM_CELL_INFO_LTE);
+        CELL_INFO_SET_HEXSTR     (lte_serving_cell->cell_id,             0xFFFFFFFF, "", lte_set_ci,               MM_CELL_INFO_LTE);
+        CELL_INFO_SET_HEXSTR     (lte_serving_cell->physical_cell_id,    0xFFFFFFFF, "", lte_set_physical_ci,      MM_CELL_INFO_LTE);
+        CELL_INFO_SET_UINT       (lte_serving_cell->earfcn,              0xFFFFFFFF,     lte_set_earfcn,           MM_CELL_INFO_LTE);
+        CELL_INFO_SET_INT_DOUBLE (lte_serving_cell->rsrp,                0xFFFFFFFF,     lte_set_rsrp,             MM_CELL_INFO_LTE);
+        CELL_INFO_SET_INT_DOUBLE (lte_serving_cell->rsrq,                0xFFFFFFFF,     lte_set_rsrq,             MM_CELL_INFO_LTE);
+        CELL_INFO_SET_UINT       (lte_serving_cell->timing_advance,      0xFFFFFFFF,     lte_set_timing_advance,   MM_CELL_INFO_LTE);
 
+        /* Update cell info with the radio frequency information received previously */
+        for (l = ctx->rfim_info_list; l; l = g_list_next (l)) {
+            MMRfInfo *data;
+
+            data = (MMRfInfo *)(l->data);
+            if (fabs ((mm_get_downlink_carrier_frequency (lte_serving_cell->earfcn, self)) - data->center_frequency) < FREQUENCY_TOLERENCE) {
+                mm_obj_dbg (self, "Merging radio frequency data with lte serving cell info");
+                CELL_INFO_SET_UINT (data->serving_cell_type, MM_SERVING_CELL_TYPE_INVALID, lte_set_serving_cell_type, MM_CELL_INFO_LTE);
+                CELL_INFO_SET_UINT (data->bandwidth,         0xFFFFFFFF,                   lte_set_bandwidth,         MM_CELL_INFO_LTE);
+                ctx->rfim_info_list = g_list_delete_link (ctx->rfim_info_list, l);
+                mm_rf_info_free (data);
+            }
+        }
         list = g_list_append (list, g_steal_pointer (&info));
     }
 
@@ -2632,19 +2677,35 @@ base_stations_info_query_ready (MbimDevice   *device,
         guint i;
 
         for (i = 0; i < nr_serving_cells_count; i++) {
+            GList *l;
+
             info = mm_cell_info_nr5g_new_from_dictionary (NULL);
             mm_cell_info_set_serving (info, TRUE);
 
-            CELL_INFO_SET_STR                (nr_serving_cells[i]->provider_id,                                             nr5g_set_operator_id,    MM_CELL_INFO_NR5G);
-            CELL_INFO_SET_HEXSTR             (nr_serving_cells[i]->tac,              0xFFFFFFFF,         "",                nr5g_set_tac,            MM_CELL_INFO_NR5G);
-            CELL_INFO_SET_HEXSTR             (nr_serving_cells[i]->nci,              0xFFFFFFFFFFFFFFFF, G_GINT64_MODIFIER, nr5g_set_ci,             MM_CELL_INFO_NR5G);
-            CELL_INFO_SET_HEXSTR             (nr_serving_cells[i]->physical_cell_id, 0xFFFFFFFF,         "",                nr5g_set_physical_ci,    MM_CELL_INFO_NR5G);
-            CELL_INFO_SET_UINT               (nr_serving_cells[i]->nrarfcn,          0xFFFFFFFF,                            nr5g_set_nrarfcn,        MM_CELL_INFO_NR5G);
-            CELL_INFO_SET_UINT_DOUBLE_SCALED (nr_serving_cells[i]->rsrp,             0xFFFFFFFF,         -156,              nr5g_set_rsrp,           MM_CELL_INFO_NR5G);
-            CELL_INFO_SET_UINT_DOUBLE_SCALED (nr_serving_cells[i]->rsrq,             0xFFFFFFFF,         -43,               nr5g_set_rsrq,           MM_CELL_INFO_NR5G);
-            CELL_INFO_SET_UINT_DOUBLE_SCALED (nr_serving_cells[i]->sinr,             0xFFFFFFFF,         -23,               nr5g_set_sinr,           MM_CELL_INFO_NR5G);
-            CELL_INFO_SET_UINT               (nr_serving_cells[i]->timing_advance,   0xFFFFFFFFFFFFFFFF,                    nr5g_set_timing_advance, MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_STR                (nr_serving_cells[i]->provider_id,                                             nr5g_set_operator_id,      MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_HEXSTR             (nr_serving_cells[i]->tac,              0xFFFFFFFF,         "",                nr5g_set_tac,              MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_HEXSTR             (nr_serving_cells[i]->nci,              0xFFFFFFFFFFFFFFFF, G_GINT64_MODIFIER, nr5g_set_ci,               MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_HEXSTR             (nr_serving_cells[i]->physical_cell_id, 0xFFFFFFFF,         "",                nr5g_set_physical_ci,      MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_UINT               (nr_serving_cells[i]->nrarfcn,          0xFFFFFFFF,                            nr5g_set_nrarfcn,          MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_UINT_DOUBLE_SCALED (nr_serving_cells[i]->rsrp,             0xFFFFFFFF,         -156,              nr5g_set_rsrp,             MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_UINT_DOUBLE_SCALED (nr_serving_cells[i]->rsrq,             0xFFFFFFFF,         -43,               nr5g_set_rsrq,             MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_UINT_DOUBLE_SCALED (nr_serving_cells[i]->sinr,             0xFFFFFFFF,         -23,               nr5g_set_sinr,             MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_UINT               (nr_serving_cells[i]->timing_advance,   0xFFFFFFFFFFFFFFFF,                    nr5g_set_timing_advance,   MM_CELL_INFO_NR5G);
 
+            /* Update cell info with the radio frequency information received previously */
+            for (l = ctx->rfim_info_list; l; l = g_list_next (l)) {
+                MMRfInfo *data;
+
+                data = (MMRfInfo *)(l->data);
+                /* Comparing the derived frequncy value from NRARFCN with received center frequency data to map the NR CELL */
+                if (fabs ((mm_get_frequency_from_nrarfcn (nr_serving_cells[i]->nrarfcn, self) * HERTZ_CONV) - data->center_frequency) < FREQUENCY_TOLERENCE) {
+                    mm_obj_dbg (self, "Merging radio frequency data with 5gnr serving cell info");
+                    CELL_INFO_SET_UINT (data->serving_cell_type, MM_SERVING_CELL_TYPE_INVALID, nr5g_set_serving_cell_type, MM_CELL_INFO_NR5G);
+                    CELL_INFO_SET_UINT (data->bandwidth,         0xFFFFFFFF,                   nr5g_set_bandwidth,         MM_CELL_INFO_NR5G);
+                    ctx->rfim_info_list = g_list_delete_link (ctx->rfim_info_list, l);
+                    mm_rf_info_free (data);
+                }
+            }
             list = g_list_append (list, g_steal_pointer (&info));
         }
     }
@@ -2674,44 +2735,137 @@ base_stations_info_query_ready (MbimDevice   *device,
 #undef CELL_INFO_SET_INT_DOUBLE
 #undef CELL_INFO_SET_UINT_DOUBLE_SCALED
 
-    g_task_return_pointer (task, list, (GDestroyNotify)cell_info_list_free);
-    g_object_unref (task);
+    ctx->cell_info_list = list;
+    ctx->step++;
+    get_cell_info_step (device, task);
 }
 
 static void
-modem_get_cell_info (MMIfaceModem        *_self,
-                     GAsyncReadyCallback  callback,
-                     gpointer             user_data)
+check_rfim_query_ready (MbimDevice   *device,
+                        GAsyncResult *res,
+                        GTask        *task)
 {
-    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
-    GTask                *task;
-    MbimDevice           *device;
-    MbimMessage          *message;
+    g_autoptr(MbimMessage)            response = NULL;
+    MbimIntelRfimFrequencyValueArray  *freq_info;
+    guint                             freq_count;
+    GetCellInfoContext                *ctx;
+    MMBroadbandModemMbim              *self;
 
-    if (!peek_device (self, &device, callback, user_data))
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    response = mbim_device_command_finish (device, res, NULL);
+    if (response &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, NULL) &&
+        mbim_message_intel_thermal_rf_rfim_response_parse (response,
+                                                           &freq_count,
+                                                           &freq_info,
+                                                           NULL)) {
+
+        ctx->rfim_info_list = mm_rfim_info_list_from_mbim_intel_rfim_frequency_value_array (freq_info,
+                                                                                            freq_count,
+                                                                                            self);
+        mbim_intel_rfim_frequency_value_array_free (freq_info);
+    } else {
+        mm_obj_dbg (self, "Fetching of bandwidth and serving cell type data failed");
+    }
+    ctx->step++;
+    get_cell_info_step (device, task);
+}
+
+static void
+get_cell_info_step (MbimDevice *device,
+                    GTask      *task)
+{
+    MMBroadbandModemMbim    *self;
+    GetCellInfoContext      *ctx;
+    g_autoptr(MbimMessage)  message = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    /* Don't run new steps if we're cancelled */
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
         return;
+    }
 
-    task = g_task_new (self, NULL, callback, user_data);
-
+    switch (ctx->step) {
+    case GET_CELL_INFO_STEP_FIRST:
     if (!self->priv->is_base_stations_info_supported) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                  "base stations info is not supported");
         g_object_unref (task);
         return;
     }
+    ctx->step++;
 
-    /* Default capacity is 15 */
-    if (mbim_device_check_ms_mbimex_version (device, 3, 0))
-        message = mbim_message_ms_basic_connect_extensions_v3_base_stations_info_query_new (15, 15, 15, 15, 15, 15, NULL);
-    else
-        message = mbim_message_ms_basic_connect_extensions_base_stations_info_query_new (15, 15, 15, 15, 15, NULL);
+    /* fall through */
+    case GET_CELL_INFO_STEP_RFIM: {
+        mm_obj_dbg (self, "Obtaining RFIM data...");
+        message = mbim_message_intel_thermal_rf_rfim_query_new (NULL);
+        mbim_device_command (device,
+                             message,
+                             10,
+                             NULL,
+                             (GAsyncReadyCallback)check_rfim_query_ready,
+                             task);
+        return;
+    }
 
-    mbim_device_command (device,
-                         message,
-                         300,
-                         NULL,
-                         (GAsyncReadyCallback)base_stations_info_query_ready,
-                         task);
+    case GET_CELL_INFO_STEP_CELL_INFO: {
+        mm_obj_dbg (self, "Obtaining cell info...");
+        /* Default capacity is 15 */
+        if (mbim_device_check_ms_mbimex_version (device, 3, 0))
+            message = mbim_message_ms_basic_connect_extensions_v3_base_stations_info_query_new (15, 15, 15, 15, 15, 15, NULL);
+        else
+            message = mbim_message_ms_basic_connect_extensions_base_stations_info_query_new (15, 15, 15, 15, 15, NULL);
+
+        mbim_device_command (device,
+                             message,
+                             300,
+                             NULL,
+                             (GAsyncReadyCallback)base_stations_info_query_ready,
+                             task);
+        return;
+    }
+
+    case GET_CELL_INFO_STEP_LAST:
+        if (ctx->saved_error)
+            g_task_return_error (task, g_steal_pointer (&ctx->saved_error));
+        else if (ctx->cell_info_list)
+            g_task_return_pointer (task, ctx->cell_info_list, (GDestroyNotify)cell_info_list_free);
+        else
+            g_assert_not_reached ();
+        g_object_unref (task);
+        return;
+
+    default:
+        break;
+    }
+
+    g_assert_not_reached ();
+}
+
+
+static void
+modem_get_cell_info (MMIfaceModem        *_self,
+                     GAsyncReadyCallback callback,
+                     gpointer            user_data)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    MbimDevice           *device;
+    GTask                *task;
+    GetCellInfoContext   *ctx;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    ctx = g_new0 (GetCellInfoContext, 1);
+    ctx->step = GET_CELL_INFO_STEP_FIRST;
+    g_task_set_task_data (task, ctx, (GDestroyNotify)get_cell_info_context_free);
+    get_cell_info_step (device, task);
 }
 
 /*****************************************************************************/

@@ -1229,3 +1229,174 @@ mm_signal_from_mbim_signal_state (MbimDataClass          data_class,
 
     return TRUE;
 }
+
+/*****************************************************************************/
+
+void
+mm_rf_info_free (MMRfInfo *rf_data)
+{
+    g_free(rf_data);
+}
+
+void
+mm_rfim_info_list_free (GList *rfim_info_list)
+{
+    g_list_free_full (rfim_info_list, (GDestroyNotify) g_free);
+}
+
+GList *
+mm_rfim_info_list_from_mbim_intel_rfim_frequency_value_array (MbimIntelRfimFrequencyValueArray  *freq_info,
+                                                              guint     freq_count,
+                                                              gpointer  log_object)
+{
+    GList *info_list = NULL;
+    guint i;
+
+    g_return_val_if_fail (freq_info != NULL, NULL);
+
+    for (i = 0; i < freq_count; i++) {
+        MMRfInfo* info;
+
+        /* If Cell info value indicates radio off, then other parameters are invalid.
+         * So those data will be ignored. */
+        if (freq_info[i]->serving_cell_info != MBIM_INTEL_SERVING_CELL_INFO_RADIO_OFF) {
+            info = g_new0 (MMRfInfo, 1);
+            info->serving_cell_type = MM_SERVING_CELL_TYPE_UNKNOWN;
+            switch (freq_info[i]->serving_cell_info) {
+                case MBIM_INTEL_SERVING_CELL_INFO_PCELL:
+                    info->serving_cell_type = MM_SERVING_CELL_TYPE_PCELL;
+                    break;
+                case MBIM_INTEL_SERVING_CELL_INFO_SCELL:
+                    info->serving_cell_type = MM_SERVING_CELL_TYPE_SCELL;
+                    break;
+                case MBIM_INTEL_SERVING_CELL_INFO_PSCELL:
+                    info->serving_cell_type = MM_SERVING_CELL_TYPE_PSCELL;
+                    break;
+                case MBIM_INTEL_SERVING_CELL_INFO_SSCELL:
+                    info->serving_cell_type = MM_SERVING_CELL_TYPE_SSCELL;
+                    break;
+                case MBIM_INTEL_SERVING_CELL_INFO_RADIO_OFF:
+                default:
+                    info->serving_cell_type = MM_SERVING_CELL_TYPE_INVALID;
+            }
+            info->bandwidth = freq_info[i]->bandwidth;
+            info->center_frequency = freq_info[i]->center_frequency;
+            info_list = g_list_append (info_list, info);
+        } else
+            mm_obj_dbg (log_object, "Ignoring radio frequency information due to cell radio off");
+    }
+
+    return info_list;
+}
+
+typedef struct LteDlRangeData {
+    guint8  band;
+    gdouble fdl_low;
+    guint32 n_offs_dl;
+    guint32 range_dl1;
+    guint32 range_dl2;
+} LteDlRangeData;
+
+static LteDlRangeData lte_dl_range_data [] = {
+    { 1, 2110, 0, 0, 599},
+    { 2, 1930, 600, 600, 1199},
+    { 3, 1805, 1200, 1200, 1949},
+    { 4, 2110, 1950, 1950, 2399},
+    { 5, 869, 2400, 2400, 2649},
+    { 6, 875, 2650, 2650, 2749},
+    { 7, 2620, 2750, 2750, 3449},
+    { 8, 925, 3450, 3450, 3799},
+    { 9, 1844.9, 3800, 3800, 4149},
+    { 10, 2110, 4150, 4150, 4749},
+    { 11, 1475.9, 4750, 4750, 4949},
+    { 12, 728, 5000, 5000, 5179},
+    { 13, 746, 5180, 5180, 5279},
+    { 14, 758, 5280, 5280, 5379},
+    { 17, 734, 5730, 5730, 5849},
+    { 18, 860, 5850, 5850, 5999},
+    { 19, 875, 6000, 6000, 6149},
+    { 20, 791, 6150, 6150, 6449},
+    { 21, 1495.9, 6450, 6450, 6599},
+    { 33, 1900, 36000, 36000, 36199},
+    { 34, 2010, 36200, 36200, 36349},
+    { 35, 1850, 36350, 36350, 36949},
+    { 36, 1930, 36950, 36950, 37549},
+    { 37, 1910, 37550, 37550, 37749},
+    { 38, 2570, 37750, 37750, 38249},
+    { 39, 1880, 38250, 38250, 38649},
+    { 40, 2300, 38650, 38650, 39649}
+};
+
+#define NUM_EUTRA_BANDS (sizeof (lte_dl_range_data) / sizeof (LteDlRangeData))
+
+static guint8
+mm_get_downlink_carrier_band (guint32  earfcn,
+                              gpointer log_object)
+{
+    guint8 i;
+
+    for (i = 0; i < NUM_EUTRA_BANDS; ++i) {
+        if (lte_dl_range_data[i].range_dl1 <= earfcn &&  lte_dl_range_data[i].range_dl2 >= earfcn) {
+            mm_obj_dbg (log_object, "Found matching band: %d for earfcn: %d" , i, earfcn);
+            return i;
+        }
+    }
+    mm_obj_dbg (log_object, "invalid earfcn: %d ", earfcn);
+    return NUM_EUTRA_BANDS;
+}
+
+gdouble
+mm_get_downlink_carrier_frequency (guint32  earfcn,
+                                   gpointer log_object)
+{
+    guint8 i;
+
+    i = mm_get_downlink_carrier_band (earfcn,log_object);
+    if (i == NUM_EUTRA_BANDS)
+        return 0.0;
+    return 1.0e6 * (lte_dl_range_data[i].fdl_low + 0.1 * (earfcn - lte_dl_range_data[i].n_offs_dl));
+}
+
+typedef struct NrRangeData {
+    guint global_khz;
+    guint range_offset;
+    guint nrarfcn_offset;
+    guint range_first;
+    guint range_last;
+} NrRangeData ;
+
+static NrRangeData nr_range_data [] = {
+    { 5, 0, 0, 0, 599999},
+    { 15, 3000000, 600000, 600000, 2016666},
+    { 60, 24250080, 2016667, 2016667, 3279165}
+};
+
+#define NUM_NR_RANGE_DATA (sizeof (nr_range_data) / sizeof (NrRangeData))
+
+static guint8
+mm_get_nr_range_data (guint32  nrarfcn,
+                      gpointer log_object)
+{
+    guint8 i;
+
+    for (i = 0; i < NUM_NR_RANGE_DATA; ++i) {
+        if (nr_range_data[i].range_first <= nrarfcn &&  nr_range_data[i].range_last >= nrarfcn) {
+            mm_obj_dbg (log_object, "Found matching NR range: %d for nrarfcn: %d" , i, nrarfcn);
+            return i;
+        }
+    }
+    mm_obj_dbg (log_object, "invalid nrarfcn: %d ", nrarfcn);
+    return NUM_NR_RANGE_DATA;
+}
+
+gdouble
+mm_get_frequency_from_nrarfcn (guint32  nrarfcn,
+                               gpointer log_object)
+{
+    guint8 i;
+
+    i = mm_get_nr_range_data (nrarfcn,log_object);
+    if (i == NUM_NR_RANGE_DATA)
+        return 0.0;
+    return nr_range_data[i].range_offset + nr_range_data[i].global_khz * (nrarfcn - nr_range_data[i].nrarfcn_offset);
+}
