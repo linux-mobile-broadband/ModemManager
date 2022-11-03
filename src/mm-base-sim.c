@@ -2349,7 +2349,7 @@ load_gid1 (MMBaseSim           *self,
     /* READ BINARY of EFgid1 */
     mm_base_modem_at_command (
         self->priv->modem,
-        "+CRSM=176,28478,0,0,15",
+        "+CRSM=176,28478,0,0,0",
         10,
         FALSE,
         (GAsyncReadyCallback)load_gid1_command_ready,
@@ -2364,7 +2364,7 @@ load_gid2 (MMBaseSim           *self,
     /* READ BINARY of EFgid2 */
     mm_base_modem_at_command (
         self->priv->modem,
-        "+CRSM=176,28479,0,0,15",
+        "+CRSM=176,28479,0,0,0",
         10,
         FALSE,
         (GAsyncReadyCallback)load_gid2_command_ready,
