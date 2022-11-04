@@ -1277,14 +1277,17 @@ initialize_ready (MMBaseModem *self,
 }
 
 static inline void
-log_port (MMBaseModem *self, MMPort *port, const char *desc)
+log_port (MMBaseModem *self,
+          MMPort      *port,
+          const gchar *desc)
 {
-    if (port) {
-        mm_obj_dbg (self, "%s/%s %s",
-                    mm_port_subsys_get_string (mm_port_get_subsys (port)),
-                    mm_port_get_device (port),
-                    desc);
-    }
+    if (!port)
+        return;
+
+    mm_obj_info (self, "%s/%s: %s",
+                 mm_port_subsys_get_string (mm_port_get_subsys (port)),
+                 mm_port_get_device (port),
+                 desc);
 }
 
 gboolean
