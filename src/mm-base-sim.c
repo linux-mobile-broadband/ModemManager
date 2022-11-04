@@ -2534,6 +2534,12 @@ initable_init_finish (GAsyncInitable  *initable,
                                                                                   \
         if (error)                                                                \
             mm_obj_dbg (self, "couldn't load %s: %s", DISPLAY, error->message);   \
+        else {                                                                    \
+            g_autofree gchar *bytearray_str = NULL;                               \
+                                                                                  \
+            bytearray_str = mm_utils_bin2hexstr (bytearray->data, bytearray->len); \
+            mm_obj_info (self, "loaded %s: %s", DISPLAY, bytearray_str);          \
+        }                                                                         \
                                                                                   \
         /* Go on to next step */                                                  \
         ctx = g_task_get_task_data (task);                                        \
