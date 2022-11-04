@@ -3015,7 +3015,7 @@ load_nr5g_registration_settings_ready (MMIfaceModem3gpp *self,
 
     settings = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_nr5g_registration_settings_finish (self, res, &error);
     if (!settings) {
-        mm_obj_warn (self, "couldn't load 5GNR registration settings: %s", error->message);
+        mm_obj_dbg (self, "couldn't load 5GNR registration settings: %s", error->message);
     } else {
         g_autoptr(GVariant) dictionary = NULL;
 
@@ -3033,24 +3033,20 @@ load_initial_eps_bearer_settings_ready (MMIfaceModem3gpp *self,
                                         GAsyncResult     *res,
                                         GTask            *task)
 {
-    InitializationContext *ctx;
-    MMBearerProperties    *config;
-    GError                *error = NULL;
+    InitializationContext         *ctx;
+    g_autoptr(MMBearerProperties)  config = NULL;
+    g_autoptr(GError)              error = NULL;
 
     ctx = g_task_get_task_data (task);
 
     config = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_settings_finish (self, res, &error);
-    if (!config) {
-        mm_obj_warn (self, "couldn't load initial EPS bearer settings: %s", error->message);
-        g_error_free (error);
-    } else {
-        GVariant *dictionary;
+    if (!config)
+        mm_obj_dbg (self, "couldn't load initial EPS bearer settings: %s", error->message);
+    else {
+        g_autoptr(GVariant) dictionary = NULL;
 
         dictionary = mm_bearer_properties_get_dictionary (config);
         mm_gdbus_modem3gpp_set_initial_eps_bearer_settings (ctx->skeleton, dictionary);
-        g_object_unref (config);
-        if (dictionary)
-            g_variant_unref (dictionary);
     }
 
     /* Go on to next step */
@@ -3065,17 +3061,15 @@ load_eps_ue_mode_operation_ready (MMIfaceModem3gpp *self,
 {
     InitializationContext         *ctx;
     MMModem3gppEpsUeModeOperation  uemode;
-    GError                        *error = NULL;
+    g_autoptr(GError)              error = NULL;
 
     ctx = g_task_get_task_data (task);
 
     uemode = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_eps_ue_mode_operation_finish (self, res, &error);
     mm_gdbus_modem3gpp_set_eps_ue_mode_operation (ctx->skeleton, uemode);
 
-    if (error) {
-        mm_obj_warn (self, "couldn't load UE mode of operation for EPS: %s", error->message);
-        g_error_free (error);
-    }
+    if (error)
+        mm_obj_dbg (self, "couldn't load UE mode of operation for EPS: %s", error->message);
 
     /* Go on to next step */
     ctx->step++;
@@ -3084,36 +3078,32 @@ load_eps_ue_mode_operation_ready (MMIfaceModem3gpp *self,
 
 static void
 load_enabled_facility_locks_ready (MMIfaceModem3gpp *self,
-                                   GAsyncResult *res,
-                                   GTask *task)
+                                   GAsyncResult     *res,
+                                   GTask            *task)
 {
     InitializationContext *ctx;
-    GError *error = NULL;
-    MMModem3gppFacility facilities;
+    g_autoptr(GError)      error = NULL;
+    MMModem3gppFacility    facilities;
 
     ctx = g_task_get_task_data (task);
 
     facilities = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_enabled_facility_locks_finish (self, res, &error);
     mm_gdbus_modem3gpp_set_enabled_facility_locks (ctx->skeleton, facilities);
 
-    if (error) {
-        mm_obj_warn (self, "couldn't load facility locks: %s", error->message);
-        g_error_free (error);
-    } else {
-        MMBaseSim *sim = NULL;
+    if (error)
+        mm_obj_dbg (self, "couldn't load facility locks: %s", error->message);
+    else {
+        g_autoptr(MMBaseSim) sim = NULL;
 
         /* We loaded the initial list of facility locks; but we do need to update
          * the SIM PIN lock status when that changes. We'll connect to the signal
          * which notifies about such update. There is no need to ref self as the
          * SIM itself is an object which exists as long as self exists. */
-        g_object_get (self,
-                      MM_IFACE_MODEM_SIM, &sim,
-                      NULL);
+        g_object_get (self, MM_IFACE_MODEM_SIM, &sim, NULL);
         g_signal_connect (sim,
                           MM_BASE_SIM_PIN_LOCK_ENABLED,
                           G_CALLBACK (sim_pin_lock_enabled_cb),
                           ctx->skeleton);
-        g_object_unref (sim);
     }
 
     /* Go on to next step */
@@ -3123,23 +3113,20 @@ load_enabled_facility_locks_ready (MMIfaceModem3gpp *self,
 
 static void
 load_imei_ready (MMIfaceModem3gpp *self,
-                 GAsyncResult *res,
-                 GTask *task)
+                 GAsyncResult     *res,
+                 GTask            *task)
 {
     InitializationContext *ctx;
-    GError *error = NULL;
-    gchar *imei;
+    g_autoptr(GError)      error = NULL;
+    g_autofree gchar      *imei = NULL;
 
     ctx = g_task_get_task_data (task);
 
     imei = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_imei_finish (self, res, &error);
     mm_gdbus_modem3gpp_set_imei (ctx->skeleton, imei);
-    g_free (imei);
 
-    if (error) {
-        mm_obj_warn (self, "couldn't load IMEI: %s", error->message);
-        g_error_free (error);
-    }
+    if (error)
+        mm_obj_dbg (self, "couldn't load IMEI: %s", error->message);
 
     /* Go on to next step */
     ctx->step++;
