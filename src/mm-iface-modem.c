@@ -240,14 +240,12 @@ mm_iface_modem_modify_sim (MMIfaceModem  *self,
                   NULL);
 
     if (!sim_slots_old) {
-        mm_obj_warn (self, "Failed to process SIM hot swap: couldn't load current list of SIM slots");
+        mm_obj_warn (self, "failed to process SIM hot swap: couldn't load current list of SIM slots");
         return;
     }
 
-    if (!skeleton) {
-        mm_obj_warn (self, "Failed to process SIM hot swap: interface skeleton not available");
+    if (!skeleton)
         return;
-    }
 
     sim_slot_paths_array = g_ptr_array_new ();
     sim_slots_new        = g_ptr_array_new_with_free_func ((GDestroyNotify) sim_slot_free);
@@ -3708,7 +3706,7 @@ load_unlock_retries_ready (MMIfaceModem *self,
 
     unlock_retries = MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_retries_finish (self, res, &error);
     if (!unlock_retries) {
-        mm_obj_warn (self, "couldn't load unlock retries: %s", error->message);
+        mm_obj_dbg (self, "couldn't load unlock retries: %s", error->message);
         g_error_free (error);
     } else {
         /* Update the dictionary in the DBus interface */
@@ -3731,7 +3729,7 @@ modem_after_sim_unlock_ready (MMIfaceModem *self,
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->modem_after_sim_unlock_finish (self, res, &error)) {
-        mm_obj_warn (self, "after SIM unlock failed: %s", error->message);
+        mm_obj_dbg (self, "after SIM unlock failed: %s", error->message);
         g_error_free (error);
     }
 
@@ -4348,15 +4346,13 @@ enabling_set_power_state_ready (MMIfaceModem *self,
 static void
 check_for_sim_swap_ready (MMIfaceModem *self,
                           GAsyncResult *res,
-                          GTask *task)
+                          GTask        *task)
 {
-    EnablingContext *ctx;
-    GError *error = NULL;
+    EnablingContext   *ctx;
+    g_autoptr(GError)  error = NULL;
 
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap_finish (self, res, &error)) {
-        mm_obj_warn (self, "failed to check if SIM was swapped: %s", error->message);
-        g_error_free (error);
-    }
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap_finish (self, res, &error))
+        mm_obj_dbg (self, "failed to check if SIM was swapped: %s", error->message);
 
     /* Go on to next step */
     ctx = g_task_get_task_data (task);
@@ -4746,22 +4742,19 @@ initialization_context_free (InitializationContext *ctx)
     static void                                                         \
     load_##NAME##_ready (MMIfaceModem *self,                            \
                          GAsyncResult *res,                             \
-                         GTask *task)                                   \
+                         GTask        *task)                            \
     {                                                                   \
         InitializationContext *ctx;                                     \
-        GError *error = NULL;                                           \
-        gchar *val;                                                     \
+        g_autoptr(GError)      error = NULL;                            \
+        g_autofree gchar      *val = NULL;                              \
                                                                         \
         ctx = g_task_get_task_data (task);                              \
                                                                         \
         val = MM_IFACE_MODEM_GET_INTERFACE (self)->load_##NAME##_finish (self, res, &error); \
         mm_gdbus_modem_set_##NAME (ctx->skeleton, val);                 \
-        g_free (val);                                                   \
                                                                         \
-        if (error) {                                                    \
-            mm_obj_warn (self, "couldn't load %s: %s", DISPLAY, error->message); \
-            g_error_free (error);                                       \
-        }                                                               \
+        if (error)                                                      \
+            mm_obj_dbg (self, "couldn't load %s: %s", DISPLAY, error->message); \
                                                                         \
         /* Go on to next step */                                        \
         ctx->step++;                                                    \
@@ -4773,10 +4766,10 @@ initialization_context_free (InitializationContext *ctx)
     static void                                                         \
     load_##NAME##_ready (MMIfaceModem *self,                            \
                          GAsyncResult *res,                             \
-                         GTask *task)                                   \
+                         GTask        *task)                            \
     {                                                                   \
         InitializationContext *ctx;                                     \
-        GError *error = NULL;                                           \
+        g_autoptr(GError)      error = NULL;                            \
                                                                         \
         ctx = g_task_get_task_data (task);                              \
                                                                         \
@@ -4784,10 +4777,8 @@ initialization_context_free (InitializationContext *ctx)
             ctx->skeleton,                                              \
             MM_IFACE_MODEM_GET_INTERFACE (self)->load_##NAME##_finish (self, res, &error)); \
                                                                         \
-        if (error) {                                                    \
-            mm_obj_warn (self, "couldn't load %s: %s", DISPLAY, error->message); \
-            g_error_free (error);                                       \
-        }                                                               \
+        if (error)                                                      \
+            mm_obj_dbg (self, "couldn't load %s: %s", DISPLAY, error->message); \
                                                                         \
         /* Go on to next step */                                        \
         ctx->step++;                                                    \
@@ -4893,19 +4884,16 @@ STR_REPLY_READY_FN (device_identifier, "device identifier")
 static void
 load_supported_charsets_ready (MMIfaceModem *self,
                                GAsyncResult *res,
-                               GTask *task)
+                               GTask        *task)
 {
     InitializationContext *ctx;
-    GError *error = NULL;
+    g_autoptr(GError)      error = NULL;
 
     ctx = g_task_get_task_data (task);
 
-    ctx->supported_charsets =
-        MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_charsets_finish (self, res, &error);
-    if (error) {
-        mm_obj_warn (self, "couldn't load supported charsets: %s", error->message);
-        g_error_free (error);
-    }
+    ctx->supported_charsets = MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_charsets_finish (self, res, &error);
+    if (error)
+        mm_obj_dbg (self, "couldn't load supported charsets: %s", error->message);
 
     /* Go on to next step */
     ctx->step++;
@@ -4915,22 +4903,20 @@ load_supported_charsets_ready (MMIfaceModem *self,
 static void
 setup_charset_ready (MMIfaceModem *self,
                      GAsyncResult *res,
-                     GTask *task)
+                     GTask        *task)
 {
     InitializationContext *ctx;
-    GError *error = NULL;
+    g_autoptr(GError)      error = NULL;
 
     ctx = g_task_get_task_data (task);
 
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->setup_charset_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->setup_charset_finish (self, res, &error))
         mm_obj_dbg (self, "couldn't set charset '%s': %s",
                     mm_modem_charset_to_string (*ctx->current_charset),
                     error->message);
-        g_error_free (error);
-
         /* Will retry step with some other charset type */
-    } else
-        /* Done, Go on to next step */
+    else
+        /* Done, go on to next step */
         ctx->step++;
 
     interface_initialization_step (task);
@@ -4939,11 +4925,11 @@ setup_charset_ready (MMIfaceModem *self,
 static void
 load_supported_modes_ready (MMIfaceModem *self,
                             GAsyncResult *res,
-                            GTask *task)
+                            GTask        *task)
 {
     InitializationContext *ctx;
-    GError *error = NULL;
-    GArray *modes_array;
+    g_autoptr(GError)      error = NULL;
+    GArray                *modes_array;
 
     ctx = g_task_get_task_data (task);
 
@@ -4954,10 +4940,8 @@ load_supported_modes_ready (MMIfaceModem *self,
         g_array_unref (modes_array);
     }
 
-    if (error) {
-        mm_obj_warn (self, "couldn't load supported modes: %s", error->message);
-        g_error_free (error);
-    }
+    if (error)
+        mm_obj_dbg (self, "couldn't load supported modes: %s", error->message);
 
     /* Go on to next step */
     ctx->step++;
@@ -4967,11 +4951,11 @@ load_supported_modes_ready (MMIfaceModem *self,
 static void
 load_supported_bands_ready (MMIfaceModem *self,
                             GAsyncResult *res,
-                            GTask *task)
+                            GTask        *task)
 {
     InitializationContext *ctx;
-    GError *error = NULL;
-    GArray *bands_array;
+    g_autoptr(GError)      error = NULL;
+    GArray                *bands_array;
 
     ctx = g_task_get_task_data (task);
 
@@ -4983,10 +4967,8 @@ load_supported_bands_ready (MMIfaceModem *self,
         g_array_unref (bands_array);
     }
 
-    if (error) {
-        mm_obj_warn (self, "couldn't load supported bands: %s", error->message);
-        g_error_free (error);
-    }
+    if (error)
+        mm_obj_dbg (self, "couldn't load supported bands: %s", error->message);
 
     /* Go on to next step */
     ctx->step++;
@@ -4996,11 +4978,11 @@ load_supported_bands_ready (MMIfaceModem *self,
 static void
 load_supported_ip_families_ready (MMIfaceModem *self,
                                   GAsyncResult *res,
-                                  GTask *task)
+                                  GTask        *task)
 {
     InitializationContext *ctx;
-    GError *error = NULL;
-    MMBearerIpFamily ip_families;
+    g_autoptr(GError)      error = NULL;
+    MMBearerIpFamily       ip_families;
 
     ctx = g_task_get_task_data (task);
 
@@ -5009,10 +4991,8 @@ load_supported_ip_families_ready (MMIfaceModem *self,
     if (ip_families != MM_BEARER_IP_FAMILY_NONE)
         mm_gdbus_modem_set_supported_ip_families (ctx->skeleton, ip_families);
 
-    if (error) {
-        mm_obj_warn (self, "couldn't load supported IP families: %s", error->message);
-        g_error_free (error);
-    }
+    if (error)
+        mm_obj_dbg (self, "couldn't load supported IP families: %s", error->message);
 
     /* Go on to next step */
     ctx->step++;
@@ -5024,12 +5004,12 @@ UINT_REPLY_READY_FN (power_state, "power state")
 static void
 load_current_modes_ready (MMIfaceModem *self,
                           GAsyncResult *res,
-                          GTask *task)
+                          GTask        *task)
 {
     InitializationContext *ctx;
-    MMModemMode allowed = MM_MODEM_MODE_NONE;
-    MMModemMode preferred = MM_MODEM_MODE_NONE;
-    GError *error = NULL;
+    MMModemMode            allowed = MM_MODEM_MODE_NONE;
+    MMModemMode            preferred = MM_MODEM_MODE_NONE;
+    g_autoptr(GError)      error = NULL;
 
     ctx = g_task_get_task_data (task);
 
@@ -5037,11 +5017,10 @@ load_current_modes_ready (MMIfaceModem *self,
                                                                          res,
                                                                          &allowed,
                                                                          &preferred,
-                                                                         &error)) {
+                                                                         &error))
         /* Errors when getting allowed/preferred won't be critical */
-        mm_obj_warn (self, "couldn't load current allowed/preferred modes: %s", error->message);
-        g_error_free (error);
-    } else
+        mm_obj_dbg (self, "couldn't load current allowed/preferred modes: %s", error->message);
+    else
         mm_gdbus_modem_set_current_modes (ctx->skeleton, g_variant_new ("(uu)", allowed, preferred));
 
     /* Done, Go on to next step */
@@ -5055,16 +5034,15 @@ load_current_bands_ready (MMIfaceModem *self,
                           GTask *task)
 {
     InitializationContext *ctx;
-    GArray *current_bands;
-    GError *error = NULL;
+    GArray                *current_bands;
+    g_autoptr(GError)      error = NULL;
 
     ctx = g_task_get_task_data (task);
 
     current_bands = MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_bands_finish (self, res, &error);
     if (!current_bands) {
         /* Errors when getting current bands won't be critical */
-        mm_obj_warn (self, "couldn't load current bands: %s", error->message);
-        g_error_free (error);
+        mm_obj_dbg (self, "couldn't load current bands: %s", error->message);
     } else {
         GArray *filtered_bands;
         GArray *supported_bands;
@@ -5104,9 +5082,9 @@ setup_sim_hot_swap_ready (MMIfaceModem *self,
 
     MM_IFACE_MODEM_GET_INTERFACE (self)->setup_sim_hot_swap_finish (self, res, &error);
     if (error)
-        mm_obj_warn (self, "SIM hot swap setup failed: %s", error->message);
+        mm_obj_info (self, "SIM hot swap setup failed: %s", error->message);
     else {
-        mm_obj_dbg (self, "SIM hot swap setup succeeded");
+        mm_obj_info (self, "SIM hot swap setup succeeded");
         priv->sim_hot_swap_configured = TRUE;
     }
 
@@ -5132,7 +5110,7 @@ load_sim_slots_ready (MMIfaceModem *self,
                                                                      &sim_slots,
                                                                      &primary_sim_slot,
                                                                      &error))
-        mm_obj_warn (self, "couldn't query SIM slots: %s", error->message);
+        mm_obj_dbg (self, "couldn't query SIM slots: %s", error->message);
 
     if (sim_slots) {
         MMBaseSim     *primary_sim = NULL;
@@ -5194,8 +5172,7 @@ modem_update_lock_info_ready (MMIfaceModem *self,
     /* NOTE: we already propagated the lock state, no need to do it again */
     mm_iface_modem_update_lock_info_finish (self, res, &ctx->fatal_error);
     if (ctx->fatal_error) {
-        g_prefix_error (&ctx->fatal_error,
-                        "Couldn't check unlock status: ");
+        g_prefix_error (&ctx->fatal_error, "Couldn't check unlock status: ");
         /* Jump to the last step */
         ctx->step = INITIALIZATION_STEP_LAST;
     } else
@@ -5245,22 +5222,20 @@ sim_new_ready (GAsyncInitable *initable,
 }
 
 static void
-sim_reinit_ready (MMBaseSim *sim,
+sim_reinit_ready (MMBaseSim    *sim,
                   GAsyncResult *res,
-                  GTask *task)
+                  GTask        *task)
 {
     MMIfaceModem          *self;
     InitializationContext *ctx;
-    GError                *error = NULL;
+    g_autoptr(GError)      error = NULL;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
 
-    if (!mm_base_sim_initialize_finish (sim, res, &error)) {
+    if (!mm_base_sim_initialize_finish (sim, res, &error))
         mm_obj_warn (self, "SIM re-initialization failed: %s",
-                     error ? error->message : "Unknown error");
-        g_clear_error (&error);
-    }
+                     error ? error->message : "unknown error");
 
     /* Go on to next step */
     ctx->step++;
@@ -5273,14 +5248,12 @@ setup_carrier_config_ready (MMIfaceModem *self,
                             GTask        *task)
 {
     InitializationContext *ctx;
-    GError                *error = NULL;
+    g_autoptr(GError)      error = NULL;
 
     ctx = g_task_get_task_data (task);
 
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->setup_carrier_config_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->setup_carrier_config_finish (self, res, &error))
         mm_obj_warn (self, "couldn't setup carrier config: %s", error->message);
-        g_error_free (error);
-    }
 
     /* Go on to next step */
     ctx->step++;
@@ -5293,20 +5266,17 @@ load_carrier_config_ready (MMIfaceModem *self,
                            GTask        *task)
 {
     InitializationContext *ctx;
-    GError                *error = NULL;
-    gchar                 *name = NULL;
-    gchar                 *revision = NULL;
+    g_autoptr(GError)      error = NULL;
+    g_autofree gchar      *name = NULL;
+    g_autofree gchar      *revision = NULL;
 
     ctx = g_task_get_task_data (task);
 
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->load_carrier_config_finish (self, res, &name, &revision, &error)) {
-        mm_obj_warn (self, "couldn't load carrier config: %s", error->message);
-        g_error_free (error);
-    } else {
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->load_carrier_config_finish (self, res, &name, &revision, &error))
+        mm_obj_dbg (self, "couldn't load carrier config: %s", error->message);
+    else {
         mm_gdbus_modem_set_carrier_configuration          (ctx->skeleton, name);
         mm_gdbus_modem_set_carrier_configuration_revision (ctx->skeleton, revision);
-        g_free (name);
-        g_free (revision);
     }
 
     /* Go on to next step */
@@ -5320,21 +5290,17 @@ load_own_numbers_ready (MMIfaceModem *self,
                         GTask *task)
 {
     InitializationContext *ctx;
-    GError *error = NULL;
-    GStrv str_list;
+    g_autoptr(GError)      error = NULL;
+    g_auto(GStrv)          str_list = NULL;
 
     ctx = g_task_get_task_data (task);
 
     str_list = MM_IFACE_MODEM_GET_INTERFACE (self)->load_own_numbers_finish (self, res, &error);
-    if (error) {
-        mm_obj_warn (self, "couldn't load list of own numbers: %s", error->message);
-        g_error_free (error);
-    }
+    if (error)
+        mm_obj_dbg (self, "couldn't load list of own numbers: %s", error->message);
 
-    if (str_list) {
+    if (str_list)
         mm_gdbus_modem_set_own_numbers (ctx->skeleton, (const gchar *const *) str_list);
-        g_strfreev (str_list);
-    }
 
     /* Go on to next step */
     ctx->step++;
