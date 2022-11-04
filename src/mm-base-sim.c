@@ -1147,17 +1147,15 @@ set_preferred_networks_reload_ready (MMBaseSim    *self,
                                      GAsyncResult *res,
                                      GTask        *task)
 {
-    GError                      *error = NULL;
+    g_autoptr(GError)            error = NULL;
     GList                       *preferred_nets_list;
     SetPreferredNetworksContext *ctx;
 
     ctx = g_task_get_task_data (task);
 
     preferred_nets_list = MM_BASE_SIM_GET_CLASS (self)->load_preferred_networks_finish (self, res, &error);
-    if (error) {
-        mm_obj_warn (self, "couldn't load list of preferred networks: %s", error->message);
-        g_error_free (error);
-    }
+    if (error)
+        mm_obj_dbg (self, "couldn't load list of preferred networks: %s", error->message);
 
     mm_gdbus_sim_set_preferred_networks (MM_GDBUS_SIM (self),
                                          mm_sim_preferred_network_list_get_variant (preferred_nets_list));
@@ -2473,7 +2471,7 @@ initable_init_finish (GAsyncInitable  *initable,
         mm_gdbus_sim_set_##NAME (MM_GDBUS_SIM (self), val);                               \
                                                                                           \
         if (error)                                                                        \
-            mm_obj_warn (self, "couldn't load %s: %s", DISPLAY, error->message);          \
+            mm_obj_dbg (self, "couldn't load %s: %s", DISPLAY, error->message);           \
         else                                                                              \
             mm_obj_info (self, "loaded %s: %s", DISPLAY, VALUE_FORMAT (val));             \
                                                                                           \
@@ -2504,7 +2502,7 @@ initable_init_finish (GAsyncInitable  *initable,
         mm_gdbus_sim_set_##NAME (MM_GDBUS_SIM (self), (guint) val);                   \
                                                                                       \
         if (error)                                                                    \
-            mm_obj_warn (self, "couldn't load %s: %s", DISPLAY, error->message);      \
+            mm_obj_dbg (self, "couldn't load %s: %s", DISPLAY, error->message);       \
         else                                                                          \
             mm_obj_info (self, "loaded %s: %s", DISPLAY, ENUM_GET_STRING (val));      \
                                                                                       \
@@ -2535,7 +2533,7 @@ initable_init_finish (GAsyncInitable  *initable,
                                   NULL));                                         \
                                                                                   \
         if (error)                                                                \
-            mm_obj_warn (self, "couldn't load %s: %s", DISPLAY, error->message);  \
+            mm_obj_dbg (self, "couldn't load %s: %s", DISPLAY, error->message);   \
                                                                                   \
         /* Go on to next step */                                                  \
         ctx = g_task_get_task_data (task);                                        \
@@ -2559,7 +2557,7 @@ init_load_preferred_networks_ready (MMBaseSim    *self,
 
     preferred_nets_list = MM_BASE_SIM_GET_CLASS (self)->load_preferred_networks_finish (self, res, &error);
     if (error)
-        mm_obj_warn (self, "couldn't load list of preferred networks: %s", error->message);
+        mm_obj_dbg (self, "couldn't load list of preferred networks: %s", error->message);
     else {
         g_autoptr(GString)  str = NULL;
         GList              *l;
@@ -2599,7 +2597,7 @@ init_load_emergency_numbers_ready (MMBaseSim    *self,
 
     str_list = MM_BASE_SIM_GET_CLASS (self)->load_emergency_numbers_finish (self, res, &error);
     if (error)
-        mm_obj_warn (self, "couldn't load list of emergency numbers: %s", error->message);
+        mm_obj_dbg (self, "couldn't load list of emergency numbers: %s", error->message);
     else {
         g_autoptr(GString) str = NULL;
         guint              i;
@@ -2671,7 +2669,7 @@ init_wait_sim_ready (MMBaseSim    *self,
     g_autoptr(GError)  error = NULL;
 
     if (!MM_BASE_SIM_GET_CLASS (self)->wait_sim_ready_finish (self, res, &error))
-        mm_obj_warn (self, "couldn't wait for SIM to be ready: %s", error->message);
+        mm_obj_dbg (self, "couldn't wait for SIM to be ready: %s", error->message);
 
     /* Go on to next step */
     ctx = g_task_get_task_data (task);
