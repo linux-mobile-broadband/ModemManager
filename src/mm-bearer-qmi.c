@@ -1185,7 +1185,7 @@ register_for_wds_indication (ConnectContext *ctx,
     } else {
         client = ctx->client_ipv6;
         mm_obj_dbg (self, "registering for wds extended ip V6 info indication");
-    }		
+    }
     qmi_message_wds_indication_register_input_set_report_extended_ip_configuration_change (input, TRUE, NULL);
     qmi_client_wds_indication_register (
         client,
@@ -1215,7 +1215,7 @@ mobile_equipment_error_from_start_network_output (MMBearerQmi                   
 
         verbose_cer_type_str = qmi_wds_verbose_call_end_reason_type_get_string (verbose_cer_type);
         verbose_cer_reason_str = qmi_wds_verbose_call_end_reason_get_string (verbose_cer_type, verbose_cer_reason);
-        mm_obj_msg (self, "verbose call end reason (%u,%d): [%s] %s",
+        mm_obj_msg (self, "  verbose call end reason (%u,%d): [%s] %s",
                     verbose_cer_type,
                     verbose_cer_reason,
                     verbose_cer_type_str,
@@ -1237,7 +1237,7 @@ mobile_equipment_error_from_start_network_output (MMBearerQmi                   
         const gchar *cer_str;
 
         cer_str = qmi_wds_call_end_reason_get_string (cer);
-        mm_obj_msg (self, "call end reason (%u): %s", cer, cer_str);
+        mm_obj_msg (self, "  call end reason (%u): %s", cer, cer_str);
 
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN,
                             "Call failed: %s", cer_str);
@@ -1277,7 +1277,7 @@ start_network_ready (QmiClientWds *client,
                 ctx->packet_data_handle_ipv6 = GLOBAL_PACKET_DATA_HANDLE;
             /* Fall down to a successful connection */
         } else {
-            mm_obj_msg (self, "couldn't start network: %s", error->message);
+            mm_obj_msg (self, "couldn't start %s network: %s", ctx->running_ipv4 ? "IPv4" : "IPv6", error->message);
             if (g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_CALL_FAILED)) {
                 g_clear_error (&error);
                 error = mobile_equipment_error_from_start_network_output (self, output);
