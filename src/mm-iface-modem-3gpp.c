@@ -402,6 +402,7 @@ typedef struct {
     MMIfaceModem3gpp *self;
     MmGdbusModem3gpp *skeleton;
     GCancellable     *cancellable;
+    gboolean          force_registration;
     gchar            *operator_id;
     GTimer           *timer;
     guint             max_registration_time;
@@ -556,6 +557,85 @@ register_in_network_ready (MMIfaceModem3gpp *self,
     run_registration_checks (task);
 }
 
+static void
+initial_registration_checks_ready (MMIfaceModem3gpp *self,
+                                   GAsyncResult     *res,
+                                   GTask            *task)
+{
+    Private                      *priv;
+    RegisterInNetworkContext     *ctx;
+    GError                       *error = NULL;
+    const gchar                  *current_operator_code;
+    MMModem3gppRegistrationState  reg_state;
+
+    priv = get_private (self);
+    ctx = g_task_get_task_data (task);
+
+    if (!mm_iface_modem_3gpp_run_registration_checks_finish (self, res, &error)) {
+        mm_obj_info (self, "Initial 3GPP registration check failed: %s", error->message);
+        g_error_free (error);
+        /* Just continue as if nothing happened */
+    }
+
+    current_operator_code = mm_gdbus_modem3gpp_get_operator_code (ctx->skeleton);
+    reg_state = mm_gdbus_modem3gpp_get_registration_state (ctx->skeleton);
+
+    /* Manual registration requested? */
+    if (ctx->operator_id) {
+        /* If already registered manually with the requested operator, we're done */
+        if (!ctx->force_registration &&
+            (g_strcmp0 (current_operator_code, ctx->operator_id) == 0) &&
+            mm_modem_3gpp_registration_state_is_registered (reg_state) &&
+            priv->manual_registration) {
+            mm_obj_info (self, "already registered manually in selected network '%s', manual registration not launched...",
+                        current_operator_code);
+            g_task_return_boolean (task, TRUE);
+            g_object_unref (task);
+            return;
+        }
+
+        /* Manual registration to a new operator required */
+        mm_obj_info (self, "launching manual network registration in '%s'...", ctx->operator_id);
+        g_free (priv->manual_registration_operator_id);
+        priv->manual_registration_operator_id = g_strdup (ctx->operator_id);
+        priv->manual_registration = TRUE;
+    }
+    /* Automatic registration requested? */
+    else {
+        /* If the modem is already registered and the last time it was asked
+         * automatic registration, we're done */
+        if (!ctx->force_registration &&
+            mm_modem_3gpp_registration_state_is_registered (reg_state) &&
+            !priv->manual_registration) {
+            mm_obj_info (self, "already registered automatically in network '%s',"
+                        " automatic registration not launched...",
+                        current_operator_code ? current_operator_code : "unknown");
+            g_task_return_boolean (task, TRUE);
+            g_object_unref (task);
+            return;
+        }
+
+        /* Automatic registration to a new operator requested */
+        mm_obj_info (self, "launching automatic network registration...");
+        g_clear_pointer (&priv->manual_registration_operator_id, g_free);
+        priv->manual_registration = FALSE;
+    }
+
+    ctx->cancellable = g_cancellable_new ();
+
+    /* Keep an accessible reference to the cancellable, so that we can cancel
+     * previous request when needed */
+    priv->pending_registration_cancellable = g_object_ref (ctx->cancellable);
+
+    ctx->timer = g_timer_new ();
+    MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network (
+        self,
+        ctx->operator_id,
+        ctx->cancellable,
+        (GAsyncReadyCallback)register_in_network_ready,
+        task);
+}
+
 void
 mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
                                          const gchar         *operator_id,
@@ -564,17 +644,16 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
                                          GAsyncReadyCallback  callback,
                                          gpointer             user_data)
 {
-    RegisterInNetworkContext     *ctx;
-    const gchar                  *current_operator_code;
-    GError                       *error = NULL;
-    GTask                        *task;
-    Private                      *priv;
-    MMModem3gppRegistrationState  reg_state;
+    Private                  *priv;
+    RegisterInNetworkContext *ctx;
+    GTask                    *task;
+    GError                   *error = NULL;
 
     priv = get_private (self);
 
     ctx = g_slice_new0 (RegisterInNetworkContext);
     ctx->self = g_object_ref (self);
+    ctx->force_registration = force_registration;
     ctx->operator_id = (operator_id && operator_id[0]) ? g_strdup (operator_id) : NULL;
     ctx->max_registration_time = max_registration_time;
 
@@ -607,62 +686,10 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
         g_clear_object (&priv->pending_registration_cancellable);
     }
 
-    current_operator_code = mm_gdbus_modem3gpp_get_operator_code (ctx->skeleton);
-    reg_state = mm_gdbus_modem3gpp_get_registration_state (ctx->skeleton);
-
-    /* Manual registration requested? */
-    if (ctx->operator_id) {
-        /* If already registered manually with the requested operator, we're done */
-        if (!force_registration &&
-            (g_strcmp0 (current_operator_code, ctx->operator_id) == 0) &&
-            mm_modem_3gpp_registration_state_is_registered (reg_state) &&
-            priv->manual_registration) {
-            mm_obj_info (self, "already registered manually in selected network '%s', manual registration not launched...",
-                        current_operator_code);
-            g_task_return_boolean (task, TRUE);
-            g_object_unref (task);
-            return;
-        }
-
-        /* Manual registration to a new operator required */
-        mm_obj_info (self, "launching manual network registration in '%s'...", ctx->operator_id);
-        g_free (priv->manual_registration_operator_id);
-        priv->manual_registration_operator_id = g_strdup (ctx->operator_id);
-        priv->manual_registration = TRUE;
-    }
-    /* Automatic registration requested? */
-    else {
-        /* If the modem is already registered and the last time it was asked
-         * automatic registration, we're done */
-        if (!force_registration &&
-            mm_modem_3gpp_registration_state_is_registered (reg_state) &&
-            !priv->manual_registration) {
-            mm_obj_info (self, "already registered automatically in network '%s',"
-                        " automatic registration not launched...",
-                        current_operator_code ? current_operator_code : "unknown");
-            g_task_return_boolean (task, TRUE);
-            g_object_unref (task);
-            return;
-        }
-
-        /* Automatic registration to a new operator requested */
-        mm_obj_info (self, "launching automatic network registration...");
-        g_clear_pointer (&priv->manual_registration_operator_id, g_free);
-        priv->manual_registration = FALSE;
-    }
-
-    ctx->cancellable = g_cancellable_new ();
-
-    /* Keep an accessible reference to the cancellable, so that we can cancel
-     * previous request when needed */
-    priv->pending_registration_cancellable = g_object_ref (ctx->cancellable);
-
-    ctx->timer = g_timer_new ();
-    MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network (
+    /* Query initial registration state here in order to avoid re-registering. */
+    mm_iface_modem_3gpp_run_registration_checks (
         self,
-        ctx->operator_id,
-        ctx->cancellable,
-        (GAsyncReadyCallback)register_in_network_ready,
+        (GAsyncReadyCallback)initial_registration_checks_ready,
         task);
 }
 
