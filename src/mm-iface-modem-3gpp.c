@@ -2271,8 +2271,10 @@ mm_iface_modem_3gpp_update_pco_list (MMIfaceModem3gpp *self,
 
     g_variant_builder_init (&builder, G_VARIANT_TYPE ("a(ubay)"));
     for (iter = pco_list; iter; iter = g_list_next (iter)) {
-        g_variant_builder_add_value (&builder,
-                                     mm_pco_to_variant (MM_PCO (iter->data)));
+        g_autoptr(GVariant) pco_variant = NULL;
+
+        pco_variant = mm_pco_to_variant (MM_PCO (iter->data));
+        g_variant_builder_add_value (&builder, pco_variant);
     }
     variant = g_variant_ref_sink (g_variant_builder_end (&builder));
     mm_gdbus_modem3gpp_set_pco (skeleton, variant);
