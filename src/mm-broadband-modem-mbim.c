@@ -472,12 +472,12 @@ complete_current_capabilities (GTask *task)
 }
 
 static void
-device_caps_query_ready (MbimDevice *device,
+device_caps_query_ready (MbimDevice   *device,
                          GAsyncResult *res,
-                         GTask *task)
+                         GTask        *task)
 {
+    g_autoptr(MbimMessage)          response = NULL;
     MMBroadbandModemMbim           *self;
-    MbimMessage                    *response;
     GError                         *error = NULL;
     LoadCurrentCapabilitiesContext *ctx;
 
@@ -488,7 +488,7 @@ device_caps_query_ready (MbimDevice *device,
     if (!response || !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
-        goto out;
+        return;
     }
 
     if (mbim_device_check_ms_mbimex_version (device, 3, 0)) {
@@ -519,12 +519,10 @@ device_caps_query_ready (MbimDevice *device,
                 &error)) {
             g_task_return_error (task, error);
             g_object_unref (task);
-            goto out;
+            return;
         }
         /* Translate data class v3 to standard data class to simplify further usage of the field */
-        self->priv->caps_data_class = mm_mbim_data_class_from_mbim_data_class_v3_and_subclass (
-                                        data_class_v3,
-                                        data_subclass);
+        self->priv->caps_data_class = mm_mbim_data_class_from_mbim_data_class_v3_and_subclass (data_class_v3, data_subclass);
     } else if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
         if (!mbim_message_ms_basic_connect_extensions_device_caps_response_parse (
                 response,
@@ -544,7 +542,7 @@ device_caps_query_ready (MbimDevice *device,
                 &error)) {
             g_task_return_error (task, error);
             g_object_unref (task);
-            goto out;
+            return;
         }
     } else {
         if (!mbim_message_device_caps_response_parse (
@@ -564,7 +562,7 @@ device_caps_query_ready (MbimDevice *device,
                 &error)) {
             g_task_return_error (task, error);
             g_object_unref (task);
-            goto out;
+            return;
         }
     }
 
@@ -572,17 +570,13 @@ device_caps_query_ready (MbimDevice *device,
                                                                    self->priv->caps_data_class,
                                                                    self->priv->caps_custom_data_class);
     complete_current_capabilities (task);
-
-out:
-    if (response)
-        mbim_message_unref (response);
 }
 
 static void
 load_current_capabilities_mbim (GTask *task)
 {
+    g_autoptr(MbimMessage)          message = NULL;
     MMBroadbandModemMbim           *self;
-    MbimMessage                    *message;
     LoadCurrentCapabilitiesContext *ctx;
 
     self = g_task_get_source_object (task);
@@ -599,7 +593,6 @@ load_current_capabilities_mbim (GTask *task)
                          NULL,
                          (GAsyncReadyCallback)device_caps_query_ready,
                          task);
-    mbim_message_unref (message);
 }
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
