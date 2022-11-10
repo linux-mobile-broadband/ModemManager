@@ -800,6 +800,30 @@ mm_flow_control_from_string (const gchar  *str,
 
 /*************************************************************************/
 
+gboolean
+mm_modem_3gpp_registration_state_is_registered (MMModem3gppRegistrationState state)
+{
+    switch (state) {
+        case MM_MODEM_3GPP_REGISTRATION_STATE_HOME:
+        case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING:
+        case MM_MODEM_3GPP_REGISTRATION_STATE_HOME_SMS_ONLY:
+        case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_SMS_ONLY:
+        case MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY:
+        case MM_MODEM_3GPP_REGISTRATION_STATE_HOME_CSFB_NOT_PREFERRED:
+        case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED:
+        case MM_MODEM_3GPP_REGISTRATION_STATE_ATTACHED_RLOS:
+            return TRUE;
+        case MM_MODEM_3GPP_REGISTRATION_STATE_IDLE:
+        case MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING:
+        case MM_MODEM_3GPP_REGISTRATION_STATE_DENIED:
+        case MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN:
+        default:
+            return FALSE;
+    }
+}
+
+/*************************************************************************/
+
 static const gchar *creg_regex[] = {
     /* +CREG: <stat>                      (GSM 07.07 CREG=1 unsolicited) */
     [0] = "\\+(CREG|CGREG|CEREG|C5GREG):\\s*0*([0-9])",

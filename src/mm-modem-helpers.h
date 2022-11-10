@@ -126,6 +126,8 @@ MMFlowControl mm_flow_control_from_string (const gchar  *str,
 /* 3GPP specific helpers and utilities */
 /*****************************************************************************/
 
+gboolean mm_modem_3gpp_registration_state_is_registered (MMModem3gppRegistrationState state);
+
 /* Common Regex getters */
 GPtrArray *mm_3gpp_creg_regex_get     (gboolean solicited);
 void       mm_3gpp_creg_regex_destroy (GPtrArray *array);

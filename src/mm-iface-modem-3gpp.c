@@ -290,19 +290,6 @@ mm_iface_modem_3gpp_bind_simple_status (MMIfaceModem3gpp *self,
 
 /*****************************************************************************/
 
-#define REG_STATE_IS_REGISTERED(state)                                    \
-    (state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||                    \
-     state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING ||                 \
-     state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME_SMS_ONLY ||           \
-     state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_SMS_ONLY ||        \
-     state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME_CSFB_NOT_PREFERRED || \
-     state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED)
-
-#define REG_STATE_IS_UNKNOWN_IDLE_DENIED(state)                           \
-    (state == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN ||                 \
-     state == MM_MODEM_3GPP_REGISTRATION_STATE_IDLE ||                    \
-     state == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED)
-
 static MMModem3gppPacketServiceState
 get_consolidated_packet_service_state (MMIfaceModem3gpp *self)
 {
@@ -312,12 +299,12 @@ get_consolidated_packet_service_state (MMIfaceModem3gpp *self)
 
     /* If registered in any of PS, EPS or 5GS, then packet service domain is
      * implicitly attached. */
-    if (REG_STATE_IS_REGISTERED (priv->state_ps) ||
-        REG_STATE_IS_REGISTERED (priv->state_eps) ||
-        REG_STATE_IS_REGISTERED (priv->state_5gs))
+    if (mm_modem_3gpp_registration_state_is_registered (priv->state_ps) ||
+        mm_modem_3gpp_registration_state_is_registered (priv->state_eps) ||
+        mm_modem_3gpp_registration_state_is_registered (priv->state_5gs))
         return MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED;
 
-    if (REG_STATE_IS_REGISTERED (priv->state_cs))
+    if (mm_modem_3gpp_registration_state_is_registered (priv->state_cs))
         return MM_MODEM_3GPP_PACKET_SERVICE_STATE_DETACHED;
 
     /* If not registered in any of CS, PS, EPS or 5GS, then packet service
@@ -353,6 +340,11 @@ get_consolidated_reg_state (MMIfaceModem3gpp *self)
         priv->state_5gs == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING)
         return MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING;
 
+#define REG_STATE_IS_UNKNOWN_IDLE_DENIED(state)                           \
+    (state == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN ||                 \
+     state == MM_MODEM_3GPP_REGISTRATION_STATE_IDLE ||                    \
+     state == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED)
+
     /* If at least one state is DENIED and the others are UNKNOWN or IDLE, use DENIED */
     if ((priv->state_cs == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED ||
          priv->state_ps == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED ||
@@ -363,6 +355,8 @@ get_consolidated_reg_state (MMIfaceModem3gpp *self)
         REG_STATE_IS_UNKNOWN_IDLE_DENIED (priv->state_eps) &&
         REG_STATE_IS_UNKNOWN_IDLE_DENIED (priv->state_5gs))
         return MM_MODEM_3GPP_REGISTRATION_STATE_DENIED;
+
+#undef REG_STATE_IS_UNKNOWN_IDLE_DENIED
 
     /* Emergency services? */
     if (priv->state_cs  == MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY ||
@@ -498,7 +492,7 @@ run_registration_checks_ready (MMIfaceModem3gpp *self,
     }
 
     /* If we got registered, end registration checks */
-    if (REG_STATE_IS_REGISTERED (current_registration_state)) {
+    if (mm_modem_3gpp_registration_state_is_registered (current_registration_state)) {
         /* Request immediate access tech and signal update: we may have changed
          * from home to roaming or viceversa, both registered states, so there
          * wouldn't be an explicit refresh triggered from the modem interface as
@@ -621,7 +615,7 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
         /* If already registered manually with the requested operator, we're done */
         if (!force_registration &&
             (g_strcmp0 (current_operator_code, ctx->operator_id) == 0) &&
-            REG_STATE_IS_REGISTERED (reg_state) &&
+            mm_modem_3gpp_registration_state_is_registered (reg_state) &&
             priv->manual_registration) {
             mm_obj_info (self, "already registered manually in selected network '%s', manual registration not launched...",
                         current_operator_code);
@@ -641,7 +635,7 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
         /* If the modem is already registered and the last time it was asked
          * automatic registration, we're done */
         if (!force_registration &&
-            REG_STATE_IS_REGISTERED (reg_state) &&
+            mm_modem_3gpp_registration_state_is_registered (reg_state) &&
             !priv->manual_registration) {
             mm_obj_info (self, "already registered automatically in network '%s',"
                         " automatic registration not launched...",
@@ -1975,7 +1969,7 @@ mm_iface_modem_3gpp_update_access_technologies (MMIfaceModem3gpp        *self,
 
     /* Even if registration state didn't change, report access technology,
      * but only if something valid to report */
-    if (REG_STATE_IS_REGISTERED (state) || priv->reloading_registration_info) {
+    if (mm_modem_3gpp_registration_state_is_registered (state) || priv->reloading_registration_info) {
         if (access_tech != MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN)
             mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
                                                        access_tech,
@@ -2008,7 +2002,7 @@ mm_iface_modem_3gpp_update_location (MMIfaceModem3gpp *self,
      * location updates, but only if something valid to report. For the case
      * where we're registering (loading current registration info after a state
      * change to registered), we also allow LAC/CID updates. */
-    if (REG_STATE_IS_REGISTERED (state) || priv->reloading_registration_info) {
+    if (mm_modem_3gpp_registration_state_is_registered (state) || priv->reloading_registration_info) {
         if (location_area_code || tracking_area_code || cell_id)
             mm_iface_modem_location_3gpp_update_lac_tac_ci (MM_IFACE_MODEM_LOCATION (self),
                                                             location_area_code,
@@ -2099,7 +2093,7 @@ update_registration_state (MMIfaceModem3gpp             *self,
     if (new_state == old_state && old_packet_service_state == get_consolidated_packet_service_state (self))
         return;
 
-    if (REG_STATE_IS_REGISTERED (new_state)) {
+    if (mm_modem_3gpp_registration_state_is_registered (new_state)) {
         MMModemState modem_state;
 
         /* If already reloading registration info, skip it */
