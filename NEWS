@@ -1,4 +1,28 @@
 
+Overview of changes in ModemManager 1.20.2
+-------------------------------------------
+
+ * build:
+   ** Fixed building without MBIM support.
+   ** Fixed building without tests support.
+   ** Disabled test interface in base manager if building without tests.
+   ** Updated intel plugin dependencies to require XMM shared utils.
+   ** Fixed templates to make build reproducible.
+
+ * FCC unlock:
+   ** Updated shell scripts to avoid requiring bash.
+
+ * MBIM:
+   ** Ignored SIM related indications during a SIM slot switch operation.
+   ** Updated capabilities loading to use Microsoft Extensions if available.
+   ** Updated supported modes loading to use the CustomDataClass field contents.
+
+ * SIM:
+   ** Fixed length when reading GID1/GID2 using AT commands.
+
+ * Several other minor improvements and fixes.
+
+
 ModemManager 1.20.0
 -------------------------------------------
 This is a new stable release of ModemManager.
