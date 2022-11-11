@@ -139,7 +139,6 @@ build-no-qmi-no-mbim-no-tests:
     - NOCONFIGURE=1 ./autogen.sh
     - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --without-qmi --without-mbim --without-tests
     - make
-    - make check
     - make install
 
 build-no-suspend-resume:
