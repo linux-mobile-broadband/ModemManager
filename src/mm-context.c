@@ -139,7 +139,7 @@ static gboolean     log_personal_info;
 static const GOptionEntry log_entries[] = {
     {
         "log-level", 0, 0, G_OPTION_ARG_STRING, &log_level,
-        "Log level: one of ERR, WARN, INFO, DEBUG",
+        "Log level: one of ERR, WARN, MSG, INFO, DEBUG",
         "[LEVEL]"
     },
     {
