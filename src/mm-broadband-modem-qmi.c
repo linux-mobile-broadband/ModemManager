@@ -12093,7 +12093,8 @@ signal_load_values_context_step (GTask *task)
       ctx->values_result->evdo ||    \
       ctx->values_result->gsm  ||    \
       ctx->values_result->umts ||    \
-      ctx->values_result->lte))
+      ctx->values_result->lte  ||    \
+      ctx->values_result->nr5g))
 
     ctx = g_task_get_task_data (task);
 
