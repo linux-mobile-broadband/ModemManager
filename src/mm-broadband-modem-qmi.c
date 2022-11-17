@@ -174,6 +174,9 @@ struct _MMBroadbandModemQmiPrivate {
     gboolean profile_manager_unsolicited_events_setup;
     guint refresh_indication_id;
 
+    /* WDS Profile changed notification ID (3gpp Profile Manager) */
+    guint profile_changed_indication_id;
+
     /* PS registration helpers when using NAS System Info and DSD
      * (not applicable when using NAS Serving System) */
     gboolean dsd_supported;
@@ -6373,7 +6376,42 @@ pdc_refresh_received (QmiClientPdc                  *client,
 }
 
 /*****************************************************************************/
+/* Profile Changed events (3gppProfileManager interface) */
+
+static void
+profile_changed_indication_received (QmiClientWds                         *client,
+                                     QmiIndicationWdsProfileChangedOutput *output,
+                                     MMBroadbandModemQmi                  *self)
+{
+    mm_obj_dbg (self, "profile changed indication was received");
+    mm_iface_modem_3gpp_profile_manager_updated (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self));
+}
+
+/*****************************************************************************/
 /* Enable/Disable unsolicited events (3gppProfileManager interface) */
+
+typedef enum {
+    REGISTER_PROFILE_REFRESH_STEP_FIRST,
+    REGISTER_PROFILE_REFRESH_STEP_PROFILE_REFRESH,
+    REGISTER_PROFILE_REFRESH_STEP_PROFILE_CHANGE,
+    REGISTER_PROFILE_REFRESH_STEP_CONFIGURE_PROFILE_EVENT,
+    REGISTER_PROFILE_REFRESH_STEP_LAST,
+} RegisterProfileRefreshStep;
+
+typedef struct {
+    QmiClientPdc               *client_pdc;
+    QmiClientWds               *client_wds;
+    RegisterProfileRefreshStep  step;
+    gboolean                    enable;
+} RegisterProfileRefreshContext;
+
+static void
+register_profile_refresh_context_free (RegisterProfileRefreshContext *ctx)
+{
+    g_clear_object (&ctx->client_pdc);
+    g_clear_object (&ctx->client_wds);
+    g_free (ctx);
+}
 
 static gboolean
 modem_3gpp_profile_manager_enable_disable_unsolicited_events_finish (MMIfaceModem3gppProfileManager  *self,
@@ -6383,37 +6421,156 @@ modem_3gpp_profile_manager_enable_disable_unsolicited_events_finish (MMIfaceMode
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
+static void register_profile_refresh_context_step (GTask *task);
+
 static void
 register_pdc_refresh_ready (QmiClientPdc *client,
                             GAsyncResult *res,
                             GTask        *task)
 {
     g_autoptr(QmiMessagePdcRegisterOutput)  output = NULL;
-    MMBroadbandModemQmi                    *self;
-    gboolean                                enable;
+    RegisterProfileRefreshContext          *ctx;
     GError                                 *error = NULL;
 
-    self = g_task_get_source_object (task);
-    enable = GPOINTER_TO_UINT (g_task_get_task_data (task));
+    ctx = g_task_get_task_data (task);
 
     output = qmi_client_pdc_register_finish (client, res, &error);
-    if (!output) {
+    if (!output || !qmi_message_pdc_register_output_get_result (output, &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
     }
 
-    if (!qmi_message_pdc_register_output_get_result (output, &error)) {
+    ctx->step++;
+    register_profile_refresh_context_step (task);
+}
+
+static void
+register_wds_profile_change_ready (QmiClientWds *client,
+                                   GAsyncResult *res,
+                                   GTask        *task)
+{
+    g_autoptr(QmiMessageWdsIndicationRegisterOutput)  output = NULL;
+    RegisterProfileRefreshContext                    *ctx;
+    GError                                           *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    output = qmi_client_wds_indication_register_finish (client, res, &error);
+    if (!output || !qmi_message_wds_indication_register_output_get_result (output, &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
     }
 
-    self->priv->profile_manager_unsolicited_events_enabled = enable;
-    mm_obj_dbg (self, "%s for refresh events", enable ? "registered" : "unregistered");
+    ctx->step++;
+    register_profile_refresh_context_step (task);
+}
 
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+static void
+register_wds_configure_profile_event_ready (QmiClientWds *client,
+                                            GAsyncResult *res,
+                                            GTask        *task)
+{
+    g_autoptr(QmiMessageWdsConfigureProfileEventListOutput)  output = NULL;
+    RegisterProfileRefreshContext                           *ctx;
+    GError                                                  *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    output = qmi_client_wds_configure_profile_event_list_finish (client, res, &error);
+    if (!output || !qmi_message_wds_configure_profile_event_list_output_get_result (output, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    ctx->step++;
+    register_profile_refresh_context_step (task);
+}
+
+static void
+register_profile_refresh_context_step (GTask *task)
+{
+    MMBroadbandModemQmi           *self;
+    RegisterProfileRefreshContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    switch (ctx->step) {
+    case REGISTER_PROFILE_REFRESH_STEP_FIRST:
+        ctx->step++;
+        /* Fall through */
+
+    case REGISTER_PROFILE_REFRESH_STEP_PROFILE_REFRESH:
+        if (ctx->client_pdc) {
+            g_autoptr(QmiMessagePdcRegisterInput) input = NULL;
+
+            input = qmi_message_pdc_register_input_new ();
+            qmi_message_pdc_register_input_set_enable_reporting (input, ctx->enable, NULL);
+            qmi_client_pdc_register (ctx->client_pdc,
+                                     input,
+                                     10,
+                                     NULL,
+                                     (GAsyncReadyCallback) register_pdc_refresh_ready,
+                                     task);
+            return;
+        }
+        ctx->step++;
+        /* Fall through */
+
+    case REGISTER_PROFILE_REFRESH_STEP_PROFILE_CHANGE:
+        if (ctx->client_wds) {
+            g_autoptr(QmiMessageWdsIndicationRegisterInput) input = NULL;
+
+            input = qmi_message_wds_indication_register_input_new ();
+            qmi_message_wds_indication_register_input_set_report_profile_changes (input, ctx->enable, NULL);
+            qmi_client_wds_indication_register (ctx->client_wds,
+                                                input,
+                                                10,
+                                                NULL,
+                                                (GAsyncReadyCallback) register_wds_profile_change_ready,
+                                                task);
+            return;
+        }
+        ctx->step++;
+        /* Fall through */
+
+    case REGISTER_PROFILE_REFRESH_STEP_CONFIGURE_PROFILE_EVENT:
+        if (ctx->client_wds) {
+            g_autoptr(QmiMessageWdsConfigureProfileEventListInput)     input = NULL;
+            g_autoptr(GArray)                                          array = NULL;
+            QmiMessageWdsConfigureProfileEventListInputRegisterElement element = {0};
+
+            element.profile_type = QMI_WDS_PROFILE_TYPE_ALL;
+            element.profile_index = 0xFF;
+            array = g_array_new (FALSE, FALSE, sizeof (QmiMessageWdsConfigureProfileEventListInputRegisterElement));
+            g_array_append_val (array, element);
+
+            input = qmi_message_wds_configure_profile_event_list_input_new ();
+            qmi_message_wds_configure_profile_event_list_input_set_register (input, array, NULL);
+            qmi_client_wds_configure_profile_event_list (ctx->client_wds,
+                                                         input,
+                                                         10,
+                                                         NULL,
+                                                         (GAsyncReadyCallback) register_wds_configure_profile_event_ready,
+                                                         task);
+            return;
+        }
+        ctx->step++;
+        /* Fall through */
+
+    case REGISTER_PROFILE_REFRESH_STEP_LAST:
+        self->priv->profile_manager_unsolicited_events_enabled = ctx->enable;
+        mm_obj_dbg (self, "%s for refresh events", ctx->enable ? "registered" : "unregistered");
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+
+    default:
+        g_assert_not_reached ();
+    }
 }
 
 static void
@@ -6422,17 +6579,22 @@ common_enable_disable_unsolicited_events_3gpp_profile_manager (MMBroadbandModemQ
                                                                GAsyncReadyCallback  callback,
                                                                gpointer             user_data)
 {
-    g_autoptr(QmiMessagePdcRegisterInput)  input = NULL;
-    GTask                                 *task;
-    QmiClient                             *client = NULL;
+    RegisterProfileRefreshContext *ctx;
+    GTask                         *task;
+    QmiClient                     *client_pdc = NULL;
+    QmiClient                     *client_wds = NULL;
 
     if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
-                                      QMI_SERVICE_PDC, &client,
+                                      QMI_SERVICE_PDC, &client_pdc,
+                                      callback, user_data))
+        return;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_WDS, &client_wds,
                                       callback, user_data))
         return;
 
     task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task, GUINT_TO_POINTER (enable), NULL);
 
     if (enable == self->priv->profile_manager_unsolicited_events_enabled) {
         mm_obj_dbg (self, "profile manager unsolicited events already %s; skipping",
@@ -6442,14 +6604,15 @@ common_enable_disable_unsolicited_events_3gpp_profile_manager (MMBroadbandModemQ
         return;
     }
 
-    input = qmi_message_pdc_register_input_new ();
-    qmi_message_pdc_register_input_set_enable_reporting (input, enable, NULL);
-    qmi_client_pdc_register (QMI_CLIENT_PDC (client),
-                             input,
-                             10,
-                             NULL,
-                             (GAsyncReadyCallback) register_pdc_refresh_ready,
-                             task);
+    ctx = g_new0 (RegisterProfileRefreshContext, 1);
+    ctx->step = REGISTER_PROFILE_REFRESH_STEP_FIRST;
+    ctx->enable = enable;
+    ctx->client_pdc = client_pdc ? QMI_CLIENT_PDC (g_object_ref (client_pdc)) : NULL;
+    ctx->client_wds = client_wds ? QMI_CLIENT_WDS (g_object_ref (client_wds)) : NULL;
+
+    g_task_set_task_data (task, ctx, (GDestroyNotify)register_profile_refresh_context_free);
+
+    register_profile_refresh_context_step (task);
 }
 
 static void
@@ -6493,10 +6656,16 @@ common_setup_cleanup_unsolicited_events_3gpp_profile_manager (MMBroadbandModemQm
 
 {
     GTask     *task;
-    QmiClient *client = NULL;
+    QmiClient *client_pdc = NULL;
+    QmiClient *client_wds = NULL;
 
     if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
-                                      QMI_SERVICE_PDC, &client,
+                                      QMI_SERVICE_PDC, &client_pdc,
+                                      callback, user_data))
+        return;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_WDS, &client_wds,
                                       callback, user_data))
         return;
 
@@ -6515,14 +6684,25 @@ common_setup_cleanup_unsolicited_events_3gpp_profile_manager (MMBroadbandModemQm
     if (enable) {
         g_assert (self->priv->refresh_indication_id == 0);
         self->priv->refresh_indication_id =
-            g_signal_connect (client,
+            g_signal_connect (client_pdc,
                               "refresh",
                               G_CALLBACK (pdc_refresh_received),
                               self);
+
+        g_assert (self->priv->profile_changed_indication_id == 0);
+        self->priv->profile_changed_indication_id =
+            g_signal_connect (client_wds,
+                              "profile-changed",
+                              G_CALLBACK (profile_changed_indication_received),
+                              self);
     } else {
         g_assert (self->priv->refresh_indication_id != 0);
-        g_signal_handler_disconnect (client, self->priv->refresh_indication_id);
+        g_signal_handler_disconnect (client_pdc, self->priv->refresh_indication_id);
         self->priv->refresh_indication_id = 0;
+
+        g_assert (self->priv->profile_changed_indication_id != 0);
+        g_signal_handler_disconnect (client_wds, self->priv->profile_changed_indication_id);
+        self->priv->profile_changed_indication_id = 0;
     }
 
     mm_obj_dbg (self, "%s profile events handler", enable ? "set up" : "cleaned up");
