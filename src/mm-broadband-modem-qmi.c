@@ -11990,6 +11990,7 @@ signal_load_values_get_signal_info_ready (QmiClientNas *client,
     gint8                    rsrq;
     gint16                   rsrp;
     gint16                   snr;
+    gint16                   rscp_umts;
     gint16                   rsrq_5g;
     g_autoptr(QmiMessageNasGetSignalInfoOutput) output = NULL;
 
@@ -12047,6 +12048,12 @@ signal_load_values_get_signal_info_ready (QmiClientNas *client,
         ctx->values_result->umts = mm_signal_new ();
         mm_signal_set_rssi (ctx->values_result->umts, (gdouble)rssi);
         mm_signal_set_ecio (ctx->values_result->umts, ((gdouble)ecio) * (-0.5));
+    }
+
+    if (qmi_message_nas_get_signal_info_output_get_wcdma_rscp (output,
+                                                               &rscp_umts,
+                                                               NULL)) {
+        mm_signal_set_rscp (ctx->values_result->umts, (-1.0) * ((gdouble)rscp_umts));
     }
 
     /* LTE... */
