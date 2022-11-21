@@ -12070,7 +12070,7 @@ signal_load_values_get_signal_info_ready (QmiClientNas *client,
                                                                        NULL)) {
         ctx->values_result->nr5g = mm_signal_new ();
         mm_signal_set_rsrp (ctx->values_result->nr5g, (gdouble)rsrp);
-        mm_signal_set_snr (ctx->values_result->nr5g, (gdouble)snr);
+        mm_signal_set_snr (ctx->values_result->nr5g, (0.1) * ((gdouble)snr));
     }
 
     if (qmi_message_nas_get_signal_info_output_get_5g_signal_strength_extended (output,
