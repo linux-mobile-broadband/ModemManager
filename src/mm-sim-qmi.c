@@ -12,6 +12,7 @@
  *
  * Copyright (C) 2012 Google, Inc.
  * Copyright (C) 2016 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc.
  */
 
 #include <config.h>
@@ -42,7 +43,8 @@ enum {
 static GParamSpec *properties[PROP_LAST];
 
 struct _MMSimQmiPrivate {
-    gboolean dms_uim_deprecated;
+    gboolean  dms_uim_deprecated;
+    gchar    *imsi;
 };
 
 static const guint16 mf_file_path[]  = { 0x3F00 };
@@ -444,9 +446,12 @@ uim_get_imsi_ready (QmiClientUim *client,
                     GAsyncResult *res,
                     GTask        *task)
 {
+    MMSimQmi          *self;
     GError            *error = NULL;
     g_autoptr(GArray)  read_result = NULL;
     g_autofree gchar  *imsi = NULL;
+
+    self = g_task_get_source_object (task);
 
     read_result = uim_read_finish (client, res, &error);
     if (!read_result) {
@@ -463,12 +468,18 @@ uim_get_imsi_ready (QmiClientUim *client,
                                  MM_CORE_ERROR,
                                  MM_CORE_ERROR_FAILED,
                                  "IMSI is malformed");
-    else
+    else {
         /* EFimsi contains a length byte, follwed by a nibble for parity,
          * and then followed by the actual IMSI in BCD. After converting
          * the BCD into a decimal string, we simply skip the first 3
          * decimal digits to obtain the IMSI. */
+
+        /* Cache IMSI */
+        g_free (self->priv->imsi);
+        self->priv->imsi = g_strdup (imsi + 3);
+
         g_task_return_pointer (task, g_strdup (imsi + 3), g_free);
+    }
     g_object_unref (task);
 }
 
@@ -489,8 +500,11 @@ dms_uim_get_imsi_ready (QmiClientDms *client,
                         GAsyncResult *res,
                         GTask        *task)
 {
+    MMSimQmi                      *self;
     QmiMessageDmsUimGetImsiOutput *output = NULL;
-    GError *error = NULL;
+    GError                        *error = NULL;
+
+    self = g_task_get_source_object (task);
 
     output = qmi_client_dms_uim_get_imsi_finish (client, res, &error);
     if (!output) {
@@ -503,6 +517,11 @@ dms_uim_get_imsi_ready (QmiClientDms *client,
         const gchar *str = NULL;
 
         qmi_message_dms_uim_get_imsi_output_get_imsi (output, &str, NULL);
+
+        /* Cache IMSI */
+        g_free (self->priv->imsi);
+        self->priv->imsi = g_strdup (str);
+
         g_task_return_pointer (task, g_strdup (str), g_free);
     }
 
@@ -633,63 +652,6 @@ load_gid2 (MMBaseSim           *self,
 /*****************************************************************************/
 /* Load operator identifier */
 
-static gboolean
-get_home_network (QmiClientNas  *client,
-                  GAsyncResult  *res,
-                  guint16       *out_mcc,
-                  guint16       *out_mnc,
-                  gboolean      *out_mnc_with_pcs,
-                  gchar        **out_operator_name,
-                  GError       **error)
-{
-    QmiMessageNasGetHomeNetworkOutput *output = NULL;
-    gboolean success = FALSE;
-
-    output = qmi_client_nas_get_home_network_finish (client, res, error);
-    if (!output) {
-        g_prefix_error (error, "QMI operation failed: ");
-    } else if (!qmi_message_nas_get_home_network_output_get_result (output, error)) {
-        g_prefix_error (error, "Couldn't get home network: ");
-    } else {
-        const gchar *name = NULL;
-
-        qmi_message_nas_get_home_network_output_get_home_network (
-            output,
-            out_mcc,
-            out_mnc,
-            &name,
-            NULL);
-        if (out_operator_name)
-            *out_operator_name = g_strdup (name);
-
-        if (out_mnc_with_pcs) {
-            gboolean is_3gpp;
-            gboolean mnc_includes_pcs_digit;
-
-            if (qmi_message_nas_get_home_network_output_get_home_network_3gpp_mnc (
-                    output,
-                    &is_3gpp,
-                    &mnc_includes_pcs_digit,
-                    NULL) &&
-                is_3gpp &&
-                mnc_includes_pcs_digit) {
-                /* MNC should include PCS digit */
-                *out_mnc_with_pcs = TRUE;
-            } else {
-                /* We default to NO PCS digit, unless of course the MNC is already > 99 */
-                *out_mnc_with_pcs = FALSE;
-            }
-        }
-
-        success = TRUE;
-    }
-
-    if (output)
-        qmi_message_nas_get_home_network_output_unref (output);
-
-    return success;
-}
-
 static gchar *
 load_operator_identifier_finish (MMBaseSim     *self,
                                  GAsyncResult  *res,
@@ -699,54 +661,70 @@ load_operator_identifier_finish (MMBaseSim     *self,
 }
 
 static void
-load_operator_identifier_ready (QmiClientNas *client,
-                                GAsyncResult *res,
-                                GTask        *task)
+uim_read_efad_ready (QmiClientUim *client,
+                     GAsyncResult *res,
+                     GTask        *task)
 {
-    guint16 mcc, mnc;
-    gboolean mnc_with_pcs;
-    GError *error = NULL;
-    GString *aux;
+    MMSimQmi          *self;
+    GError            *error = NULL;
+    g_autoptr(GArray)  read_result = NULL;
+    guint              mnc_length;
 
-    if (!get_home_network (client, res, &mcc, &mnc, &mnc_with_pcs, NULL, &error)) {
+    self = g_task_get_source_object (task);
+
+    read_result = uim_read_finish (client, res, &error);
+    if (!read_result) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
     }
 
-    aux = g_string_new ("");
-    /* MCC always 3 digits */
-    g_string_append_printf (aux, "%.3" G_GUINT16_FORMAT, mcc);
-    /* Guess about MNC, if < 100 assume it's 2 digits, no PCS info here */
-    if (mnc >= 100 || mnc_with_pcs)
-        g_string_append_printf (aux, "%.3" G_GUINT16_FORMAT, mnc);
-    else
-        g_string_append_printf (aux, "%.2" G_GUINT16_FORMAT, mnc);
-    g_task_return_pointer (task, g_string_free (aux, FALSE), g_free);
+    if (read_result->len < 4) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Unexpected response length reading EFad: %u", read_result->len);
+        g_object_unref (task);
+        return;
+    }
+
+    /* MNC length is byte 4 of this SIM file */
+    mnc_length = read_result->data[3];
+    if (mnc_length == 2 || mnc_length == 3) {
+        g_task_return_pointer (task, g_strndup (self->priv->imsi, 3 + mnc_length), g_free);
+    } else {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "SIM returned invalid MNC length %d (should be either 2 or 3)", mnc_length);
+    }
     g_object_unref (task);
 }
 
 static void
-load_operator_identifier (MMBaseSim           *self,
+load_operator_identifier (MMBaseSim           *_self,
                           GAsyncReadyCallback  callback,
                           gpointer             user_data)
 {
-    GTask *task;
-    QmiClient *client = NULL;
+    MMSimQmi *self;
+    GTask    *task;
 
+    self = MM_SIM_QMI (_self);
     task = g_task_new (self, NULL, callback, user_data);
-    if (!ensure_qmi_client (task,
-                            MM_SIM_QMI (self),
-                            QMI_SERVICE_NAS, &client))
-        return;
 
     mm_obj_dbg (self, "loading SIM operator identifier...");
-    qmi_client_nas_get_home_network (QMI_CLIENT_NAS (client),
-                                     NULL,
-                                     5,
-                                     NULL,
-                                     (GAsyncReadyCallback)load_operator_identifier_ready,
-                                     task);
+
+    if (!self->priv->imsi) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't load SIM operator identifier without IMSI");
+        g_object_unref (task);
+        return;
+    }
+
+    uim_read (self,
+              0x6FAD,
+              adf_file_path,
+              G_N_ELEMENTS (adf_file_path),
+              (GAsyncReadyCallback)uim_read_efad_ready,
+              task);
 }
 
 /*****************************************************************************/
@@ -760,42 +738,77 @@ load_operator_name_finish (MMBaseSim     *self,
     return g_task_propagate_pointer (G_TASK (res), error);
 }
 
-static void
-load_operator_name_ready (QmiClientNas *client,
-                          GAsyncResult *res,
-                          GTask        *task)
+static gchar *
+parse_spn (const guint8  *bin,
+           gsize          len,
+           GError       **error)
 {
-    gchar *operator_name = NULL;
-    GError *error = NULL;
+    g_autoptr(GByteArray)  bin_array = NULL;
+    gsize                  binlen;
 
-    if (!get_home_network (client, res, NULL, NULL, NULL, &operator_name, &error))
+    /* Remove the FF filler at the end */
+    binlen = len;
+    while (binlen > 1 && bin[binlen - 1] == 0xff)
+        binlen--;
+    if (binlen <= 1) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "SIM returned empty spn");
+        return NULL;
+    }
+
+    /* Setup as bytearray.
+     * First byte is metadata; remainder is GSM-7 unpacked into octets; convert to UTF8 */
+    bin_array = g_byte_array_sized_new (binlen - 1);
+    g_byte_array_append (bin_array, bin + 1, binlen - 1);
+
+    return mm_modem_charset_bytearray_to_utf8 (bin_array, MM_MODEM_CHARSET_GSM, FALSE, error);
+}
+
+static void
+uim_read_efspn_ready (QmiClientUim *client,
+                      GAsyncResult *res,
+                      GTask        *task)
+{
+    GError            *error = NULL;
+    g_autoptr(GArray)  read_result = NULL;
+    gchar             *spn;
+
+    read_result = uim_read_finish (client, res, &error);
+    if (!read_result) {
         g_task_return_error (task, error);
-    else
-        g_task_return_pointer (task, operator_name, g_free);
+        g_object_unref (task);
+        return;
+    }
+
+    spn = parse_spn ((const guint8 *) read_result->data, read_result->len, &error);
+
+    if (!spn) {
+        g_task_return_error (task, error);
+    } else {
+        g_task_return_pointer (task, spn, g_free);
+    }
+
     g_object_unref (task);
 }
 
 static void
-load_operator_name (MMBaseSim           *self,
+load_operator_name (MMBaseSim           *_self,
                     GAsyncReadyCallback  callback,
                     gpointer             user_data)
 {
-    GTask *task;
-    QmiClient *client = NULL;
+    MMSimQmi *self;
+    GTask    *task;
 
+    self = MM_SIM_QMI (_self);
     task = g_task_new (self, NULL, callback, user_data);
-    if (!ensure_qmi_client (task,
-                            MM_SIM_QMI (self),
-                            QMI_SERVICE_NAS, &client))
-        return;
 
     mm_obj_dbg (self, "loading SIM operator name...");
-    qmi_client_nas_get_home_network (QMI_CLIENT_NAS (client),
-                                     NULL,
-                                     5,
-                                     NULL,
-                                     (GAsyncReadyCallback)load_operator_name_ready,
-                                     task);
+
+    uim_read (self,
+              0x6F46,
+              adf_file_path,
+              G_N_ELEMENTS (adf_file_path),
+              (GAsyncReadyCallback)uim_read_efspn_ready,
+              task);
 }
 
 /*****************************************************************************/
@@ -1923,6 +1936,16 @@ get_property (GObject    *object,
 }
 
 static void
+finalize (GObject *object)
+{
+    MMSimQmi *self = MM_SIM_QMI (object);
+
+    g_free (self->priv->imsi);
+
+    G_OBJECT_CLASS (mm_sim_qmi_parent_class)->finalize (object);
+}
+
+static void
 mm_sim_qmi_class_init (MMSimQmiClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
@@ -1932,6 +1955,7 @@ mm_sim_qmi_class_init (MMSimQmiClass *klass)
 
     object_class->get_property = get_property;
     object_class->set_property = set_property;
+    object_class->finalize = finalize;
 
     base_sim_class->wait_sim_ready = wait_sim_ready;
     base_sim_class->wait_sim_ready_finish = wait_sim_ready_finish;
