@@ -11761,7 +11761,9 @@ signal_load_values_result_free (SignalLoadValuesResult *result)
     g_clear_object (&result->cdma);
     g_clear_object (&result->evdo);
     g_clear_object (&result->gsm);
+    g_clear_object (&result->umts);
     g_clear_object (&result->lte);
+    g_clear_object (&result->nr5g);
     g_slice_free (SignalLoadValuesResult, result);
 }
 
