@@ -6584,22 +6584,29 @@ common_enable_disable_unsolicited_events_3gpp_profile_manager (MMBroadbandModemQ
     QmiClient                     *client_pdc = NULL;
     QmiClient                     *client_wds = NULL;
 
-    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
-                                      QMI_SERVICE_PDC, &client_pdc,
-                                      callback, user_data))
-        return;
-
-    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
-                                      QMI_SERVICE_WDS, &client_wds,
-                                      callback, user_data))
-        return;
-
     task = g_task_new (self, NULL, callback, user_data);
 
     if (enable == self->priv->profile_manager_unsolicited_events_enabled) {
         mm_obj_dbg (self, "profile manager unsolicited events already %s; skipping",
                     enable ? "enabled" : "disabled");
         g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    client_pdc = mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
+                                            QMI_SERVICE_PDC,
+                                            MM_PORT_QMI_FLAG_DEFAULT,
+                                            NULL);
+    client_wds = mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
+                                            QMI_SERVICE_WDS,
+                                            MM_PORT_QMI_FLAG_DEFAULT,
+                                            NULL);
+
+    /* Fail if none of the clients can be allocated */
+    if (!client_pdc && !client_wds) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "No support for profile refresh events");
         g_object_unref (task);
         return;
     }
