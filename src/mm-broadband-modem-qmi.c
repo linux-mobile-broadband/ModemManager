@@ -12658,6 +12658,8 @@ signal_load_values_get_signal_info_ready (QmiClientNas *client,
     if (qmi_message_nas_get_signal_info_output_get_5g_signal_strength_extended (output,
                                                                                 &rsrq_5g,
                                                                                 NULL)) {
+        if (G_UNLIKELY (!ctx->values_result->nr5g))
+            ctx->values_result->nr5g = mm_signal_new ();
         mm_signal_set_rsrq (ctx->values_result->nr5g, (gdouble)rsrq_5g);
     }
 
