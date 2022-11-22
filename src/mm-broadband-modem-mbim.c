@@ -2608,6 +2608,7 @@ base_stations_info_query_ready (MbimDevice   *device,
 
     if (lte_serving_cell) {
         GList *l;
+        GList *next;
 
         info = mm_cell_info_lte_new_from_dictionary (NULL);
         mm_cell_info_set_serving (info, TRUE);
@@ -2622,8 +2623,10 @@ base_stations_info_query_ready (MbimDevice   *device,
         CELL_INFO_SET_UINT       (lte_serving_cell->timing_advance,      0xFFFFFFFF,     lte_set_timing_advance,   MM_CELL_INFO_LTE);
 
         /* Update cell info with the radio frequency information received previously */
-        for (l = ctx->rfim_info_list; l; l = g_list_next (l)) {
+        for (l = ctx->rfim_info_list, next = NULL; l; l = next) {
             MMRfInfo *data;
+
+            next = g_list_next (l);
 
             data = (MMRfInfo *)(l->data);
             if (fabs ((mm_get_downlink_carrier_frequency (lte_serving_cell->earfcn, self)) - data->center_frequency) < FREQUENCY_TOLERENCE) {
@@ -2678,6 +2681,7 @@ base_stations_info_query_ready (MbimDevice   *device,
 
         for (i = 0; i < nr_serving_cells_count; i++) {
             GList *l;
+            GList *next;
 
             info = mm_cell_info_nr5g_new_from_dictionary (NULL);
             mm_cell_info_set_serving (info, TRUE);
@@ -2693,8 +2697,10 @@ base_stations_info_query_ready (MbimDevice   *device,
             CELL_INFO_SET_UINT               (nr_serving_cells[i]->timing_advance,   0xFFFFFFFFFFFFFFFF,                    nr5g_set_timing_advance,   MM_CELL_INFO_NR5G);
 
             /* Update cell info with the radio frequency information received previously */
-            for (l = ctx->rfim_info_list; l; l = g_list_next (l)) {
+            for (l = ctx->rfim_info_list, next = NULL; l; l = next) {
                 MMRfInfo *data;
+
+                next = g_list_next (l);
 
                 data = (MMRfInfo *)(l->data);
                 /* Comparing the derived frequncy value from NRARFCN with received center frequency data to map the NR CELL */
