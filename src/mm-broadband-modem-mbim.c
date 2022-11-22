@@ -2629,7 +2629,7 @@ base_stations_info_query_ready (MbimDevice   *device,
             next = g_list_next (l);
 
             data = (MMRfInfo *)(l->data);
-            if (fabs ((mm_get_downlink_carrier_frequency (lte_serving_cell->earfcn, self)) - data->center_frequency) < FREQUENCY_TOLERENCE) {
+            if (fabs ((mm_earfcn_to_frequency (lte_serving_cell->earfcn, self)) - data->center_frequency) < FREQUENCY_TOLERANCE_HZ) {
                 mm_obj_dbg (self, "Merging radio frequency data with lte serving cell info");
                 CELL_INFO_SET_UINT (data->serving_cell_type, MM_SERVING_CELL_TYPE_INVALID, lte_set_serving_cell_type, MM_CELL_INFO_LTE);
                 CELL_INFO_SET_UINT (data->bandwidth,         0xFFFFFFFF,                   lte_set_bandwidth,         MM_CELL_INFO_LTE);
@@ -2704,7 +2704,7 @@ base_stations_info_query_ready (MbimDevice   *device,
 
                 data = (MMRfInfo *)(l->data);
                 /* Comparing the derived frequncy value from NRARFCN with received center frequency data to map the NR CELL */
-                if (fabs ((mm_get_frequency_from_nrarfcn (nr_serving_cells[i]->nrarfcn, self) * HERTZ_CONV) - data->center_frequency) < FREQUENCY_TOLERENCE) {
+                if (fabs (mm_nrarfcn_to_frequency (nr_serving_cells[i]->nrarfcn, self) - data->center_frequency) < FREQUENCY_TOLERANCE_HZ) {
                     mm_obj_dbg (self, "Merging radio frequency data with 5gnr serving cell info");
                     CELL_INFO_SET_UINT (data->serving_cell_type, MM_SERVING_CELL_TYPE_INVALID, nr5g_set_serving_cell_type, MM_CELL_INFO_NR5G);
                     CELL_INFO_SET_UINT (data->bandwidth,         0xFFFFFFFF,                   nr5g_set_bandwidth,         MM_CELL_INFO_NR5G);

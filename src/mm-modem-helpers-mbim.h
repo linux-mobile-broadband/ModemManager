@@ -147,11 +147,8 @@ gboolean mm_signal_from_mbim_signal_state (MbimDataClass          data_class,
 /* RF utilities */
 /*****************************************************************************/
 
-/* Value defined to allow tolerence in the center frequency comparison logic */
-#define FREQUENCY_TOLERENCE 300
-
-/* Value used to convert KHz value to Hz */
-#define HERTZ_CONV 1000
+/* Value defined to allow tolerance in the center frequency comparison logic */
+#define FREQUENCY_TOLERANCE_HZ 300
 
 typedef struct {
     MMServingCellType  serving_cell_type;
@@ -167,10 +164,9 @@ GList *mm_rfim_info_list_from_mbim_intel_rfim_frequency_value_array (MbimIntelRf
                                                                      guint    freq_count,
                                                                      gpointer log_object);
 
-gdouble mm_get_downlink_carrier_frequency (guint32  earfcn,
-                                           gpointer log_object);
-
-gdouble mm_get_frequency_from_nrarfcn (guint32  nrarfcn,
-                                       gpointer log_object);
+gdouble mm_earfcn_to_frequency (guint32  earfcn,
+                                gpointer log_object);
+gdouble mm_nrarfcn_to_frequency (guint32  nrarfcn,
+                                 gpointer log_object);
 
 #endif  /* MM_MODEM_HELPERS_MBIM_H */
