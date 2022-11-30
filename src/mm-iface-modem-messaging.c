@@ -146,7 +146,7 @@ typedef struct {
     MmGdbusModemMessaging *skeleton;
     GDBusMethodInvocation *invocation;
     MMIfaceModemMessaging *self;
-    gchar *path;
+    gchar                 *path;
 } HandleDeleteContext;
 
 static void
@@ -156,12 +156,12 @@ handle_delete_context_free (HandleDeleteContext *ctx)
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
     g_free (ctx->path);
-    g_free (ctx);
+    g_slice_free (HandleDeleteContext, ctx);
 }
 
 static void
-handle_delete_ready (MMSmsList *list,
-                     GAsyncResult *res,
+handle_delete_ready (MMSmsList           *list,
+                     GAsyncResult        *res,
                      HandleDeleteContext *ctx)
 {
     GError *error = NULL;
@@ -170,17 +170,16 @@ handle_delete_ready (MMSmsList *list,
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem_messaging_complete_delete (ctx->skeleton, ctx->invocation);
-
     handle_delete_context_free (ctx);
 }
 
 static void
-handle_delete_auth_ready (MMBaseModem *self,
-                          GAsyncResult *res,
+handle_delete_auth_ready (MMBaseModem         *self,
+                          GAsyncResult        *res,
                           HandleDeleteContext *ctx)
 {
-    MMSmsList *list = NULL;
-    GError *error = NULL;
+    g_autoptr(MMSmsList)  list = NULL;
+    GError               *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -216,18 +215,17 @@ handle_delete_auth_ready (MMBaseModem *self,
                             ctx->path,
                             (GAsyncReadyCallback)handle_delete_ready,
                             ctx);
-    g_object_unref (list);
 }
 
 static gboolean
 handle_delete (MmGdbusModemMessaging *skeleton,
                GDBusMethodInvocation *invocation,
-               const gchar *path,
+               const gchar           *path,
                MMIfaceModemMessaging *self)
 {
     HandleDeleteContext *ctx;
 
-    ctx = g_new (HandleDeleteContext, 1);
+    ctx = g_slice_new0 (HandleDeleteContext);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
@@ -247,7 +245,7 @@ typedef struct {
     MmGdbusModemMessaging *skeleton;
     GDBusMethodInvocation *invocation;
     MMIfaceModemMessaging *self;
-    GVariant *dictionary;
+    GVariant              *dictionary;
 } HandleCreateContext;
 
 static void
@@ -257,18 +255,18 @@ handle_create_context_free (HandleCreateContext *ctx)
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
     g_variant_unref (ctx->dictionary);
-    g_free (ctx);
+    g_slice_free (HandleCreateContext, ctx);
 }
 
 static void
-handle_create_auth_ready (MMBaseModem *self,
-                          GAsyncResult *res,
+handle_create_auth_ready (MMBaseModem         *self,
+                          GAsyncResult        *res,
                           HandleCreateContext *ctx)
 {
-    MMSmsList *list = NULL;
-    GError *error = NULL;
-    MMSmsProperties *properties;
-    MMBaseSms *sms;
+    GError                     *error = NULL;
+    g_autoptr(MMSmsList)        list = NULL;
+    g_autoptr(MMSmsProperties)  properties = NULL;
+    g_autoptr(MMBaseSms)        sms = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -291,11 +289,8 @@ handle_create_auth_ready (MMBaseModem *self,
         return;
     }
 
-    sms = mm_base_sms_new_from_properties (MM_BASE_MODEM (self),
-                                           properties,
-                                           &error);
+    sms = mm_base_sms_new_from_properties (MM_BASE_MODEM (self), properties, &error);
     if (!sms) {
-        g_object_unref (properties);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_create_context_free (ctx);
         return;
@@ -305,8 +300,6 @@ handle_create_auth_ready (MMBaseModem *self,
                   MM_IFACE_MODEM_MESSAGING_SMS_LIST, &list,
                   NULL);
     if (!list) {
-        g_object_unref (properties);
-        g_object_unref (sms);
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
@@ -322,23 +315,18 @@ handle_create_auth_ready (MMBaseModem *self,
     mm_gdbus_modem_messaging_complete_create (ctx->skeleton,
                                               ctx->invocation,
                                               mm_base_sms_get_path (sms));
-    g_object_unref (sms);
-
-    g_object_unref (properties);
-    g_object_unref (list);
-
     handle_create_context_free (ctx);
 }
 
 static gboolean
 handle_create (MmGdbusModemMessaging *skeleton,
                GDBusMethodInvocation *invocation,
-               GVariant *dictionary,
+               GVariant              *dictionary,
                MMIfaceModemMessaging *self)
 {
     HandleCreateContext *ctx;
 
-    ctx = g_new (HandleCreateContext, 1);
+    ctx = g_slice_new0 (HandleCreateContext);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
@@ -359,8 +347,8 @@ handle_list (MmGdbusModemMessaging *skeleton,
              GDBusMethodInvocation *invocation,
              MMIfaceModemMessaging *self)
 {
-    GStrv paths;
-    MMSmsList *list = NULL;
+    g_auto(GStrv)        paths = NULL;
+    g_autoptr(MMSmsList) list = NULL;
 
     if (mm_iface_modem_abort_invocation_if_state_not_reached (MM_IFACE_MODEM (self),
                                                               invocation,
@@ -382,8 +370,6 @@ handle_list (MmGdbusModemMessaging *skeleton,
     mm_gdbus_modem_messaging_complete_list (skeleton,
                                             invocation,
                                             (const gchar *const *)paths);
-    g_strfreev (paths);
-    g_object_unref (list);
     return TRUE;
 }
 
