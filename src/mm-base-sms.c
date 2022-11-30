@@ -322,10 +322,10 @@ generate_submit_pdus (MMBaseSms *self,
 /* Store SMS (DBus call handling) */
 
 typedef struct {
-    MMBaseSms *self;
-    MMBaseModem *modem;
+    MMBaseSms             *self;
+    MMBaseModem           *modem;
     GDBusMethodInvocation *invocation;
-    MMSmsStorage storage;
+    MMSmsStorage           storage;
 } HandleStoreContext;
 
 static void
@@ -334,12 +334,12 @@ handle_store_context_free (HandleStoreContext *ctx)
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
-    g_free (ctx);
+    g_slice_free (HandleStoreContext, ctx);
 }
 
 static void
-handle_store_ready (MMBaseSms *self,
-                    GAsyncResult *res,
+handle_store_ready (MMBaseSms          *self,
+                    GAsyncResult       *res,
                     HandleStoreContext *ctx)
 {
     GError *error = NULL;
@@ -403,8 +403,8 @@ prepare_sms_to_be_stored (MMBaseSms  *self,
 }
 
 static void
-handle_store_auth_ready (MMBaseModem *modem,
-                         GAsyncResult *res,
+handle_store_auth_ready (MMBaseModem        *modem,
+                         GAsyncResult       *res,
                          HandleStoreContext *ctx)
 {
     GError *error = NULL;
@@ -468,13 +468,13 @@ handle_store_auth_ready (MMBaseModem *modem,
 }
 
 static gboolean
-handle_store (MMBaseSms *self,
+handle_store (MMBaseSms             *self,
               GDBusMethodInvocation *invocation,
-              guint32 storage)
+              guint32                storage)
 {
     HandleStoreContext *ctx;
 
-    ctx = g_new0 (HandleStoreContext, 1);
+    ctx = g_slice_new0 (HandleStoreContext);
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
     g_object_get (self,
@@ -502,8 +502,8 @@ handle_store (MMBaseSms *self,
 /* Send SMS (DBus call handling) */
 
 typedef struct {
-    MMBaseSms *self;
-    MMBaseModem *modem;
+    MMBaseSms             *self;
+    MMBaseModem           *modem;
     GDBusMethodInvocation *invocation;
 } HandleSendContext;
 
@@ -513,12 +513,12 @@ handle_send_context_free (HandleSendContext *ctx)
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
-    g_free (ctx);
+    g_slice_free (HandleSendContext, ctx);
 }
 
 static void
-handle_send_ready (MMBaseSms *self,
-                   GAsyncResult *res,
+handle_send_ready (MMBaseSms         *self,
+                   GAsyncResult      *res,
                    HandleSendContext *ctx)
 {
     GError *error = NULL;
@@ -547,8 +547,8 @@ handle_send_ready (MMBaseSms *self,
 }
 
 static gboolean
-prepare_sms_to_be_sent (MMBaseSms *self,
-                        GError **error)
+prepare_sms_to_be_sent (MMBaseSms  *self,
+                        GError    **error)
 {
     GList *l;
 
@@ -576,12 +576,12 @@ prepare_sms_to_be_sent (MMBaseSms *self,
 }
 
 static void
-handle_send_auth_ready (MMBaseModem *modem,
-                        GAsyncResult *res,
+handle_send_auth_ready (MMBaseModem       *modem,
+                        GAsyncResult      *res,
                         HandleSendContext *ctx)
 {
-    MMSmsState state;
-    GError *error = NULL;
+    MMSmsState  state;
+    GError     *error = NULL;
 
     if (!mm_base_modem_authorize_finish (modem, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -636,12 +636,12 @@ handle_send_auth_ready (MMBaseModem *modem,
 }
 
 static gboolean
-handle_send (MMBaseSms *self,
+handle_send (MMBaseSms             *self,
              GDBusMethodInvocation *invocation)
 {
     HandleSendContext *ctx;
 
-    ctx = g_new0 (HandleSendContext, 1);
+    ctx = g_slice_new0 (HandleSendContext);
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
     g_object_get (self,
