@@ -166,10 +166,13 @@ handle_delete_ready (MMSmsList           *list,
 {
     GError *error = NULL;
 
-    if (!mm_sms_list_delete_sms_finish (list, res, &error))
+    if (!mm_sms_list_delete_sms_finish (list, res, &error)) {
+        mm_obj_warn (ctx->self, "failed deleting SMS message '%s': %s", ctx->path, error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
+    } else {
+        mm_obj_info (ctx->self, "deleted SMS message '%s'", ctx->path);
         mm_gdbus_modem_messaging_complete_delete (ctx->skeleton, ctx->invocation);
+    }
     handle_delete_context_free (ctx);
 }
 
@@ -211,6 +214,7 @@ handle_delete_auth_ready (MMBaseModem         *self,
         return;
     }
 
+    mm_obj_info (self, "processing user request to delete SMS message '%s'...", ctx->path);
     mm_sms_list_delete_sms (list,
                             ctx->path,
                             (GAsyncReadyCallback)handle_delete_ready,
@@ -308,13 +312,12 @@ handle_create_auth_ready (MMBaseModem         *self,
         return;
     }
 
-    /* Add it to the list */
+    mm_obj_info (self, "processing user request to create SMS message...");
     mm_sms_list_add_sms (list, sms);
-
-    /* Complete the DBus call */
     mm_gdbus_modem_messaging_complete_create (ctx->skeleton,
                                               ctx->invocation,
                                               mm_base_sms_get_path (sms));
+    mm_obj_info (self, "created SMS message: %s", mm_base_sms_get_path (sms));
     handle_create_context_free (ctx);
 }
 
@@ -366,10 +369,12 @@ handle_list (MmGdbusModemMessaging *skeleton,
         return TRUE;
     }
 
+    mm_obj_info (self, "processing user request to list SMS messages...");
     paths = mm_sms_list_get_paths (list);
     mm_gdbus_modem_messaging_complete_list (skeleton,
                                             invocation,
                                             (const gchar *const *)paths);
+    mm_obj_info (self, "reported %u SMS messages available", paths ? g_strv_length (paths) : 0);
     return TRUE;
 }
 
