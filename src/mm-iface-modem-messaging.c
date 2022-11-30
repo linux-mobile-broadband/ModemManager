@@ -179,7 +179,6 @@ handle_delete_auth_ready (MMBaseModem *self,
                           GAsyncResult *res,
                           HandleDeleteContext *ctx)
 {
-    MMModemState modem_state = MM_MODEM_STATE_UNKNOWN;
     MMSmsList *list = NULL;
     GError *error = NULL;
 
@@ -189,20 +188,14 @@ handle_delete_auth_ready (MMBaseModem *self,
         return;
     }
 
-    g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &modem_state,
-                  NULL);
-
     /* We do allow deleting SMS messages while enabling or disabling, it doesn't
      * interfere with the state transition logic to do so. The main reason to allow
      * this is that during modem enabling we're emitting "Added" signals before we
      * reach the enabled state, and so users listening to the signal may want to
      * delete the SMS message as soon as it's read. */
-    if (modem_state <= MM_MODEM_STATE_DISABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot delete SMS: device not yet enabled");
+    if (mm_iface_modem_abort_invocation_if_state_not_reached (MM_IFACE_MODEM (self),
+                                                              ctx->invocation,
+                                                              MM_MODEM_STATE_DISABLING)) {
         handle_delete_context_free (ctx);
         return;
     }
@@ -272,7 +265,6 @@ handle_create_auth_ready (MMBaseModem *self,
                           GAsyncResult *res,
                           HandleCreateContext *ctx)
 {
-    MMModemState modem_state = MM_MODEM_STATE_UNKNOWN;
     MMSmsList *list = NULL;
     GError *error = NULL;
     MMSmsProperties *properties;
@@ -284,15 +276,9 @@ handle_create_auth_ready (MMBaseModem *self,
         return;
     }
 
-    g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &modem_state,
-                  NULL);
-
-    if (modem_state < MM_MODEM_STATE_ENABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot create SMS: device not yet enabled");
+    if (mm_iface_modem_abort_invocation_if_state_not_reached (MM_IFACE_MODEM (self),
+                                                              ctx->invocation,
+                                                              MM_MODEM_STATE_ENABLED)) {
         handle_create_context_free (ctx);
         return;
     }
@@ -375,21 +361,11 @@ handle_list (MmGdbusModemMessaging *skeleton,
 {
     GStrv paths;
     MMSmsList *list = NULL;
-    MMModemState modem_state;
 
-    modem_state = MM_MODEM_STATE_UNKNOWN;
-    g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &modem_state,
-                  NULL);
-
-    if (modem_state < MM_MODEM_STATE_ENABLED) {
-        g_dbus_method_invocation_return_error (invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot list SMS messages: "
-                                               "device not yet enabled");
+    if (mm_iface_modem_abort_invocation_if_state_not_reached (MM_IFACE_MODEM (self),
+                                                              invocation,
+                                                              MM_MODEM_STATE_ENABLED))
         return TRUE;
-    }
 
     g_object_get (self,
                   MM_IFACE_MODEM_MESSAGING_SMS_LIST, &list,
