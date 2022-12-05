@@ -5127,7 +5127,7 @@ sms_notification (MMBroadbandModemMbim *self,
                 &index,
                 NULL)) {
             mm_obj_dbg (self, "received SMS store status update: '%s'", mbim_sms_status_flag_get_string (flag));
-            if (flag == MBIM_SMS_STATUS_FLAG_NEW_MESSAGE)
+            if (flag & MBIM_SMS_STATUS_FLAG_NEW_MESSAGE)
                 sms_notification_read_stored_sms (self, index);
         }
         break;
