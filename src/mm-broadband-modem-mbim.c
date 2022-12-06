@@ -5117,17 +5117,20 @@ sms_notification (MMBroadbandModemMbim *self,
         break;
 
     case MBIM_CID_SMS_MESSAGE_STORE_STATUS: {
-        MbimSmsStatusFlag flag;
-        guint32 index;
+        MbimSmsStatusFlag flags;
+        guint32           index;
 
         if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SMS_READ &&
             mbim_message_sms_message_store_status_notification_parse (
                 notification,
-                &flag,
+                &flags,
                 &index,
                 NULL)) {
-            mm_obj_dbg (self, "received SMS store status update: '%s'", mbim_sms_status_flag_get_string (flag));
-            if (flag & MBIM_SMS_STATUS_FLAG_NEW_MESSAGE)
+            g_autofree gchar *flags_str = NULL;
+
+            flags_str = mbim_sms_status_flag_build_string_from_mask (flags);
+            mm_obj_dbg (self, "received SMS store status update: '%s'", flags_str);
+            if (flags & MBIM_SMS_STATUS_FLAG_NEW_MESSAGE)
                 sms_notification_read_stored_sms (self, index);
         }
         break;
