@@ -309,12 +309,20 @@ if enable_mbim
   )
 endif
 
+# Daemon related variables before processing plugins
+daemon_sources = sources + daemon_enums_sources
+daemon_deps = deps
+daemon_c_args = c_args
+
+# Additional vendor plugins
+subdir('plugins')
+
 executable(
   'ModemManager',
-  sources: sources + daemon_enums_sources,
+  sources: daemon_sources,
   include_directories: top_inc,
-  dependencies: deps,
-  c_args: c_args,
+  dependencies: daemon_deps,
+  c_args: daemon_c_args,
   install: true,
   install_dir: mm_sbindir,
 )
@@ -336,6 +344,3 @@ install_data(
 if enable_tests
   subdir('tests')
 endif
-
-# Additional vendor plugins
-subdir('plugins')
