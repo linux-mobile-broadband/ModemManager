@@ -3,7 +3,7 @@
 
 test_conf = {
   'abs_top_builddir': build_root,
-  'PLUGIN_BUILD_SUBDIR': 'plugins/',
+  'PLUGIN_BUILD_SUBDIR': 'src/plugins/',
 }
 
 configure_file(

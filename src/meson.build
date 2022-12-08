@@ -336,3 +336,6 @@ install_data(
 if enable_tests
   subdir('tests')
 endif
+
+# Additional vendor plugins
+subdir('plugins')

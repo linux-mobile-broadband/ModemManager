@@ -55,9 +55,9 @@ source_root = meson.current_source_dir()
 build_root = meson.current_build_dir()
 
 build_aux_dir = source_root / 'build-aux'
-plugins_dir = source_root / 'plugins'
 po_dir = source_root / 'po'
 src_dir = source_root / 'src'
+plugins_dir = source_root / 'src/plugins'
 
 top_inc = include_directories('.')
 
@@ -397,7 +397,6 @@ endif
 
 subdir('libmm-glib')
 subdir('src')
-subdir('plugins')
 subdir('cli')
 
 if enable_tests
