@@ -4,6 +4,7 @@
 # helpers library
 src_inc = include_directories('.')
 kerneldevice_inc = include_directories('kerneldevice')
+plugins_inc = include_directories('plugins')
 
 headers = files(
   'mm-modem-helpers.h',
@@ -177,6 +178,9 @@ libport_dep = declare_dependency(
   link_with: libport,
 )
 
+# Additional vendor plugins
+subdir('plugins')
+
 # ModemManager daemon
 headers = files(
   'mm-base-bearer.h',
@@ -229,15 +233,14 @@ sources = files(
 
 enums_types = 'mm-daemon-enums-types'
 
-daemon_enums_sources = []
-daemon_enums_sources += gnome.mkenums(
+sources += gnome.mkenums(
   enums_types + '.c',
   sources: headers,
   c_template: build_aux_dir / enums_types + '.c.template',
   fhead: '#include "mm-daemon-enums-types.h"',
 )
 
-daemon_enums_sources += gnome.mkenums(
+sources += gnome.mkenums(
   enums_types + '.h',
   sources: headers,
   h_template: build_aux_dir / enums_types + '.h.template',
@@ -309,20 +312,13 @@ if enable_mbim
   )
 endif
 
-# Daemon related variables before processing plugins
-daemon_sources = sources + daemon_enums_sources
-daemon_deps = deps
-daemon_c_args = c_args
-
-# Additional vendor plugins
-subdir('plugins')
-
 executable(
   'ModemManager',
-  sources: daemon_sources,
-  include_directories: top_inc,
-  dependencies: daemon_deps,
-  c_args: daemon_c_args,
+  sources: [sources, builtin_sources],
+  include_directories: [ top_inc, plugins_inc ],
+  dependencies: deps,
+  c_args: c_args,
+  link_whole: builtin_plugins,
   install: true,
   install_dir: mm_sbindir,
 )

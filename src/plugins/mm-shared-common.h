@@ -33,9 +33,13 @@
 #define MM_VISIBILITY
 #endif
 
-#define MM_DEFINE_SHARED(MyShared) \
+#if defined WITH_BUILTIN_PLUGINS
+# define MM_DEFINE_SHARED(unused)
+#else
+# define MM_DEFINE_SHARED(MyShared)                                      \
     MM_VISIBILITY int mm_shared_major_version = MM_SHARED_MAJOR_VERSION; \
     MM_VISIBILITY int mm_shared_minor_version = MM_SHARED_MINOR_VERSION; \
     MM_VISIBILITY const char *mm_shared_name = #MyShared;
+#endif
 
 #endif /* MM_SHARED_COMMON_H */

@@ -57,7 +57,9 @@ GType mm_base_manager_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBaseManager, g_object_unref)
 
 MMBaseManager   *mm_base_manager_new         (GDBusConnection  *bus,
+#if !defined WITH_BUILTIN_PLUGINS
                                               const gchar      *plugin_dir,
+#endif
                                               gboolean          auto_scan,
                                               MMFilterRule      filter_policy,
                                               const gchar      *initial_kernel_events,

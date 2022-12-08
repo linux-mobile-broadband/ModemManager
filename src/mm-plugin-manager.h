@@ -32,7 +32,9 @@
 #define MM_IS_PLUGIN_MANAGER_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((obj), MM_TYPE_PLUGIN_MANAGER))
 #define MM_PLUGIN_MANAGER_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), MM_TYPE_PLUGIN_MANAGER, MMPluginManagerClass))
 
-#define MM_PLUGIN_MANAGER_PLUGIN_DIR "plugin-dir" /* Construct-only */
+#if !defined WITH_BUILTIN_PLUGINS
+# define MM_PLUGIN_MANAGER_PLUGIN_DIR "plugin-dir" /* Construct-only */
+#endif
 #define MM_PLUGIN_MANAGER_FILTER     "filter"     /* Construct-only */
 
 typedef struct _MMPluginManager MMPluginManager;
@@ -51,8 +53,10 @@ struct _MMPluginManagerClass {
 GType mm_plugin_manager_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMPluginManager, g_object_unref)
 
-MMPluginManager *mm_plugin_manager_new                         (const gchar          *plugindir,
-                                                                MMFilter             *filter,
+MMPluginManager *mm_plugin_manager_new                         (MMFilter             *filter,
+#if !defined WITH_BUILTIN_PLUGINS
+                                                                const gchar          *plugindir,
+#endif
                                                                 GError              **error);
 void             mm_plugin_manager_device_support_check        (MMPluginManager      *self,
                                                                 MMDevice             *device,

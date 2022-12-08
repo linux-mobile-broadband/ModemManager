@@ -33,8 +33,12 @@
 #include "mm-utils.h"
 #include "mm-log-object.h"
 
-#define SHARED_PREFIX "libmm-shared"
-#define PLUGIN_PREFIX "libmm-plugin"
+#if defined WITH_BUILTIN_PLUGINS
+# include "mm-builtin-plugins.h"
+#else
+# define SHARED_PREFIX "libmm-shared"
+# define PLUGIN_PREFIX "libmm-plugin"
+#endif
 
 static void initable_iface_init   (GInitableIface *iface);
 static void log_object_iface_init (MMLogObjectInterface *iface);
@@ -45,14 +49,19 @@ G_DEFINE_TYPE_EXTENDED (MMPluginManager, mm_plugin_manager, G_TYPE_OBJECT, 0,
 
 enum {
     PROP_0,
+#if !defined WITH_BUILTIN_PLUGINS
     PROP_PLUGIN_DIR,
+#endif
     PROP_FILTER,
     LAST_PROP
 };
 
 struct _MMPluginManagerPrivate {
+#if !defined WITH_BUILTIN_PLUGINS
     /* Path to look for plugins */
     gchar *plugin_dir;
+#endif
+
     /* Device filter */
     MMFilter *filter;
 
@@ -1681,9 +1690,90 @@ register_plugin_allowlist_subsystem_vendor_ids (MMPluginManager *self,
         mm_filter_register_plugin_allowlist_subsystem_vendor_id (self->priv->filter, subsystem_vendor_ids[i].l, subsystem_vendor_ids[i].r);
 }
 
+static gboolean
+track_plugin (MMPluginManager  *self,
+              MMPlugin         *plugin,
+              GPtrArray       **subsystems,
+              GError          **error)
+{
+    const gchar **plugin_subsystems;
+    guint         i;
+
+    /* Ignore plugins that don't specify subsystems */
+    plugin_subsystems = mm_plugin_get_allowed_subsystems (plugin);
+    if (!plugin_subsystems) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Allowed subsystems not specified");
+        return FALSE;
+    }
+
+    /* Process generic plugin */
+    if (mm_plugin_is_generic (plugin)) {
+        if (self->priv->generic) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                         "Another generic plugin already registered");
+            return FALSE;
+        }
+        self->priv->generic = g_object_ref (plugin);
+    } else
+        self->priv->plugins = g_list_append (self->priv->plugins, g_object_ref (plugin));
+
+    /* Track required subsystems, avoiding duplicates in the list */
+    for (i = 0; plugin_subsystems[i]; i++) {
+        if (!g_ptr_array_find_with_equal_func (*subsystems, plugin_subsystems[i], g_str_equal, NULL))
+            g_ptr_array_add (*subsystems, g_strdup (plugin_subsystems[i]));
+    }
+
+    /* Register plugin allowlist rules in filter, if any */
+    register_plugin_allowlist_tags                 (self, plugin);
+    register_plugin_allowlist_vendor_ids           (self, plugin);
+    register_plugin_allowlist_product_ids          (self, plugin);
+    register_plugin_allowlist_subsystem_vendor_ids (self, plugin);
+
+    return TRUE;
+}
+
+static gboolean
+validate_tracked_plugins (MMPluginManager  *self,
+                          GPtrArray        *subsystems_take,
+                          GError          **error)
+{
+    g_autofree gchar *subsystems_str = NULL;
+
+    /* Check the generic plugin once all looped */
+    if (!self->priv->generic)
+        mm_obj_dbg (self, "generic plugin not loaded");
+
+    /* Treat as error if we don't find any plugin */
+    if (!self->priv->plugins && !self->priv->generic) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_NO_PLUGINS, "no plugins found");
+        return FALSE;
+    }
+
+    /* Validate required subsystems */
+    if (!subsystems_take->len) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_NO_PLUGINS,
+                     "empty list of subsystems required by plugins");
+        return FALSE;
+    }
+
+    /* Add trailing NULL and store as GStrv */
+    g_ptr_array_add (subsystems_take, NULL);
+    self->priv->subsystems = (gchar **) g_ptr_array_free (subsystems_take, FALSE);
+    subsystems_str = g_strjoinv (", ", self->priv->subsystems);
+
+    mm_obj_dbg (self, "successfully loaded %u plugins registering %u subsystems: %s",
+                g_list_length (self->priv->plugins) + !!self->priv->generic,
+                g_strv_length (self->priv->subsystems), subsystems_str);
+
+    return TRUE;
+}
+
+#if !defined WITH_BUILTIN_PLUGINS
+
 static MMPlugin *
-load_plugin (MMPluginManager *self,
-             const gchar     *path)
+load_external_plugin (MMPluginManager *self,
+                      const gchar     *path)
 {
     MMPlugin           *plugin = NULL;
     GModule            *module;
@@ -1729,10 +1819,9 @@ load_plugin (MMPluginManager *self,
     }
 
     plugin = (*plugin_create_func) ();
-    if (plugin) {
+    if (plugin)
         mm_obj_dbg (self, "loaded plugin '%s' from '%s'", mm_plugin_get_name (plugin), path_display);
-        g_object_weak_ref (G_OBJECT (plugin), (GWeakNotify) g_module_close, module);
-    } else
+    else
         mm_obj_warn (self, "could not load plugin '%s': initialization failed", path_display);
 
 out:
@@ -1745,8 +1834,8 @@ out:
 }
 
 static void
-load_shared (MMPluginManager *self,
-             const gchar     *path)
+load_external_shared (MMPluginManager *self,
+                      const gchar     *path)
 {
     GModule      *module;
     gchar        *path_display;
@@ -1802,8 +1891,8 @@ out:
 }
 
 static gboolean
-load_plugins (MMPluginManager  *self,
-              GError          **error)
+load_external_plugins (MMPluginManager  *self,
+                       GError          **error)
 {
     GDir             *dir = NULL;
     const gchar      *fname;
@@ -1811,8 +1900,8 @@ load_plugins (MMPluginManager  *self,
     GList            *plugin_paths = NULL;
     GList            *l;
     GPtrArray        *subsystems = NULL;
-    g_autofree gchar *subsystems_str = NULL;
     g_autofree gchar *plugindir_display = NULL;
+    gboolean          valid_plugins = FALSE;
 
     if (!g_module_supported ()) {
         g_set_error (error,
@@ -1828,11 +1917,8 @@ load_plugins (MMPluginManager  *self,
     mm_obj_dbg (self, "looking for plugins in '%s'", plugindir_display);
     dir = g_dir_open (self->priv->plugin_dir, 0, NULL);
     if (!dir) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_NO_PLUGINS,
-                     "plugin directory '%s' not found",
-                     plugindir_display);
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_NO_PLUGINS,
+                     "plugin directory '%s' not found", plugindir_display);
         goto out;
     }
 
@@ -1847,81 +1933,23 @@ load_plugins (MMPluginManager  *self,
 
     /* Load all shared utils */
     for (l = shared_paths; l; l = g_list_next (l))
-        load_shared (self, (const gchar *)(l->data));
+        load_external_shared (self, (const gchar *)(l->data));
 
     /* Load all plugins */
     subsystems = g_ptr_array_new ();
     for (l = plugin_paths; l; l = g_list_next (l)) {
-        MMPlugin     *plugin;
-        const gchar **plugin_subsystems;
-        guint         i;
+        g_autoptr(MMPlugin) plugin = NULL;
+        g_autoptr(GError)   inner_error = NULL;
 
-        plugin = load_plugin (self, (const gchar *)(l->data));
+        plugin = load_external_plugin (self, (const gchar *)(l->data));
         if (!plugin)
             continue;
 
-        /* Ignore plugins that don't specify subsystems */
-        plugin_subsystems = mm_plugin_get_allowed_subsystems (plugin);
-        if (!plugin_subsystems) {
-            mm_obj_warn (self, "plugin '%s' doesn't specify allowed subsystems: ignored",
-                         mm_plugin_get_name (plugin));
-            continue;
-        }
-
-        /* Process generic plugin */
-        if (mm_plugin_is_generic (plugin)) {
-            if (self->priv->generic) {
-                mm_obj_warn (self, "plugin '%s' is generic and another one is already registered: ignored",
-                             mm_plugin_get_name (plugin));
-                continue;
-            }
-            self->priv->generic = plugin;
-        } else
-            self->priv->plugins = g_list_append (self->priv->plugins, plugin);
-
-        /* Track required subsystems, avoiding duplicates in the list */
-        for (i = 0; plugin_subsystems[i]; i++) {
-            if (!g_ptr_array_find_with_equal_func (subsystems, plugin_subsystems[i], g_str_equal, NULL))
-                g_ptr_array_add (subsystems, g_strdup (plugin_subsystems[i]));
-        }
-
-        /* Register plugin allowlist rules in filter, if any */
-        register_plugin_allowlist_tags                 (self, plugin);
-        register_plugin_allowlist_vendor_ids           (self, plugin);
-        register_plugin_allowlist_product_ids          (self, plugin);
-        register_plugin_allowlist_subsystem_vendor_ids (self, plugin);
+        if (!track_plugin (self, plugin, &subsystems, &inner_error))
+            mm_obj_warn (self, "ignored plugin '%s': %s", mm_plugin_get_name (plugin), inner_error->message);
     }
 
-    /* Check the generic plugin once all looped */
-    if (!self->priv->generic)
-        mm_obj_dbg (self, "generic plugin not loaded");
-
-    /* Treat as error if we don't find any plugin */
-    if (!self->priv->plugins && !self->priv->generic) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_NO_PLUGINS,
-                     "no plugins found in plugin directory '%s'",
-                     plugindir_display);
-        goto out;
-    }
-
-    /* Validate required subsystems */
-    if (!subsystems->len) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_NO_PLUGINS,
-                     "empty list of subsystems required by plugins");
-        goto out;
-    }
-    /* Add trailing NULL and store as GStrv */
-    g_ptr_array_add (subsystems, NULL);
-    self->priv->subsystems = (gchar **) g_ptr_array_free (subsystems, FALSE);
-    subsystems_str = g_strjoinv (", ", self->priv->subsystems);
-
-    mm_obj_dbg (self, "successfully loaded %u plugins registering %u subsystems: %s",
-                g_list_length (self->priv->plugins) + !!self->priv->generic,
-                g_strv_length (self->priv->subsystems), subsystems_str);
+    valid_plugins = validate_tracked_plugins (self, subsystems, error);
 
 out:
     g_list_free_full (shared_paths, g_free);
@@ -1929,9 +1957,37 @@ out:
     if (dir)
         g_dir_close (dir);
 
-    /* Return TRUE if at least one plugin found */
-    return (self->priv->plugins || self->priv->generic);
+    return valid_plugins;
 }
+
+#else
+
+static gboolean
+load_builtin_plugins (MMPluginManager  *self,
+                      GError          **error)
+{
+    GList     *builtin_plugins;
+    GList     *l;
+    GPtrArray *subsystems = NULL;
+
+    subsystems = g_ptr_array_new ();
+
+    builtin_plugins = mm_builtin_plugins_load ();
+    for (l = builtin_plugins; l; l = g_list_next (l)) {
+        gboolean  tracked;
+        MMPlugin *plugin;
+
+        plugin = MM_PLUGIN (l->data);
+        mm_obj_dbg (self, "loaded builtin plugin '%s'", mm_plugin_get_name (plugin));
+        tracked = track_plugin (self, plugin, &subsystems, NULL);
+        g_assert (tracked);
+    }
+    g_list_free_full (builtin_plugins, (GDestroyNotify)g_object_unref);
+
+    return validate_tracked_plugins (self, subsystems, error);
+}
+
+#endif /* !WITH_BUILTIN_PLUGINS */
 
 /*****************************************************************************/
 
@@ -1944,15 +2000,19 @@ log_object_build_id (MMLogObject *_self)
 /*****************************************************************************/
 
 MMPluginManager *
-mm_plugin_manager_new (const gchar  *plugin_dir,
-                       MMFilter     *filter,
+mm_plugin_manager_new (MMFilter     *filter,
+#if !defined WITH_BUILTIN_PLUGINS
+                       const gchar  *plugin_dir,
+#endif
                        GError      **error)
 {
     return g_initable_new (MM_TYPE_PLUGIN_MANAGER,
                            NULL,
                            error,
+                           MM_PLUGIN_MANAGER_FILTER, filter,
+#if !defined WITH_BUILTIN_PLUGINS
                            MM_PLUGIN_MANAGER_PLUGIN_DIR, plugin_dir,
-                           MM_PLUGIN_MANAGER_FILTER,     filter,
+#endif
                            NULL);
 }
 
@@ -1966,18 +2026,20 @@ mm_plugin_manager_init (MMPluginManager *self)
 }
 
 static void
-set_property (GObject *object,
-              guint prop_id,
+set_property (GObject      *object,
+              guint         prop_id,
               const GValue *value,
-              GParamSpec *pspec)
+              GParamSpec   *pspec)
 {
     MMPluginManagerPrivate *priv = MM_PLUGIN_MANAGER (object)->priv;
 
     switch (prop_id) {
+#if !defined WITH_BUILTIN_PLUGINS
     case PROP_PLUGIN_DIR:
         g_free (priv->plugin_dir);
         priv->plugin_dir = g_value_dup_string (value);
         break;
+#endif
     case PROP_FILTER:
         priv->filter = g_value_dup_object (value);
         break;
@@ -1988,17 +2050,19 @@ set_property (GObject *object,
 }
 
 static void
-get_property (GObject *object,
-              guint prop_id,
-              GValue *value,
+get_property (GObject    *object,
+              guint       prop_id,
+              GValue     *value,
               GParamSpec *pspec)
 {
     MMPluginManagerPrivate *priv = MM_PLUGIN_MANAGER (object)->priv;
 
     switch (prop_id) {
+#if !defined WITH_BUILTIN_PLUGINS
     case PROP_PLUGIN_DIR:
         g_value_set_string (value, priv->plugin_dir);
         break;
+#endif
     case PROP_FILTER:
         g_value_set_object (value, priv->filter);
         break;
@@ -2009,12 +2073,16 @@ get_property (GObject *object,
 }
 
 static gboolean
-initable_init (GInitable *initable,
-               GCancellable *cancellable,
-               GError **error)
+initable_init (GInitable     *initable,
+               GCancellable  *cancellable,
+               GError       **error)
 {
-    /* Load the list of plugins */
-    return load_plugins (MM_PLUGIN_MANAGER (initable), error);
+#if defined WITH_BUILTIN_PLUGINS
+    return load_builtin_plugins (MM_PLUGIN_MANAGER (initable), error);
+#else
+    /* Load the list of plugins from the filesystem*/
+    return load_external_plugins (MM_PLUGIN_MANAGER (initable), error);
+#endif
 }
 
 static void
@@ -2024,9 +2092,11 @@ dispose (GObject *object)
 
     g_list_free_full (g_steal_pointer (&self->priv->plugins), g_object_unref);
     g_clear_object (&self->priv->generic);
-    g_clear_pointer (&self->priv->plugin_dir, g_free);
     g_clear_object (&self->priv->filter);
     g_clear_pointer (&self->priv->subsystems, g_strfreev);
+#if !defined WITH_BUILTIN_PLUGINS
+    g_clear_pointer (&self->priv->plugin_dir, g_free);
+#endif
 
     G_OBJECT_CLASS (mm_plugin_manager_parent_class)->dispose (object);
 }
@@ -2056,6 +2126,7 @@ mm_plugin_manager_class_init (MMPluginManagerClass *manager_class)
     object_class->get_property = get_property;
 
     /* Properties */
+#if !defined WITH_BUILTIN_PLUGINS
     g_object_class_install_property
         (object_class, PROP_PLUGIN_DIR,
          g_param_spec_string (MM_PLUGIN_MANAGER_PLUGIN_DIR,
@@ -2063,6 +2134,8 @@ mm_plugin_manager_class_init (MMPluginManagerClass *manager_class)
                               "Where to look for plugins",
                               NULL,
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+#endif
+
     g_object_class_install_property
         (object_class, PROP_FILTER,
          g_param_spec_object (MM_PLUGIN_MANAGER_FILTER,

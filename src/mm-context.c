@@ -229,7 +229,9 @@ static gboolean  test_session;
 #if defined WITH_TESTS
 static gboolean  test_enable;
 #endif
+#if !defined WITH_BUILTIN_PLUGINS
 static gchar    *test_plugin_dir;
+#endif
 #if defined WITH_UDEV
 static gboolean  test_no_udev;
 #endif
@@ -258,11 +260,13 @@ static const GOptionEntry test_entries[] = {
         NULL
     },
 #endif
+#if !defined WITH_BUILTIN_PLUGINS
     {
         "test-plugin-dir", 0, 0, G_OPTION_ARG_FILENAME, &test_plugin_dir,
         "Path to look for plugins",
         "[PATH]"
     },
+#endif
 #if defined WITH_UDEV
     {
         "test-no-udev", 0, 0, G_OPTION_ARG_NONE, &test_no_udev,
@@ -332,11 +336,13 @@ mm_context_get_test_enable (void)
 }
 #endif
 
+#if !defined WITH_BUILTIN_PLUGINS
 const gchar *
 mm_context_get_test_plugin_dir (void)
 {
     return test_plugin_dir ? test_plugin_dir : PLUGINDIR;
 }
+#endif
 
 #if defined WITH_UDEV
 gboolean

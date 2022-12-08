@@ -48,7 +48,9 @@ gboolean     mm_context_get_test_session           (void);
 #if defined WITH_TESTS
 gboolean     mm_context_get_test_enable            (void);
 #endif
+#if !defined WITH_BUILTIN_PLUGINS
 const gchar *mm_context_get_test_plugin_dir        (void);
+#endif
 #if defined WITH_UDEV
 gboolean     mm_context_get_test_no_udev           (void);
 #endif

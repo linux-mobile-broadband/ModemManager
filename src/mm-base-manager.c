@@ -68,7 +68,9 @@ enum {
     PROP_CONNECTION,
     PROP_AUTO_SCAN,
     PROP_FILTER_POLICY,
+#if !defined WITH_BUILTIN_PLUGINS
     PROP_PLUGIN_DIR,
+#endif
     PROP_INITIAL_KERNEL_EVENTS,
 #if defined WITH_TESTS
     PROP_ENABLE_TEST,
@@ -83,8 +85,10 @@ struct _MMBaseManagerPrivate {
     gboolean auto_scan;
     /* Filter policy (mask of enabled rules) */
     MMFilterRule filter_policy;
+#if !defined WITH_BUILTIN_PLUGINS
     /* Path to look for plugins */
     gchar *plugin_dir;
+#endif
     /* Path to the list of initial kernel events */
     gchar *initial_kernel_events;
     /* The authorization provider */
@@ -1380,7 +1384,9 @@ log_object_build_id (MMLogObject *_self)
 
 MMBaseManager *
 mm_base_manager_new (GDBusConnection  *connection,
+#if !defined WITH_BUILTIN_PLUGINS
                      const gchar      *plugin_dir,
+#endif
                      gboolean          auto_scan,
                      MMFilterRule      filter_policy,
                      const gchar      *initial_kernel_events,
@@ -1395,7 +1401,9 @@ mm_base_manager_new (GDBusConnection  *connection,
                            NULL, /* cancellable */
                            error,
                            MM_BASE_MANAGER_CONNECTION,            connection,
+#if !defined WITH_BUILTIN_PLUGINS
                            MM_BASE_MANAGER_PLUGIN_DIR,            plugin_dir,
+#endif
                            MM_BASE_MANAGER_AUTO_SCAN,             auto_scan,
                            MM_BASE_MANAGER_FILTER_POLICY,         filter_policy,
                            MM_BASE_MANAGER_INITIAL_KERNEL_EVENTS, initial_kernel_events,
@@ -1445,10 +1453,12 @@ set_property (GObject      *object,
     case PROP_FILTER_POLICY:
         self->priv->filter_policy = g_value_get_flags (value);
         break;
+#if !defined WITH_BUILTIN_PLUGINS
     case PROP_PLUGIN_DIR:
         g_free (self->priv->plugin_dir);
         self->priv->plugin_dir = g_value_dup_string (value);
         break;
+#endif
     case PROP_INITIAL_KERNEL_EVENTS:
         g_free (self->priv->initial_kernel_events);
         self->priv->initial_kernel_events = g_value_dup_string (value);
@@ -1482,9 +1492,11 @@ get_property (GObject    *object,
     case PROP_FILTER_POLICY:
         g_value_set_flags (value, self->priv->filter_policy);
         break;
+#if !defined WITH_BUILTIN_PLUGINS
     case PROP_PLUGIN_DIR:
         g_value_set_string (value, self->priv->plugin_dir);
         break;
+#endif
     case PROP_INITIAL_KERNEL_EVENTS:
         g_value_set_string (value, self->priv->initial_kernel_events);
         break;
@@ -1548,7 +1560,11 @@ initable_init (GInitable     *initable,
         return FALSE;
 
     /* Create plugin manager */
-    self->priv->plugin_manager = mm_plugin_manager_new (self->priv->plugin_dir, self->priv->filter, error);
+    self->priv->plugin_manager = mm_plugin_manager_new (self->priv->filter,
+#if !defined WITH_BUILTIN_PLUGINS
+                                                        self->priv->plugin_dir,
+#endif
+                                                        error);
     if (!self->priv->plugin_manager)
         return FALSE;
 
@@ -1613,7 +1629,9 @@ finalize (GObject *object)
     MMBaseManager *self = MM_BASE_MANAGER (object);
 
     g_free (self->priv->initial_kernel_events);
+#if !defined WITH_BUILTIN_PLUGINS
     g_free (self->priv->plugin_dir);
+#endif
 
     g_hash_table_destroy (self->priv->inhibited_devices);
     g_hash_table_destroy (self->priv->devices);
@@ -1704,6 +1722,7 @@ mm_base_manager_class_init (MMBaseManagerClass *manager_class)
                             MM_FILTER_RULE_NONE,
                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
+#if !defined WITH_BUILTIN_PLUGINS
     g_object_class_install_property
         (object_class, PROP_PLUGIN_DIR,
          g_param_spec_string (MM_BASE_MANAGER_PLUGIN_DIR,
@@ -1711,6 +1730,7 @@ mm_base_manager_class_init (MMBaseManagerClass *manager_class)
                               "Where to look for plugins",
                               NULL,
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+#endif
 
     g_object_class_install_property
         (object_class, PROP_INITIAL_KERNEL_EVENTS,

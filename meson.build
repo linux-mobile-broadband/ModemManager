@@ -242,6 +242,10 @@ config_h.set('WITH_POLKIT', enable_polkit)
 enable_at_command_via_dbus = get_option('at_command_via_dbus')
 config_h.set('WITH_AT_COMMAND_VIA_DBUS', enable_at_command_via_dbus)
 
+# Builtin plugin support (disabled by default)
+enable_builtin_plugins =  get_option('builtin_plugins')
+config_h.set('WITH_BUILTIN_PLUGINS', enable_builtin_plugins)
+
 # MBIM support (enabled by default)
 enable_mbim = get_option('mbim')
 if enable_mbim
@@ -444,6 +448,7 @@ summary({
   'powerd suspend/resume': enable_powerd_suspend_resume,
   'systemd journal': enable_systemd_journal,
   'at command via dbus': enable_at_command_via_dbus,
+  'builtin plugins': enable_builtin_plugins,
 }, section: 'Features')
 
 summary(plugins_shared, section: 'Shared utils')

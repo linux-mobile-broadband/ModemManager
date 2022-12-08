@@ -17,6 +17,8 @@ option('polkit', type: 'combo', choices: ['strict', 'permissive', 'no'], value: 
 
 option('at_command_via_dbus', type: 'boolean', value: false, description: 'enable at commands vida d-bus')
 
+option('builtin_plugins', type: 'boolean', value: false, description: 'integrate all built plugins within the daemon binary')
+
 option('mbim', type: 'boolean', value: true, description: 'enable MBIM support')
 option('qmi', type: 'boolean', value: true, description: 'enable QMI support')
 option('qrtr', type: 'boolean', value: true, description: 'enable QRTR support')

@@ -26,20 +26,28 @@
 
 #include "mm-plugin.h"
 
-#define MM_PLUGIN_NAMED_CREATOR_SCOPE static
+#if defined (G_HAVE_GNUC_VISIBILITY)
+# define MM_VISIBILITY __attribute__((visibility("protected")))
+#else
+# define MM_VISIBILITY
+#endif
 
-#define MM_PLUGIN_CREATOR(my_plugin)                   \
+#if defined WITH_BUILTIN_PLUGINS
+# define MM_PLUGIN_VERSION
+# define MM_PLUGIN_NAMED_CREATOR_SCOPE
+# define MM_PLUGIN_CREATOR(unused)
+#else
+# define MM_PLUGIN_VERSION                                               \
+    MM_VISIBILITY int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION; \
+    MM_VISIBILITY int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
+# define MM_PLUGIN_NAMED_CREATOR_SCOPE static
+# define MM_PLUGIN_CREATOR(my_plugin)                  \
     G_MODULE_EXPORT MMPlugin *mm_plugin_create (void); \
     G_MODULE_EXPORT MMPlugin *                         \
     mm_plugin_create (void)                            \
     {                                                  \
         return mm_plugin_create_##my_plugin ();        \
     }
-
-#if defined (G_HAVE_GNUC_VISIBILITY)
-# define MM_VISIBILITY __attribute__((visibility("protected")))
-#else
-# define MM_VISIBILITY
 #endif
 
 #define MM_DEFINE_PLUGIN(MY_PLUGIN, my_plugin, MyPlugin)                                              \
@@ -49,8 +57,7 @@
     };                                                                                                \
     G_DEFINE_TYPE (MMPlugin##MyPlugin, mm_plugin_##my_plugin, MM_TYPE_PLUGIN)                         \
                                                                                                       \
-    MM_VISIBILITY int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;                              \
-    MM_VISIBILITY int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;                              \
+    MM_PLUGIN_VERSION                                                                                 \
                                                                                                       \
     MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *mm_plugin_create_##my_plugin (void);                      \
     MM_PLUGIN_CREATOR(my_plugin)

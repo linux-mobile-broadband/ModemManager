@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Copyright (C) 2021 Iñigo Martinez <inigomartinez@gmail.com>
 
-symbol_map = plugins_dir / 'symbol.map'
-ldflags = cc.get_supported_link_arguments('-Wl,--version-script,@0@'.format(symbol_map))
+if not enable_builtin_plugins
+  symbol_map = plugins_dir / 'symbol.map'
+  ldflags = cc.get_supported_link_arguments('-Wl,--version-script,@0@'.format(symbol_map))
+endif
 
 # common service test support
 plugins_common_test_dep = []
@@ -36,7 +38,6 @@ if enable_tests
 endif
 
 # plugins
-plugins_inc = include_directories('.')
 plugins = {}
 plugins_data = []
 plugins_udev_rules = []
@@ -958,6 +959,13 @@ if plugins_options['zte']
   plugins_udev_rules += files('zte/77-mm-zte-port-types.rules')
 endif
 
+builtin_sources = []
+builtin_plugins = []
+
+if enable_builtin_plugins
+   builtin_sources += files('mm-builtin-plugins.c')
+endif
+
 foreach plugin_name, plugin_data: plugins
   libpluginhelpers = []
   if plugin_data.has_key('helper')
@@ -969,21 +977,31 @@ foreach plugin_name, plugin_data: plugins
   endif
 
   module_args = plugin_data['module']
-  if plugin_data['plugin']
-    module_args += {
-      'link_args': ldflags,
-      'link_depends': symbol_map,
-    }
-  endif
+  if not enable_builtin_plugins
+    if plugin_data['plugin']
+      module_args += {
+        'link_args': ldflags,
+        'link_depends': symbol_map,
+      }
+    endif
 
-  shared_module(
-    'mm-' + plugin_name,
-    dependencies: plugins_deps,
-    link_with: libpluginhelpers,
-    kwargs: module_args,
-    install: true,
-    install_dir: mm_pkglibdir,
-  )
+    shared_module(
+      'mm-' + plugin_name,
+      dependencies: plugins_deps,
+      link_with: libpluginhelpers,
+      kwargs: module_args,
+      install: true,
+      install_dir: mm_pkglibdir,
+    )
+  else
+    libplugin = static_library(
+      'mm-' + plugin_name,
+      dependencies: plugins_deps,
+      link_with: libpluginhelpers,
+      kwargs: module_args,
+    )
+    builtin_plugins += libplugin
+  endif
 
   if enable_tests
     if plugin_data.has_key('test')
