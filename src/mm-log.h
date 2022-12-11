@@ -29,16 +29,18 @@ typedef enum {
     MM_LOG_LEVEL_DEBUG = 0x00000010,
 } MMLogLevel;
 
-#if !defined MM_MODULE_NAME
-# define MM_MODULE_NAME (const gchar *)NULL
+#if defined MM_MODULE_NAME
+# define MM_LOG_MODULE_NAME MM_MODULE_NAME
+#else
+# define MM_LOG_MODULE_NAME (const gchar *)NULL
 #endif
 
-#define mm_obj_log(obj, level, ...) _mm_log (obj, MM_MODULE_NAME, G_STRLOC, G_STRFUNC, level,              ## __VA_ARGS__ )
-#define mm_obj_err(obj, ...)        _mm_log (obj, MM_MODULE_NAME, G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_ERR,   ## __VA_ARGS__ )
-#define mm_obj_warn(obj, ...)       _mm_log (obj, MM_MODULE_NAME, G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_WARN,  ## __VA_ARGS__ )
-#define mm_obj_msg(obj, ...)        _mm_log (obj, MM_MODULE_NAME, G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_MSG,   ## __VA_ARGS__ )
-#define mm_obj_info(obj, ...)       _mm_log (obj, MM_MODULE_NAME, G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_INFO,  ## __VA_ARGS__ )
-#define mm_obj_dbg(obj, ...)        _mm_log (obj, MM_MODULE_NAME, G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_DEBUG, ## __VA_ARGS__ )
+#define mm_obj_log(obj, level, ...) _mm_log (obj, MM_LOG_MODULE_NAME, G_STRLOC, G_STRFUNC, level,              ## __VA_ARGS__ )
+#define mm_obj_err(obj, ...)        _mm_log (obj, MM_LOG_MODULE_NAME, G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_ERR,   ## __VA_ARGS__ )
+#define mm_obj_warn(obj, ...)       _mm_log (obj, MM_LOG_MODULE_NAME, G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_WARN,  ## __VA_ARGS__ )
+#define mm_obj_msg(obj, ...)        _mm_log (obj, MM_LOG_MODULE_NAME, G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_MSG,   ## __VA_ARGS__ )
+#define mm_obj_info(obj, ...)       _mm_log (obj, MM_LOG_MODULE_NAME, G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_INFO,  ## __VA_ARGS__ )
+#define mm_obj_dbg(obj, ...)        _mm_log (obj, MM_LOG_MODULE_NAME, G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_DEBUG, ## __VA_ARGS__ )
 
 /* only allow using non-object logging API if explicitly requested
  * (e.g. in the main daemon source) */
