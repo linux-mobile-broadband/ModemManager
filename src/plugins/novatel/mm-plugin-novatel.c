@@ -27,7 +27,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-plugin-novatel.h"
+#include "mm-plugin-common.h"
 #include "mm-common-novatel.h"
 #include "mm-private-boxed-types.h"
 #include "mm-broadband-modem-novatel.h"
@@ -37,10 +37,8 @@
 #include "mm-broadband-modem-qmi.h"
 #endif
 
-G_DEFINE_TYPE (MMPluginNovatel, mm_plugin_novatel, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_NOVATEL mm_plugin_novatel_get_type ()
+MM_DEFINE_PLUGIN (NOVATEL, novatel, Novatel)
 
 /*****************************************************************************/
 
@@ -74,8 +72,8 @@ create_modem (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_novatel (void)
 {
     static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
     static const guint16 vendors[] = { 0x1410, 0 };

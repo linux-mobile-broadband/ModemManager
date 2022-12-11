@@ -27,7 +27,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-plugin-cinterion.h"
+#include "mm-plugin-common.h"
 #include "mm-broadband-modem-cinterion.h"
 #include "mm-log-object.h"
 
@@ -39,10 +39,8 @@
 #include "mm-broadband-modem-mbim-cinterion.h"
 #endif
 
-G_DEFINE_TYPE (MMPluginCinterion, mm_plugin_cinterion, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_CINTERION mm_plugin_cinterion_get_type ()
+MM_DEFINE_PLUGIN (CINTERION, cinterion, Cinterion)
 
 /*****************************************************************************/
 /* Custom init */
@@ -179,8 +177,8 @@ grab_port (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_cinterion (void)
 {
     static const gchar *subsystems[] = { "tty", "net", "usbmisc", "wwan", NULL };
     static const gchar *vendor_strings[] = { "cinterion", "siemens", NULL };

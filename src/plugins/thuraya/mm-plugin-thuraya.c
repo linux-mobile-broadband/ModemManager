@@ -27,15 +27,15 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-plugin-thuraya.h"
+#include "mm-plugin-common.h"
 #include "mm-broadband-modem.h"
 #include "mm-broadband-modem-thuraya.h"
 #include "mm-private-boxed-types.h"
 
-G_DEFINE_TYPE (MMPluginThuraya, mm_plugin_thuraya, MM_TYPE_PLUGIN)
+#define MM_TYPE_PLUGIN_THURAYA mm_plugin_thuraya_get_type ()
+MM_DEFINE_PLUGIN (THURAYA, thuraya, Thuraya)
 
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+/*****************************************************************************/
 
 static MMBaseModem *
 create_modem (MMPlugin *self,
@@ -56,8 +56,8 @@ create_modem (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_thuraya (void)
 {
     static const gchar *subsystems[] = { "tty", NULL };
     static const guint16 vendor_ids[] = { 0x1a26, 0 };

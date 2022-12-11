@@ -23,13 +23,11 @@
 
 #include "mm-log-object.h"
 #include "mm-modem-helpers.h"
-#include "mm-plugin-longcheer.h"
+#include "mm-plugin-common.h"
 #include "mm-broadband-modem-longcheer.h"
 
-G_DEFINE_TYPE (MMPluginLongcheer, mm_plugin_longcheer, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_LONGCHEER mm_plugin_longcheer_get_type ()
+MM_DEFINE_PLUGIN (LONGCHEER, longcheer, Longcheer)
 
 /*****************************************************************************/
 /* Custom init */
@@ -200,8 +198,8 @@ create_modem (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_longcheer (void)
 {
     static const gchar *subsystems[] = { "tty", NULL };
     /* Vendors: Longcheer and TAMobile */

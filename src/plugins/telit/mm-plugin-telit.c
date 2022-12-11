@@ -23,7 +23,7 @@
 
 #include "mm-log-object.h"
 #include "mm-modem-helpers.h"
-#include "mm-plugin-telit.h"
+#include "mm-plugin-common.h"
 #include "mm-common-telit.h"
 #include "mm-broadband-modem-telit.h"
 
@@ -36,10 +36,8 @@
 # include "mm-broadband-modem-mbim-telit.h"
 #endif
 
-G_DEFINE_TYPE (MMPluginTelit, mm_plugin_telit, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_TELIT mm_plugin_telit_get_type ()
+MM_DEFINE_PLUGIN (TELIT, telit, Telit)
 
 /*****************************************************************************/
 
@@ -85,8 +83,8 @@ create_modem (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_telit (void)
 {
     static const gchar *subsystems[] = { "tty", "net", "usbmisc", "wwan", NULL };
     /* Vendors: Telit */

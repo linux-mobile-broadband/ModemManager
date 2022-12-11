@@ -22,12 +22,10 @@
 #include "mm-log-object.h"
 #include "mm-serial-parsers.h"
 #include "mm-broadband-modem-ublox.h"
-#include "mm-plugin-ublox.h"
+#include "mm-plugin-common.h"
 
-G_DEFINE_TYPE (MMPluginUblox, mm_plugin_ublox, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_UBLOX mm_plugin_ublox_get_type ()
+MM_DEFINE_PLUGIN (UBLOX, ublox, Ublox)
 
 /*****************************************************************************/
 
@@ -229,8 +227,8 @@ ublox_custom_init (MMPortProbe         *probe,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_ublox (void)
 {
     static const gchar *subsystems[] = { "tty", "net", NULL };
     static const guint16 vendor_ids[] = { 0x1546, 0 };

@@ -22,7 +22,7 @@
 #include <libmm-glib.h>
 
 #include "mm-log-object.h"
-#include "mm-plugin-zte.h"
+#include "mm-plugin-common.h"
 #include "mm-broadband-modem-zte.h"
 #include "mm-broadband-modem-zte-icera.h"
 
@@ -34,10 +34,8 @@
 #include "mm-broadband-modem-mbim.h"
 #endif
 
-G_DEFINE_TYPE (MMPluginZte, mm_plugin_zte, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_ZTE mm_plugin_zte_get_type ()
+MM_DEFINE_PLUGIN (ZTE, zte, Zte)
 
 /*****************************************************************************/
 /* Custom commands for AT probing */
@@ -142,8 +140,8 @@ grab_port (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_zte (void)
 {
     static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
     static const guint16 vendor_ids[] = { 0x19d2, 0 };

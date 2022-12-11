@@ -23,17 +23,15 @@
 
 #include "mm-log-object.h"
 #include "mm-modem-helpers.h"
-#include "mm-plugin-x22x.h"
+#include "mm-plugin-common.h"
 #include "mm-broadband-modem-x22x.h"
 
 #if defined WITH_QMI
 #include "mm-broadband-modem-qmi.h"
 #endif
 
-G_DEFINE_TYPE (MMPluginX22x, mm_plugin_x22x, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_X22X mm_plugin_x22x_get_type ()
+MM_DEFINE_PLUGIN (X22X, x22x, X22x)
 
 /*****************************************************************************/
 /* Custom init */
@@ -213,8 +211,8 @@ create_modem (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_x22x (void)
 {
     static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
     /* Vendors: TAMobile and Olivetti */

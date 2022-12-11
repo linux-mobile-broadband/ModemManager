@@ -24,15 +24,13 @@
 #include <string.h>
 #include <gmodule.h>
 
-#include "mm-plugin-altair-lte.h"
+#include "mm-plugin-common.h"
 #include "mm-private-boxed-types.h"
 #include "mm-broadband-modem-altair-lte.h"
 #include "mm-log.h"
 
-G_DEFINE_TYPE (MMPluginAltairLte, mm_plugin_altair_lte, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_ALTAIR_LTE mm_plugin_altair_lte_get_type ()
+MM_DEFINE_PLUGIN (ALTAIR_LTE, altair_lte, AltairLte)
 
 /*****************************************************************************/
 /* Custom commands for AT probing */
@@ -67,8 +65,9 @@ create_modem (MMPlugin *self,
 }
 
 /*****************************************************************************/
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_altair_lte (void)
 {
     static const gchar *subsystems[] = { "tty", "net", NULL };
     static const mm_uint16_pair products[] = {

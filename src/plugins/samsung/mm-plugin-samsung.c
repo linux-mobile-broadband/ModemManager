@@ -24,14 +24,14 @@
 #include <string.h>
 #include <gmodule.h>
 
-#include "mm-plugin-samsung.h"
+#include "mm-plugin-common.h"
 #include "mm-private-boxed-types.h"
 #include "mm-broadband-modem-samsung.h"
 
-G_DEFINE_TYPE (MMPluginSamsung, mm_plugin_samsung, MM_TYPE_PLUGIN)
+#define MM_TYPE_PLUGIN_SAMSUNG mm_plugin_samsung_get_type ()
+MM_DEFINE_PLUGIN (SAMSUNG, samsung, Samsung)
 
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+/*****************************************************************************/
 
 static MMBaseModem *
 create_modem (MMPlugin *self,
@@ -52,8 +52,8 @@ create_modem (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_samsung (void)
 {
     static const gchar *subsystems[] = { "tty", "net", NULL };
     static const mm_uint16_pair products[] = { { 0x04e8, 0x6872 },

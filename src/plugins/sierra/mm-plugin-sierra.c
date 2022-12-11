@@ -23,7 +23,7 @@
 #include <libmm-glib.h>
 
 #include "mm-log-object.h"
-#include "mm-plugin-sierra.h"
+#include "mm-plugin-common.h"
 #include "mm-broadband-modem.h"
 #include "mm-broadband-modem-xmm.h"
 
@@ -36,10 +36,8 @@
 #include "mm-broadband-modem-mbim-xmm.h"
 #endif
 
-G_DEFINE_TYPE (MMPluginSierra, mm_plugin_sierra, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_SIERRA mm_plugin_sierra_get_type ()
+MM_DEFINE_PLUGIN (SIERRA, sierra, Sierra)
 
 /*****************************************************************************/
 
@@ -102,8 +100,8 @@ create_modem (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_sierra (void)
 {
     static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
     static const guint16 vendor_ids[] = { 0x1199, 0 };

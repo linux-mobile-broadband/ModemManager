@@ -26,12 +26,12 @@
 #include <libmm-glib.h>
 
 #include "mm-broadband-modem-via.h"
-#include "mm-plugin-via.h"
+#include "mm-plugin-common.h"
 
-G_DEFINE_TYPE (MMPluginVia, mm_plugin_via, MM_TYPE_PLUGIN)
+#define MM_TYPE_PLUGIN_VIA mm_plugin_via_get_type ()
+MM_DEFINE_PLUGIN (VIA, via, Via)
 
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+/*****************************************************************************/
 
 static MMBaseModem *
 create_modem (MMPlugin *self,
@@ -52,8 +52,8 @@ create_modem (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_via (void)
 {
     static const gchar *subsystems[] = { "tty", NULL };
     static const mm_str_pair product_strings[] = { { (gchar *) "via",    (gchar *) "cbp7" },

@@ -22,17 +22,15 @@
 #include <libmm-glib.h>
 
 #include "mm-log-object.h"
-#include "mm-plugin-simtech.h"
+#include "mm-plugin-common.h"
 #include "mm-broadband-modem-simtech.h"
 
 #if defined WITH_QMI
 #include "mm-broadband-modem-qmi-simtech.h"
 #endif
 
-G_DEFINE_TYPE (MMPluginSimtech, mm_plugin_simtech, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_SIMTECH mm_plugin_simtech_get_type ()
+MM_DEFINE_PLUGIN (SIMTECH, simtech, Simtech)
 
 /*****************************************************************************/
 
@@ -66,8 +64,8 @@ create_modem (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_simtech (void)
 {
     static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
     static const guint16 vendor_ids[] = { 0x1e0e, /* A-Link (for now) */

@@ -19,7 +19,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-plugin-intel.h"
+#include "mm-plugin-common.h"
 #include "mm-log-object.h"
 #include "mm-broadband-modem.h"
 
@@ -27,10 +27,10 @@
 #include "mm-broadband-modem-mbim-intel.h"
 #endif
 
-G_DEFINE_TYPE (MMPluginIntel, mm_plugin_intel, MM_TYPE_PLUGIN)
+#define MM_TYPE_PLUGIN_INTEL mm_plugin_intel_get_type ()
+MM_DEFINE_PLUGIN (INTEL, intel, Intel)
 
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+/*****************************************************************************/
 
 static MMBaseModem *
 create_modem (MMPlugin      *self,
@@ -61,8 +61,10 @@ create_modem (MMPlugin      *self,
                                                   product));
 }
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+/*****************************************************************************/
+
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_intel (void)
 {
     static const gchar   *subsystems[] = { "net", "wwan", NULL };
     static const guint16  vendor_ids[]  = { 0x8086, 0 };

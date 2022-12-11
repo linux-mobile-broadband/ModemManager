@@ -19,13 +19,11 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include "mm-plugin-common.h"
 #include "mm-broadband-modem.h"
-#include "mm-plugin-haier.h"
 
-G_DEFINE_TYPE (MMPluginHaier, mm_plugin_haier, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_HAIER mm_plugin_haier_get_type ()
+MM_DEFINE_PLUGIN (HAIER, haier, Haier)
 
 /*****************************************************************************/
 
@@ -48,8 +46,8 @@ create_modem (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_haier (void)
 {
     static const gchar *subsystems[] = { "tty", NULL };
     static const guint16 vendor_ids[] = { 0x201e, 0 };

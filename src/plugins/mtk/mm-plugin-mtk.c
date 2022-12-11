@@ -21,13 +21,11 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-plugin-mtk.h"
+#include "mm-plugin-common.h"
 #include "mm-broadband-modem-mtk.h"
 
-G_DEFINE_TYPE (MMPluginMtk, mm_plugin_mtk, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_MTK mm_plugin_mtk_get_type ()
+MM_DEFINE_PLUGIN (MTK, mtk, Mtk)
 
 /*****************************************************************************/
 
@@ -51,8 +49,8 @@ create_modem (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_mtk (void)
 {
     static const gchar *subsystems[] = { "tty", NULL };
     static const gchar *udev_tags[]={

@@ -22,13 +22,11 @@
 #include <libmm-glib.h>
 
 #include "mm-private-boxed-types.h"
-#include "mm-plugin-option.h"
+#include "mm-plugin-common.h"
 #include "mm-broadband-modem-option.h"
 
-G_DEFINE_TYPE (MMPluginOption, mm_plugin_option, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_OPTION mm_plugin_option_get_type ()
+MM_DEFINE_PLUGIN (OPTION, option, Option)
 
 /*****************************************************************************/
 
@@ -87,8 +85,8 @@ grab_port (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_option (void)
 {
     static const gchar *subsystems[] = { "tty", NULL };
     static const guint16 vendor_ids[] = { 0x0af0, /* Option USB devices */

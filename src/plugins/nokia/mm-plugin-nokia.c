@@ -21,13 +21,11 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-plugin-nokia.h"
+#include "mm-plugin-common.h"
 #include "mm-broadband-modem-nokia.h"
 
-G_DEFINE_TYPE (MMPluginNokia, mm_plugin_nokia, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_NOKIA mm_plugin_nokia_get_type ()
+MM_DEFINE_PLUGIN (NOKIA, nokia, Nokia)
 
 /*****************************************************************************/
 /* Custom commands for AT probing */
@@ -60,8 +58,8 @@ create_modem (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_nokia (void)
 {
     static const gchar *subsystems[] = { "tty", NULL };
     static const guint16 vendor_ids[] = { 0x0421, 0 };

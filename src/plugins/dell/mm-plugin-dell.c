@@ -25,7 +25,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-plugin-dell.h"
+#include "mm-plugin-common.h"
 #include "mm-common-novatel.h"
 #include "mm-private-boxed-types.h"
 #include "mm-broadband-modem.h"
@@ -48,12 +48,12 @@
 #include "mm-broadband-modem-mbim-foxconn.h"
 #endif
 
+#define MM_TYPE_PLUGIN_DELL mm_plugin_dell_get_type ()
+MM_DEFINE_PLUGIN (DELL, dell, Dell)
+
+/*****************************************************************************/
+
 #define MAX_PORT_PROBE_TIMEOUTS 3
-
-G_DEFINE_TYPE (MMPluginDell, mm_plugin_dell, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
 
 #define TAG_DELL_MANUFACTURER   "dell-manufacturer"
 typedef enum {
@@ -489,8 +489,8 @@ grab_port (MMPlugin     *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_dell (void)
 {
     static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
     static const guint16 vendors[] = { 0x413c, 0 };

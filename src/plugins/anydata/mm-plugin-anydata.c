@@ -22,17 +22,15 @@
 #include <libmm-glib.h>
 
 #include "mm-log-object.h"
-#include "mm-plugin-anydata.h"
+#include "mm-plugin-common.h"
 #include "mm-broadband-modem-anydata.h"
 
 #if defined WITH_QMI
 #include "mm-broadband-modem-qmi.h"
 #endif
 
-G_DEFINE_TYPE (MMPluginAnydata, mm_plugin_anydata, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_ANYDATA mm_plugin_anydata_get_type ()
+MM_DEFINE_PLUGIN (ANYDATA, anydata, Anydata)
 
 /*****************************************************************************/
 
@@ -66,8 +64,8 @@ create_modem (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_anydata (void)
 {
     static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
     static const guint16 vendor_ids[] = { 0x16d5, 0 };

@@ -20,7 +20,7 @@
 #include <libmm-glib.h>
 
 #include "mm-log-object.h"
-#include "mm-plugin-quectel.h"
+#include "mm-plugin-common.h"
 #include "mm-broadband-modem-quectel.h"
 
 #if defined WITH_QMI
@@ -32,10 +32,8 @@
 #include "mm-broadband-modem-mbim-quectel.h"
 #endif
 
-G_DEFINE_TYPE (MMPluginQuectel, mm_plugin_quectel, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_QUECTEL mm_plugin_quectel_get_type ()
+MM_DEFINE_PLUGIN (QUECTEL, quectel, Quectel)
 
 /*****************************************************************************/
 
@@ -80,8 +78,8 @@ create_modem (MMPlugin     *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_quectel (void)
 {
     static const gchar *subsystems[] = { "tty", "net", "usbmisc", "wwan", NULL };
     static const gchar *vendor_strings[] = { "quectel", NULL };

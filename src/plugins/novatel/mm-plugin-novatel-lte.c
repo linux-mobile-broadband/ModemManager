@@ -23,14 +23,14 @@
 #include <string.h>
 #include <gmodule.h>
 
-#include "mm-plugin-novatel-lte.h"
+#include "mm-plugin-common.h"
 #include "mm-private-boxed-types.h"
 #include "mm-broadband-modem-novatel-lte.h"
 
-G_DEFINE_TYPE (MMPluginNovatelLte, mm_plugin_novatel_lte, MM_TYPE_PLUGIN)
+#define MM_TYPE_PLUGIN_NOVATEL_LTE mm_plugin_novatel_lte_get_type ()
+MM_DEFINE_PLUGIN (NOVATEL_LTE, novatel_lte, NovatelLte)
 
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+/*****************************************************************************/
 
 static MMBaseModem *
 create_modem (MMPlugin *self,
@@ -51,8 +51,8 @@ create_modem (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_novatel_lte (void)
 {
     static const gchar *subsystems[] = { "tty", "net", NULL };
     static const mm_uint16_pair products[] = { { 0x1410, 0x9010 }, /* Novatel E362 */

@@ -22,13 +22,11 @@
 #include <libmm-glib.h>
 
 #include "mm-private-boxed-types.h"
-#include "mm-plugin-motorola.h"
+#include "mm-plugin-common.h"
 #include "mm-broadband-modem-motorola.h"
 
-G_DEFINE_TYPE (MMPluginMotorola, mm_plugin_motorola, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_MOTOROLA mm_plugin_motorola_get_type ()
+MM_DEFINE_PLUGIN (MOTOROLA, motorola, Motorola)
 
 /*****************************************************************************/
 
@@ -51,8 +49,8 @@ create_modem (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_motorola (void)
 {
     static const gchar *subsystems[] = { "tty", NULL };
     static const mm_uint16_pair product_ids[] = {

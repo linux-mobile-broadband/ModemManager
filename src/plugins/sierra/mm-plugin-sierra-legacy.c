@@ -22,15 +22,13 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-plugin-sierra-legacy.h"
+#include "mm-plugin-common.h"
 #include "mm-common-sierra.h"
 #include "mm-broadband-modem-sierra.h"
 #include "mm-broadband-modem-sierra-icera.h"
 
-G_DEFINE_TYPE (MMPluginSierraLegacy, mm_plugin_sierra_legacy, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_SIERRA_LEGACY mm_plugin_sierra_legacy_get_type ()
+MM_DEFINE_PLUGIN (SIERRA_LEGACY, sierra_legacy, SierraLegacy)
 
 /*****************************************************************************/
 
@@ -60,8 +58,8 @@ create_modem (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_sierra_legacy (void)
 {
     static const gchar *subsystems[] = { "tty", "net", NULL };
     static const gchar *drivers[] = { "sierra", "sierra_net", NULL };

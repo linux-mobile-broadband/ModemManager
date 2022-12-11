@@ -26,7 +26,7 @@
 #include <ModemManager-tags.h>
 #include "mm-port-enums-types.h"
 #include "mm-log.h"
-#include "mm-plugin-huawei.h"
+#include "mm-plugin-common.h"
 #include "mm-broadband-modem-huawei.h"
 #include "mm-modem-helpers-huawei.h"
 #include "mm-huawei-enums-types.h"
@@ -39,10 +39,8 @@
 #include "mm-broadband-modem-mbim.h"
 #endif
 
-G_DEFINE_TYPE (MMPluginHuawei, mm_plugin_huawei, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_HUAWEI mm_plugin_huawei_get_type ()
+MM_DEFINE_PLUGIN (HUAWEI, huawei, Huawei)
 
 /*****************************************************************************/
 /* Custom init */
@@ -697,8 +695,8 @@ grab_port (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_huawei (void)
 {
     static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
     static const guint16 vendor_ids[] = { 0x12d1, 0 };

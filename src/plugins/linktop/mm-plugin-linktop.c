@@ -21,13 +21,11 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-plugin-linktop.h"
+#include "mm-plugin-common.h"
 #include "mm-broadband-modem-linktop.h"
 
-G_DEFINE_TYPE (MMPluginLinktop, mm_plugin_linktop, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_LINKTOP mm_plugin_linktop_get_type ()
+MM_DEFINE_PLUGIN (LINKTOP, linktop, Linktop)
 
 /*****************************************************************************/
 
@@ -50,8 +48,8 @@ create_modem (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_linktop (void)
 {
     static const gchar *subsystems[] = { "tty", NULL };
     static const guint16 vendor_ids[] = { 0x230d, 0 };

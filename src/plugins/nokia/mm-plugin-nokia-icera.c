@@ -20,13 +20,11 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-plugin-nokia-icera.h"
+#include "mm-plugin-common.h"
 #include "mm-broadband-modem-icera.h"
 
-G_DEFINE_TYPE (MMPluginNokiaIcera, mm_plugin_nokia_icera, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_NOKIA_ICERA mm_plugin_nokia_icera_get_type ()
+MM_DEFINE_PLUGIN (NOKIA_ICERA, nokia_icera, NokiaIcera)
 
 /*****************************************************************************/
 /* Custom commands for AT probing */
@@ -59,8 +57,8 @@ create_modem (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_nokia_icera (void)
 {
     static const gchar *subsystems[] = { "tty", "net", NULL };
     static const guint16 vendor_ids[] = { 0x0421, 0 };

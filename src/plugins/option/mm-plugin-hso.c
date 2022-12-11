@@ -22,14 +22,12 @@
 #include <libmm-glib.h>
 
 #include "mm-private-boxed-types.h"
-#include "mm-plugin-hso.h"
+#include "mm-plugin-common.h"
 #include "mm-broadband-modem-hso.h"
 #include "mm-log-object.h"
 
-G_DEFINE_TYPE (MMPluginHso, mm_plugin_hso, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_HSO mm_plugin_hso_get_type ()
+MM_DEFINE_PLUGIN (HSO, hso, Hso)
 
 /*****************************************************************************/
 /* Custom init */
@@ -165,8 +163,8 @@ grab_port (MMPlugin *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_hso (void)
 {
     static const gchar *subsystems[] = { "tty", "net", NULL };
     static const gchar *drivers[] = { "hso", NULL };

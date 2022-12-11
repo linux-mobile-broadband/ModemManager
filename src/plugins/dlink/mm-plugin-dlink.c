@@ -20,17 +20,15 @@
 #include <libmm-glib.h>
 
 #include "mm-log-object.h"
-#include "mm-plugin-dlink.h"
+#include "mm-plugin-common.h"
 #include "mm-broadband-modem.h"
 
 #if defined WITH_QMI
 # include "mm-broadband-modem-qmi.h"
 #endif
 
-G_DEFINE_TYPE (MMPluginDlink, mm_plugin_dlink, MM_TYPE_PLUGIN)
-
-MM_PLUGIN_DEFINE_MAJOR_VERSION
-MM_PLUGIN_DEFINE_MINOR_VERSION
+#define MM_TYPE_PLUGIN_DLINK mm_plugin_dlink_get_type ()
+MM_DEFINE_PLUGIN (DLINK, dlink, Dlink)
 
 /*****************************************************************************/
 
@@ -64,8 +62,8 @@ create_modem (MMPlugin     *self,
 
 /*****************************************************************************/
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
+MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
+mm_plugin_create_dlink (void)
 {
     static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
     static const guint16 vendor_ids[] = { 0x2001, 0 };

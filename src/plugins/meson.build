@@ -36,6 +36,7 @@ if enable_tests
 endif
 
 # plugins
+plugins_inc = include_directories('.')
 plugins = {}
 plugins_data = []
 plugins_udev_rules = []
@@ -48,6 +49,7 @@ plugins_incs = [
   top_inc,
   src_inc,
   kerneldevice_inc,
+  plugins_inc,
 ]
 
 plugins_deps = [libmm_glib_dep]
