@@ -13,8 +13,6 @@
  * Copyright (C) 2022 Aleksander Morgado <aleksander@aleksander.es>
  */
 
-#include "mm-shared.h"
+#include "mm-shared-common.h"
 
-MM_SHARED_DEFINE_MAJOR_VERSION
-MM_SHARED_DEFINE_MINOR_VERSION
-MM_SHARED_DEFINE_NAME(Intel)
+MM_DEFINE_SHARED (fibocom)

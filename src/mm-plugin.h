@@ -31,6 +31,9 @@
 #define MM_PLUGIN_MAJOR_VERSION 5
 #define MM_PLUGIN_MINOR_VERSION 0
 
+#define MM_SHARED_MAJOR_VERSION 1
+#define MM_SHARED_MINOR_VERSION 0
+
 #define MM_TYPE_PLUGIN            (mm_plugin_get_type ())
 #define MM_PLUGIN(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN, MMPlugin))
 #define MM_PLUGIN_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_PLUGIN, MMPluginClass))

@@ -13,8 +13,6 @@
  * Copyright (C) 2019 Aleksander Morgado <aleksander@aleksander.es>
  */
 
-#include "mm-shared.h"
+#include "mm-shared-common.h"
 
-MM_SHARED_DEFINE_MAJOR_VERSION
-MM_SHARED_DEFINE_MINOR_VERSION
-MM_SHARED_DEFINE_NAME(Icera)
+MM_DEFINE_SHARED (icera)
