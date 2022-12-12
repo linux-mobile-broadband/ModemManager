@@ -144,7 +144,7 @@ if plugins_shared['option']
 
   plugins += {'shared-option': {
     'plugin': false,
-    'module': {'sources': sources, 'include_directories': plugins_incs},
+    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': '-DMM_MODULE_NAME="shared-option"'},
   }}
 endif
 
