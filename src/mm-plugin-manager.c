@@ -1753,6 +1753,7 @@ load_shared (MMPluginManager *self,
     const gchar **shared_name = NULL;
     gint         *major_shared_version;
     gint         *minor_shared_version;
+    gboolean      success =  FALSE;
 
     /* Get printable UTF-8 string of the path */
     path_display = g_filename_display_name (path);
@@ -1791,9 +1792,10 @@ load_shared (MMPluginManager *self,
     }
 
     mm_obj_dbg (self, "loaded shared '%s' utils from '%s'", *shared_name, path_display);
+    success = TRUE;
 
 out:
-    if (module && !(*shared_name))
+    if (module && !success)
         g_module_close (module);
 
     g_free (path_display);
