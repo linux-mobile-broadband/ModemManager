@@ -1726,7 +1726,9 @@ static gchar *
 date_time_format_iso8601 (GDateTime *dt)
 {
 #if GLIB_CHECK_VERSION (2, 62, 0)
+    G_GNUC_BEGIN_IGNORE_DEPRECATIONS
     return g_date_time_format_iso8601 (dt);
+    G_GNUC_END_IGNORE_DEPRECATIONS
 #else
     GString          *outstr = NULL;
     g_autofree gchar *main_date = NULL;
