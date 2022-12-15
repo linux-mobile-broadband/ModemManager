@@ -147,6 +147,18 @@ mm_base_modem_get_dbus_id (MMBaseModem *self)
 /******************************************************************************/
 
 static void
+port_removed_cb (MMPort      *port,
+                 MMBaseModem *self)
+{
+    /* We have to do a full re-probe here because simply reopening the device
+     * and restarting proxy would leave us without proper notifications. */
+    mm_obj_msg (self, "port '%s' no longer controllable, reprobing",
+                mm_port_get_device (MM_PORT (port)));
+    self->priv->reprobe = TRUE;
+    g_cancellable_cancel (self->priv->cancellable);
+}
+
+static void
 port_timed_out_cb (MMPort       *port,
                    guint         n_consecutive_timeouts,
                    MMBaseModem  *self)
@@ -322,6 +334,7 @@ base_modem_internal_grab_port (MMBaseModem         *self,
     const gchar      *subsys;
     const gchar      *name;
     g_autofree gchar *key = NULL;
+    gboolean          port_monitoring = FALSE;
 
     subsys = mm_kernel_device_get_subsystem (kernel_device);
     name   = mm_kernel_device_get_name      (kernel_device);
@@ -362,35 +375,37 @@ base_modem_internal_grab_port (MMBaseModem         *self,
         return NULL;
     }
 
-    /* Setup consecutive timeout watcher in all control ports */
-    if (self->priv->max_timeouts > 0) {
-        gboolean timeout_monitoring = FALSE;
-
-        if (MM_IS_PORT_SERIAL_AT (port)) {
-            mm_obj_dbg (port, "timeout monitoring enabled in AT port");
-            timeout_monitoring = TRUE;
-        } else if (MM_IS_PORT_SERIAL_QCDM (port)) {
-            mm_obj_dbg (port, "timeout monitoring enabled in QCDM port");
-            timeout_monitoring = TRUE;
-        }
+    /* Setup consecutive ports and removal watchers in all control ports */
+    if (MM_IS_PORT_SERIAL_AT (port)) {
+        mm_obj_dbg (port, "port monitoring enabled in AT port");
+        port_monitoring = TRUE;
+    } else if (MM_IS_PORT_SERIAL_QCDM (port)) {
+        mm_obj_dbg (port, "port monitoring enabled in QCDM port");
+        port_monitoring = TRUE;
+    }
 #if defined WITH_QMI
-        else if (MM_IS_PORT_QMI (port)) {
-            mm_obj_dbg (port, "timeout monitoring enabled in QMI port");
-            timeout_monitoring = TRUE;
-        }
+    else if (MM_IS_PORT_QMI (port)) {
+        mm_obj_dbg (port, "port monitoring enabled in QMI port");
+        port_monitoring = TRUE;
+    }
 #endif
 #if defined WITH_MBIM
-        else if (MM_IS_PORT_MBIM (port)) {
-            mm_obj_dbg (port, "timeout monitoring enabled in MBIM port");
-            timeout_monitoring = TRUE;
-        }
+    else if (MM_IS_PORT_MBIM (port)) {
+        mm_obj_dbg (port, "port monitoring enabled in MBIM port");
+        port_monitoring = TRUE;
+    }
 #endif
 
-        if (timeout_monitoring)
+    if (port_monitoring) {
+        if (self->priv->max_timeouts > 0)
             g_signal_connect (port,
                               MM_PORT_SIGNAL_TIMED_OUT,
                               G_CALLBACK (port_timed_out_cb),
                               self);
+        g_signal_connect (port,
+                          MM_PORT_SIGNAL_REMOVED,
+                          G_CALLBACK (port_removed_cb),
+                          self);
     }
 
     /* Store kernel device */
@@ -1748,6 +1763,7 @@ cleanup_modem_port (MMBaseModem *self,
 
     /* Cleanup on all control ports */
     g_signal_handlers_disconnect_by_func (port, port_timed_out_cb, self);
+    g_signal_handlers_disconnect_by_func (port, port_removed_cb, self);
 
 #if defined WITH_MBIM
     /* We need to close the MBIM port cleanly when disposing the modem object */
