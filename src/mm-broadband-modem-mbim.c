@@ -5340,11 +5340,17 @@ ussd_notification (MMBroadbandModemMbim *self,
 }
 
 static void
-device_notification_cb (MbimDevice *device,
-                        MbimMessage *notification,
-                        MMBroadbandModemMbim *self)
+port_notification_cb (MMPortMbim           *port,
+                      MbimMessage          *notification,
+                      MMBroadbandModemMbim *self)
 {
-    MbimService service;
+    MbimService  service;
+    MbimDevice  *device;
+
+    /* Onlyu process notifications if the device still exists */
+    device = mm_port_mbim_peek_device (port);
+    if (!device)
+        return;
 
     service = mbim_message_indicate_status_get_service (notification);
     mm_obj_dbg (self, "received notification (service '%s', command '%s')",
@@ -5364,10 +5370,10 @@ device_notification_cb (MbimDevice *device,
 
 static void
 common_setup_cleanup_unsolicited_events_sync (MMBroadbandModemMbim *self,
-                                              MbimDevice           *device,
+                                              MMPortMbim           *port,
                                               gboolean              setup)
 {
-    if (!device)
+    if (!port)
         return;
 
     mm_obj_dbg (self, "supported notifications: signal (%s), registration (%s), sms (%s), "
@@ -5389,16 +5395,16 @@ common_setup_cleanup_unsolicited_events_sync (MMBroadbandModemMbim *self,
         /* Don't re-enable it if already there */
         if (!self->priv->notification_id)
             self->priv->notification_id =
-                g_signal_connect (device,
-                                  MBIM_DEVICE_SIGNAL_INDICATE_STATUS,
-                                  G_CALLBACK (device_notification_cb),
+                g_signal_connect (port,
+                                  MM_PORT_MBIM_SIGNAL_NOTIFICATION,
+                                  G_CALLBACK (port_notification_cb),
                                   self);
     } else {
         /* Don't remove the signal if there are still listeners interested */
         if (self->priv->setup_flags == PROCESS_NOTIFICATION_FLAG_NONE &&
             self->priv->notification_id &&
-            g_signal_handler_is_connected (device, self->priv->notification_id)) {
-            g_signal_handler_disconnect (device, self->priv->notification_id);
+            g_signal_handler_is_connected (port, self->priv->notification_id)) {
+            g_signal_handler_disconnect (port, self->priv->notification_id);
             self->priv->notification_id = 0;
         }
     }
@@ -5419,14 +5425,20 @@ common_setup_cleanup_unsolicited_events (MMBroadbandModemMbim *self,
                                          gpointer              user_data)
 {
     GTask      *task;
-    MbimDevice *device;
-
-    if (!peek_device (self, &device, callback, user_data))
-        return;
-
-    common_setup_cleanup_unsolicited_events_sync (self, device, setup);
+    MMPortMbim *port;
 
     task = g_task_new (self, NULL, callback, user_data);
+
+    port = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self));
+    if (!port) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Couldn't peek MBIM port");
+        g_object_unref (task);
+        return;
+    }
+
+    common_setup_cleanup_unsolicited_events_sync (self, port, setup);
+
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
@@ -5702,7 +5714,7 @@ modem_3gpp_enable_unsolicited_registration_events (MMIfaceModem3gpp *_self,
 /* Setup SIM hot swap */
 
 typedef struct {
-    MbimDevice *device;
+    MMPortMbim *port;
     GError     *subscriber_info_error;
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     GError     *qmi_error;
@@ -5716,7 +5728,7 @@ setup_sim_hot_swap_context_free (SetupSimHotSwapContext *ctx)
     g_clear_error (&ctx->qmi_error);
 #endif
     g_clear_error (&ctx->subscriber_info_error);
-    g_clear_object (&ctx->device);
+    g_clear_object (&ctx->port);
     g_slice_free (SetupSimHotSwapContext, ctx);
 }
 
@@ -5780,7 +5792,7 @@ enable_subscriber_info_unsolicited_events_ready (MMBroadbandModemMbim *self,
         mm_obj_dbg (self, "failed to enable subscriber info events: %s", ctx->subscriber_info_error->message);
         /* reset setup flags if enabling failed */
         self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
-        common_setup_cleanup_unsolicited_events_sync (self, ctx->device, FALSE);
+        common_setup_cleanup_unsolicited_events_sync (self, ctx->port, FALSE);
         /* and also reset enable flags */
         self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
     }
@@ -5800,21 +5812,27 @@ modem_setup_sim_hot_swap (MMIfaceModem        *_self,
                           gpointer             user_data)
 {
     MMBroadbandModemMbim   *self = MM_BROADBAND_MODEM_MBIM (_self);
-    MbimDevice             *device;
+    MMPortMbim             *port;
     GTask                  *task;
     SetupSimHotSwapContext *ctx;
 
-    if (!peek_device (self, &device, callback, user_data))
-        return;
-
     task = g_task_new (self, NULL, callback, user_data);
+
+    port = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self));
+    if (!port) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Couldn't peek MBIM port");
+        g_object_unref (task);
+        return;
+    }
+
     ctx = g_slice_new0 (SetupSimHotSwapContext);
-    ctx->device = g_object_ref (device);
+    ctx->port = g_object_ref (port);
     g_task_set_task_data (task, ctx, (GDestroyNotify)setup_sim_hot_swap_context_free);
 
     /* Setup flags synchronously, which never fails */
     self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
-    common_setup_cleanup_unsolicited_events_sync (self, ctx->device, TRUE);
+    common_setup_cleanup_unsolicited_events_sync (self, ctx->port, TRUE);
 
     /* Enable flags asynchronously, which may fail */
     self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
@@ -9174,7 +9192,7 @@ dispose (GObject *object)
     if (mbim) {
         /* Explicitly remove notification handler */
         self->priv->setup_flags = PROCESS_NOTIFICATION_FLAG_NONE;
-        common_setup_cleanup_unsolicited_events_sync (self, mm_port_mbim_peek_device (mbim), FALSE);
+        common_setup_cleanup_unsolicited_events_sync (self, mbim, FALSE);
 
         /* If we did open the MBIM port during initialization, close it now */
         if (mm_port_mbim_is_open (mbim))
