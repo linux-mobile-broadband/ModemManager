@@ -121,8 +121,6 @@ QmiClient *mm_port_qmi_get_client  (MMPortQmi  *self,
                                     QmiService  service,
                                     guint       flag);
 
-QmiDevice *mm_port_qmi_peek_device (MMPortQmi *self);
-
 typedef struct {
     QmiDataEndpointType type;
     guint               interface_number;
