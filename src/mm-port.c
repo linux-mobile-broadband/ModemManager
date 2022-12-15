@@ -40,6 +40,7 @@ enum {
 
 enum {
     TIMED_OUT,
+    REMOVED,
     LAST_SIGNAL
 };
 
@@ -287,4 +288,13 @@ mm_port_class_init (MMPortClass *klass)
                       NULL, NULL,
                       g_cclosure_marshal_generic,
                       G_TYPE_NONE, 1, G_TYPE_UINT);
+
+    signals[REMOVED] =
+        g_signal_new (MM_PORT_SIGNAL_REMOVED,
+                      G_OBJECT_CLASS_TYPE (object_class),
+                      G_SIGNAL_RUN_FIRST,
+                      G_STRUCT_OFFSET (MMPortClass, removed),
+                      NULL, NULL,
+                      g_cclosure_marshal_generic,
+                      G_TYPE_NONE, 0);
 }

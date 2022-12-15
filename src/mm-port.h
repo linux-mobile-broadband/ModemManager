@@ -61,6 +61,7 @@ typedef enum { /*< underscore_name=mm_port_type >*/
 #define MM_PORT_KERNEL_DEVICE "kernel-device"
 
 #define MM_PORT_SIGNAL_TIMED_OUT "timed-out"
+#define MM_PORT_SIGNAL_REMOVED   "removed"
 
 typedef struct _MMPort MMPort;
 typedef struct _MMPortClass MMPortClass;
@@ -76,6 +77,7 @@ struct _MMPortClass {
 
     /* signals */
     void (* timed_out) (MMPort *port, guint n_consecutive_replies);
+    void (* removed)   (MMPort *port);
 };
 
 GType mm_port_get_type (void);
