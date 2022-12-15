@@ -31,11 +31,19 @@
 
 G_DEFINE_TYPE (MMPortMbim, mm_port_mbim, MM_TYPE_PORT)
 
+enum {
+    SIGNAL_NOTIFICATION,
+    SIGNAL_LAST
+};
+
+static guint signals[SIGNAL_LAST] = { 0 };
+
 struct _MMPortMbimPrivate {
     gboolean    in_progress;
     MbimDevice *mbim_device;
 
     /* monitoring */
+    gulong notification_monitoring_id;
     gulong timeout_monitoring_id;
     gulong removed_monitoring_id;
 
@@ -396,6 +404,10 @@ static void
 reset_monitoring (MMPortMbim *self,
                   MbimDevice *mbim_device)
 {
+    if (self->priv->notification_monitoring_id && mbim_device) {
+        g_signal_handler_disconnect (mbim_device, self->priv->notification_monitoring_id);
+        self->priv->notification_monitoring_id = 0;
+    }
     if (self->priv->timeout_monitoring_id && mbim_device) {
         g_signal_handler_disconnect (mbim_device, self->priv->timeout_monitoring_id);
         self->priv->timeout_monitoring_id = 0;
@@ -421,12 +433,25 @@ device_removed_cb (MMPortMbim  *self)
 }
 
 static void
+notification_cb (MMPortMbim  *self,
+                 MbimMessage *notification)
+{
+    g_signal_emit (self, signals[SIGNAL_NOTIFICATION], 0, notification);
+}
+
+static void
 setup_monitoring (MMPortMbim *self,
                   MbimDevice *mbim_device)
 {
     g_assert (mbim_device);
 
     reset_monitoring (self, mbim_device);
+
+    g_assert (!self->priv->notification_monitoring_id);
+    self->priv->notification_monitoring_id = g_signal_connect_swapped (mbim_device,
+                                                                       MBIM_DEVICE_SIGNAL_INDICATE_STATUS,
+                                                                       G_CALLBACK (notification_cb),
+                                                                       self);
 
     g_assert (!self->priv->timeout_monitoring_id);
     self->priv->timeout_monitoring_id = g_signal_connect_swapped (mbim_device,
@@ -928,4 +953,13 @@ mm_port_mbim_class_init (MMPortMbimClass *klass)
 
     /* Virtual methods */
     object_class->dispose = dispose;
+
+    signals[SIGNAL_NOTIFICATION] =
+        g_signal_new (MM_PORT_MBIM_SIGNAL_NOTIFICATION,
+                      G_OBJECT_CLASS_TYPE (G_OBJECT_CLASS (klass)),
+                      G_SIGNAL_RUN_LAST,
+                      G_STRUCT_OFFSET (MMPortMbimClass, notification),
+                      NULL, NULL,
+                      g_cclosure_marshal_generic,
+                      G_TYPE_NONE, 1, MBIM_TYPE_MESSAGE);
 }

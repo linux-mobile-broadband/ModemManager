@@ -37,6 +37,8 @@
 #define MM_IS_PORT_MBIM_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_PORT_MBIM))
 #define MM_PORT_MBIM_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PORT_MBIM, MMPortMbimClass))
 
+#define MM_PORT_MBIM_SIGNAL_NOTIFICATION "notification"
+
 typedef struct _MMPortMbim MMPortMbim;
 typedef struct _MMPortMbimClass MMPortMbimClass;
 typedef struct _MMPortMbimPrivate MMPortMbimPrivate;
@@ -48,6 +50,10 @@ struct _MMPortMbim {
 
 struct _MMPortMbimClass {
     MMPortClass parent;
+
+    /* signals */
+    void (* notification) (MMPortMbim  *port,
+                           MbimMessage *notification);
 };
 
 GType mm_port_mbim_get_type (void);
