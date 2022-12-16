@@ -339,6 +339,12 @@ base_modem_internal_grab_port (MMBaseModem         *self,
     subsys = mm_kernel_device_get_subsystem (kernel_device);
     name   = mm_kernel_device_get_name      (kernel_device);
 
+    if (!self->priv->ports || (link_port && !self->priv->link_ports)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Cannot add port '%s/%s', no ports table", subsys, name);
+        return NULL;
+    }
+
     /* Check whether we already have it stored */
     key  = g_strdup_printf ("%s%s", subsys, name);
     port = g_hash_table_lookup (self->priv->ports, key);
@@ -521,6 +527,12 @@ mm_base_modem_release_link_port (MMBaseModem  *self,
     g_autofree gchar *key = NULL;
     MMPort           *port;
 
+    if (!self->priv->link_ports) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Cannot release link port '%s/%s', no link ports table", subsystem, name);
+        return FALSE;
+    }
+
     key  = g_strdup_printf ("%s%s", subsystem, name);
     port = g_hash_table_lookup (self->priv->link_ports, key);
     if (!port) {
@@ -637,6 +649,13 @@ mm_base_modem_wait_link_port (MMBaseModem         *self,
     if (!g_str_equal (subsystem, "net")) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                  "Cannot wait for port '%s/%s', unexpected link port subsystem", subsystem, name);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!self->priv->link_ports) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Cannot wait for port '%s/%s', no link ports table", subsystem, name);
         g_object_unref (task);
         return;
     }
@@ -1116,6 +1135,9 @@ mm_base_modem_has_at_port (MMBaseModem *self)
     gpointer value;
     gpointer key;
 
+    if (!self->priv->ports)
+        return FALSE;
+
     /* We'll iterate the ht of ports, looking for any port which is AT */
     g_hash_table_iter_init (&iter, self->priv->ports);
     while (g_hash_table_iter_next (&iter, &key, &value)) {
@@ -1141,6 +1163,11 @@ mm_base_modem_get_port_infos (MMBaseModem *self,
     GHashTableIter  iter;
     GArray         *port_infos;
     MMPort         *port;
+
+    if (!self->priv->ports) {
+        *n_port_infos = 0;
+        return NULL;
+    }
 
     *n_port_infos = g_hash_table_size (self->priv->ports);
     port_infos = g_array_sized_new (FALSE, FALSE, sizeof (MMModemPortInfo), *n_port_infos);
@@ -1338,6 +1365,14 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     /* If ports have already been organized, just return success */
     if (self->priv->primary)
         return TRUE;
+
+    /* Ports table is created on init and removed on dispose(), not on
+     * finalize(), so there is a chance this may happen */
+    if (!self->priv->ports) {
+        g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                             "No ports table");
+        return FALSE;
+    }
 
     g_hash_table_iter_init (&iter, self->priv->ports);
     while (g_hash_table_iter_next (&iter, NULL, (gpointer *) &candidate)) {
