@@ -86,6 +86,20 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1061", ENV{.MM_USBIFNUM}=="05", SUBS
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1061", ENV{.MM_USBIFNUM}=="06", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1061", ENV{.MM_USBIFNUM}=="07", ENV{ID_MM_PORT_IGNORE}="1"
 
+# FN990
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1070", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_TYPE_QCDM}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1070", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1070", ENV{.MM_USBIFNUM}=="04", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1070", ENV{.MM_USBIFNUM}=="05", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1070", ENV{.MM_USBIFNUM}=="06", ENV{ID_MM_PORT_IGNORE}="1"
+
+# FN990 (MBIM composition)
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1071", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_TYPE_QCDM}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1071", ENV{.MM_USBIFNUM}=="04", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1071", ENV{.MM_USBIFNUM}=="05", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1071", ENV{.MM_USBIFNUM}=="06", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1071", ENV{.MM_USBIFNUM}=="07", ENV{ID_MM_PORT_IGNORE}="1"
+
 # LE910C1 with default usb cfg
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1201", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_TYPE_QCDM}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1201", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
@@ -135,6 +149,10 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1051", ENV{ID_MM_TELIT_PORT_DELAY}="
 # LN920 initial port delay
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1060", ENV{ID_MM_TELIT_PORT_DELAY}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1061", ENV{ID_MM_TELIT_PORT_DELAY}="1"
+
+# FN990 initial port delay
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1070", ENV{ID_MM_TELIT_PORT_DELAY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1071", ENV{ID_MM_TELIT_PORT_DELAY}="1"
 
 GOTO="mm_telit_end"
 
