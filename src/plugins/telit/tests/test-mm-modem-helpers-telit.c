@@ -633,6 +633,7 @@ test_telit_parse_swpkgv_response (void)
         {"\r\n16.38.571-P0F.224700\r\nM0F.223004-B001\r\nP0F.224700\r\nA0F.223004-B001\r\n\r\nOK\r\n", "16.38.571-P0F.224700"},
         /* real example from LE910C1-EUX */
         {"\r\n25.30.224-B001-P0F.224700\r\nM0F.223004-B001\r\nP0F.224700\r\nA0F.223004-B001\r\n\r\nOK\r\n", "25.30.224-B001-P0F.224700"},
+        {"\r\n45.00.010-B022-P0R.001600\r\nM0R.010000-B022\r\nP0R.001600\r\nA0R.000000-B022\r\n\r\nOK\r\n", "45.00.010-B022-P0R.001600"},
     };
     guint i;
 
