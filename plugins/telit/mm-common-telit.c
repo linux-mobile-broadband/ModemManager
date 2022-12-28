@@ -30,9 +30,9 @@
 #define TELIT_GE910_FAMILY_PID     0x0022
 
 /* The following number of retries of the port responsiveness
- * check allows having up to 30 seconds of wait, that should
+ * check allows having up to 40 seconds of wait, that should
  * be fine for most of the modems */
-#define TELIT_PORT_CHECK_RETRIES   6
+#define TELIT_PORT_CHECK_RETRIES   8
 
 gboolean
 telit_grab_port (MMPlugin *self,
