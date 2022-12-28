@@ -141,17 +141,41 @@ load_revision_finish (MMIfaceModem *self,
 }
 
 static void
-parent_load_revision_ready (MMIfaceModem *self,
+load_revision_ready_shared (MMIfaceModem *self,
                             GAsyncResult *res,
                             GTask        *task)
 {
     GError *error = NULL;
     gchar  *revision = NULL;
 
-    revision = iface_modem_parent->load_revision_finish (self, res, &error);
+    revision = mm_shared_telit_modem_load_revision_finish (self, res, &error);
     if (!revision) {
+        /* give up */
         g_task_return_error (task, error);
         g_object_unref (task);
+        return;
+    }
+    mm_shared_telit_store_revision (MM_SHARED_TELIT (self), revision);
+    g_task_return_pointer (task, revision, g_free);
+    g_object_unref (task);
+}
+
+static void
+parent_load_revision_ready (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GTask        *task)
+{
+    gchar *revision = NULL;
+
+    revision = iface_modem_parent->load_revision_finish (self, res, NULL);
+    if (!revision || !strlen (revision)) {
+        /* Some firmware versions do not properly populate the revision in the
+         * MBIM response, so try using the AT ports */
+        g_free (revision);
+        mm_shared_telit_modem_load_revision (
+            self,
+            (GAsyncReadyCallback)load_revision_ready_shared,
+            task);
         return;
     }
     mm_shared_telit_store_revision (MM_SHARED_TELIT (self), revision);
