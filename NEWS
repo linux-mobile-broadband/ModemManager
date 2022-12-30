@@ -1,4 +1,40 @@
 
+Overview of changes in ModemManager 1.20.4
+-------------------------------------------
+
+ * build:
+   ** Don't hardcode building shared libraries, so that meson's default_library
+      option can be used properly,
+   ** po: Added missing Georgian translation in LINGUAS.
+
+ * QMI:
+   ** Fixed loading NR5G signal info.
+   ** Fixed memory leaks when processing signal info.
+   ** Correctly scaled the SNR value reported in NR5G.
+   ** Fixed invalid use-after-free actions due to improper handling of proxy
+      removal events.
+
+ * MBIM:
+   ** Fixed processing MbimSmsStatusFlag as flags, not as an enum.
+   ** Fixed invalid use-after-free actions due to improper handling of proxy
+      removal events.
+   ** Chained up device notifications through the MMPortMbim object.
+
+ * Messaging:
+   ** Allowed Delete operation during enabling/disabling.
+
+ * Core:
+   ** Don't assume port tables always exist so that long-standing operations
+      holding an object reference can finish cleanly even after the initial
+      object disposal has already been run.
+
+ * plugins:
+   ** quectel: added new firehose/sahara support udev tags in new models.
+   ** broadmobi: added MM_PLUGIN_REQUIRED_QCDM flag.
+   ** cinterion: added a delay to the ^SWWAN? command.
+   ** cinterion: added retry mechanism to the ^SWWAN? command.
+
+
 Overview of changes in ModemManager 1.20.2
 -------------------------------------------
 
