@@ -18,7 +18,7 @@ if enable_tests
     libmm_test_generated_dep
   ]
 
-  libmm_test_common = shared_library(
+  libmm_test_common = library(
     'mm-test-common',
     sources: sources,
     include_directories: top_inc,
