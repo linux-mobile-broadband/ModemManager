@@ -129,7 +129,7 @@ deps = [include_dep]
 
 libname = 'mm-glib'
 
-libmm_glib = shared_library(
+libmm_glib = library(
   libname,
   version: mm_glib_version,
   sources: sources,
