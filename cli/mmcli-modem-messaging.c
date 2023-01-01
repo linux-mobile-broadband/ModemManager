@@ -277,7 +277,9 @@ create_process_reply (MMSms        *sms,
         exit (EXIT_FAILURE);
     }
 
-    g_print ("Successfully created new SMS: %s\n", mm_sms_get_path (sms));
+    mmcli_output_string (MMC_F_MESSAGING_CREATED_SMS,  mm_sms_get_path (sms));
+    mmcli_output_dump ();
+
     g_object_unref (sms);
 }
 
