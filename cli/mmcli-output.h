@@ -179,6 +179,7 @@ typedef enum {
     /* Messaging section */
     MMC_F_MESSAGING_SUPPORTED_STORAGES,
     MMC_F_MESSAGING_DEFAULT_STORAGES,
+    MMC_F_MESSAGING_CREATED_SMS,
     /* Signal section */
     MMC_F_SIGNAL_REFRESH_RATE,
     MMC_F_SIGNAL_RSSI_THRESHOLD,

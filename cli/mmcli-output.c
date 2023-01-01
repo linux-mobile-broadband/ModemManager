@@ -169,6 +169,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_TIMEZONE_LEAP_SECONDS]                    = { "modem.time.leap-seconds",                         "leap seconds",             MMC_S_MODEM_TIMEZONE,             },
     [MMC_F_MESSAGING_SUPPORTED_STORAGES]             = { "modem.messaging.supported-storages",              "supported storages",       MMC_S_MODEM_MESSAGING,            },
     [MMC_F_MESSAGING_DEFAULT_STORAGES]               = { "modem.messaging.default-storages",                "default storages",         MMC_S_MODEM_MESSAGING,            },
+    [MMC_F_MESSAGING_CREATED_SMS]                    = { "modem.messaging.created-sms",                     "created sms",              MMC_S_MODEM_MESSAGING,            },
     [MMC_F_SIGNAL_REFRESH_RATE]                      = { "modem.signal.refresh.rate",                       "refresh rate",             MMC_S_MODEM_SIGNAL,               },
     [MMC_F_SIGNAL_RSSI_THRESHOLD]                    = { "modem.signal.threshold.rssi",                     "rssi threshold",           MMC_S_MODEM_SIGNAL,               },
     [MMC_F_SIGNAL_ERROR_RATE_THRESHOLD]              = { "modem.signal.threshold.error-rate",               "error rate threshold",     MMC_S_MODEM_SIGNAL,               },
