@@ -165,7 +165,9 @@ build-no-suspend-resume:
   - .fdo.distribution-image@ubuntu
   - .common_variables
   only:
+    - main
     - merge_requests
+    - tags
     - schedules
   script:
     - *prepare_deps
@@ -179,7 +181,9 @@ build-suspend-resume-powerd:
   - .fdo.distribution-image@ubuntu
   - .common_variables
   only:
+    - main
     - merge_requests
+    - tags
     - schedules
   script:
     - *prepare_deps
