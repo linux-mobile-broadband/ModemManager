@@ -197,6 +197,8 @@ build-single-plugins:
   - .fdo.distribution-image@ubuntu
   - .common_variables
   only:
+    - main
+    - tags
     - schedules
   script:
     - *prepare_deps
@@ -211,6 +213,8 @@ build-single-plugins-builtin:
   - .fdo.distribution-image@ubuntu
   - .common_variables
   only:
+    - main
+    - tags
     - schedules
   script:
     - *prepare_deps
