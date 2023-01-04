@@ -1722,6 +1722,254 @@ load_signal_quality (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Cell info */
+
+static GList *
+get_cell_info_finish (MMIfaceModem *self,
+                      GAsyncResult *res,
+                      GError **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+cell_info_list_free (GList *cell_info_list)
+{
+    g_list_free_full (cell_info_list, g_object_unref);
+}
+
+/* Stolen from qmicli-nas.c as mm_bcd_to_string() doesn't correctly handle
+ * special filler byte (0xF) for 2-digit MNCs.
+ * ref: Table 10.5.3/3GPP TS 24.008 */
+static gchar *
+str_from_bcd_plmn (GArray *bcd)
+{
+    static const gchar bcd_chars[] = "0123456789*#abc\0\0";
+    gchar *str;
+    guint i;
+    guint j;
+
+    if (!bcd || !bcd->len)
+        return NULL;
+
+    str = g_malloc (1 + (bcd->len * 2));
+    for (i = 0, j = 0 ; i < bcd->len; i++) {
+        str[j] = bcd_chars[g_array_index (bcd, guint8, i) & 0xF];
+        if (str[j])
+            j++;
+        str[j] = bcd_chars[(g_array_index (bcd, guint8, i) >> 4) & 0xF];
+        if (str[j])
+            j++;
+    }
+    str[j] = '\0';
+
+    return str;
+}
+
+static void
+get_cell_info_ready (QmiClientNas *client,
+                     GAsyncResult *res,
+                     GTask *task)
+{
+    QmiMessageNasGetCellLocationInfoOutput *output;
+    GError *error = NULL;
+
+    GList *list = NULL;
+
+    /* common vars */
+    GArray *operator;
+    guint32 cell_id;
+    guint16 arfcn;
+    GArray* cell_array;
+    GArray* frequency_array;
+
+    guint16 lte_tac;
+    guint16 lte_scell_id;
+    guint32 lte_timing_advance;
+
+    GArray *nr5g_tac;
+    guint64 nr5g_global_ci;
+    guint16 nr5g_pci;
+    gint16 nr5g_rsrq;
+    gint16 nr5g_rsrp;
+    gint16 nr5g_snr;
+    guint32 nr5g_arfcn;
+
+    output = qmi_client_nas_get_cell_location_info_finish (client, res, &error);
+    if (!output) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!qmi_message_nas_get_cell_location_info_output_get_result (output, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        qmi_message_nas_get_cell_location_info_output_unref (output);
+        return;
+    }
+
+    if (qmi_message_nas_get_cell_location_info_output_get_intrafrequency_lte_info_v2 (
+            output,
+            NULL /* ue in idle */,
+            &operator,
+            &lte_tac,
+            &cell_id,
+            &arfcn,
+            &lte_scell_id,
+            NULL /* cell reselect prio */,
+            NULL /* non-intra search thres */,
+            NULL /* scell low thres */,
+            NULL /* s intra search thres */,
+            &cell_array,
+            &error)) {
+        g_autofree gchar *operator_id = NULL;
+        g_autofree gchar *tac = NULL;
+        g_autofree gchar *ci = NULL;
+        guint i;
+
+        operator_id = str_from_bcd_plmn (operator);
+        /* Encoded in upper-case hexadecimal format without leading zeros, as specified in 3GPP TS 27.007. */
+        tac = g_strdup_printf ("%X", lte_tac);
+        ci = g_strdup_printf ("%X", cell_id);
+
+        for (i = 0; i < cell_array->len; i++) {
+            QmiMessageNasGetCellLocationInfoOutputIntrafrequencyLteInfoV2CellElement *element;
+            MMCellInfoLte    *lte_info;
+            g_autofree gchar *pci = NULL;
+
+            element = &g_array_index (cell_array, QmiMessageNasGetCellLocationInfoOutputIntrafrequencyLteInfoV2CellElement, i);
+            lte_info = MM_CELL_INFO_LTE (mm_cell_info_lte_new_from_dictionary (NULL));
+
+            /* valid for all cells */
+            mm_cell_info_lte_set_operator_id (lte_info, operator_id);
+            mm_cell_info_lte_set_tac (lte_info, tac);
+            mm_cell_info_lte_set_earfcn (lte_info, arfcn);
+            /* this cell */
+            pci = g_strdup_printf ("%X", element->physical_cell_id);
+            mm_cell_info_lte_set_physical_ci (lte_info, pci);
+            mm_cell_info_lte_set_rsrp (lte_info, (0.1) * ((gdouble)element->rsrp));
+            mm_cell_info_lte_set_rsrq (lte_info, (0.1) * ((gdouble)element->rsrq));
+
+            /* only for serving cell, we get details about CGI and TA */
+            if (element->physical_cell_id == lte_scell_id) {
+                mm_cell_info_set_serving (MM_CELL_INFO (lte_info), TRUE);
+                mm_cell_info_lte_set_ci (lte_info, ci);
+
+                if (qmi_message_nas_get_cell_location_info_output_get_lte_info_timing_advance (output,
+                                                                                               &lte_timing_advance,
+                                                                                               NULL)) {
+                    mm_cell_info_lte_set_timing_advance (lte_info, lte_timing_advance);
+                }
+            }
+
+            list = g_list_append (list, g_steal_pointer (&lte_info));
+        }
+    }
+
+    if (qmi_message_nas_get_cell_location_info_output_get_interfrequency_lte_info (output,
+                                                                                   NULL /* UE in idle */,
+                                                                                   &frequency_array,
+                                                                                   NULL)) {
+        guint i;
+
+        for (i = 0; i < frequency_array->len; i++) {
+            QmiMessageNasGetCellLocationInfoOutputInterfrequencyLteInfoFrequencyElement *frequency;
+            MMCellInfoLte *lte_info;
+            guint j;
+
+            frequency = &g_array_index (frequency_array, QmiMessageNasGetCellLocationInfoOutputInterfrequencyLteInfoFrequencyElement, i);
+            arfcn = frequency->eutra_absolute_rf_channel_number;
+            cell_array = frequency->cell;
+
+            for (j = 0; j < cell_array->len; j++) {
+                QmiMessageNasGetCellLocationInfoOutputInterfrequencyLteInfoFrequencyElementCellElement *cell;
+                g_autofree gchar *pci = NULL;
+
+                cell = &g_array_index (cell_array, QmiMessageNasGetCellLocationInfoOutputInterfrequencyLteInfoFrequencyElementCellElement, j);
+                lte_info = MM_CELL_INFO_LTE (mm_cell_info_lte_new_from_dictionary (NULL));
+                pci = g_strdup_printf ("%X", cell->physical_cell_id);
+
+                mm_cell_info_lte_set_earfcn (lte_info, arfcn);
+                mm_cell_info_lte_set_physical_ci (lte_info, pci);
+                mm_cell_info_lte_set_rsrp (lte_info, (0.1) * ((gdouble)cell->rsrp));
+                mm_cell_info_lte_set_rsrq (lte_info, (0.1) * ((gdouble)cell->rsrq));
+
+                list = g_list_append (list, g_steal_pointer (&lte_info));
+            }
+        }
+    }
+
+    if (qmi_message_nas_get_cell_location_info_output_get_nr5g_cell_information (output,
+                                                                                 &operator,
+                                                                                 &nr5g_tac,
+                                                                                 &nr5g_global_ci,
+                                                                                 &nr5g_pci,
+                                                                                 &nr5g_rsrq,
+                                                                                 &nr5g_rsrp,
+                                                                                 &nr5g_snr,
+                                                                                 &error)) {
+        MMCellInfoNr5g   *nr5g_info;
+        g_autofree gchar *operator_id = NULL;
+        g_autofree gchar *tac = NULL;
+        g_autofree gchar *global_ci = NULL;
+        g_autofree gchar *pci = NULL;
+
+        operator_id = str_from_bcd_plmn (operator);
+
+        g_assert (nr5g_tac->len == 3);
+        /* Encoded in upper-case hexadecimal format without leading zeros, as specified in 3GPP TS 27.007. */
+        tac = g_strdup_printf ("%X", ((((g_array_index (nr5g_tac, guint8, 0) << 8) |
+                                         g_array_index (nr5g_tac, guint8, 1)) << 8) |
+                                         g_array_index (nr5g_tac, guint8, 2)));
+        global_ci = g_strdup_printf ("%" G_GINT64_MODIFIER "X", nr5g_global_ci);
+        pci = g_strdup_printf ("%X", nr5g_pci);
+
+        nr5g_info = MM_CELL_INFO_NR5G (mm_cell_info_nr5g_new_from_dictionary (NULL));
+        mm_cell_info_set_serving (MM_CELL_INFO (nr5g_info), TRUE);
+        mm_cell_info_nr5g_set_operator_id (nr5g_info, operator_id);
+        mm_cell_info_nr5g_set_tac (nr5g_info, tac);
+        mm_cell_info_nr5g_set_ci (nr5g_info, global_ci);
+        mm_cell_info_nr5g_set_physical_ci (nr5g_info, pci);
+        mm_cell_info_nr5g_set_rsrq (nr5g_info, (0.1) * ((gdouble)nr5g_rsrq));
+        mm_cell_info_nr5g_set_rsrp (nr5g_info, (0.1) * ((gdouble)nr5g_rsrp));
+        mm_cell_info_nr5g_set_sinr (nr5g_info, (0.1) * ((gdouble)nr5g_snr));
+
+        if (qmi_message_nas_get_cell_location_info_output_get_nr5g_arfcn (output, &nr5g_arfcn, &error)) {
+            mm_cell_info_nr5g_set_nrarfcn (nr5g_info, nr5g_arfcn);
+        }
+
+        list = g_list_append (list, g_steal_pointer (&nr5g_info));
+    }
+
+    g_task_return_pointer (task, list, (GDestroyNotify)cell_info_list_free);
+    g_object_unref (task);
+    qmi_message_nas_get_cell_location_info_output_unref (output);
+}
+
+static void
+get_cell_info (MMIfaceModem        *self,
+               GAsyncReadyCallback  callback,
+               gpointer             user_data)
+{
+    QmiClient *client = NULL;
+    GTask *task;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self), QMI_SERVICE_NAS, &client, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    mm_obj_dbg (self, "getting cell info...");
+    qmi_client_nas_get_cell_location_info (QMI_CLIENT_NAS (client),
+                                           NULL,
+                                           10,
+                                           NULL,
+                                           (GAsyncReadyCallback)get_cell_info_ready,
+                                           task);
+}
+
+/*****************************************************************************/
 /* Powering up/down/off the modem (Modem interface) */
 
 typedef struct {
@@ -13241,6 +13489,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->set_current_modes_finish = mm_shared_qmi_set_current_modes_finish;
     iface->load_signal_quality = load_signal_quality;
     iface->load_signal_quality_finish = load_signal_quality_finish;
+    iface->get_cell_info = get_cell_info;
+    iface->get_cell_info_finish = get_cell_info_finish;
     iface->load_current_bands = mm_shared_qmi_load_current_bands;
     iface->load_current_bands_finish = mm_shared_qmi_load_current_bands_finish;
     iface->set_current_bands = mm_shared_qmi_set_current_bands;
