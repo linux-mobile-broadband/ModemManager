@@ -1342,10 +1342,15 @@ pin_set_enter_ready (MbimDevice *device,
         mbim_message_unref (response);
     }
 
-    if (error)
+    if (error) {
         g_task_return_error (task, error);
-    else
+    } else {
         g_task_return_boolean (task, TRUE);
+
+        /* Reset cached SIM subscriber info */
+        reset_subscriber_info (self);
+    }
+
     g_object_unref (task);
 }
 
@@ -1439,10 +1444,15 @@ puk_set_enter_ready (MbimDevice *device,
         mbim_message_unref (response);
     }
 
-    if (error)
+    if (error) {
         g_task_return_error (task, error);
-    else
+    } else {
         g_task_return_boolean (task, TRUE);
+
+        /* Reset cached SIM subscriber info */
+        reset_subscriber_info (self);
+    }
+
     g_object_unref (task);
 }
 
