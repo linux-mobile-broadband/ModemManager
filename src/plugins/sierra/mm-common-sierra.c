@@ -105,7 +105,7 @@ gcap_ready (MMPortSerialAt *port,
 {
     MMPortProbe *probe;
     SierraCustomInitContext *ctx;
-    const gchar *response;
+    g_autofree gchar *response = NULL;
     GError *error = NULL;
 
     probe = g_task_get_source_object (task);

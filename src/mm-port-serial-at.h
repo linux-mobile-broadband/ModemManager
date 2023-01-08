@@ -108,7 +108,7 @@ void         mm_port_serial_at_command        (MMPortSerialAt *self,
                                                GCancellable *cancellable,
                                                GAsyncReadyCallback callback,
                                                gpointer user_data);
-const gchar *mm_port_serial_at_command_finish (MMPortSerialAt *self,
+gchar *mm_port_serial_at_command_finish       (MMPortSerialAt *self,
                                                GAsyncResult *res,
                                                GError **error);
 

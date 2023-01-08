@@ -158,7 +158,7 @@ response_ready (MMPortSerialAt *port,
 {
     CustomInitContext *ctx;
     MMPortProbe       *probe;
-    const gchar       *response;
+    g_autofree gchar  *response = NULL;
     GError            *error = NULL;
     gchar             *lower;
     DellManufacturer   manufacturer;

@@ -49,10 +49,11 @@ nwdmat_ready (MMPortSerialAt *port,
 {
     g_autoptr(GError)  error = NULL;
     MMPortProbe       *probe;
+    g_autofree gchar  *response = NULL;
 
     probe = g_task_get_source_object (task);
 
-    mm_port_serial_at_command_finish (port, res, &error);
+    response = mm_port_serial_at_command_finish (port, res, &error);
     if (error) {
         if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
             custom_init_step (task);

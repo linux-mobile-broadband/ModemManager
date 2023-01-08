@@ -340,24 +340,15 @@ at_command_to_byte_array (const char *command, gboolean is_raw, gboolean send_lf
     return buf;
 }
 
-const gchar *
+gchar *
 mm_port_serial_at_command_finish (MMPortSerialAt *self,
                                   GAsyncResult *res,
                                   GError **error)
 {
-    GString *str;
-
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
 
-    str = (GString *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    return str->str;
-}
-
-static void
-string_free (GString *str)
-{
-    g_string_free (str, TRUE);
+    return (gchar *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
 }
 
 static void
@@ -368,6 +359,7 @@ serial_command_ready (MMPortSerial *port,
     GByteArray *response_buffer;
     GError *error = NULL;
     GString *response;
+    gchar *str;
 
     response_buffer = mm_port_serial_command_finish (port, res, &error);
     if (!response_buffer) {
@@ -384,9 +376,8 @@ serial_command_ready (MMPortSerial *port,
         g_byte_array_remove_range (response_buffer, 0, response_buffer->len);
     g_byte_array_unref (response_buffer);
 
-    g_simple_async_result_set_op_res_gpointer (simple,
-                                               response,
-                                               (GDestroyNotify)string_free);
+    str = g_string_free (response, FALSE);
+    g_simple_async_result_set_op_res_gpointer (simple, str, g_free);
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
 }

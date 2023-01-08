@@ -160,7 +160,7 @@ at_sequence_parse_response (MMPortSerialAt    *port,
     GVariant                             *result = NULL;
     GError                               *result_error = NULL;
     GSimpleAsyncResult                   *simple;
-    const gchar                          *response;
+    g_autofree gchar                     *response = NULL;
     GError                               *error = NULL;
 
     response = mm_port_serial_at_command_finish (port, res, &error);
@@ -513,7 +513,7 @@ at_command_ready (MMPortSerialAt *port,
                   GAsyncResult *res,
                   AtCommandContext *ctx)
 {
-    const gchar *response;
+    gchar *response;
     GError *error = NULL;
 
     response = mm_port_serial_at_command_finish (port, res, &error);
@@ -530,7 +530,7 @@ at_command_ready (MMPortSerialAt *port,
         g_simple_async_result_take_error (ctx->result, error);
     /* Valid string response */
     else if (response)
-        g_simple_async_result_set_op_res_gpointer (ctx->result, (gchar *)response, NULL);
+        g_simple_async_result_set_op_res_gpointer (ctx->result, response, g_free);
     else
         g_assert_not_reached ();
 

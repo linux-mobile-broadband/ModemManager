@@ -80,7 +80,7 @@ sqport_ready (MMPortSerialAt *port,
               GTask          *task)
 {
     MMPortProbe *probe;
-    const gchar *response;
+    g_autofree gchar *response = NULL;
 
     probe = g_task_get_source_object (task);
 

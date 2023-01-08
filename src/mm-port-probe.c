@@ -994,7 +994,7 @@ serial_probe_at_parse_response (MMPortSerialAt *port,
 {
     GVariant            *result = NULL;
     GError              *result_error = NULL;
-    const gchar         *response = NULL;
+    g_autofree gchar    *response = NULL;
     GError              *error = NULL;
     PortProbeRunContext *ctx;
 

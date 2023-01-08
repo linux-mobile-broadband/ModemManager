@@ -151,10 +151,11 @@ quick_at_ready (MMPortSerialAt *port,
 {
     MMPortProbe       *probe;
     g_autoptr(GError)  error = NULL;
+    g_autofree gchar  *response = NULL;
 
     probe = g_task_get_source_object (task);
 
-    mm_port_serial_at_command_finish (port, res, &error);
+    response = mm_port_serial_at_command_finish (port, res, &error);
     if (error) {
         /* On a timeout error, wait for READY URC */
         if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {

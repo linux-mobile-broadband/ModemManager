@@ -110,8 +110,8 @@ static void
 at_command_ready (MMPortSerialAt *serial_at,
                   GAsyncResult   *res)
 {
-    const gchar *response;
-    GError      *error = NULL;
+    g_autofree gchar *response = NULL;
+    GError           *error = NULL;
 
     response = mm_port_serial_at_command_finish (serial_at, res, &error);
     if (response)

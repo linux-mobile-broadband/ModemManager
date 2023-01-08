@@ -63,10 +63,10 @@ gmr_ready (MMPortSerialAt *port,
            GAsyncResult   *res,
            GTask          *task)
 {
-    MMPortProbe *probe;
-    const gchar *p;
-    const gchar *response;
-    GError      *error = NULL;
+    MMPortProbe      *probe;
+    const gchar      *p;
+    g_autofree gchar *response = NULL;
+    GError           *error = NULL;
 
     probe = g_task_get_source_object (task);
 

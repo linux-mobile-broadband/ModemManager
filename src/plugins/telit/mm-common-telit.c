@@ -185,7 +185,7 @@ getportcfg_ready (MMPortSerialAt *port,
                   GAsyncResult *res,
                   GTask *task)
 {
-    const gchar *response;
+    g_autofree gchar *response = NULL;
     GError *error = NULL;
     MMPortProbe *probe;
     TelitCustomInitContext *ctx;

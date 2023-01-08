@@ -104,7 +104,7 @@ getportmode_ready (MMPortSerialAt *port,
     MMDevice                *device;
     MMPortProbe             *probe;
     HuaweiCustomInitContext *ctx;
-    const gchar             *response;
+    g_autofree gchar        *response = NULL;
     GArray                  *modes;
     g_autoptr(GError)        error = NULL;
 

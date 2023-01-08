@@ -61,7 +61,7 @@ gmr_ready (MMPortSerialAt *port,
 {
     MMPortProbe *probe;
     const gchar *p;
-    const gchar *response;
+    g_autofree gchar *response = NULL;
 
     probe = g_task_get_source_object (task);
 
