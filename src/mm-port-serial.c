@@ -117,9 +117,6 @@ struct _MMPortSerialPrivate {
 /* Command */
 
 typedef struct {
-    MMPortSerial *self;
-    GSimpleAsyncResult *result;
-    GCancellable *cancellable;
     GByteArray *command;
     guint32 timeout;
     gboolean allow_cached;
@@ -131,17 +128,9 @@ typedef struct {
 } CommandContext;
 
 static void
-command_context_complete_and_free (CommandContext *ctx, gboolean idle)
+command_context_free (CommandContext *ctx)
 {
-    if (idle)
-        g_simple_async_result_complete_in_idle (ctx->result);
-    else
-        g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
     g_byte_array_unref (ctx->command);
-    if (ctx->cancellable)
-        g_object_unref (ctx->cancellable);
-    g_object_unref (ctx->self);
     g_slice_free (CommandContext, ctx);
 }
 
@@ -150,10 +139,7 @@ mm_port_serial_command_finish (MMPortSerial *self,
                                GAsyncResult *res,
                                GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return g_byte_array_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 void
@@ -167,21 +153,20 @@ mm_port_serial_command (MMPortSerial *self,
                         gpointer user_data)
 {
     CommandContext *ctx;
+    GTask *task;
 
     g_return_if_fail (MM_IS_PORT_SERIAL (self));
     g_return_if_fail (command != NULL);
 
     /* Setup command context */
     ctx = g_slice_new0 (CommandContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_port_serial_command);
+
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)command_context_free);
+
     ctx->command = g_byte_array_ref (command);
     ctx->allow_cached = allow_cached;
     ctx->timeout = timeout_seconds;
-    ctx->cancellable = (cancellable ? g_object_ref (cancellable) : NULL);
 
     /* Only accept about 3 seconds of EAGAIN for this command */
     if (self->priv->send_delay && mm_port_get_subsys (MM_PORT (self)) == MM_PORT_SUBSYS_TTY)
@@ -190,11 +175,11 @@ mm_port_serial_command (MMPortSerial *self,
         ctx->eagain_count = 1000;
 
     if (self->priv->open_count == 0) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_SERIAL_ERROR,
-                                         MM_SERIAL_ERROR_SEND_FAILED,
-                                         "Sending command failed: device is not open");
-        command_context_complete_and_free (ctx, TRUE);
+        g_task_return_new_error (task,
+                                 MM_SERIAL_ERROR,
+                                 MM_SERIAL_ERROR_SEND_FAILED,
+                                 "Sending command failed: device is not open");
+        g_object_unref (task);
         return;
     }
 
@@ -205,9 +190,9 @@ mm_port_serial_command (MMPortSerial *self,
     /* If requested to run next, push to the head of the queue so that it really is
      * the next one sent */
     if (run_next)
-        g_queue_push_head (self->priv->queue, ctx);
+        g_queue_push_head (self->priv->queue, task);
     else
-        g_queue_push_tail (self->priv->queue, ctx);
+        g_queue_push_tail (self->priv->queue, task);
 
     if (g_queue_get_length (self->priv->queue) == 1)
         port_serial_schedule_queue_process (self, 0);
@@ -708,7 +693,7 @@ port_serial_schedule_queue_process (MMPortSerial *self, guint timeout_ms)
 static void
 port_serial_got_response (MMPortSerial *self,
                           GByteArray   *parsed_response,
-                          const GError *error)
+                          GError *error)
 {
     /* Either one or the other, not both */
     g_assert ((parsed_response && !error) || (!parsed_response && error));
@@ -733,30 +718,32 @@ port_serial_got_response (MMPortSerial *self,
      * setup runs. */
     g_object_ref (self);
     {
-        CommandContext *ctx;
+        GTask *task;
 
-        ctx = (CommandContext *) g_queue_pop_head (self->priv->queue);
-        if (ctx) {
+        task = g_queue_pop_head (self->priv->queue);
+        if (task) {
             /* Complete the command context with the appropriate result */
-            if (error)
-                g_simple_async_result_set_from_error (ctx->result, error);
-            else {
+            if (error) {
+		g_task_return_error (task, g_steal_pointer (&error));
+	    } else {
+                CommandContext *ctx;
+
+		ctx = g_task_get_task_data (task);
                 if (ctx->allow_cached)
                     port_serial_set_cached_reply (self, ctx->command, parsed_response);
-                g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                           g_byte_array_ref (parsed_response),
-                                                           (GDestroyNotify) g_byte_array_unref);
+                g_task_return_pointer (task,
+                                       g_byte_array_ref (parsed_response),
+                                       (GDestroyNotify) g_byte_array_unref);
             }
 
-            /* Don't complete in idle. We need the caller remove the response range which
-             * was processed, and that must be done before processing any new queued command */
-            command_context_complete_and_free (ctx, FALSE);
+	    g_object_unref (task);
         }
 
         if (!g_queue_is_empty (self->priv->queue))
             port_serial_schedule_queue_process (self, 0);
     }
     g_object_unref (self);
+    g_clear_error (&error);
 }
 
 static gboolean
@@ -788,8 +775,6 @@ port_serial_timed_out (gpointer data)
     }
     g_object_unref (self);
 
-    g_error_free (error);
-
     return G_SOURCE_REMOVE;
 }
 
@@ -809,7 +794,6 @@ port_serial_response_wait_cancelled (GCancellable *cancellable,
                                  "Waiting for the reply cancelled");
     /* Note: may complete last operation and unref the MMPortSerial */
     port_serial_got_response (self, NULL, error);
-    g_error_free (error);
 }
 
 static gboolean
@@ -817,13 +801,16 @@ port_serial_queue_process (gpointer data)
 {
     MMPortSerial *self = MM_PORT_SERIAL (data);
     CommandContext *ctx;
+    GTask *task;
+    GCancellable *cancellable;
     GError *error = NULL;
 
     self->priv->queue_id = 0;
 
-    ctx = (CommandContext *) g_queue_peek_head (self->priv->queue);
-    if (!ctx)
+    task = g_queue_peek_head (self->priv->queue);
+    if (!task)
         return G_SOURCE_REMOVE;
+    ctx = g_task_get_task_data (task);
 
     if (ctx->allow_cached) {
         const GByteArray *cached;
@@ -847,7 +834,6 @@ port_serial_queue_process (gpointer data)
     if (!port_serial_process_command (self, ctx, &error)) {
         /* Note: may complete last operation and unref the MMPortSerial */
         port_serial_got_response (self, NULL, error);
-        g_error_free (error);
         return G_SOURCE_REMOVE;
     }
 
@@ -861,10 +847,11 @@ port_serial_queue_process (gpointer data)
     }
 
     /* Setup the cancellable so that we can stop waiting for a response */
-    if (ctx->cancellable) {
+    cancellable = g_task_get_cancellable (task);
+    if (cancellable) {
         gulong cancellable_id;
 
-        self->priv->cancellable = g_object_ref (ctx->cancellable);
+        self->priv->cancellable = g_object_ref (cancellable);
 
         /* If the GCancellable is already cancelled here, the callback will be
          * called right away, and a GError will be propagated as response. In
@@ -873,7 +860,7 @@ port_serial_queue_process (gpointer data)
          * So, use an intermediate variable to store the cancellable id, and
          * just return without further processing if we're already cancelled.
          */
-        cancellable_id = g_cancellable_connect (ctx->cancellable,
+        cancellable_id = g_cancellable_connect (cancellable,
                                                 (GCallback)port_serial_response_wait_cancelled,
                                                 self,
                                                 NULL);
@@ -930,7 +917,6 @@ parse_response_buffer (MMPortSerial *self)
         self->priv->n_consecutive_timeouts = 0;
         /* Note: may complete last operation and unref the MMPortSerial */
         port_serial_got_response (self, NULL, error);
-        g_error_free (error);
         break;
     case MM_PORT_SERIAL_RESPONSE_NONE:
         /* Nothing to do this time */
@@ -948,6 +934,7 @@ common_input_available (MMPortSerial *self,
     gsize bytes_read;
     GIOStatus status = G_IO_STATUS_NORMAL;
     CommandContext *ctx;
+    GTask *task;
     GError *error = NULL;
     gboolean iterate = TRUE;
     gboolean keep_source = G_SOURCE_CONTINUE;
@@ -967,7 +954,8 @@ common_input_available (MMPortSerial *self,
     }
 
     /* Don't read any input if the current command isn't done being sent yet */
-    ctx = g_queue_peek_nth (self->priv->queue, 0);
+    task = g_queue_peek_nth (self->priv->queue, 0);
+    ctx = task ? g_task_get_task_data (task) : NULL;
     if (ctx && (ctx->started == TRUE) && (ctx->done == FALSE))
         return G_SOURCE_CONTINUE;
 
@@ -1438,14 +1426,14 @@ _close_internal (MMPortSerial *self, gboolean force)
 
     /* Clear the command queue */
     for (i = 0; i < g_queue_get_length (self->priv->queue); i++) {
-        CommandContext *ctx;
+        GTask *task;
 
-        ctx = g_queue_peek_nth (self->priv->queue, i);
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_SERIAL_ERROR,
-                                         MM_SERIAL_ERROR_SEND_FAILED,
-                                         "Serial port is now closed");
-        command_context_complete_and_free (ctx, TRUE);
+        task = g_queue_peek_nth (self->priv->queue, i);
+        g_task_return_new_error (task,
+                                 MM_SERIAL_ERROR,
+                                 MM_SERIAL_ERROR_SEND_FAILED,
+                                 "Serial port is now closed");
+        g_object_unref (task);
     }
     g_queue_clear (self->priv->queue);
 
