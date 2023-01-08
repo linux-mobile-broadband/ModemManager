@@ -22,20 +22,16 @@
 #include "mm-errors-types.h"
 
 static gboolean
-abort_async_if_port_unusable (MMBaseModem *self,
-                              MMPortSerialAt *port,
-                              GAsyncReadyCallback callback,
-                              gpointer user_data)
+abort_task_if_port_unusable (MMBaseModem *self,
+                             MMPortSerialAt *port,
+                             GTask *task)
 {
     GError *error = NULL;
     gboolean init_sequence_enabled = FALSE;
 
     /* If no port given, probably the port disappeared */
     if (!port) {
-        g_simple_async_report_error_in_idle (
-            G_OBJECT (self),
-            callback,
-            user_data,
+        g_task_return_new_error (task,
             MM_CORE_ERROR,
             MM_CORE_ERROR_NOT_FOUND,
             "Cannot run sequence: port not given");
@@ -44,10 +40,7 @@ abort_async_if_port_unusable (MMBaseModem *self,
 
     /* Ensure we don't try to use a connected port */
     if (mm_port_get_connected (MM_PORT (port))) {
-        g_simple_async_report_error_in_idle (
-            G_OBJECT (self),
-            callback,
-            user_data,
+        g_task_return_new_error (task,
             MM_CORE_ERROR,
             MM_CORE_ERROR_CONNECTED,
             "Cannot run sequence: port is connected");
@@ -61,10 +54,7 @@ abort_async_if_port_unusable (MMBaseModem *self,
 
     /* Ensure we have a port open during the sequence */
     if (!mm_port_serial_open (MM_PORT_SERIAL (port), &error)) {
-        g_simple_async_report_error_in_idle (
-            G_OBJECT (self),
-            callback,
-            user_data,
+        g_task_return_new_error (task,
             MM_CORE_ERROR,
             MM_CORE_ERROR_CONNECTED,
             "Cannot run sequence: '%s'",
@@ -90,15 +80,11 @@ modem_cancellable_cancelled (GCancellable *modem_cancellable,
 /* AT sequence handling */
 
 typedef struct {
-    MMBaseModem                *self;
     MMPortSerialAt             *port;
-    GCancellable               *cancellable;
     gulong                      cancelled_id;
     GCancellable               *modem_cancellable;
-    GCancellable               *user_cancellable;
     const MMBaseModemAtCommand *current;
     const MMBaseModemAtCommand *sequence;
-    GSimpleAsyncResult         *simple;
     gpointer                    response_processor_context;
     GDestroyNotify              response_processor_context_free;
     GVariant                   *result;
@@ -109,24 +95,19 @@ at_sequence_context_free (AtSequenceContext *ctx)
 {
     mm_port_serial_close (MM_PORT_SERIAL (ctx->port));
     g_object_unref (ctx->port);
-    g_object_unref (ctx->self);
 
     if (ctx->response_processor_context &&
         ctx->response_processor_context_free)
         ctx->response_processor_context_free (ctx->response_processor_context);
 
-    if (ctx->cancelled_id)
+    if (ctx->modem_cancellable) {
         g_cancellable_disconnect (ctx->modem_cancellable,
                                   ctx->cancelled_id);
-    if (ctx->user_cancellable)
-        g_object_unref (ctx->user_cancellable);
-    g_object_unref (ctx->modem_cancellable);
-    g_object_unref (ctx->cancellable);
+        g_object_unref (ctx->modem_cancellable);
+    }
 
     if (ctx->result)
         g_variant_unref (ctx->result);
-    if (ctx->simple)
-        g_object_unref (ctx->simple);
     g_free (ctx);
 }
 
@@ -136,51 +117,54 @@ mm_base_modem_at_sequence_full_finish (MMBaseModem   *self,
                                        gpointer      *response_processor_context,
                                        GError       **error)
 {
-    AtSequenceContext *ctx;
+    GTask *task;
+    GVariant *result;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
+    task = G_TASK (res);
+    result = g_task_propagate_pointer (task, error);
 
-    ctx = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    if (response_processor_context)
+    if (response_processor_context && !g_task_had_error (task)) {
+        AtSequenceContext *ctx;
+
+        ctx = g_task_get_task_data (task);
+
         /* transfer none, no need to free the context ourselves, if
          * we gave a response_processor_context_free callback */
         *response_processor_context = ctx->response_processor_context;
+    }
 
     /* transfer-none! (so that we can ignore it) */
-    return ctx->result;
+    return result;
 }
 
 static void
 at_sequence_parse_response (MMPortSerialAt    *port,
                             GAsyncResult      *res,
-                            AtSequenceContext *ctx)
+                            GTask             *task)
 {
     MMBaseModemAtResponseProcessorResult  processor_result;
     GVariant                             *result = NULL;
     GError                               *result_error = NULL;
-    GSimpleAsyncResult                   *simple;
+    AtSequenceContext                    *ctx;
     g_autofree gchar                     *response = NULL;
     GError                               *error = NULL;
 
     response = mm_port_serial_at_command_finish (port, res, &error);
 
     /* Cancelled? */
-    if (g_cancellable_is_cancelled (ctx->cancellable)) {
-        g_simple_async_result_set_error (ctx->simple, G_IO_ERROR, G_IO_ERROR_CANCELLED, "AT sequence was cancelled");
-        g_clear_error (&error);
-        g_simple_async_result_complete (ctx->simple);
-        at_sequence_context_free (ctx);
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
         return;
     }
 
+    ctx = g_task_get_task_data (task);
     if (!ctx->current->response_processor)
         processor_result = MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
     else {
         const MMBaseModemAtCommand *next = ctx->current + 1;
 
         /* Response processor will tell us if we need to keep on the sequence */
-        processor_result = ctx->current->response_processor (ctx->self,
+        processor_result = ctx->current->response_processor (g_task_get_source_object (task),
                                                              ctx->response_processor_context,
                                                              ctx->current->command,
                                                              response,
@@ -198,9 +182,8 @@ at_sequence_parse_response (MMPortSerialAt    *port,
             case MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE:
                 /* On failure, complete with error right away */
                 g_assert (!result && result_error); /* result is optional */
-                g_simple_async_result_take_error (ctx->simple, result_error);
-                g_simple_async_result_complete (ctx->simple);
-                at_sequence_context_free (ctx);
+                g_task_return_error (task, result_error);
+                g_object_unref (task);
                 if (error)
                     g_error_free (error);
                 return;
@@ -222,9 +205,9 @@ at_sequence_parse_response (MMPortSerialAt    *port,
                 ctx->current->timeout,
                 FALSE,
                 ctx->current->allow_cached,
-                ctx->cancellable,
+                g_task_get_cancellable (task),
                 (GAsyncReadyCallback)at_sequence_parse_response,
-                ctx);
+                task);
             return;
         }
         /* On last command, end. */
@@ -235,20 +218,60 @@ at_sequence_parse_response (MMPortSerialAt    *port,
         /* transfer-full */
         ctx->result = result;
 
-    /* Set the whole context as result, in order to pass the response
-     * processor context during finish(). We do remove the simple async result
-     * from the context as well, so that we control its last unref. */
-    simple = ctx->simple;
-    ctx->simple = NULL;
-    g_simple_async_result_set_op_res_gpointer (
-        simple,
-        ctx,
-        (GDestroyNotify)at_sequence_context_free);
+    /* transfer-none, the result remains owned by the GTask context */
+    g_task_return_pointer (task, ctx->result, NULL);
+    g_object_unref (task);
+}
 
-    /* And complete. The whole context is owned by the result, and it will
-     * be freed when completed. */
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+static void
+at_sequence_common (MMBaseModem                *self,
+                    MMPortSerialAt             *port,
+                    const MMBaseModemAtCommand *sequence,
+                    gpointer                    response_processor_context,
+                    GDestroyNotify              response_processor_context_free,
+                    GTask                      *task,
+                    GCancellable               *modem_cancellable)
+{
+    AtSequenceContext *ctx;
+
+    /* Ensure that we have an open port */
+    if (!abort_task_if_port_unusable (self, port, task)) {
+        g_object_unref (task);
+        return;
+    }
+
+    /* Setup context */
+    ctx = g_new0 (AtSequenceContext, 1);
+    ctx->port = g_object_ref (port);
+    ctx->current = ctx->sequence = sequence;
+    ctx->response_processor_context = response_processor_context;
+    ctx->response_processor_context_free = response_processor_context_free;
+
+    /* Ensure the cancellable that's already associated with the modem
+     * will also get cancelled if the modem wide-one gets cancelled */
+    if (modem_cancellable) {
+        GCancellable *user_cancellable;
+
+        user_cancellable = g_task_get_cancellable (task);
+        ctx->modem_cancellable = g_object_ref (modem_cancellable);
+        ctx->cancelled_id = g_cancellable_connect (ctx->modem_cancellable,
+                                                   G_CALLBACK (modem_cancellable_cancelled),
+                                                   user_cancellable,
+                                                   NULL);
+    }
+
+    g_task_set_task_data (task, ctx, (GDestroyNotify)at_sequence_context_free);
+
+    /* Go on with the first one in the sequence */
+    mm_port_serial_at_command (
+        ctx->port,
+        ctx->current->command,
+        ctx->current->timeout,
+        FALSE,
+        ctx->current->allow_cached,
+        g_task_get_cancellable (task),
+        (GAsyncReadyCallback)at_sequence_parse_response,
+        task);
 }
 
 void
@@ -261,50 +284,22 @@ mm_base_modem_at_sequence_full (MMBaseModem                *self,
                                 GAsyncReadyCallback         callback,
                                 gpointer                    user_data)
 {
-    AtSequenceContext *ctx;
+    GCancellable *modem_cancellable;
+    GTask *task;
 
-    /* Ensure that we have an open port */
-    if (!abort_async_if_port_unusable (self, port, callback, user_data))
-        return;
+    modem_cancellable = mm_base_modem_peek_cancellable (self);
+    task = g_task_new (self,
+                       cancellable ? cancellable : modem_cancellable,
+                       callback,
+                       user_data);
 
-    /* Setup context */
-    ctx = g_new0 (AtSequenceContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->port = g_object_ref (port);
-    ctx->simple = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_base_modem_at_sequence_full);
-    ctx->current = ctx->sequence = sequence;
-    ctx->response_processor_context = response_processor_context;
-    ctx->response_processor_context_free = response_processor_context_free;
-
-    /* Setup cancellables */
-    ctx->modem_cancellable = mm_base_modem_get_cancellable (self);
-    ctx->user_cancellable = cancellable ? g_object_ref (cancellable) : NULL;
-    if (!ctx->user_cancellable)
-        /* Just the modem-wide one, use it directly */
-        ctx->cancellable = g_object_ref (ctx->modem_cancellable);
-    else {
-        /* Use the user provided one, which will also get cancelled if the modem
-         * wide-one gets cancelled */
-        ctx->cancellable = g_object_ref (ctx->user_cancellable);
-        ctx->cancelled_id = g_cancellable_connect (ctx->modem_cancellable,
-                                                   G_CALLBACK (modem_cancellable_cancelled),
-                                                   ctx->user_cancellable,
-                                                   NULL);
-    }
-
-    /* Go on with the first one in the sequence */
-    mm_port_serial_at_command (
-        ctx->port,
-        ctx->current->command,
-        ctx->current->timeout,
-        FALSE,
-        ctx->current->allow_cached,
-        ctx->cancellable,
-        (GAsyncReadyCallback)at_sequence_parse_response,
-        ctx);
+    at_sequence_common (self,
+                        port,
+                        sequence,
+                        response_processor_context,
+                        response_processor_context_free,
+                        task,
+                        cancellable ? modem_cancellable : NULL);
 }
 
 GVariant *
@@ -330,27 +325,29 @@ mm_base_modem_at_sequence (MMBaseModem *self,
 {
     MMPortSerialAt *port;
     GError *error = NULL;
+    GTask *task;
+
+    task = g_task_new (self,
+                       mm_base_modem_peek_cancellable (self),
+                       callback,
+                       user_data);
 
     /* No port given, so we'll try to guess which is best */
     port = mm_base_modem_peek_best_at_port (self, &error);
     if (!port) {
         g_assert (error != NULL);
-        g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
-                                                   callback,
-                                                   user_data,
-                                                   error);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
-    mm_base_modem_at_sequence_full (
-        self,
-        port,
-        sequence,
-        response_processor_context,
-        response_processor_context_free,
-        NULL,
-        callback,
-        user_data);
+    at_sequence_common (self,
+                        port,
+                        sequence,
+                        response_processor_context,
+                        response_processor_context_free,
+                        task,
+                        NULL);
 }
 
 /*****************************************************************************/
@@ -469,13 +466,10 @@ mm_base_modem_response_processor_string_ignore_at_errors (MMBaseModem   *self,
 /* Single AT command handling */
 
 typedef struct {
-    MMBaseModem *self;
     MMPortSerialAt *port;
-    GCancellable *cancellable;
     gulong cancelled_id;
     GCancellable *modem_cancellable;
-    GCancellable *user_cancellable;
-    GSimpleAsyncResult *result;
+    gchar *response;
 } AtCommandContext;
 
 static void
@@ -483,17 +477,14 @@ at_command_context_free (AtCommandContext *ctx)
 {
     mm_port_serial_close (MM_PORT_SERIAL (ctx->port));
 
-    if (ctx->cancelled_id)
+    if (ctx->modem_cancellable) {
         g_cancellable_disconnect (ctx->modem_cancellable,
                                   ctx->cancelled_id);
-    if (ctx->user_cancellable)
-        g_object_unref (ctx->user_cancellable);
-    g_object_unref (ctx->modem_cancellable);
-    g_object_unref (ctx->cancellable);
+        g_object_unref (ctx->modem_cancellable);
+    }
 
     g_object_unref (ctx->port);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
+    g_free (ctx->response);
     g_free (ctx);
 }
 
@@ -502,41 +493,86 @@ mm_base_modem_at_command_full_finish (MMBaseModem *self,
                                       GAsyncResult *res,
                                       GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 at_command_ready (MMPortSerialAt *port,
                   GAsyncResult *res,
-                  AtCommandContext *ctx)
+                 GTask *task)
 {
-    gchar *response;
+    AtCommandContext *ctx;
     GError *error = NULL;
 
-    response = mm_port_serial_at_command_finish (port, res, &error);
+    ctx = g_task_get_task_data (task);
+
+    g_assert (!ctx->response);
+    ctx->response = mm_port_serial_at_command_finish (port, res, &error);
 
     /* Cancelled? */
-    if (g_cancellable_is_cancelled (ctx->cancellable)) {
-        g_simple_async_result_set_error (ctx->result, G_IO_ERROR, G_IO_ERROR_CANCELLED,
-                                         "AT command was cancelled");
+    if (g_task_return_error_if_cancelled (task)) {
         if (error)
             g_error_free (error);
     }
     /* Error coming from the serial port? */
     else if (error)
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
     /* Valid string response */
-    else if (response)
-        g_simple_async_result_set_op_res_gpointer (ctx->result, response, g_free);
+    else if (ctx->response)
+        /* transfer-none, the response remains owned by the GTask context */
+        g_task_return_pointer (task, ctx->response, NULL);
     else
         g_assert_not_reached ();
 
-    /* Never in idle! */
-    g_simple_async_result_complete (ctx->result);
-    at_command_context_free (ctx);
+    g_object_unref (task);
+}
+
+static void
+at_command_common (MMBaseModem *self,
+                   MMPortSerialAt *port,
+                   const gchar *command,
+                   guint timeout,
+                   gboolean allow_cached,
+                   gboolean is_raw,
+                   GTask *task,
+                   GCancellable *modem_cancellable)
+{
+    AtCommandContext *ctx;
+
+    /* Ensure that we have an open port */
+    if (!abort_task_if_port_unusable (self, port, task)) {
+        g_object_unref (task);
+        return;
+    }
+
+    ctx = g_new0 (AtCommandContext, 1);
+    ctx->port = g_object_ref (port);
+
+    /* Ensure the cancellable that's already associated with the modem
+     * will also get cancelled if the modem wide-one gets cancelled */
+    if (modem_cancellable) {
+        GCancellable *user_cancellable;
+
+        user_cancellable = g_task_get_cancellable (task);
+        ctx->modem_cancellable = g_object_ref (modem_cancellable);
+        ctx->cancelled_id = g_cancellable_connect (ctx->modem_cancellable,
+                                                   G_CALLBACK (modem_cancellable_cancelled),
+                                                   user_cancellable,
+                                                   NULL);
+    }
+
+    g_task_set_task_data (task, ctx, (GDestroyNotify)at_command_context_free);
+
+    /* Go on with the command */
+    mm_port_serial_at_command (
+        port,
+        command,
+        timeout,
+        is_raw,
+        allow_cached,
+        g_task_get_cancellable (task),
+        (GAsyncReadyCallback)at_command_ready,
+        task);
 }
 
 void
@@ -550,46 +586,23 @@ mm_base_modem_at_command_full (MMBaseModem *self,
                                GAsyncReadyCallback callback,
                                gpointer user_data)
 {
-    AtCommandContext *ctx;
+    GCancellable *modem_cancellable;
+    GTask *task;
 
-    /* Ensure that we have an open port */
-    if (!abort_async_if_port_unusable (self, port, callback, user_data))
-        return;
+    modem_cancellable = mm_base_modem_peek_cancellable (self);
+    task = g_task_new (self,
+                       cancellable ? cancellable : modem_cancellable,
+                       callback,
+                       user_data);
 
-    ctx = g_new0 (AtCommandContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->port = g_object_ref (port);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_base_modem_at_command_full);
-
-    /* Setup cancellables */
-    ctx->modem_cancellable = mm_base_modem_get_cancellable (self);
-    ctx->user_cancellable = cancellable ? g_object_ref (cancellable) : NULL;
-    if (!ctx->user_cancellable)
-        /* Just the modem-wide one, use it directly */
-        ctx->cancellable = g_object_ref (ctx->modem_cancellable);
-    else {
-        /* Use the user provided one, which will also get cancelled if the modem
-         * wide-one gets cancelled */
-        ctx->cancellable = g_object_ref (ctx->user_cancellable);
-        ctx->cancelled_id = g_cancellable_connect (ctx->modem_cancellable,
-                                                   G_CALLBACK (modem_cancellable_cancelled),
-                                                   ctx->user_cancellable,
-                                                   NULL);
-    }
-
-    /* Go on with the command */
-    mm_port_serial_at_command (
-        port,
-        command,
-        timeout,
-        is_raw,
-        allow_cached,
-        ctx->cancellable,
-        (GAsyncReadyCallback)at_command_ready,
-        ctx);
+    at_command_common (self,
+                       port,
+                       command,
+                       timeout,
+                       allow_cached,
+                       is_raw,
+                       task,
+                       cancellable ? modem_cancellable : NULL);
 }
 
 const gchar *
@@ -611,27 +624,30 @@ _at_command (MMBaseModem *self,
 {
     MMPortSerialAt *port;
     GError *error = NULL;
+    GTask *task;
+
+    task = g_task_new (self,
+                       mm_base_modem_peek_cancellable (self),
+                       callback,
+                       user_data);
 
     /* No port given, so we'll try to guess which is best */
     port = mm_base_modem_peek_best_at_port (self, &error);
     if (!port) {
         g_assert (error != NULL);
-        g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
-                                                   callback,
-                                                   user_data,
-                                                   error);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
-    mm_base_modem_at_command_full (self,
-                                   port,
-                                   command,
-                                   timeout,
-                                   allow_cached,
-                                   is_raw,
-                                   NULL,
-                                   callback,
-                                   user_data);
+    at_command_common (self,
+                       port,
+                       command,
+                       timeout,
+                       allow_cached,
+                       is_raw,
+                       task,
+                       NULL);
 }
 
 void
