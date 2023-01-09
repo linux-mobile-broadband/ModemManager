@@ -53,7 +53,10 @@ plugins_incs = [
   plugins_inc,
 ]
 
-plugins_deps = [libmm_glib_dep]
+plugins_deps = [
+  daemon_enums_types_dep,
+  libmm_glib_dep,
+]
 
 if enable_mbim
   plugins_deps += mbim_glib_dep
