@@ -5733,11 +5733,14 @@ setup_sim_hot_swap_context_free (SetupSimHotSwapContext *ctx)
 }
 
 static gboolean
-modem_setup_sim_hot_swap_finish (MMIfaceModem  *self,
+modem_setup_sim_hot_swap_finish (MMIfaceModem  *_self,
                                  GAsyncResult  *res,
                                  GError       **error)
 {
-    return g_task_propagate_boolean (G_TASK (res), error);
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+
+    self->priv->sim_hot_swap_configured = g_task_propagate_boolean (G_TASK (res), error);
+    return self->priv->sim_hot_swap_configured;
 }
 
 static void
