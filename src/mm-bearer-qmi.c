@@ -557,7 +557,7 @@ process_operator_reserved_pco (MMBearerQmi                           *self,
     MMBaseModem           *modem = NULL;
     MMPco                 *pco;
     g_autofree gchar      *app_specific_info_str = NULL;
-    g_autoptr(GArray)      array = NULL;
+    GArray                *array = NULL;
     g_autoptr(GByteArray)  pco_raw = NULL;
     guint16                container_id;
     guint16                tmp_mcc;
