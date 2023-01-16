@@ -576,6 +576,10 @@ process_operator_reserved_pco (MMBearerQmi                           *self,
             NULL))
         return;
 
+    /* Ignore PCOs with undefined contents */
+    if (!tmp_mcc && !tmp_mcc && !container_id && !array->len)
+        return;
+
     app_specific_info_str = ((array->len > 0) ?
                              mm_utils_bin2hexstr ((guint8*) (array->data), array->len) :
                              NULL);
