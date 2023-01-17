@@ -35,6 +35,7 @@ abort_task_if_port_unusable (MMBaseModem *self,
             MM_CORE_ERROR,
             MM_CORE_ERROR_NOT_FOUND,
             "Cannot run sequence: port not given");
+        g_object_unref (task);
         return FALSE;
     }
 
@@ -44,6 +45,7 @@ abort_task_if_port_unusable (MMBaseModem *self,
             MM_CORE_ERROR,
             MM_CORE_ERROR_CONNECTED,
             "Cannot run sequence: port is connected");
+        g_object_unref (task);
         return FALSE;
     }
 
@@ -60,6 +62,7 @@ abort_task_if_port_unusable (MMBaseModem *self,
             "Cannot run sequence: '%s'",
             error->message);
         g_error_free (error);
+        g_object_unref (task);
         return FALSE;
     }
 
@@ -235,10 +238,8 @@ at_sequence_common (MMBaseModem                *self,
     AtSequenceContext *ctx;
 
     /* Ensure that we have an open port */
-    if (!abort_task_if_port_unusable (self, port, task)) {
-        g_object_unref (task);
+    if (!abort_task_if_port_unusable (self, port, task))
         return;
-    }
 
     /* Setup context */
     ctx = g_new0 (AtSequenceContext, 1);
@@ -540,10 +541,8 @@ at_command_common (MMBaseModem *self,
     AtCommandContext *ctx;
 
     /* Ensure that we have an open port */
-    if (!abort_task_if_port_unusable (self, port, task)) {
-        g_object_unref (task);
+    if (!abort_task_if_port_unusable (self, port, task))
         return;
-    }
 
     ctx = g_new0 (AtCommandContext, 1);
     ctx->port = g_object_ref (port);
