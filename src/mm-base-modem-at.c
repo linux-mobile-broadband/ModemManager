@@ -73,10 +73,10 @@ abort_task_if_port_unusable (MMBaseModem *self,
 }
 
 static void
-modem_cancellable_cancelled (GCancellable *modem_cancellable,
-                             GCancellable *user_cancellable)
+parent_cancellable_cancelled (GCancellable *parent_cancellable,
+                              GCancellable *cancellable)
 {
-    g_cancellable_cancel (user_cancellable);
+    g_cancellable_cancel (cancellable);
 }
 
 /*****************************************************************************/
@@ -85,7 +85,7 @@ modem_cancellable_cancelled (GCancellable *modem_cancellable,
 typedef struct {
     MMPortSerialAt             *port;
     gulong                      cancelled_id;
-    GCancellable               *modem_cancellable;
+    GCancellable               *parent_cancellable;
     const MMBaseModemAtCommand *current;
     const MMBaseModemAtCommand *sequence;
     gpointer                    response_processor_context;
@@ -103,10 +103,10 @@ at_sequence_context_free (AtSequenceContext *ctx)
         ctx->response_processor_context_free)
         ctx->response_processor_context_free (ctx->response_processor_context);
 
-    if (ctx->modem_cancellable) {
-        g_cancellable_disconnect (ctx->modem_cancellable,
+    if (ctx->parent_cancellable) {
+        g_cancellable_disconnect (ctx->parent_cancellable,
                                   ctx->cancelled_id);
-        g_object_unref (ctx->modem_cancellable);
+        g_object_unref (ctx->parent_cancellable);
     }
 
     if (ctx->result)
@@ -233,7 +233,7 @@ at_sequence_common (MMBaseModem                *self,
                     gpointer                    response_processor_context,
                     GDestroyNotify              response_processor_context_free,
                     GTask                      *task,
-                    GCancellable               *modem_cancellable)
+                    GCancellable               *parent_cancellable)
 {
     AtSequenceContext *ctx;
 
@@ -250,14 +250,14 @@ at_sequence_common (MMBaseModem                *self,
 
     /* Ensure the cancellable that's already associated with the modem
      * will also get cancelled if the modem wide-one gets cancelled */
-    if (modem_cancellable) {
-        GCancellable *user_cancellable;
+    if (parent_cancellable) {
+        GCancellable *cancellable;
 
-        user_cancellable = g_task_get_cancellable (task);
-        ctx->modem_cancellable = g_object_ref (modem_cancellable);
-        ctx->cancelled_id = g_cancellable_connect (ctx->modem_cancellable,
-                                                   G_CALLBACK (modem_cancellable_cancelled),
-                                                   user_cancellable,
+        cancellable = g_task_get_cancellable (task);
+        ctx->parent_cancellable = g_object_ref (parent_cancellable);
+        ctx->cancelled_id = g_cancellable_connect (ctx->parent_cancellable,
+                                                   G_CALLBACK (parent_cancellable_cancelled),
+                                                   cancellable,
                                                    NULL);
     }
 
@@ -469,7 +469,7 @@ mm_base_modem_response_processor_string_ignore_at_errors (MMBaseModem   *self,
 typedef struct {
     MMPortSerialAt *port;
     gulong cancelled_id;
-    GCancellable *modem_cancellable;
+    GCancellable *parent_cancellable;
     gchar *response;
 } AtCommandContext;
 
@@ -478,10 +478,10 @@ at_command_context_free (AtCommandContext *ctx)
 {
     mm_port_serial_close (MM_PORT_SERIAL (ctx->port));
 
-    if (ctx->modem_cancellable) {
-        g_cancellable_disconnect (ctx->modem_cancellable,
+    if (ctx->parent_cancellable) {
+        g_cancellable_disconnect (ctx->parent_cancellable,
                                   ctx->cancelled_id);
-        g_object_unref (ctx->modem_cancellable);
+        g_object_unref (ctx->parent_cancellable);
     }
 
     g_object_unref (ctx->port);
@@ -536,7 +536,7 @@ at_command_common (MMBaseModem *self,
                    gboolean allow_cached,
                    gboolean is_raw,
                    GTask *task,
-                   GCancellable *modem_cancellable)
+                   GCancellable *parent_cancellable)
 {
     AtCommandContext *ctx;
 
@@ -549,14 +549,14 @@ at_command_common (MMBaseModem *self,
 
     /* Ensure the cancellable that's already associated with the modem
      * will also get cancelled if the modem wide-one gets cancelled */
-    if (modem_cancellable) {
-        GCancellable *user_cancellable;
+    if (parent_cancellable) {
+        GCancellable *cancellable;
 
-        user_cancellable = g_task_get_cancellable (task);
-        ctx->modem_cancellable = g_object_ref (modem_cancellable);
-        ctx->cancelled_id = g_cancellable_connect (ctx->modem_cancellable,
-                                                   G_CALLBACK (modem_cancellable_cancelled),
-                                                   user_cancellable,
+        cancellable = g_task_get_cancellable (task);
+        ctx->parent_cancellable = g_object_ref (parent_cancellable);
+        ctx->cancelled_id = g_cancellable_connect (ctx->parent_cancellable,
+                                                   G_CALLBACK (parent_cancellable_cancelled),
+                                                   cancellable,
                                                    NULL);
     }
 
