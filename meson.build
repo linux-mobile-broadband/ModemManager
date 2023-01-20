@@ -147,9 +147,7 @@ deps = [
 ]
 
 c_args = [
-  # In 2.46, g_simple_async_* calls. Disable deprecations from then on
-  # until everything is ported to GTask.
-  '-DGLIB_VERSION_MIN_REQUIRED=GLIB_VERSION_2_44',
+  '-DGLIB_VERSION_MIN_REQUIRED=GLIB_VERSION_' + glib_version.underscorify(),
   '-DGLIB_VERSION_MAX_ALLOWED=GLIB_VERSION_' + glib_version.underscorify(),
 ]
 
