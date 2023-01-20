@@ -577,7 +577,7 @@ process_operator_reserved_pco (MMBearerQmi                           *self,
         return;
 
     /* Ignore PCOs with undefined contents */
-    if (!tmp_mcc && !tmp_mcc && !container_id && !array->len)
+    if (!tmp_mcc && !tmp_mnc && !container_id && !array->len)
         return;
 
     app_specific_info_str = ((array->len > 0) ?
