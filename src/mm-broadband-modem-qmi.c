@@ -1869,14 +1869,17 @@ dms_set_operating_mode_ready (QmiClientDms        *client,
         set_operating_mode_complete (self, NULL);
     } else if (error)
         set_operating_mode_complete (self, error);
-    else
+    else if (ctx->timeout_id)
         mm_obj_dbg (self, "operating mode request sent, waiting for power update indication");
+    else
+        set_operating_mode_complete (self, NULL);
 
     g_object_unref (self);
 }
 
 static void
-dms_set_operating_mode (MMBroadbandModemQmi *self)
+dms_set_operating_mode (MMBroadbandModemQmi *self,
+                        gboolean             supports_power_indications)
 {
     g_autoptr (QmiMessageDmsSetOperatingModeInput)  input = NULL;
     SetOperatingModeContext                        *ctx;
@@ -1893,10 +1896,12 @@ dms_set_operating_mode (MMBroadbandModemQmi *self)
                                        (GAsyncReadyCallback)dms_set_operating_mode_ready,
                                        g_object_ref (self));
 
-    mm_obj_dbg (self, "Starting timeout for indication receiving for 10 seconds");
-    ctx->timeout_id = g_timeout_add_seconds (10,
-                                             (GSourceFunc) dms_set_operating_mode_timeout_cb,
-                                             self);
+    if (supports_power_indications) {
+        mm_obj_dbg (self, "Starting timeout for indication receiving for 10 seconds");
+        ctx->timeout_id = g_timeout_add_seconds (10,
+                                                (GSourceFunc) dms_set_operating_mode_timeout_cb,
+                                                self);
+    }
 }
 
 static void
@@ -1907,26 +1912,36 @@ dms_set_event_report_operating_mode_activate_ready (QmiClientDms        *client,
     g_autoptr(QmiMessageDmsSetEventReportOutput)  output = NULL;
     GError                                       *error = NULL;
     SetOperatingModeContext                      *ctx;
+    gboolean                                      supports_power_indications = TRUE;
 
     g_assert (self->priv->set_operating_mode_task);
     ctx = g_task_get_task_data (self->priv->set_operating_mode_task);
 
     output = qmi_client_dms_set_event_report_finish (client, res, &error);
     if (!output || !qmi_message_dms_set_event_report_output_get_result (output, &error)) {
-        g_prefix_error (&error, "Couldn't register for power indications: ");
-        set_operating_mode_complete (self, error);
-        g_object_unref (self);
-        return;
+        if (g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_MISSING_ARGUMENT)) {
+            mm_obj_dbg (self, "device doesn't support power indication registration: ignore it and continue");
+            g_clear_error (&error);
+            supports_power_indications = FALSE;
+        } else {
+            g_prefix_error (&error, "Couldn't register for power indications: ");
+            set_operating_mode_complete (self, error);
+            g_object_unref (self);
+            return;
+        }
     }
 
     g_assert (ctx->indication_id == 0);
-    ctx->indication_id = g_signal_connect (client,
-                                           "event-report",
-                                           G_CALLBACK (power_event_report_indication_cb),
-                                           self);
+    if (supports_power_indications) {
+        ctx->indication_id = g_signal_connect (client,
+                                               "event-report",
+                                                G_CALLBACK (power_event_report_indication_cb),
+                                                self);
+        mm_obj_dbg (self, "Power operation is pending");
+    }
 
-    mm_obj_dbg (self, "Power operation is pending");
-    dms_set_operating_mode (self);
+    dms_set_operating_mode (self,
+                            supports_power_indications);
     g_object_unref (self);
 }
 
