@@ -211,26 +211,37 @@ _flags_from_string (GType         type,
                     guint         error_value,
                     GError      **error)
 {
+    g_auto(GStrv)          flags_strings = NULL;
     g_autoptr(GFlagsClass) flags_class = NULL;
-    guint                  value;
+    guint                  value = 0;
     guint                  i;
 
     flags_class = G_FLAGS_CLASS (g_type_class_ref (type));
+    flags_strings = g_strsplit (str, "|", -1);
 
-    for (i = 0; flags_class->values[i].value_nick; i++) {
-        if (!g_ascii_strcasecmp (str, flags_class->values[i].value_nick)) {
-            value = flags_class->values[i].value;
-            return value;
+    for (i = 0; flags_strings[i]; i++) {
+        guint j;
+        gboolean found = FALSE;
+
+        for (j = 0; flags_class->values[j].value_nick; j++) {
+            if (!g_ascii_strcasecmp (flags_strings[i], flags_class->values[j].value_nick)) {
+                value |= flags_class->values[j].value;
+                found = TRUE;
+            }
+        }
+
+        if (!found) {
+            g_set_error (error,
+                MM_CORE_ERROR,
+                MM_CORE_ERROR_INVALID_ARGS,
+                "Couldn't match '%s' with a valid %s value",
+                flags_strings[i],
+                g_type_name (type));
+            return error_value;
         }
     }
 
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_INVALID_ARGS,
-                 "Couldn't match '%s' with a valid %s value",
-                 str,
-                 g_type_name (type));
-    return error_value;
+    return value;
 }
 
 MMModemCapability

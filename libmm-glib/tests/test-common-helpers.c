@@ -915,6 +915,15 @@ ip_type_from_string (void)
     ip_type = mm_common_get_ip_type_from_string ("ipv4v6", &error);
     g_assert_no_error (error);
     g_assert (ip_type == MM_BEARER_IP_FAMILY_IPV4V6);
+
+    ip_type = mm_common_get_ip_type_from_string ("ipv4v6|type-unknown", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (ip_type == MM_BEARER_IP_FAMILY_NONE);
+    g_clear_error (&error);
+
+    ip_type = mm_common_get_ip_type_from_string ("ipv4|ipv6", &error);
+    g_assert_no_error (error);
+    g_assert (ip_type == (MM_BEARER_IP_FAMILY_IPV4 | MM_BEARER_IP_FAMILY_IPV6));
 }
 
 static void
@@ -1150,6 +1159,15 @@ apn_type_from_string (void)
     apn_type = mm_common_get_apn_type_from_string ("emergency", &error);
     g_assert_no_error (error);
     g_assert (apn_type == MM_BEARER_APN_TYPE_EMERGENCY);
+
+    apn_type = mm_common_get_apn_type_from_string ("emergency|type-unknown", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (apn_type == MM_BEARER_APN_TYPE_NONE);
+    g_clear_error (&error);
+
+    apn_type = mm_common_get_apn_type_from_string ("emergency|local", &error);
+    g_assert_no_error (error);
+    g_assert (apn_type == (MM_BEARER_APN_TYPE_EMERGENCY | MM_BEARER_APN_TYPE_LOCAL));
 }
 
 static void
@@ -1166,6 +1184,15 @@ _3gpp_facility_from_string (void)
     facility = mm_common_get_3gpp_facility_from_string ("ph-sim", &error);
     g_assert_no_error (error);
     g_assert (facility == MM_MODEM_3GPP_FACILITY_PH_SIM);
+
+    facility = mm_common_get_3gpp_facility_from_string ("ph-sim|type-unknown", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (facility == MM_MODEM_3GPP_FACILITY_NONE);
+    g_clear_error (&error);
+
+    facility = mm_common_get_3gpp_facility_from_string ("ph-fsim|provider-pers", &error);
+    g_assert_no_error (error);
+    g_assert (facility == (MM_MODEM_3GPP_FACILITY_PH_FSIM | MM_MODEM_3GPP_FACILITY_PROVIDER_PERS));
 }
 
 static void
