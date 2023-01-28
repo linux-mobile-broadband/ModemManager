@@ -646,6 +646,609 @@ date_time_iso8601 (void)
 }
 
 /**************************************************************/
+/* string helpers */
+
+static void
+bands_to_string (void)
+{
+    gchar *bands_str = NULL;
+    MMModemBand bands[2] = {MM_MODEM_BAND_G480, MM_MODEM_BAND_CDMA_BC9};
+
+    bands_str = mm_common_build_bands_string (NULL, 0);
+    g_assert_cmpstr (bands_str, ==, "none");
+    g_clear_pointer (&bands_str, g_free);
+
+    bands_str = mm_common_build_bands_string (bands, 1);
+    g_assert_cmpstr (bands_str, ==, "g480");
+    g_clear_pointer (&bands_str, g_free);
+
+    bands_str = mm_common_build_bands_string (bands, 2);
+    g_assert_cmpstr (bands_str, ==, "g480, cdma-bc9");
+    g_clear_pointer (&bands_str, g_free);
+}
+
+static void
+capabilities_to_string (void)
+{
+    gchar *capabilities_str = NULL;
+    MMModemCapability capabilities[2] = {MM_MODEM_CAPABILITY_CDMA_EVDO, MM_MODEM_CAPABILITY_TDS};
+
+    capabilities_str = mm_common_build_capabilities_string (NULL, 0);
+    g_assert_cmpstr (capabilities_str, ==, "none");
+    g_clear_pointer (&capabilities_str, g_free);
+
+    capabilities_str = mm_common_build_capabilities_string (capabilities, 1);
+    g_assert_cmpstr (capabilities_str, ==, "cdma-evdo");
+    g_clear_pointer (&capabilities_str, g_free);
+
+    capabilities_str = mm_common_build_capabilities_string (capabilities, 2);
+    g_assert_cmpstr (capabilities_str, ==, "cdma-evdo\ntds");
+    g_clear_pointer (&capabilities_str, g_free);
+}
+
+static void
+mode_combinations_to_string (void)
+{
+    gchar *mode_combinations_str = NULL;
+    MMModemModeCombination mode_combinations[2] = {
+        {
+            .allowed = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
+            .preferred = MM_MODEM_MODE_3G
+        },
+        {
+            .allowed = MM_MODEM_MODE_4G | MM_MODEM_MODE_5G,
+            .preferred = MM_MODEM_MODE_5G
+        }
+    };
+
+    mode_combinations_str = mm_common_build_mode_combinations_string (NULL, 0);
+    g_assert_cmpstr (mode_combinations_str, ==, "none");
+    g_clear_pointer (&mode_combinations_str, g_free);
+
+    mode_combinations_str = mm_common_build_mode_combinations_string (mode_combinations, 1);
+    g_assert_cmpstr (mode_combinations_str, ==, "allowed: 2g, 3g; preferred: 3g");
+    g_clear_pointer (&mode_combinations_str, g_free);
+
+    mode_combinations_str = mm_common_build_mode_combinations_string (mode_combinations, 2);
+    g_assert_cmpstr (mode_combinations_str, ==, "allowed: 2g, 3g; preferred: 3g\nallowed: 4g, 5g; preferred: 5g");
+    g_clear_pointer (&mode_combinations_str, g_free);
+}
+
+static void
+ports_to_string (void)
+{
+    gchar *ports_str = NULL;
+    MMModemPortInfo ports[2] = {
+        {
+          .name = (gchar*)"port1",
+          .type = MM_MODEM_PORT_TYPE_AT
+        },
+        {
+          .name = (gchar*)"port2",
+          .type = MM_MODEM_PORT_TYPE_QMI
+        }
+    };
+
+    ports_str = mm_common_build_ports_string (NULL, 0);
+    g_assert_cmpstr (ports_str, ==, "none");
+    g_clear_pointer (&ports_str, g_free);
+
+    ports_str = mm_common_build_ports_string (ports, 1);
+    g_assert_cmpstr (ports_str, ==, "port1 (at)");
+    g_clear_pointer (&ports_str, g_free);
+
+    ports_str = mm_common_build_ports_string (ports, 2);
+    g_assert_cmpstr (ports_str, ==, "port1 (at), port2 (qmi)");
+    g_clear_pointer (&ports_str, g_free);
+}
+
+static void
+sms_storages_to_string (void)
+{
+    gchar *sms_storages_str = NULL;
+    MMSmsStorage sms_storages[2] = {MM_SMS_STORAGE_MT, MM_SMS_STORAGE_BM};
+
+    sms_storages_str = mm_common_build_sms_storages_string (NULL, 0);
+    g_assert_cmpstr (sms_storages_str, ==, "none");
+    g_clear_pointer (&sms_storages_str, g_free);
+
+    sms_storages_str = mm_common_build_sms_storages_string (sms_storages, 1);
+    g_assert_cmpstr (sms_storages_str, ==, "mt");
+    g_clear_pointer (&sms_storages_str, g_free);
+
+    sms_storages_str = mm_common_build_sms_storages_string (sms_storages, 2);
+    g_assert_cmpstr (sms_storages_str, ==, "mt, bm");
+    g_clear_pointer (&sms_storages_str, g_free);
+}
+
+static void
+capabilities_from_string (void)
+{
+    MMModemCapability capability = MM_MODEM_CAPABILITY_ANY;
+    GError *error = NULL;
+
+    capability = mm_common_get_capabilities_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (capability == MM_MODEM_CAPABILITY_NONE);
+    g_clear_error (&error);
+
+    capability = mm_common_get_capabilities_from_string ("gsm-umts", &error);
+    g_assert_no_error (error);
+    g_assert (capability == MM_MODEM_CAPABILITY_GSM_UMTS);
+
+    capability = mm_common_get_capabilities_from_string ("gsm-umts|capa-unknown", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (capability == MM_MODEM_CAPABILITY_NONE);
+    g_clear_error (&error);
+
+    capability = mm_common_get_capabilities_from_string ("gsm-umts|lte", &error);
+    g_assert_no_error (error);
+    g_assert (capability == (MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_LTE));
+}
+
+static void
+modes_from_string (void)
+{
+    MMModemMode mode = MM_MODEM_MODE_ANY;
+    GError *error = NULL;
+
+    mode = mm_common_get_modes_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (mode == MM_MODEM_MODE_NONE);
+    g_clear_error (&error);
+
+    mode = mm_common_get_modes_from_string ("3g", &error);
+    g_assert_no_error (error);
+    g_assert (mode == MM_MODEM_MODE_3G);
+
+    mode = mm_common_get_modes_from_string ("3g|mode-unknown", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (mode == MM_MODEM_MODE_NONE);
+    g_clear_error (&error);
+
+    mode = mm_common_get_modes_from_string ("3g|4g", &error);
+    g_assert_no_error (error);
+    g_assert (mode == (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G));
+}
+
+static void
+bands_from_string (void)
+{
+    MMModemBand *bands = NULL;
+    guint n_bands = 0;
+    gboolean ret = FALSE;
+    GError *error = NULL;
+
+    ret = mm_common_get_bands_from_string ("not found", &bands, &n_bands, &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert_false (ret);
+    g_assert_cmpuint (n_bands, ==, 0);
+    g_assert_null (bands);
+    g_clear_error (&error);
+
+    ret = mm_common_get_bands_from_string ("eutran-9", &bands, &n_bands, &error);
+    g_assert_no_error (error);
+    g_assert_true (ret);
+    g_assert_cmpuint (n_bands, ==, 1);
+    g_assert (bands[0] == MM_MODEM_BAND_EUTRAN_9);
+    g_clear_pointer(&bands, g_free);
+
+    ret = mm_common_get_bands_from_string ("eutran-9|band-unknown", &bands, &n_bands, &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert_false (ret);
+    g_assert_cmpuint (n_bands, ==, 0);
+    g_assert_null (bands);
+    g_clear_error (&error);
+
+    ret = mm_common_get_bands_from_string ("eutran-9|cdma-bc7", &bands, &n_bands, &error);
+    g_assert_no_error (error);
+    g_assert_true (ret);
+    g_assert_cmpuint (n_bands, ==, 2);
+    g_assert (bands[0] == MM_MODEM_BAND_EUTRAN_9);
+    g_assert (bands[1] == MM_MODEM_BAND_CDMA_BC7);
+    g_clear_pointer(&bands, g_free);
+}
+
+static void
+boolean_from_string (void)
+{
+    gboolean ret = FALSE;
+    GError *error = NULL;
+
+    ret = mm_common_get_boolean_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert_false (ret);
+    g_clear_error (&error);
+
+    ret = mm_common_get_boolean_from_string ("true", &error);
+    g_assert_no_error (error);
+    g_assert_true (ret);
+
+    ret = mm_common_get_boolean_from_string ("1", &error);
+    g_assert_no_error (error);
+    g_assert_true (ret);
+
+    ret = mm_common_get_boolean_from_string ("yes", &error);
+    g_assert_no_error (error);
+    g_assert_true (ret);
+
+    ret = mm_common_get_boolean_from_string ("false", &error);
+    g_assert_no_error (error);
+    g_assert_false (ret);
+
+    ret = mm_common_get_boolean_from_string ("0", &error);
+    g_assert_no_error (error);
+    g_assert_false (ret);
+
+    ret = mm_common_get_boolean_from_string ("no", &error);
+    g_assert_no_error (error);
+    g_assert_false (ret);
+}
+
+static void
+rm_protocol_from_string (void)
+{
+    MMModemCdmaRmProtocol rm_protocol = MM_MODEM_CDMA_RM_PROTOCOL_STU_III;
+    GError *error = NULL;
+
+    rm_protocol = mm_common_get_rm_protocol_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (rm_protocol == MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN);
+    g_clear_error (&error);
+
+    rm_protocol = mm_common_get_rm_protocol_from_string ("packet-network-ppp", &error);
+    g_assert_no_error (error);
+    g_assert (rm_protocol == MM_MODEM_CDMA_RM_PROTOCOL_PACKET_NETWORK_PPP);
+}
+
+static void
+ip_type_from_string (void)
+{
+    MMBearerIpFamily ip_type = MM_BEARER_IP_FAMILY_ANY;
+    GError *error = NULL;
+
+    ip_type = mm_common_get_ip_type_from_string("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (ip_type == MM_BEARER_IP_FAMILY_NONE);
+    g_clear_error (&error);
+
+    ip_type = mm_common_get_ip_type_from_string ("ipv4v6", &error);
+    g_assert_no_error (error);
+    g_assert (ip_type == MM_BEARER_IP_FAMILY_IPV4V6);
+}
+
+static void
+allowed_auth_from_string (void)
+{
+    MMBearerAllowedAuth allowed_auth = MM_BEARER_ALLOWED_AUTH_EAP;
+    GError *error = NULL;
+
+    allowed_auth = mm_common_get_allowed_auth_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (allowed_auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN);
+    g_clear_error (&error);
+
+    allowed_auth = mm_common_get_allowed_auth_from_string ("pap", &error);
+    g_assert_no_error (error);
+    g_assert (allowed_auth == MM_BEARER_ALLOWED_AUTH_PAP);
+
+    allowed_auth = mm_common_get_allowed_auth_from_string ("pap|auth-unknown", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (allowed_auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN);
+    g_clear_error (&error);
+
+    allowed_auth = mm_common_get_allowed_auth_from_string ("pap|chap", &error);
+    g_assert_no_error (error);
+    g_assert (allowed_auth == (MM_BEARER_ALLOWED_AUTH_PAP | MM_BEARER_ALLOWED_AUTH_CHAP));
+}
+
+static void
+sms_storage_from_string (void)
+{
+    MMSmsStorage sms_storage = MM_SMS_STORAGE_TA;
+    GError *error = NULL;
+
+    sms_storage = mm_common_get_sms_storage_from_string("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (sms_storage == MM_SMS_STORAGE_UNKNOWN);
+    g_clear_error (&error);
+
+    sms_storage = mm_common_get_sms_storage_from_string ("bm", &error);
+    g_assert_no_error (error);
+    g_assert (sms_storage == MM_SMS_STORAGE_BM);
+}
+
+static void
+sms_cdma_teleservice_id_from_string (void)
+{
+    MMSmsCdmaTeleserviceId sms_cdma_teleservice_id = MM_SMS_CDMA_TELESERVICE_ID_CATPT;
+    GError *error = NULL;
+
+    sms_cdma_teleservice_id = mm_common_get_sms_cdma_teleservice_id_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (sms_cdma_teleservice_id == MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN);
+    g_clear_error (&error);
+
+    sms_cdma_teleservice_id = mm_common_get_sms_cdma_teleservice_id_from_string ("wemt", &error);
+    g_assert_no_error (error);
+    g_assert (sms_cdma_teleservice_id == MM_SMS_CDMA_TELESERVICE_ID_WEMT);
+}
+
+static void
+sms_cdma_service_category_from_string (void)
+{
+    MMSmsCdmaServiceCategory sms_cdma_service_category = MM_SMS_CDMA_SERVICE_CATEGORY_LODGINGS;
+    GError *error = NULL;
+
+    sms_cdma_service_category = mm_common_get_sms_cdma_service_category_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (sms_cdma_service_category == MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN);
+    g_clear_error (&error);
+
+    sms_cdma_service_category = mm_common_get_sms_cdma_service_category_from_string ("lodgings", &error);
+    g_assert_no_error (error);
+    g_assert (sms_cdma_service_category == MM_SMS_CDMA_SERVICE_CATEGORY_LODGINGS);
+}
+
+static void
+call_direction_from_string (void)
+{
+    MMCallDirection call_direction = MM_CALL_DIRECTION_OUTGOING;
+    GError *error = NULL;
+
+    call_direction = mm_common_get_call_direction_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (call_direction == MM_CALL_DIRECTION_UNKNOWN);
+    g_clear_error (&error);
+
+    call_direction = mm_common_get_call_direction_from_string ("incoming", &error);
+    g_assert_no_error (error);
+    g_assert (call_direction == MM_CALL_DIRECTION_INCOMING); 
+}
+
+static void
+call_state_from_string (void)
+{
+    MMCallState call_state = MM_CALL_STATE_RINGING_IN;
+    GError *error = NULL;
+
+    call_state = mm_common_get_call_state_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (call_state == MM_CALL_STATE_UNKNOWN);
+    g_clear_error (&error);
+
+    call_state = mm_common_get_call_state_from_string ("waiting", &error);
+    g_assert_no_error (error);
+    g_assert (call_state == MM_CALL_STATE_WAITING);
+}
+
+static void
+call_state_reason_from_string (void)
+{
+    MMCallStateReason call_state_reason = MM_CALL_STATE_REASON_TERMINATED;
+    GError *error = NULL;
+
+    call_state_reason = mm_common_get_call_state_reason_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (call_state_reason == MM_CALL_STATE_REASON_UNKNOWN);
+    g_clear_error (&error);
+
+    call_state_reason = mm_common_get_call_state_reason_from_string ("refused-or-busy", &error);
+    g_assert_no_error (error);
+    g_assert (call_state_reason == MM_CALL_STATE_REASON_REFUSED_OR_BUSY);
+}
+
+static void
+oma_features_from_string (void)
+{
+    MMOmaFeature oma_features = MM_OMA_FEATURE_HANDS_FREE_ACTIVATION;
+    GError *error = NULL;
+
+    oma_features = mm_common_get_oma_features_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (oma_features == MM_OMA_FEATURE_NONE);
+    g_clear_error (&error);
+
+    oma_features = mm_common_get_oma_features_from_string ("device-provisioning", &error);
+    g_assert_no_error (error);
+    g_assert (oma_features == MM_OMA_FEATURE_DEVICE_PROVISIONING);
+
+    oma_features = mm_common_get_oma_features_from_string ("device-provisioning|oma-unknown", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (oma_features == MM_OMA_FEATURE_NONE);
+    g_clear_error (&error);
+
+    oma_features = mm_common_get_oma_features_from_string ("device-provisioning|prl-update", &error);
+    g_assert_no_error (error);
+    g_assert (oma_features == (MM_OMA_FEATURE_DEVICE_PROVISIONING | MM_OMA_FEATURE_PRL_UPDATE));
+}
+
+static void
+oma_session_type_from_string (void)
+{
+    MMOmaSessionType oma_session_type = MM_OMA_SESSION_TYPE_NETWORK_INITIATED_DEVICE_CONFIGURE;
+    GError *error = NULL;
+
+    oma_session_type = mm_common_get_oma_session_type_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (oma_session_type == MM_OMA_SESSION_TYPE_UNKNOWN);
+    g_clear_error (&error);
+
+    oma_session_type = mm_common_get_oma_session_type_from_string ("device-initiated-prl-update", &error);
+    g_assert_no_error (error);
+    g_assert (oma_session_type == MM_OMA_SESSION_TYPE_DEVICE_INITIATED_PRL_UPDATE);
+}
+
+static void
+eps_ue_mode_operation_from_string (void)
+{
+    MMModem3gppEpsUeModeOperation eps_ue_mode_opearation = MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_CSPS_1;
+    GError *error = NULL;
+
+    eps_ue_mode_opearation = mm_common_get_eps_ue_mode_operation_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (eps_ue_mode_opearation == MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_UNKNOWN);
+    g_clear_error (&error);
+
+    eps_ue_mode_opearation = mm_common_get_eps_ue_mode_operation_from_string ("ps-2", &error);
+    g_assert_no_error (error);
+    g_assert (eps_ue_mode_opearation == MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_PS_2);
+}
+
+static void
+access_technology_from_string (void)
+{
+    MMModemAccessTechnology access_technology = MM_MODEM_ACCESS_TECHNOLOGY_ANY;
+    GError *error = NULL;
+
+    access_technology = mm_common_get_access_technology_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (access_technology == MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+    g_clear_error (&error);
+
+    access_technology = mm_common_get_access_technology_from_string ("hsdpa", &error);
+    g_assert_no_error (error);
+    g_assert (access_technology == MM_MODEM_ACCESS_TECHNOLOGY_HSDPA);
+
+    access_technology = mm_common_get_access_technology_from_string ("hsdpa|access-unknown", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (access_technology == MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+    g_clear_error (&error);
+
+    access_technology = mm_common_get_access_technology_from_string ("hsdpa|hspa-plus", &error);
+    g_assert_no_error (error);
+    g_assert (access_technology == (MM_MODEM_ACCESS_TECHNOLOGY_HSDPA | MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS));
+}
+
+static void
+multiplex_support_from_string (void)
+{
+    MMBearerMultiplexSupport multiplex_support = MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED;
+    GError *error = NULL;
+
+    multiplex_support = mm_common_get_multiplex_support_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (multiplex_support == MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN);
+    g_clear_error (&error);
+
+    multiplex_support = mm_common_get_multiplex_support_from_string ("requested", &error);
+    g_assert_no_error (error);
+    g_assert (multiplex_support == MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED);
+}
+
+static void
+apn_type_from_string (void)
+{
+    MMBearerApnType apn_type = MM_BEARER_APN_TYPE_DEFAULT;
+    GError *error = NULL;
+
+    apn_type = mm_common_get_apn_type_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (apn_type == MM_BEARER_APN_TYPE_NONE);
+    g_clear_error (&error);
+
+    apn_type = mm_common_get_apn_type_from_string ("emergency", &error);
+    g_assert_no_error (error);
+    g_assert (apn_type == MM_BEARER_APN_TYPE_EMERGENCY);
+}
+
+static void
+_3gpp_facility_from_string (void)
+{
+    MMModem3gppFacility facility = MM_MODEM_3GPP_FACILITY_CORP_PERS;
+    GError *error = NULL;
+
+    facility = mm_common_get_3gpp_facility_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (facility == MM_MODEM_3GPP_FACILITY_NONE);
+    g_clear_error (&error);
+
+    facility = mm_common_get_3gpp_facility_from_string ("ph-sim", &error);
+    g_assert_no_error (error);
+    g_assert (facility == MM_MODEM_3GPP_FACILITY_PH_SIM);
+}
+
+static void
+_3gpp_packet_service_state_from_string (void)
+{
+    MMModem3gppPacketServiceState packet_service_state = MM_MODEM_3GPP_PACKET_SERVICE_STATE_DETACHED;
+    GError *error = NULL;
+
+    packet_service_state = mm_common_get_3gpp_packet_service_state_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (packet_service_state == MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN);
+    g_clear_error (&error);
+
+    packet_service_state = mm_common_get_3gpp_packet_service_state_from_string ("attached", &error);
+    g_assert_no_error (error);
+    g_assert (packet_service_state == MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED);
+}
+
+static void
+_3gpp_mico_mode_from_string (void)
+{
+    MMModem3gppMicoMode mico_mode = MM_MODEM_3GPP_MICO_MODE_UNSUPPORTED;
+    GError *error = NULL;
+
+    mico_mode = mm_common_get_3gpp_mico_mode_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (mico_mode == MM_MODEM_3GPP_MICO_MODE_UNKNOWN);
+    g_clear_error (&error);
+
+    mico_mode = mm_common_get_3gpp_mico_mode_from_string ("enabled", &error);
+    g_assert_no_error (error);
+    g_assert (mico_mode == MM_MODEM_3GPP_MICO_MODE_ENABLED);
+}
+
+static void
+_3gpp_drx_cycle_from_string (void)
+{
+    MMModem3gppDrxCycle drx_cycle = MM_MODEM_3GPP_DRX_CYCLE_UNSUPPORTED;
+    GError *error = NULL;
+
+    drx_cycle = mm_common_get_3gpp_drx_cycle_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (drx_cycle == MM_MODEM_3GPP_DRX_CYCLE_UNKNOWN);
+    g_clear_error (&error);
+
+    drx_cycle = mm_common_get_3gpp_drx_cycle_from_string ("128", &error);
+    g_assert_no_error (error);
+    g_assert (drx_cycle == MM_MODEM_3GPP_DRX_CYCLE_128);
+}
+
+static void
+access_type_preference_from_string (void)
+{
+    MMBearerAccessTypePreference access_type_preference = MM_BEARER_ACCESS_TYPE_PREFERENCE_NON_3GPP_ONLY;
+    GError *error = NULL;
+
+    access_type_preference = mm_common_get_access_type_preference_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (access_type_preference == MM_BEARER_ACCESS_TYPE_PREFERENCE_NONE);
+    g_clear_error (&error);
+
+    access_type_preference = mm_common_get_access_type_preference_from_string ("3gpp-preferred", &error);
+    g_assert_no_error (error);
+    g_assert (access_type_preference == MM_BEARER_ACCESS_TYPE_PREFERENCE_3GPP_PREFERRED);   
+}
+
+static void
+profile_source_from_string (void)
+{
+    MMBearerProfileSource profile_source = MM_BEARER_PROFILE_SOURCE_OPERATOR;
+    GError *error = NULL;
+
+    profile_source = mm_common_get_profile_source_from_string ("not found", &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert (profile_source == MM_BEARER_PROFILE_SOURCE_UNKNOWN);
+    g_clear_error (&error);
+
+    profile_source = mm_common_get_profile_source_from_string ("modem", &error);
+    g_assert_no_error (error);
+    g_assert (profile_source == MM_BEARER_PROFILE_SOURCE_MODEM);
+}
+
+/**************************************************************/
 
 int main (int argc, char **argv)
 {
@@ -692,5 +1295,38 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/Common/HexStr/wrong-digits-some", hexstr_wrong_digits_some);
 
     g_test_add_func ("/MM/Common/DateTime/iso8601", date_time_iso8601);
+
+    g_test_add_func ("/MM/Common/StrConvTo/bands",             bands_to_string);
+    g_test_add_func ("/MM/Common/StrConvTo/capabilities",      capabilities_to_string);
+    g_test_add_func ("/MM/Common/StrConvTo/mode-combinations", mode_combinations_to_string);
+    g_test_add_func ("/MM/Common/StrConvTo/ports",             ports_to_string);
+    g_test_add_func ("/MM/Common/StrConvTo/sms-storages",      sms_storages_to_string);
+
+    g_test_add_func ("/MM/Common/StrConvFrom/capabilities",              capabilities_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/modes",                     modes_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/bands",                     bands_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/boolean",                   boolean_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/rm_protocol",               rm_protocol_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/ip_type",                   ip_type_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/allowed_auth",              allowed_auth_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/sms_storage",               sms_storage_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/sms_cdma_teleservice_id",   sms_cdma_teleservice_id_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/sms_cdma_service_category", sms_cdma_service_category_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/call_direction",            call_direction_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/call_state",                call_state_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/call_state_reason",         call_state_reason_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/oma_features",              oma_features_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/oma_session_type",          oma_session_type_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/eps_ue_mode_operation",     eps_ue_mode_operation_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/access_technology",         access_technology_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/multiplex_support",         multiplex_support_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/apn_type",                  apn_type_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/3gpp_facility",             _3gpp_facility_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/3gpp_packet_service_state", _3gpp_packet_service_state_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/3gpp_mico_mode",            _3gpp_mico_mode_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/3gpp_drx_cycle",            _3gpp_drx_cycle_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/access_type",               access_type_preference_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/profile_source",            profile_source_from_string);
+
     return g_test_run ();
 }
