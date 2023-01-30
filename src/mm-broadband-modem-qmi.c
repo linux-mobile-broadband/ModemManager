@@ -12,7 +12,7 @@
  *
  * Copyright (C) 2012 Google Inc.
  * Copyright (C) 2014 Aleksander Morgado <aleksander@aleksander.es>
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc.
  */
 
 #include <config.h>
@@ -5805,22 +5805,209 @@ nas_event_report_indication_cb (QmiClientNas                      *client,
     }
 }
 
+static gdouble
+get_db_from_sinr_level (MMBroadbandModemQmi *self,
+                        QmiNasEvdoSinrLevel  level)
+{
+    switch (level) {
+    case QMI_NAS_EVDO_SINR_LEVEL_0: return -9.0;
+    case QMI_NAS_EVDO_SINR_LEVEL_1: return -6;
+    case QMI_NAS_EVDO_SINR_LEVEL_2: return -4.5;
+    case QMI_NAS_EVDO_SINR_LEVEL_3: return -3;
+    case QMI_NAS_EVDO_SINR_LEVEL_4: return -2;
+    case QMI_NAS_EVDO_SINR_LEVEL_5: return 1;
+    case QMI_NAS_EVDO_SINR_LEVEL_6: return 3;
+    case QMI_NAS_EVDO_SINR_LEVEL_7: return 6;
+    case QMI_NAS_EVDO_SINR_LEVEL_8: return +9;
+    default:
+        mm_obj_warn (self, "invalid SINR level '%u'", level);
+        return -G_MAXDOUBLE;
+    }
+}
+
+static void
+common_process_signal_info (MMBroadbandModemQmi               *self,
+                            QmiMessageNasGetSignalInfoOutput  *response_output,
+                            QmiIndicationNasSignalInfoOutput  *indication_output,
+                            MMSignal                         **out_cdma,
+                            MMSignal                         **out_evdo,
+                            MMSignal                         **out_gsm,
+                            MMSignal                         **out_umts,
+                            MMSignal                         **out_lte,
+                            MMSignal                         **out_nr5g)
+{
+    gint8               rssi;
+    gint16              ecio;
+    QmiNasEvdoSinrLevel sinr_level;
+    gint32              io;
+    gint8               rsrq;
+    gint16              rsrp;
+    gint16              snr;
+    gint16              rscp_umts;
+    gint16              rsrq_5g;
+
+    *out_cdma = NULL;
+    *out_evdo = NULL;
+    *out_gsm = NULL;
+    *out_umts = NULL;
+    *out_lte = NULL;
+    *out_nr5g = NULL;
+
+    /* CDMA */
+    if ((response_output &&
+         qmi_message_nas_get_signal_info_output_get_cdma_signal_strength (response_output,
+                                                                          &rssi,
+                                                                          &ecio,
+                                                                          NULL)) ||
+        (indication_output &&
+         qmi_indication_nas_signal_info_output_get_cdma_signal_strength (indication_output,
+                                                                         &rssi,
+                                                                         &ecio,
+                                                                         NULL))) {
+        *out_cdma = mm_signal_new ();
+        mm_signal_set_rssi (*out_cdma, (gdouble)rssi);
+        mm_signal_set_ecio (*out_cdma, ((gdouble)ecio) * (-0.5));
+    }
+
+    /* HDR... */
+    if ((response_output &&
+         qmi_message_nas_get_signal_info_output_get_hdr_signal_strength (response_output,
+                                                                         &rssi,
+                                                                         &ecio,
+                                                                         &sinr_level,
+                                                                         &io,
+                                                                         NULL)) ||
+        (indication_output &&
+         qmi_indication_nas_signal_info_output_get_hdr_signal_strength (indication_output,
+                                                                        &rssi,
+                                                                        &ecio,
+                                                                        &sinr_level,
+                                                                        &io,
+                                                                        NULL))) {
+        *out_evdo = mm_signal_new ();
+        mm_signal_set_rssi (*out_evdo, (gdouble)rssi);
+        mm_signal_set_ecio (*out_evdo, ((gdouble)ecio) * (-0.5));
+        mm_signal_set_sinr (*out_evdo, get_db_from_sinr_level (self, sinr_level));
+        mm_signal_set_io (*out_evdo, (gdouble)io);
+    }
+
+    /* GSM */
+    if ((response_output &&
+         qmi_message_nas_get_signal_info_output_get_gsm_signal_strength (response_output,
+                                                                         &rssi,
+                                                                         NULL)) ||
+        (indication_output &&
+         qmi_indication_nas_signal_info_output_get_gsm_signal_strength (indication_output,
+                                                                        &rssi,
+                                                                        NULL))) {
+        *out_gsm = mm_signal_new ();
+        mm_signal_set_rssi (*out_gsm, (gdouble)rssi);
+    }
+
+    /* WCDMA... */
+    if ((response_output &&
+         qmi_message_nas_get_signal_info_output_get_wcdma_signal_strength (response_output,
+                                                                           &rssi,
+                                                                           &ecio,
+                                                                           NULL)) ||
+        (indication_output &&
+         qmi_indication_nas_signal_info_output_get_wcdma_signal_strength (indication_output,
+                                                                          &rssi,
+                                                                          &ecio,
+                                                                          NULL))) {
+        *out_umts = mm_signal_new ();
+        mm_signal_set_rssi (*out_umts, (gdouble)rssi);
+        mm_signal_set_ecio (*out_umts, ((gdouble)ecio) * (-0.5));
+    }
+
+    if ((response_output &&
+         qmi_message_nas_get_signal_info_output_get_wcdma_rscp (response_output,
+                                                                &rscp_umts,
+                                                                NULL)) ||
+        (indication_output &&
+         qmi_indication_nas_signal_info_output_get_wcdma_rscp (indication_output,
+                                                               &rscp_umts,
+                                                               NULL))) {
+        if (G_UNLIKELY (!*out_umts))
+            *out_umts = mm_signal_new ();
+        mm_signal_set_rscp (*out_umts, (-1.0) * ((gdouble)rscp_umts));
+    }
+
+    /* LTE... */
+    if ((response_output &&
+         qmi_message_nas_get_signal_info_output_get_lte_signal_strength (response_output,
+                                                                         &rssi,
+                                                                         &rsrq,
+                                                                         &rsrp,
+                                                                         &snr,
+                                                                         NULL)) ||
+        (indication_output &&
+         qmi_indication_nas_signal_info_output_get_lte_signal_strength (indication_output,
+                                                                        &rssi,
+                                                                        &rsrq,
+                                                                        &rsrp,
+                                                                        &snr,
+                                                                        NULL))) {
+        *out_lte = mm_signal_new ();
+        mm_signal_set_rssi (*out_lte, (gdouble)rssi);
+        mm_signal_set_rsrq (*out_lte, (gdouble)rsrq);
+        mm_signal_set_rsrp (*out_lte, (gdouble)rsrp);
+        mm_signal_set_snr (*out_lte, (0.1) * ((gdouble)snr));
+    }
+
+    /* 5G */
+    if ((response_output &&
+         qmi_message_nas_get_signal_info_output_get_5g_signal_strength (response_output,
+                                                                        &rsrp,
+                                                                        &snr,
+                                                                        NULL)) ||
+        (indication_output &&
+         qmi_indication_nas_signal_info_output_get_5g_signal_strength (indication_output,
+                                                                       &rsrp,
+                                                                       &snr,
+                                                                       NULL))) {
+        *out_nr5g = mm_signal_new ();
+        mm_signal_set_rsrp (*out_nr5g, (gdouble)rsrp);
+        mm_signal_set_snr (*out_nr5g, (0.1) * ((gdouble)snr));
+    }
+
+    if ((response_output &&
+         qmi_message_nas_get_signal_info_output_get_5g_signal_strength_extended (response_output,
+                                                                                 &rsrq_5g,
+                                                                                 NULL)) ||
+        (indication_output &&
+         qmi_indication_nas_signal_info_output_get_5g_signal_strength_extended (indication_output,
+                                                                                &rsrq_5g,
+                                                                                NULL))) {
+        if (G_UNLIKELY (!*out_nr5g))
+            *out_nr5g = mm_signal_new ();
+        mm_signal_set_rsrq (*out_nr5g, (gdouble)rsrq_5g);
+    }
+}
+
 static void
 nas_signal_info_indication_cb (QmiClientNas                     *client,
                                QmiIndicationNasSignalInfoOutput *output,
                                MMBroadbandModemQmi              *self)
 {
-    gint8 cdma1x_rssi = 0;
-    gint8 evdo_rssi = 0;
-    gint8 gsm_rssi = 0;
-    gint8 wcdma_rssi = 0;
-    gint8 lte_rssi = 0;
-    gint16 nr5g_rsrp = RSRP_MAX + 1;
+    gint8               cdma1x_rssi = 0;
+    gint8               evdo_rssi = 0;
+    gint8               gsm_rssi = 0;
+    gint8               wcdma_rssi = 0;
+    gint8               lte_rssi = 0;
+    gint16              nr5g_rsrp = RSRP_MAX + 1;
     /* Multiplying SNR_MAX by 10 as QMI gives SNR level
      * as a scaled integer in units of 0.1 dB. */
-    gint16 nr5g_snr = 10 * SNR_MAX + 10;
-    gint16 nr5g_rsrq = RSRQ_MAX + 1;
-    guint8 quality;
+    gint16              nr5g_snr = 10 * SNR_MAX + 10;
+    gint16              nr5g_rsrq = RSRQ_MAX + 1;
+    guint8              quality;
+    g_autoptr(MMSignal) cdma = NULL;
+    g_autoptr(MMSignal) evdo = NULL;
+    g_autoptr(MMSignal) gsm = NULL;
+    g_autoptr(MMSignal) umts = NULL;
+    g_autoptr(MMSignal) lte = NULL;
+    g_autoptr(MMSignal) nr5g = NULL;
+
 
     qmi_indication_nas_signal_info_output_get_cdma_signal_strength (output, &cdma1x_rssi, NULL, NULL);
     qmi_indication_nas_signal_info_output_get_hdr_signal_strength (output, &evdo_rssi, NULL, NULL, NULL, NULL);
@@ -5845,6 +6032,9 @@ nas_signal_info_indication_cb (QmiClientNas                     *client,
                                         &quality)) {
         mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
     }
+
+    common_process_signal_info (self, NULL, output, &cdma, &evdo, &gsm, &umts, &lte, &nr5g);
+    mm_iface_modem_signal_update (MM_IFACE_MODEM_SIGNAL (self), cdma, evdo, gsm, umts, lte, nr5g);
 }
 
 static void
@@ -12265,26 +12455,6 @@ signal_load_values_context_free (SignalLoadValuesContext *ctx)
     g_slice_free (SignalLoadValuesContext, ctx);
 }
 
-static gdouble
-get_db_from_sinr_level (MMBroadbandModemQmi *self,
-                        QmiNasEvdoSinrLevel  level)
-{
-    switch (level) {
-    case QMI_NAS_EVDO_SINR_LEVEL_0: return -9.0;
-    case QMI_NAS_EVDO_SINR_LEVEL_1: return -6;
-    case QMI_NAS_EVDO_SINR_LEVEL_2: return -4.5;
-    case QMI_NAS_EVDO_SINR_LEVEL_3: return -3;
-    case QMI_NAS_EVDO_SINR_LEVEL_4: return -2;
-    case QMI_NAS_EVDO_SINR_LEVEL_5: return 1;
-    case QMI_NAS_EVDO_SINR_LEVEL_6: return 3;
-    case QMI_NAS_EVDO_SINR_LEVEL_7: return 6;
-    case QMI_NAS_EVDO_SINR_LEVEL_8: return +9;
-    default:
-        mm_obj_warn (self, "invalid SINR level '%u'", level);
-        return -G_MAXDOUBLE;
-    }
-}
-
 static gboolean
 signal_load_values_finish (MMIfaceModemSignal *self,
                            GAsyncResult       *res,
@@ -12474,15 +12644,7 @@ signal_load_values_get_signal_info_ready (QmiClientNas *client,
 {
     MMBroadbandModemQmi     *self;
     SignalLoadValuesContext *ctx;
-    gint8                    rssi;
-    gint16                   ecio;
-    QmiNasEvdoSinrLevel      sinr_level;
-    gint32                   io;
-    gint8                    rsrq;
-    gint16                   rsrp;
-    gint16                   snr;
-    gint16                   rscp_umts;
-    gint16                   rsrq_5g;
+
     g_autoptr(QmiMessageNasGetSignalInfoOutput) output = NULL;
 
     self = g_task_get_source_object (task);
@@ -12499,87 +12661,15 @@ signal_load_values_get_signal_info_ready (QmiClientNas *client,
     /* Good, we have results */
     ctx->values_result = g_slice_new0 (SignalLoadValuesResult);
 
-    /* CDMA */
-    if (qmi_message_nas_get_signal_info_output_get_cdma_signal_strength (output,
-                                                                         &rssi,
-                                                                         &ecio,
-                                                                         NULL)) {
-        ctx->values_result->cdma = mm_signal_new ();
-        mm_signal_set_rssi (ctx->values_result->cdma, (gdouble)rssi);
-        mm_signal_set_ecio (ctx->values_result->cdma, ((gdouble)ecio) * (-0.5));
-    }
-
-    /* HDR... */
-    if (qmi_message_nas_get_signal_info_output_get_hdr_signal_strength (output,
-                                                                        &rssi,
-                                                                        &ecio,
-                                                                        &sinr_level,
-                                                                        &io,
-                                                                        NULL)) {
-        ctx->values_result->evdo = mm_signal_new ();
-        mm_signal_set_rssi (ctx->values_result->evdo, (gdouble)rssi);
-        mm_signal_set_ecio (ctx->values_result->evdo, ((gdouble)ecio) * (-0.5));
-        mm_signal_set_sinr (ctx->values_result->evdo, get_db_from_sinr_level (self, sinr_level));
-        mm_signal_set_io (ctx->values_result->evdo, (gdouble)io);
-    }
-
-    /* GSM */
-    if (qmi_message_nas_get_signal_info_output_get_gsm_signal_strength (output,
-                                                                        &rssi,
-                                                                        NULL)) {
-        ctx->values_result->gsm = mm_signal_new ();
-        mm_signal_set_rssi (ctx->values_result->gsm, (gdouble)rssi);
-    }
-
-    /* WCDMA... */
-    if (qmi_message_nas_get_signal_info_output_get_wcdma_signal_strength (output,
-                                                                          &rssi,
-                                                                          &ecio,
-                                                                          NULL)) {
-        ctx->values_result->umts = mm_signal_new ();
-        mm_signal_set_rssi (ctx->values_result->umts, (gdouble)rssi);
-        mm_signal_set_ecio (ctx->values_result->umts, ((gdouble)ecio) * (-0.5));
-    }
-
-    if (qmi_message_nas_get_signal_info_output_get_wcdma_rscp (output,
-                                                               &rscp_umts,
-                                                               NULL)) {
-        if (G_UNLIKELY (!ctx->values_result->umts))
-            ctx->values_result->umts = mm_signal_new ();
-        mm_signal_set_rscp (ctx->values_result->umts, (-1.0) * ((gdouble)rscp_umts));
-    }
-
-    /* LTE... */
-    if (qmi_message_nas_get_signal_info_output_get_lte_signal_strength (output,
-                                                                        &rssi,
-                                                                        &rsrq,
-                                                                        &rsrp,
-                                                                        &snr,
-                                                                        NULL)) {
-        ctx->values_result->lte = mm_signal_new ();
-        mm_signal_set_rssi (ctx->values_result->lte, (gdouble)rssi);
-        mm_signal_set_rsrq (ctx->values_result->lte, (gdouble)rsrq);
-        mm_signal_set_rsrp (ctx->values_result->lte, (gdouble)rsrp);
-        mm_signal_set_snr (ctx->values_result->lte, (0.1) * ((gdouble)snr));
-    }
-
-    /* 5G */
-    if (qmi_message_nas_get_signal_info_output_get_5g_signal_strength (output,
-                                                                       &rsrp,
-                                                                       &snr,
-                                                                       NULL)) {
-        ctx->values_result->nr5g = mm_signal_new ();
-        mm_signal_set_rsrp (ctx->values_result->nr5g, (gdouble)rsrp);
-        mm_signal_set_snr (ctx->values_result->nr5g, (0.1) * ((gdouble)snr));
-    }
-
-    if (qmi_message_nas_get_signal_info_output_get_5g_signal_strength_extended (output,
-                                                                                &rsrq_5g,
-                                                                                NULL)) {
-        if (G_UNLIKELY (!ctx->values_result->nr5g))
-            ctx->values_result->nr5g = mm_signal_new ();
-        mm_signal_set_rsrq (ctx->values_result->nr5g, (gdouble)rsrq_5g);
-    }
+    common_process_signal_info (self,
+                                output,
+                                NULL,
+                                &ctx->values_result->cdma,
+                                &ctx->values_result->evdo,
+                                &ctx->values_result->gsm,
+                                &ctx->values_result->umts,
+                                &ctx->values_result->lte,
+                                &ctx->values_result->nr5g);
 
     /* Keep on */
     ctx->step++;
