@@ -1697,6 +1697,8 @@ set_nr5g_registration_settings_auth_ready (MMBaseModem                          
     GError                                *error = NULL;
     GVariant                              *old_dictionary;
     g_autoptr(MMNr5gRegistrationSettings)  old_settings = NULL;
+    MMModem3gppDrxCycle                    new_drx_cycle;
+    MMModem3gppMicoMode                    new_mico_mode;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -1715,6 +1717,24 @@ set_nr5g_registration_settings_auth_ready (MMBaseModem                          
 
     ctx->settings = mm_nr5g_registration_settings_new_from_dictionary (ctx->dictionary, &error);
     if (!ctx->settings) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_set_nr5g_registration_settings_context_free (ctx);
+        return;
+    }
+
+    new_drx_cycle = mm_nr5g_registration_settings_get_drx_cycle (ctx->settings);
+    if (new_drx_cycle == MM_MODEM_3GPP_DRX_CYCLE_UNSUPPORTED) {
+        g_set_error (&error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS, "Invalid value for DRX cycle: %s",
+                     mm_modem_3gpp_drx_cycle_get_string (new_drx_cycle));
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_set_nr5g_registration_settings_context_free (ctx);
+        return;
+    }
+
+    new_mico_mode = mm_nr5g_registration_settings_get_mico_mode (ctx->settings);
+    if (new_mico_mode == MM_MODEM_3GPP_MICO_MODE_UNSUPPORTED) {
+        g_set_error (&error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS, "Invalid value for MICO mode: %s",
+                     mm_modem_3gpp_mico_mode_get_string (new_mico_mode));
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_nr5g_registration_settings_context_free (ctx);
         return;
