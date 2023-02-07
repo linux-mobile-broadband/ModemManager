@@ -12453,17 +12453,11 @@ iface_modem_initialize_ready (MMBroadbandModem *self,
         g_error_free (error);
 
         mm_iface_modem_update_failed_state (MM_IFACE_MODEM (self), failed_reason);
-
-        /* Jump to the fallback step when on failure, we will allow some additional
-         * interfaces even in failed state. */
-        ctx->step = INITIALIZE_STEP_FALLBACK_LIMITED;
-        initialize_step (task);
-        return;
+    } else {
+        /* bind simple properties */
+        mm_iface_modem_bind_simple_status (MM_IFACE_MODEM (self),
+                                           self->priv->modem_simple_status);
     }
-
-    /* bind simple properties */
-    mm_iface_modem_bind_simple_status (MM_IFACE_MODEM (self),
-                                       self->priv->modem_simple_status);
 
     /* Go on to next step */
     ctx->step++;
@@ -12592,9 +12586,10 @@ initialize_step (GTask *task)
        /* fall through */
 
     case INITIALIZE_STEP_JUMP_TO_LIMITED:
-        if (ctx->self->priv->modem_state == MM_MODEM_STATE_LOCKED) {
-            /* Jump to the fallback step when locked, we will allow some additional
-             * interfaces even in locked state. */
+        if (ctx->self->priv->modem_state == MM_MODEM_STATE_LOCKED ||
+            ctx->self->priv->modem_state == MM_MODEM_STATE_FAILED) {
+            /* Jump to the fallback step when locked or failed, we will allow some additional
+             * interfaces even in locked or failed state. */
             ctx->step = INITIALIZE_STEP_FALLBACK_LIMITED;
             initialize_step (task);
             return;
@@ -12736,7 +12731,6 @@ initialize_step (GTask *task)
                  * leave the Voice interface around so that we can attempt
                  * emergency voice calls.
                  */
-                mm_iface_modem_3gpp_shutdown (MM_IFACE_MODEM_3GPP (ctx->self));
                 mm_iface_modem_3gpp_profile_manager_shutdown (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (ctx->self));
                 mm_iface_modem_3gpp_ussd_shutdown (MM_IFACE_MODEM_3GPP_USSD (ctx->self));
                 mm_iface_modem_cdma_shutdown (MM_IFACE_MODEM_CDMA (ctx->self));

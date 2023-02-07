@@ -3053,8 +3053,8 @@ static void interface_initialization_step (GTask *task);
 typedef enum {
     INITIALIZATION_STEP_FIRST,
     INITIALIZATION_STEP_ENABLED_FACILITY_LOCKS,
-    INITIALIZATION_STEP_TEST_LOCKED,
     INITIALIZATION_STEP_IMEI,
+    INITIALIZATION_STEP_TEST_LOCKED_OR_FAILED,
     INITIALIZATION_STEP_EPS_UE_MODE_OPERATION,
     INITIALIZATION_STEP_EPS_INITIAL_BEARER_SETTINGS,
     INITIALIZATION_STEP_NR5G_REGISTRATION_SETTINGS,
@@ -3254,20 +3254,6 @@ interface_initialization_step (GTask *task)
         ctx->step++;
         /* fall through */
 
-    case INITIALIZATION_STEP_TEST_LOCKED:
-        modem_state = MM_MODEM_STATE_UNKNOWN;
-        g_object_get (self,
-                      MM_IFACE_MODEM_STATE, &modem_state,
-                      NULL);
-        if (modem_state == MM_MODEM_STATE_LOCKED) {
-            /* Skip some steps and export the interface if modem is locked */
-            ctx->step = INITIALIZATION_STEP_LAST;
-            interface_initialization_step (task);
-            return;
-        }
-        ctx->step++;
-        /* fall through */
-
     case INITIALIZATION_STEP_IMEI:
         /* IMEI value is meant to be loaded only once during the whole
          * lifetime of the modem. Therefore, if we already have it loaded,
@@ -3279,6 +3265,21 @@ interface_initialization_step (GTask *task)
                 self,
                 (GAsyncReadyCallback)load_imei_ready,
                 task);
+            return;
+        }
+        ctx->step++;
+        /* fall through */
+
+    case INITIALIZATION_STEP_TEST_LOCKED_OR_FAILED:
+        modem_state = MM_MODEM_STATE_UNKNOWN;
+        g_object_get (self,
+                      MM_IFACE_MODEM_STATE, &modem_state,
+                      NULL);
+        if (modem_state == MM_MODEM_STATE_LOCKED ||
+            modem_state == MM_MODEM_STATE_FAILED) {
+            /* Skip some steps and export the interface if modem is locked or failed */
+            ctx->step = INITIALIZATION_STEP_LAST;
+            interface_initialization_step (task);
             return;
         }
         ctx->step++;
