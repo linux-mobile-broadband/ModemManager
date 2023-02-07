@@ -358,6 +358,7 @@ typedef struct {
     OutputItem   base;
     gchar      **values;
     gboolean     multiline;
+    gboolean     is_object;
 } OutputItemMultiple;
 
 typedef struct {
@@ -419,7 +420,8 @@ output_item_new_take_single (MmcF   field,
 static void
 output_item_new_take_multiple (MmcF       field,
                                gchar    **values,
-                               gboolean   multiline)
+                               gboolean   multiline,
+                               gboolean   is_object)
 {
     OutputItemMultiple *item;
 
@@ -427,6 +429,7 @@ output_item_new_take_multiple (MmcF       field,
     item->base.field = field;
     item->base.type = VALUE_TYPE_MULTIPLE;
     item->multiline = multiline;
+    item->is_object = is_object;
 
     if (values && (g_strv_length (values) == 1) && filter_out_value (values[0]))
         g_strfreev (values);
@@ -467,7 +470,7 @@ mmcli_output_string_list (MmcF         field,
             g_strstrip (split[i]);
     }
 
-    output_item_new_take_multiple (field, split, FALSE);
+    output_item_new_take_multiple (field, split, FALSE, FALSE);
 }
 
 void
@@ -491,7 +494,7 @@ mmcli_output_string_multiline (MmcF         field,
             g_strstrip (split[i]);
     }
 
-    output_item_new_take_multiple (field, split, TRUE);
+    output_item_new_take_multiple (field, split, TRUE, FALSE);
 }
 
 void
@@ -507,7 +510,7 @@ mmcli_output_string_array (MmcF          field,
                            const gchar **strv,
                            gboolean      multiline)
 {
-    output_item_new_take_multiple (field, g_strdupv ((gchar **)strv), multiline);
+    output_item_new_take_multiple (field, g_strdupv ((gchar **)strv), multiline, FALSE);
 }
 
 void
@@ -515,7 +518,7 @@ mmcli_output_string_array_take (MmcF       field,
                                 gchar    **strv,
                                 gboolean   multiline)
 {
-    output_item_new_take_multiple (field, strv, multiline);
+    output_item_new_take_multiple (field, strv, multiline, FALSE);
 }
 
 void
@@ -551,7 +554,7 @@ mmcli_output_string_array_multiline_take (MmcF       field,
         merged = (gchar **)g_ptr_array_free (pointers, FALSE);
     }
 
-    output_item_new_take_multiple (field, merged, TRUE);
+    output_item_new_take_multiple (field, merged, TRUE, FALSE);
 }
 
 void
@@ -703,6 +706,8 @@ mmcli_output_sim_slots (gchar **sim_slot_paths,
 /******************************************************************************/
 /* (Custom) Network scan output */
 
+static gchar *json_strescape (const gchar *str);
+
 static gchar *
 build_network_info (MMModem3gppNetwork *network)
 {
@@ -719,18 +724,49 @@ build_network_info (MMModem3gppNetwork *network)
     access_technologies = mm_modem_access_technology_build_string_from_mask (mm_modem_3gpp_network_get_access_technology (network));
     availability = mm_modem_3gpp_network_availability_get_string (mm_modem_3gpp_network_get_availability (network));
 
-    if (selected_type == MMC_OUTPUT_TYPE_HUMAN)
+    if (selected_type == MMC_OUTPUT_TYPE_HUMAN) {
         out = g_strdup_printf ("%s - %s (%s, %s)",
                                operator_code ? operator_code : "code n/a",
                                operator_name ? operator_name : "name n/a",
                                access_technologies,
                                availability);
-    else
+    } else if (selected_type == MMC_OUTPUT_TYPE_JSON) {
+        GString *str;
+        gchar *escape;
+
+        str = g_string_new (NULL);
+
+        g_string_append_printf (str, "{");
+
+        escape = json_strescape (operator_code);
+        g_string_append_printf (str, "\"operator-code\":\"%s\"", escape ? escape: "--");
+        g_free (escape);
+        g_string_append_printf (str, ",");
+
+        escape = json_strescape (operator_name);
+        g_string_append_printf (str, "\"operator-name\":\"%s\"", escape ? escape: "--");
+        g_free (escape);
+        g_string_append_printf (str, ",");
+
+        escape = json_strescape (access_technologies);
+        g_string_append_printf (str, "\"access-technologies\":\"%s\"", escape);
+        g_free (escape);
+        g_string_append_printf (str, ",");
+
+        escape = json_strescape (availability);
+        g_string_append_printf (str, "\"availability\":\"%s\"", escape);
+        g_free (escape);
+
+        g_string_append_printf (str, "}");
+
+        out = g_string_free (str, FALSE);
+    } else {
         out = g_strdup_printf ("operator-code: %s, operator-name: %s, access-technologies: %s, availability: %s",
                                operator_code ? operator_code : "--",
                                operator_name ? operator_name : "--",
                                access_technologies,
                                availability);
+    }
     g_free (access_technologies);
 
     return out;
@@ -757,7 +793,7 @@ mmcli_output_scan_networks (GList *network_list)
     if (selected_type == MMC_OUTPUT_TYPE_HUMAN && !networks)
         output_item_new_take_single (MMC_F_3GPP_SCAN_NETWORKS, g_strdup ("n/a"));
     else
-        output_item_new_take_multiple (MMC_F_3GPP_SCAN_NETWORKS, networks, TRUE);
+        output_item_new_take_multiple (MMC_F_3GPP_SCAN_NETWORKS, networks, TRUE, TRUE);
 }
 
 /******************************************************************************/
@@ -849,7 +885,7 @@ mmcli_output_firmware_list (GList                *firmware_list,
     if (selected_type == MMC_OUTPUT_TYPE_HUMAN && !firmwares)
         output_item_new_take_single (MMC_F_FIRMWARE_LIST, g_strdup ("n/a"));
     else
-        output_item_new_take_multiple (MMC_F_FIRMWARE_LIST, firmwares, TRUE);
+        output_item_new_take_multiple (MMC_F_FIRMWARE_LIST, firmwares, TRUE, FALSE);
 }
 
 /******************************************************************************/
@@ -891,7 +927,7 @@ mmcli_output_pco_list (GList *pco_list)
     }
     g_ptr_array_add (aux, NULL);
 
-    output_item_new_take_multiple (MMC_F_3GPP_PCO, (gchar **) g_ptr_array_free (aux, FALSE), TRUE);
+    output_item_new_take_multiple (MMC_F_3GPP_PCO, (gchar **) g_ptr_array_free (aux, FALSE), TRUE, FALSE);
 }
 
 /******************************************************************************/
@@ -999,7 +1035,7 @@ output_profile_list (MmcF   field,
     if (selected_type == MMC_OUTPUT_TYPE_HUMAN && !profiles)
         output_item_new_take_single (field, g_strdup ("n/a"));
     else
-        output_item_new_take_multiple (field, profiles, TRUE);
+        output_item_new_take_multiple (field, profiles, TRUE, FALSE);
 }
 
 void
@@ -1042,7 +1078,7 @@ mmcli_output_cell_info (GList *cell_info_list)
     if (selected_type == MMC_OUTPUT_TYPE_HUMAN && !cell_infos)
         output_item_new_take_single (MMC_F_CELL_INFO, g_strdup ("n/a"));
     else
-        output_item_new_take_multiple (MMC_F_CELL_INFO, cell_infos, TRUE);
+        output_item_new_take_multiple (MMC_F_CELL_INFO, cell_infos, TRUE, FALSE);
 }
 
 /******************************************************************************/
@@ -1490,13 +1526,17 @@ dump_output_json (void)
 
             g_print ("\"%s\":[", current_path[cur_dlen]);
             for (i = 0; i < n; i++) {
-                gchar *escaped;
+                if (multiple->is_object) {
+                    g_print ("%s", multiple->values[i]);
+                } else {
+                    gchar *escaped;
 
-                escaped = json_strescape (multiple->values[i]);
-                g_print("\"%s\"", escaped);
+                    escaped = json_strescape (multiple->values[i]);
+                    g_print ("\"%s\"", escaped);
+                    g_free (escaped);
+                }
                 if (i < n - 1)
                     g_print(",");
-                g_free (escaped);
             }
             g_print("]");
         } else
