@@ -390,8 +390,10 @@ version_conf = {
 
 subdir('po')
 subdir('data')
-subdir('data/dispatcher-connection')
-subdir('data/dispatcher-fcc-unlock')
+if get_option('examples')
+  subdir('data/dispatcher-connection')
+  subdir('data/dispatcher-fcc-unlock')
+endif
 subdir('introspection')
 subdir('include')
 
