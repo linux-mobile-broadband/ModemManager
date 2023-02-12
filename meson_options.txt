@@ -4,6 +4,7 @@
 option('udev', type: 'boolean', value: true, description: 'enable udev support')
 option('udevdir', type: 'string', value: '', description: 'udev base directory')
 
+option('examples', type: 'boolean', value: true, description: 'install examples')
 option('tests', type: 'boolean', value: true, description: 'enable tests')
 
 option('dbus_policy_dir', type: 'string', value: '', description: 'd-bus system policy directory')
