@@ -1472,7 +1472,7 @@ dump_output_json (void)
 
     output_items = g_list_sort (output_items, (GCompareFunc) list_sort_by_keys);
 
-    g_print("{");
+    g_print ("{");
     for (l = output_items; l; l = g_list_next (l)) {
         OutputItem *item_l = (OutputItem *)(l->data);
 
@@ -1536,16 +1536,16 @@ dump_output_json (void)
                     g_free (escaped);
                 }
                 if (i < n - 1)
-                    g_print(",");
+                    g_print (",");
             }
-            g_print("]");
+            g_print ("]");
         } else
             g_assert_not_reached ();
     }
 
     while (cur_dlen--)
         g_print ("}");
-    g_print("}\n");
+    g_print ("}\n");
 
     g_strfreev (current_path);
 }
@@ -1557,7 +1557,7 @@ dump_output_list_json (MmcF field)
 
     g_assert (field != MMC_F_UNKNOWN);
 
-    g_print("{\"%s\":[", field_infos[field].key);
+    g_print ("{\"%s\":[", field_infos[field].key);
 
     for (l = output_items; l; l = g_list_next (l)) {
         OutputItem         *item_l;
@@ -1570,13 +1570,13 @@ dump_output_list_json (MmcF field)
 
         /* All items must be of same type */
         g_assert_cmpint (item_l->field, ==, field);
-        g_print("\"%s\"", listitem->value);
+        g_print ("\"%s\"", listitem->value);
 
         if (g_list_next (l))
-            g_print(",");
+            g_print (",");
     }
 
-    g_print("]}\n");
+    g_print ("]}\n");
 }
 
 /******************************************************************************/
