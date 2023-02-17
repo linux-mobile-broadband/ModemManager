@@ -907,9 +907,13 @@ load_settings_from_profile (MMBearerMbim    *self,
                             MMBearerApnType  default_apn_type,
                             GError         **error)
 {
-    MMBearerAllowedAuth  bearer_auth;
-    MMBearerApnType      apn_type;
-    GError              *inner_error = NULL;
+    MMBearerAllowedAuth     bearer_auth;
+    MMBearerApnType         apn_type;
+    GError                 *inner_error = NULL;
+    g_autoptr(MMBaseModem)  modem  = NULL;
+
+    g_object_get (self, MM_BASE_BEARER_MODEM,  &modem, NULL);
+    g_assert (modem);
 
     /* APN settings */
     ctx->apn = g_strdup (mm_3gpp_profile_get_apn (profile));
@@ -922,7 +926,11 @@ load_settings_from_profile (MMBearerMbim    *self,
         }
         apn_type = default_apn_type;
     }
-    ctx->context_type = mm_bearer_apn_type_to_mbim_context_type (apn_type, self, &inner_error);
+    ctx->context_type = mm_bearer_apn_type_to_mbim_context_type (
+                            apn_type,
+                            mm_broadband_modem_mbim_is_context_type_ext_supported (MM_BROADBAND_MODEM_MBIM (modem)),
+                            self,
+                            &inner_error);
     if (inner_error) {
         g_propagate_error (error, inner_error);
         return FALSE;

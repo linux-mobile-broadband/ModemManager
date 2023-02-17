@@ -562,6 +562,7 @@ mm_bearer_apn_type_from_mbim_context_type (MbimContextType context_type)
 
 MbimContextType
 mm_bearer_apn_type_to_mbim_context_type (MMBearerApnType   apn_type,
+                                         gboolean          mbim_extensions_supported,
                                          gpointer          log_object,
                                          GError          **error)
 {
@@ -580,8 +581,6 @@ mm_bearer_apn_type_to_mbim_context_type (MMBearerApnType   apn_type,
         return MBIM_CONTEXT_TYPE_IMS;
     if (apn_type & MM_BEARER_APN_TYPE_MMS)
         return MBIM_CONTEXT_TYPE_MMS;
-    if (apn_type &MM_BEARER_APN_TYPE_MANAGEMENT)
-        return MBIM_CONTEXT_TYPE_ADMIN;
     if (apn_type & MM_BEARER_APN_TYPE_VOICE)
         return MBIM_CONTEXT_TYPE_VOICE;
     if (apn_type & MM_BEARER_APN_TYPE_PRIVATE)
@@ -592,14 +591,30 @@ mm_bearer_apn_type_to_mbim_context_type (MMBearerApnType   apn_type,
         return MBIM_CONTEXT_TYPE_VIDEO_SHARE;
     if (apn_type & MM_BEARER_APN_TYPE_LOCAL)
         return MBIM_CONTEXT_TYPE_LOCAL;
-    if (apn_type & MM_BEARER_APN_TYPE_APP)
-        return MBIM_CONTEXT_TYPE_APP;
-    if (apn_type & MM_BEARER_APN_TYPE_XCAP)
-        return MBIM_CONTEXT_TYPE_XCAP;
-    if (apn_type & MM_BEARER_APN_TYPE_TETHERING)
-        return MBIM_CONTEXT_TYPE_TETHERING;
-    if (apn_type & MM_BEARER_APN_TYPE_EMERGENCY)
-        return MBIM_CONTEXT_TYPE_EMERGENCY_CALLING;
+
+    if (mbim_extensions_supported) {
+        if (apn_type & MM_BEARER_APN_TYPE_MANAGEMENT)
+            return MBIM_CONTEXT_TYPE_ADMIN;
+        if (apn_type & MM_BEARER_APN_TYPE_APP)
+            return MBIM_CONTEXT_TYPE_APP;
+        if (apn_type & MM_BEARER_APN_TYPE_XCAP)
+            return MBIM_CONTEXT_TYPE_XCAP;
+        if (apn_type & MM_BEARER_APN_TYPE_TETHERING)
+            return MBIM_CONTEXT_TYPE_TETHERING;
+        if (apn_type & MM_BEARER_APN_TYPE_EMERGENCY)
+            return MBIM_CONTEXT_TYPE_EMERGENCY_CALLING;
+    } else {
+        if ((apn_type & MM_BEARER_APN_TYPE_MANAGEMENT) ||
+            (apn_type & MM_BEARER_APN_TYPE_APP)        ||
+            (apn_type & MM_BEARER_APN_TYPE_XCAP)       ||
+            (apn_type & MM_BEARER_APN_TYPE_TETHERING)  ||
+            (apn_type & MM_BEARER_APN_TYPE_EMERGENCY)) {
+            mm_obj_dbg (log_object,
+                        "MS extensions unsupported: "
+                        "fallback to using default (internet) APN type");
+            return MBIM_CONTEXT_TYPE_INTERNET;
+        }
+    }
 
     str = mm_bearer_apn_type_build_string_from_mask (apn_type);
     g_set_error (error,

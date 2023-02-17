@@ -71,4 +71,6 @@ void mm_broadband_modem_mbim_get_speeds (MMBroadbandModemMbim *self,
                                          guint64              *uplink_speed,
                                          guint64              *downlink_speed);
 
+gboolean mm_broadband_modem_mbim_is_context_type_ext_supported (MMBroadbandModemMbim *self);
+
 #endif /* MM_BROADBAND_MODEM_MBIM_H */

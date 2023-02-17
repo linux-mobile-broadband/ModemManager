@@ -66,6 +66,7 @@ MbimContextIpType   mm_bearer_ip_family_to_mbim_context_ip_type    (MMBearerIpFa
                                                                     GError              **error);
 MMBearerApnType     mm_bearer_apn_type_from_mbim_context_type      (MbimContextType       context_type);
 MbimContextType     mm_bearer_apn_type_to_mbim_context_type        (MMBearerApnType       apn_type,
+                                                                    gboolean              mbim_extensions_supported,
                                                                     gpointer              log_object,
                                                                     GError              **error);
 

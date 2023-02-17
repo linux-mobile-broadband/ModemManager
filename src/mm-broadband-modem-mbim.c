@@ -120,6 +120,7 @@ struct _MMBroadbandModemMbimPrivate {
     /* Supported features */
     gboolean is_profile_management_supported;
     gboolean is_profile_management_ext_supported;
+    gboolean is_context_type_ext_supported;
     gboolean is_pco_supported;
     gboolean is_lte_attach_info_supported;
     gboolean is_nr5g_registration_settings_supported;
@@ -387,6 +388,14 @@ mm_broadband_modem_mbim_peek_port_mbim_for_data (MMBroadbandModemMbim  *self,
     g_assert (MM_BROADBAND_MODEM_MBIM_GET_CLASS (self)->peek_port_mbim_for_data);
 
     return MM_BROADBAND_MODEM_MBIM_GET_CLASS (self)->peek_port_mbim_for_data (self, data, error);
+}
+
+/*****************************************************************************/
+
+gboolean
+mm_broadband_modem_mbim_is_context_type_ext_supported (MMBroadbandModemMbim *self)
+{
+    return self->priv->is_context_type_ext_supported;
 }
 
 /*****************************************************************************/
@@ -3281,6 +3290,8 @@ query_device_services_ready (MbimDevice   *device,
                         mm_obj_dbg (self, "Base stations info is supported");
                         self->priv->is_base_stations_info_supported = TRUE;
                     } else if (device_services[i]->cids[j] == MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_PROVISIONED_CONTEXTS) {
+                        mm_obj_dbg (self, "Context types extension is supported");
+                        self->priv->is_context_type_ext_supported = TRUE;
                         if (mm_context_get_test_mbimex_profile_management ()) {
                             mm_obj_dbg (self, "Profile management extension is supported");
                             self->priv->is_profile_management_ext_supported = TRUE;
@@ -7223,7 +7234,10 @@ modem_3gpp_profile_manager_store_profile (MMIfaceModem3gppProfileManager *_self,
 
     ctx->apn_type = mm_3gpp_profile_get_apn_type (profile);
     apn_type_str = mm_bearer_apn_type_build_string_from_mask (ctx->apn_type);
-    context_type = mm_bearer_apn_type_to_mbim_context_type (ctx->apn_type, self, &error);
+    context_type = mm_bearer_apn_type_to_mbim_context_type (ctx->apn_type,
+                                                            self->priv->is_context_type_ext_supported,
+                                                            self,
+                                                            &error);
     if (error) {
         g_prefix_error (&error, "Failed to convert mbim context type from apn type: ");
         g_task_return_error (task, error);
@@ -7398,11 +7412,11 @@ modem_3gpp_profile_manager_delete_profile (MMIfaceModem3gppProfileManager *_self
         MbimContextType  context_type;
 
         g_assert (self->priv->is_profile_management_ext_supported);
+        g_assert (self->priv->is_context_type_ext_supported);
 
         apn_type = mm_3gpp_profile_get_apn_type (profile);
         g_assert (apn_type != MM_BEARER_APN_TYPE_NONE);
-
-        context_type = mm_bearer_apn_type_to_mbim_context_type (apn_type, self, &error);
+        context_type = mm_bearer_apn_type_to_mbim_context_type (apn_type, TRUE, self, &error);
         if (error)
             g_prefix_error (&error, "Failed to convert mbim context type from apn type: ");
         else {
