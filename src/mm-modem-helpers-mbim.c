@@ -598,6 +598,8 @@ mm_bearer_apn_type_to_mbim_context_type (MMBearerApnType   apn_type,
         return MBIM_CONTEXT_TYPE_XCAP;
     if (apn_type & MM_BEARER_APN_TYPE_TETHERING)
         return MBIM_CONTEXT_TYPE_TETHERING;
+    if (apn_type & MM_BEARER_APN_TYPE_EMERGENCY)
+        return MBIM_CONTEXT_TYPE_EMERGENCY_CALLING;
 
     str = mm_bearer_apn_type_build_string_from_mask (apn_type);
     g_set_error (error,
