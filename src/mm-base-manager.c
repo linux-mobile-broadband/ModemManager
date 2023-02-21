@@ -1109,15 +1109,58 @@ remove_device_inhibition (MMBaseManager *self,
     info->port_infos = NULL;
     g_hash_table_remove (self->priv->inhibited_devices, uid);
 
+    /* If any port info exists, we require explicit port probing that will be
+     * triggered via the artificial port notifications emitted with the
+     * device_added() calls */
     if (port_infos) {
         GList *l;
 
-        /* Note that a device can only be inhibited if it had an existing
-         * modem exposed in the bus. And so, inhibition can only be placed
-         * AFTER all port probes have finished for a given device. This means
-         * that we either have a device tracked, or we have a list of port
-         * infos. Both at the same time should never happen. */
-        g_assert (!device);
+        /* A device may exist at this point if e.g. not all ports were
+         * removed during the inhibition (i.e. the MMDevice was never fully
+         * removed) and new ports were then added while inhibited. In this
+         * case, we must fake all ports going away so that the MMDevice gets
+         * completely removed, otherwise the plugin manager won't start a new
+         * device probing task and therefore no port probing tasks. */
+        if (device) {
+            GList *readded_port_infos = NULL;
+            GList *leftover_ports;
+            GList *l;
+
+            /* Create a new list of inhibited device port infos from the existing
+             * port probes */
+            leftover_ports = mm_device_peek_port_probe_list (device);
+            for (l = leftover_ports; l; l = g_list_next (l)) {
+                InhibitedDevicePortInfo *port_info;
+                MMPortProbe             *port_probe;
+
+                port_probe = MM_PORT_PROBE (l->data);
+
+                port_info = g_slice_new0 (InhibitedDevicePortInfo);
+                port_info->kernel_port = mm_port_probe_get_port (port_probe);
+                port_info->manual_scan = TRUE;
+                readded_port_infos = g_list_append (readded_port_infos, port_info);
+            }
+
+            /* Now, explicitly request to remove all ports, the device should go
+             * away as well while doing so. */
+            for (l = readded_port_infos; l; l = g_list_next (l)) {
+                InhibitedDevicePortInfo *port_info;
+
+                port_info = (InhibitedDevicePortInfo *)(l->data);
+                mm_obj_msg (self, "fake releasing port %s/%s during uninhibition...",
+                            mm_kernel_device_get_subsystem (port_info->kernel_port),
+                            mm_kernel_device_get_name (port_info->kernel_port));
+                device_removed (self,
+                                mm_kernel_device_get_subsystem (port_info->kernel_port),
+                                mm_kernel_device_get_name (port_info->kernel_port));
+            }
+
+            /* At this point, the device should have gone completely */
+            g_assert (!find_device_by_physdev_uid (self, uid));
+
+            /* Added the ports to re-add in the pending list */
+            port_infos = g_list_concat (port_infos, readded_port_infos);
+        }
 
         /* Report as added all port infos that we had tracked while the
          * device was inhibited. We can only report the added port after
@@ -1130,10 +1173,12 @@ remove_device_inhibition (MMBaseManager *self,
             device_added (self, port_info->kernel_port, FALSE, port_info->manual_scan);
         }
         g_list_free_full (port_infos, (GDestroyNotify)inhibited_device_port_info_free);
+        return;
     }
+
     /* The device may be totally gone from the system while we were
      * keeping the inhibition, so do not error out if not found. */
-    else if (device) {
+    if (device) {
         GError *error = NULL;
 
         /* Uninhibit device, which will create and expose the modem object */
