@@ -366,10 +366,9 @@ mm_xmm_parse_xact_query_response (const gchar             *response,
 {
     g_autoptr(GRegex)      r = NULL;
     g_autoptr(GMatchInfo)  match_info = NULL;
+    g_autoptr(GArray)      bands = NULL;
     GError                *inner_error = NULL;
-    GArray                *bands = NULL;
     guint                  i;
-
     MMModemModeCombination mode = {
         .allowed   = MM_MODEM_MODE_NONE,
         .preferred = MM_MODEM_MODE_NONE,
@@ -390,72 +389,76 @@ mm_xmm_parse_xact_query_response (const gchar             *response,
     g_assert (r != NULL);
 
     g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
-    if (!inner_error && g_match_info_matches (match_info)) {
-        if (mode_out) {
-            guint xmm_mode;
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
 
-            /* Number at index 1 */
-            mm_get_uint_from_match_info (match_info, 1, &xmm_mode);
+    if (!g_match_info_matches (match_info)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Unsupported XACT? response: %s", response);
+        return FALSE;
+    }
+
+    if (mode_out) {
+        guint xmm_mode;
+
+        /* Number at index 1 */
+        mm_get_uint_from_match_info (match_info, 1, &xmm_mode);
+        if (xmm_mode >= G_N_ELEMENTS (xmm_modes)) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                         "Unsupported XACT AcT value: %u", xmm_mode);
+            return FALSE;
+        }
+        mode.allowed = xmm_modes[xmm_mode];
+
+        /* Number at index 2 */
+        if (mm_count_bits_set (mode.allowed) > 1 && mm_get_uint_from_match_info (match_info, 2, &xmm_mode)) {
             if (xmm_mode >= G_N_ELEMENTS (xmm_modes)) {
-                inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Unsupported XACT AcT value: %u", xmm_mode);
-                goto out;
+                g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                             "Unsupported XACT preferred AcT value: %u", xmm_mode);
+                return FALSE;
             }
-            mode.allowed = xmm_modes[xmm_mode];
-
-            /* Number at index 2 */
-            if (mm_count_bits_set (mode.allowed) > 1 && mm_get_uint_from_match_info (match_info, 2, &xmm_mode)) {
-                if (xmm_mode >= G_N_ELEMENTS (xmm_modes)) {
-                    inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Unsupported XACT preferred AcT value: %u", xmm_mode);
-                    goto out;
-                }
-                mode.preferred = xmm_modes[xmm_mode];
-            }
-
-            /* Number at index 3: ignored */
+            mode.preferred = xmm_modes[xmm_mode];
         }
 
-        if (bands_out) {
-            gchar  *bandstr;
-            GArray *nums;
+        /* Number at index 3: ignored */
+    }
 
-            /* Bands start at index 4 */
-            bandstr = mm_get_string_unquoted_from_match_info (match_info, 4);
-            nums = mm_parse_uint_list (bandstr, &inner_error);
-            g_free (bandstr);
+    if (bands_out) {
+        g_autofree gchar *bandstr = NULL;
+        g_autoptr(GArray) nums = NULL;
 
-            if (inner_error)
-                goto out;
-            if (!nums) {
-                inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Invalid XACT? response");
-                goto out;
-            }
+        /* Bands start at index 4 */
+        bandstr = mm_get_string_unquoted_from_match_info (match_info, 4);
+        nums = mm_parse_uint_list (bandstr, &inner_error);
+        if (inner_error) {
+            g_propagate_error (error, inner_error);
+            return FALSE;
+        }
+        if (!nums) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                         "Missing bands in XACT? response: %s", response);
+            return FALSE;
+        }
 
-            bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), nums->len);
-            for (i = 0; i < nums->len; i++) {
-                MMModemBand band;
+        bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), nums->len);
+        for (i = 0; i < nums->len; i++) {
+            MMModemBand band;
 
-                band = xact_num_to_band (g_array_index (nums, guint, i));
-                if (band != MM_MODEM_BAND_UNKNOWN)
-                    g_array_append_val (bands, band);
-            }
-            g_array_unref (nums);
+            band = xact_num_to_band (g_array_index (nums, guint, i));
+            if (band != MM_MODEM_BAND_UNKNOWN)
+                g_array_append_val (bands, band);
+        }
 
-            if (bands->len == 0) {
-                inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Missing current band list");
-                goto out;
-            }
+        if (bands->len == 0) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                         "Invalid list of bands in XACT? response: %s", response);
+            return FALSE;
         }
     }
 
     /* success */
-
-out:
-    if (inner_error) {
-        if (bands)
-            g_array_unref (bands);
-        g_propagate_error (error, inner_error);
-        return FALSE;
-    }
 
     if (mode_out) {
         g_assert (mode.allowed != MM_MODEM_MODE_NONE);
@@ -465,7 +468,7 @@ out:
 
     if (bands_out) {
         g_assert (bands);
-        *bands_out = bands;
+        *bands_out = g_steal_pointer (&bands);
     }
 
     return TRUE;
