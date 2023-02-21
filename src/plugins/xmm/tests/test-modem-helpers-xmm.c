@@ -274,6 +274,33 @@ test_xact_query_3g_4g (void)
                                   expected_bands, G_N_ELEMENTS (expected_bands));
 }
 
+static void
+test_xact_query_no_match_mode (void)
+{
+    g_autoptr(GError)      error = NULL;
+    gboolean               ret;
+    MMModemModeCombination mode = {
+        .allowed = MM_MODEM_MODE_NONE,
+        .preferred = MM_MODEM_MODE_NONE,
+    };
+
+    ret = mm_xmm_parse_xact_query_response ("something here", &mode, NULL, &error);
+    g_assert (error);
+    g_assert (!ret);
+}
+
+static void
+test_xact_query_no_match_bands (void)
+{
+    g_autoptr(GError) error = NULL;
+    g_autoptr(GArray) bands = NULL;
+    gboolean          ret;
+
+    ret = mm_xmm_parse_xact_query_response ("something here", NULL, &bands, &error);
+    g_assert (error);
+    g_assert (!ret);
+}
+
 /*****************************************************************************/
 
 #define XACT_SET_TEST_MAX_BANDS 6
@@ -764,8 +791,10 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/xmm/xact/test/3g-4g",    test_xact_test_3g_4g);
     g_test_add_func ("/MM/xmm/xact/test/2g-3g-4g", test_xact_test_2g_3g_4g);
 
-    g_test_add_func ("/MM/xmm/xact/query/3g-only", test_xact_query_3g_only);
-    g_test_add_func ("/MM/xmm/xact/query/3g-4g",   test_xact_query_3g_4g);
+    g_test_add_func ("/MM/xmm/xact/query/3g-only",        test_xact_query_3g_only);
+    g_test_add_func ("/MM/xmm/xact/query/3g-4g",          test_xact_query_3g_4g);
+    g_test_add_func ("/MM/xmm/xact/query/no-match/mode",  test_xact_query_no_match_mode);
+    g_test_add_func ("/MM/xmm/xact/query/no-match/bands", test_xact_query_no_match_bands);
 
     g_test_add_func ("/MM/xmm/xact/set", test_xact_set);
 
