@@ -1124,7 +1124,6 @@ remove_device_inhibition (MMBaseManager *self,
         if (device) {
             GList *readded_port_infos = NULL;
             GList *leftover_ports;
-            GList *l;
 
             /* Create a new list of inhibited device port infos from the existing
              * port probes */
