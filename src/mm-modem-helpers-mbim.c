@@ -1247,6 +1247,68 @@ mm_signal_from_mbim_signal_state (MbimDataClass          data_class,
     return TRUE;
 }
 
+gboolean
+mm_signal_from_atds_signal_response (guint32    rssi,
+                                     guint32    rscp,
+                                     guint32    ecno,
+                                     guint32    rsrq,
+                                     guint32    rsrp,
+                                     guint32    snr,
+                                     MMSignal **out_gsm,
+                                     MMSignal **out_umts,
+                                     MMSignal **out_lte)
+{
+
+    if (rscp <= 96) {
+        *out_umts = mm_signal_new ();
+        mm_signal_set_rscp (*out_umts, -120.0 + rscp);
+    }
+
+    if (ecno <= 49) {
+        if (!*out_umts)
+            *out_umts = mm_signal_new ();
+        mm_signal_set_ecio (*out_umts, -24.0 + ((gdouble) ecno / 2));
+    }
+
+    if (rsrq <= 34) {
+        *out_lte = mm_signal_new ();
+        mm_signal_set_rsrq (*out_lte, -19.5 + ((gdouble) rsrq / 2));
+    }
+
+    if (rsrp <= 97) {
+        if (!*out_lte)
+            *out_lte = mm_signal_new ();
+        mm_signal_set_rsrp (*out_lte, -140.0 + rsrp);
+    }
+
+    if (snr <= 35) {
+        if (!*out_lte)
+            *out_lte = mm_signal_new ();
+        mm_signal_set_snr (*out_lte, -5.0 + snr);
+    }
+
+    /* RSSI may be given for all 2G, 3G or 4G so we detect to which one applies */
+    if (rssi <= 31) {
+        gdouble value;
+
+        value = -113.0 + (2 * rssi);
+        if (*out_lte)
+            mm_signal_set_rssi (*out_lte, value);
+        else if (*out_umts)
+            mm_signal_set_rssi (*out_umts, value);
+        else {
+            *out_gsm = mm_signal_new ();
+            mm_signal_set_rssi (*out_gsm, value);
+        }
+    }
+
+    if (!out_gsm && !out_umts && !out_lte) {
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
 /*****************************************************************************/
 
 void

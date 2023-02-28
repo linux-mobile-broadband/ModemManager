@@ -144,6 +144,16 @@ gboolean mm_signal_from_mbim_signal_state (MbimDataClass          data_class,
                                            MMSignal             **out_lte,
                                            MMSignal             **out_nr5g);
 
+gboolean mm_signal_from_atds_signal_response (guint32    rssi,
+                                              guint32    rscp,
+                                              guint32    ecno,
+                                              guint32    rsrq,
+                                              guint32    rsrp,
+                                              guint32    snr,
+                                              MMSignal **out_gsm,
+                                              MMSignal **out_umts,
+                                              MMSignal **out_lte);
+
 /*****************************************************************************/
 /* RF utilities */
 /*****************************************************************************/
