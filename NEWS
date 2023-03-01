@@ -1,4 +1,42 @@
 
+Overview of changes in ModemManager 1.20.6
+-------------------------------------------
+
+ * build:
+   ** New build option to allow disabling the installation of examples.
+
+ * core:
+   ** Fix crash when uninhibiting partially removed device.
+   ** Fix crash when attempting to load an invalid shared utils library.
+
+ * mmcli:
+   ** Allow JSON and key/value output when creating SMS messages.
+   ** Improved JSON output in network scan results.
+
+ * libmm-glib:
+   ** Avoid using g_time_zone_new_offset() unless glib >= 2.58.
+   ** Fix flags to string conversion utils to allow multiple flags.
+
+ * MBIM:
+   ** Reset cached SIM info when SIM is unlocked.
+   ** Fix synchronizing the state of the SIM hot swap configured flag.
+   ** Fix bug cleaning up the LTE attach info unsolicited message handler.
+   ** Fallback from QMI UIM service only if unsupported.
+   ** Add missing support for 'emergency' APN type.
+
+ * QMI:
+   ** Fix processing and exposing PCOs.
+   ** Fix power up on modems that don't support power state change indications.
+
+ * plugins:
+   ** telit: add additional support for 5G modems.
+   ** telit: added port type hints for FN990 0x1070, 0x1071 compositions.
+   ** telit: increase allowed initial delay in AT ports.
+   ** telit: fallback to AT commands if loading revision via MBIM fails.
+   ** quectel: add support for EC21-EUX usb modules.
+   ** xmm: fix crash parsing XACT? response.
+
+
 Overview of changes in ModemManager 1.20.4
 -------------------------------------------
 
