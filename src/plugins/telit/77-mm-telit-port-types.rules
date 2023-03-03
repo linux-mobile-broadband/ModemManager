@@ -100,6 +100,9 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1071", ENV{.MM_USBIFNUM}=="05", SUBS
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1071", ENV{.MM_USBIFNUM}=="06", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1071", ENV{.MM_USBIFNUM}=="07", ENV{ID_MM_PORT_IGNORE}="1"
 
+# FN990 (PCIe composition: ignore, since it should not be detected as a modem)
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1075", ENV{ID_MM_DEVICE_IGNORE}="1"
+
 # LE910C1 with default usb cfg
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1201", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_TYPE_QCDM}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1201", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
