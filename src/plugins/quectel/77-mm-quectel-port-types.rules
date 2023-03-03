@@ -58,6 +58,16 @@ ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0125", ENV{.MM_USBIFNUM}=="01", SUBS
 ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0125", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
 ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0125", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 
+# Quectel EG12-EA
+#  ttyUSB0 (if #0): QCDM/DIAG port
+#  ttyUSB1 (if #1): GPS data port
+#  ttyUSB2 (if #2): AT primary port
+#  ttyUSB3 (if #3): AT secondary port
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0512", ENV{.MM_USBIFNUM}=="00", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_QCDM}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0512", ENV{.MM_USBIFNUM}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0512", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0512", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+
 # Quectel EC21-EUX
 #  ttyUSB0 (if #0): QCDM/DIAG port
 #  ttyUSB1 (if #1): GPS data port
