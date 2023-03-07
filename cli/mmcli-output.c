@@ -914,12 +914,12 @@ mmcli_output_pco_list (GList *pco_list)
         pco_data_hex = (pco_data ? mm_utils_bin2hexstr (pco_data, pco_data_size) : NULL);
 
         if (selected_type == MMC_OUTPUT_TYPE_HUMAN)
-            g_ptr_array_add (aux, g_strdup_printf ("%u: (%s) '%s'\n",
+            g_ptr_array_add (aux, g_strdup_printf ("%u: (%s) '%s'",
                                                    mm_pco_get_session_id (pco),
                                                    mm_pco_is_complete (pco) ? "complete" : "partial",
                                                    pco_data_hex ? pco_data_hex : ""));
         else
-            g_ptr_array_add (aux, g_strdup_printf ("session-id: %u, complete: %s, data: %s\n",
+            g_ptr_array_add (aux, g_strdup_printf ("session-id: %u, complete: %s, data: %s",
                                                    mm_pco_get_session_id (pco),
                                                    mm_pco_is_complete (pco) ? "yes" : "no",
                                                    pco_data_hex ? pco_data_hex : ""));
