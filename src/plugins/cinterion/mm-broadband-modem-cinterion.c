@@ -3405,6 +3405,49 @@ load_sim_slots (MMIfaceModem        *self,
 }
 
 static void
+set_primary_sim_slot_ready (MMBaseModem  *_self,
+                            GAsyncResult *res,
+                            GTask        *task)
+{
+    GError *error = NULL;
+
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+
+    g_object_unref (task);
+}
+
+static void
+set_primary_sim_slot (MMIfaceModem        *self,
+                      guint                sim_slot,
+                      GAsyncReadyCallback  callback,
+                      gpointer             user_data)
+{
+    GTask            *task;
+    g_autofree gchar *cmd = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    cmd = g_strdup_printf ("^SCFG=\"SIM/CS\",\"SIM_%i\"", sim_slot);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              cmd,
+                              10,
+                              FALSE,
+                              (GAsyncReadyCallback)set_primary_sim_slot_ready,
+                              task);
+}
+
+static gboolean
+set_primary_sim_slot_finish (MMIfaceModem  *self,
+                             GAsyncResult  *res,
+                             GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
 iface_modem_init (MMIfaceModem *iface)
 {
     iface_modem_parent = g_type_interface_peek_parent (iface);
@@ -3440,6 +3483,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->cleanup_sim_hot_swap = modem_cleanup_sim_hot_swap;
     iface->load_sim_slots = load_sim_slots;
     iface->load_sim_slots_finish = load_sim_slots_finish;
+    iface->set_primary_sim_slot = set_primary_sim_slot;
+    iface->set_primary_sim_slot_finish = set_primary_sim_slot_finish;
 }
 
 static MMIfaceModem *
