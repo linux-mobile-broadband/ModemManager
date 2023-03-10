@@ -538,6 +538,120 @@ finish:
 }
 
 /*****************************************************************************/
+/* ^SCFG response sim parser
+ *
+ * Example:
+ *   ...
+ *   ^SCFG: "SIM/CS","SIM_1"
+ *   ...
+ */
+
+gboolean
+mm_cinterion_parse_scfg_sim_response (const gchar  *response,
+                                      guint        *active_slot,
+                                      GError      **error)
+{
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *inner_error = NULL;
+
+    if (!response) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Missing response");
+        return FALSE;
+    }
+
+    r = g_regex_new ("\\^SCFG:\\s*\"SIM/CS\",\".*?(\\d)\"", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+    if (inner_error) {
+        g_prefix_error (&inner_error, "No valid SIM/CS entry found in ^SCFG response: ");
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    if (!mm_get_uint_from_match_info (match_info, 1, active_slot)) {
+        g_prefix_error (&inner_error, "Could not parse SIM slot index: ");
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+gboolean
+mm_cinterion_get_available_from_simlocal (const gchar  *response,
+                                          GArray      **available,
+                                          GError      **error)
+{
+    g_autoptr(GArray)  tmp_available = NULL;
+    GError            *inner_error = NULL;
+
+    if (!response) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Missing response");
+        return FALSE;
+    }
+
+    tmp_available = mm_parse_uint_list (response, &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    *available = g_steal_pointer (&tmp_available);
+
+    return TRUE;
+}
+
+/*****************************************************************************/
+/* ^SIND response simlocal parser
+ *
+ * Example:
+ *   ^SIND: simlocal,1,0,0
+ */
+
+gboolean
+mm_cinterion_parse_sind_simlocal_response (const gchar  *response,
+                                           GArray      **available,
+                                           GError      **error)
+{
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    g_autofree gchar      *str = NULL;
+    GError                *inner_error = NULL;
+
+    if (!response) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Missing response");
+        return FALSE;
+    }
+
+    r = g_regex_new ("\\^SIND:\\s*simlocal,\\d+,((\\d,)*\\d)", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+    if (inner_error) {
+        g_prefix_error (&inner_error, "No valid SIM/CS entry found in ^SCFG response: ");
+        g_propagate_error (error, inner_error);
+
+        return FALSE;
+    }
+
+    if (!g_match_info_matches (match_info)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Couldn't match SIM slot index");
+        return FALSE;
+    }
+
+    str = g_match_info_fetch (match_info, 1);
+    if (!mm_cinterion_get_available_from_simlocal (str, available, &inner_error)) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+/*****************************************************************************/
 /* +CNMI test parser
  *
  * Example (PHS8):

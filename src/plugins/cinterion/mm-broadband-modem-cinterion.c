@@ -96,6 +96,8 @@ struct _MMBroadbandModemCinterionPrivate {
     GRegex *sysstart_regex;
     /* +CIEV indications as configured via AT^SIND */
     GRegex *ciev_regex;
+    /* +CIEV indication for simlocal configured via AT^SIND */
+    GRegex *simlocal_regex;
     /* Ignore SIM hotswap SCKS msg, until ready */
     GRegex *scks_regex;
 
@@ -3109,6 +3111,10 @@ setup_ports (MMBroadbandModem *_self)
             ports[i],
             self->priv->scks_regex,
             NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->simlocal_regex,
+            NULL, NULL, NULL);
     }
 }
 
@@ -3158,6 +3164,8 @@ mm_broadband_modem_cinterion_init (MMBroadbandModemCinterion *self)
                                               G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->scks_regex = g_regex_new ("\\^SCKS:\\s*([0-3])\\r\\n",
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->simlocal_regex = g_regex_new ("\\r\\n\\+CIEV:\\s*simlocal,((\\d,)*\\d)\\r\\n",
+                                              G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
     self->priv->any_allowed = MM_MODEM_MODE_NONE;
 }
@@ -3187,8 +3195,213 @@ finalize (GObject *object)
     g_regex_unref (self->priv->ciev_regex);
     g_regex_unref (self->priv->sysstart_regex);
     g_regex_unref (self->priv->scks_regex);
+    g_regex_unref (self->priv->simlocal_regex);
 
     G_OBJECT_CLASS (mm_broadband_modem_cinterion_parent_class)->finalize (object);
+}
+
+/*****************************************************************************/
+/* Load SIM slots (modem interface) */
+
+typedef struct {
+    GPtrArray *sim_slots;
+    guint number_slots;
+    guint active_slot_index; /* range [1,number_slots]   */
+} LoadSimSlotsContext;
+
+static void
+load_sim_slots_context_free (LoadSimSlotsContext *ctx)
+{
+    g_clear_pointer (&ctx->sim_slots, g_ptr_array_unref);
+    g_slice_free (LoadSimSlotsContext, ctx);
+}
+
+static void
+sim_slot_free (MMBaseSim *sim)
+{
+    if (sim)
+        g_object_unref (sim);
+}
+
+static gboolean
+load_sim_slots_finish (MMIfaceModem  *self,
+                       GAsyncResult  *res,
+                       GPtrArray    **sim_slots,
+                       guint         *primary_sim_slot,
+                       GError       **error)
+{
+    LoadSimSlotsContext *ctx;
+
+    if (!g_task_propagate_boolean (G_TASK (res), error))
+        return FALSE;
+
+    ctx = g_task_get_task_data (G_TASK (res));
+
+    if (sim_slots)
+        *sim_slots = g_steal_pointer (&ctx->sim_slots);
+
+    if (primary_sim_slot)
+        *primary_sim_slot = ctx->active_slot_index;
+
+    return TRUE;
+}
+
+static void
+scfg_query_ready (MMBaseModem  *_self,
+                  GAsyncResult *res,
+                  GTask        *task)
+{
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    LoadSimSlotsContext       *ctx;
+    MMBaseSim                 *active_sim;
+    const gchar               *response;
+    GError                    *error = NULL;
+    guint                      active_slot;
+
+    ctx = g_task_get_task_data (task);
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!response ||
+        !mm_cinterion_parse_scfg_sim_response (response,
+                                               &active_slot,
+                                               &error)) {
+        g_task_return_error (task, error);
+        return;
+    }
+
+    mm_obj_info (self, "active SIM slot request successful");
+
+    ctx->active_slot_index = active_slot;
+    active_sim = g_ptr_array_index (ctx->sim_slots, active_slot - 1);
+    if (active_sim != NULL)
+        g_object_set (G_OBJECT (active_sim), "active", TRUE, NULL);
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+cinterion_simlocal_unsolicited_handler (MMPortSerialAt            *port,
+                                        GMatchInfo                *match_info,
+                                        MMBroadbandModemCinterion *self)
+{
+    g_autoptr(GError)     error = NULL;
+    g_autoptr(GArray)     available = NULL;
+    g_autoptr(GPtrArray)  sim_slots = NULL;
+    g_autofree gchar     *response = NULL;
+    guint                 i;
+
+    response = g_match_info_fetch (match_info, 1);
+    if (!response || !mm_cinterion_get_available_from_simlocal (response, &available, &error)) {
+        mm_obj_warn (self, "Could not parse list of available SIMs: %s", error->message);
+        return;
+    }
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_SIM_SLOTS, &sim_slots,
+                  NULL);
+
+    for (i = 0; i < sim_slots->len; i++) {
+        MMBaseSim *sim;
+        gboolean   is_available;
+
+        sim = g_ptr_array_index (sim_slots, i);
+        is_available = g_array_index (available, gboolean, i);
+
+        if (sim == NULL && is_available) {
+            mm_obj_info (self, "SIM in slot %i inserted", i + 1);
+            sim = mm_base_sim_new_initialized (MM_BASE_MODEM (self), i + 1, FALSE,
+                                               NULL, NULL, NULL, NULL, NULL, NULL);
+            mm_iface_modem_modify_sim (MM_IFACE_MODEM (self), i, sim);
+        } else if (sim != NULL && !is_available) {
+            mm_obj_info (self, "SIM in slot %i removed", i + 1);
+            mm_iface_modem_modify_sim (MM_IFACE_MODEM (self), i, NULL);
+        }
+    }
+}
+
+static void
+cinterion_slot_availability_init_ready (MMBaseModem  *_self,
+                                        GAsyncResult *res,
+                                        GTask        *task)
+{
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    const gchar               *response;
+    MMPortSerialAt            *primary;
+    MMPortSerialAt            *secondary;
+    LoadSimSlotsContext       *ctx;
+    g_autoptr(GArray)          available = NULL;
+    g_autoptr(GError)          error = NULL;
+    guint                      i;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!response || !mm_cinterion_parse_sind_simlocal_response (response, &available, &error)) {
+        g_prefix_error (&error, "Could not enable simlocal: ");
+        g_task_return_error (task, g_steal_pointer (&error));
+        g_object_unref (task);
+        return;
+    }
+
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    mm_port_serial_at_add_unsolicited_msg_handler (
+        primary,
+        self->priv->simlocal_regex,
+        (MMPortSerialAtUnsolicitedMsgFn) cinterion_simlocal_unsolicited_handler,
+        self,
+        NULL);
+
+    secondary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+    if (secondary)
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            secondary,
+            self->priv->simlocal_regex,
+            (MMPortSerialAtUnsolicitedMsgFn) cinterion_simlocal_unsolicited_handler,
+            self,
+            NULL);
+
+    mm_obj_info (self, "SIM availability change with simlocal successfully enabled");
+
+    ctx = g_task_get_task_data (task);
+    ctx->number_slots = available->len;
+    ctx->sim_slots = g_ptr_array_new_full (ctx->number_slots, (GDestroyNotify)sim_slot_free);
+
+    for (i = 0; i < ctx->number_slots; i++) {
+        MMBaseSim *sim = NULL;
+        gboolean   is_available;
+
+        is_available = g_array_index (available, gboolean, i);
+
+        if (is_available)
+            sim = mm_base_sim_new_initialized (MM_BASE_MODEM (self), i + 1, FALSE,
+                                               NULL, NULL, NULL, NULL, NULL, NULL);
+        g_ptr_array_add (ctx->sim_slots, sim);
+    }
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^SCFG?",
+                              10,
+                              FALSE,
+                              (GAsyncReadyCallback)scfg_query_ready,
+                              task);
+}
+
+static void
+load_sim_slots (MMIfaceModem        *self,
+                GAsyncReadyCallback  callback,
+                gpointer             user_data)
+{
+    GTask               *task;
+    LoadSimSlotsContext *ctx;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    ctx = g_slice_new0 (LoadSimSlotsContext);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)load_sim_slots_context_free);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^SIND=\"simlocal\",1",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)cinterion_slot_availability_init_ready,
+                              task);
 }
 
 static void
@@ -3225,6 +3438,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->setup_sim_hot_swap = modem_setup_sim_hot_swap;
     iface->setup_sim_hot_swap_finish = modem_setup_sim_hot_swap_finish;
     iface->cleanup_sim_hot_swap = modem_cleanup_sim_hot_swap;
+    iface->load_sim_slots = load_sim_slots;
+    iface->load_sim_slots_finish = load_sim_slots_finish;
 }
 
 static MMIfaceModem *

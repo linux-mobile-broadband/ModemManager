@@ -73,6 +73,27 @@ gboolean mm_cinterion_parse_scfg_response (const gchar                   *respon
                                            GError                       **error);
 
 /*****************************************************************************/
+/* ^SCFG response sim parser */
+
+gboolean mm_cinterion_parse_scfg_sim_response (const gchar  *response,
+                                               guint        *sim_count,
+                                               GError      **error);
+
+/*****************************************************************************/
+/* ^SIND simlocal helper */
+
+gboolean mm_cinterion_get_available_from_simlocal (const gchar  *response,
+                                                   GArray      **available,
+                                                   GError      **error);
+
+/*****************************************************************************/
+/* ^SIND response simlocal parser */
+
+gboolean mm_cinterion_parse_sind_simlocal_response (const gchar  *response,
+                                                    GArray      **available,
+                                                    GError      **error);
+
+/*****************************************************************************/
 /* +CNMI test parser */
 
 gboolean mm_cinterion_parse_cnmi_test (const gchar *response,
