@@ -1586,7 +1586,10 @@ common_load_initial_eps_cgdcont_ready (MMBaseModem  *_self,
 
         context_list = mm_3gpp_parse_cgdcont_read_response (response, &error);
         if (!context_list)
-            mm_obj_dbg (self, "couldn't parse CGDCONT response: %s", error->message);
+            if (error)
+                mm_obj_dbg (self, "couldn't parse CGDCONT response: %s", error->message);
+            else
+                mm_obj_dbg (self, "No PDP contexts found.");
         else {
             GList *l;
 
