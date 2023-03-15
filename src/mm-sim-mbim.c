@@ -1131,7 +1131,6 @@ common_read_binary (MMSimMbim           *self,
                     GAsyncReadyCallback  callback,
                     gpointer             user_data)
 {
-    g_autoptr(MbimMessage)   request = NULL;
     GTask                   *task;
     MbimDevice              *device;
     CommonReadBinaryContext *ctx;
