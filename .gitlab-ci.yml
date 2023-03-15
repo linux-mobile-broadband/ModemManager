@@ -159,6 +159,26 @@ build-no-qmi-no-mbim-no-tests:
     - ninja -C build
     - ninja -C build install
 
+build-no-deprecated:
+  stage: build
+  extends:
+  - .fdo.distribution-image@ubuntu
+  - .common_variables
+  only:
+    - main
+    - merge_requests
+    - tags
+    - schedules
+  script:
+    - export BUILD_MBIM=false
+    - export BUILD_QRTR=false
+    - export BUILD_QMI=false
+    - *prepare_deps
+    - CFLAGS="-DMM_DISABLE_DEPRECATED" meson setup build --prefix=/usr -Dgtk_doc=false -Dqmi=false -Dqrtr=false -Dmbim=false
+    - ninja -C build
+    - ninja -C build test
+    - ninja -C build install
+
 build-no-suspend-resume:
   stage: build
   extends:
