@@ -94,9 +94,8 @@ info_log_signal_quality (MMIfaceModemSignal *self,
                          MMSignal           *info,
                          const gchar        *rat)
 {
-    Private              *priv = NULL;
-    g_autofree gchar     *printable = NULL;
-    g_autoptr(GDateTime)  current_time = NULL;
+    Private          *priv = NULL;
+    g_autofree gchar *printable = NULL;
 
     priv = get_private (self);
 
