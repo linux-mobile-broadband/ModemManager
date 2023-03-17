@@ -2031,12 +2031,81 @@ set_operating_mode_complete (MMBroadbandModemQmi *self,
 }
 
 static void
+dms_check_current_operating_mode_ready (QmiClientDms *client,
+                                        GAsyncResult *res,
+                                        GTask        *task)
+{
+    QmiMessageDmsGetOperatingModeOutput *output = NULL;
+    GError                              *error = NULL;
+    SetOperatingModeContext             *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    output = qmi_client_dms_get_operating_mode_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_dms_get_operating_mode_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get operating mode: ");
+        g_task_return_error (task, error);
+    } else {
+        QmiDmsOperatingMode mode = QMI_DMS_OPERATING_MODE_UNKNOWN;
+
+        qmi_message_dms_get_operating_mode_output_get_mode (output, &mode, NULL);
+
+        if (mode == ctx->mode)
+            g_task_return_boolean (task, TRUE);
+        else
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Requested mode (%s) and mode received (%s) did not match",
+                                     qmi_dms_operating_mode_get_string (ctx->mode),
+                                     qmi_dms_operating_mode_get_string (mode));
+    }
+
+    if (output)
+        qmi_message_dms_get_operating_mode_output_unref (output);
+
+    g_object_unref (task);
+}
+
+static void
 dms_set_operating_mode_timeout_cb (MMBroadbandModemQmi *self)
 {
-    GError *error = NULL;
+    GTask                   *task;
+    SetOperatingModeContext *ctx;
 
-    error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Power update operation timed out");
-    set_operating_mode_complete (self, error);
+    g_assert (self->priv->set_operating_mode_task);
+    task = g_steal_pointer (&self->priv->set_operating_mode_task);
+    ctx = g_task_get_task_data (task);
+
+    mm_obj_warn (self, "Power update operation timed out");
+
+    if (ctx->timeout_id) {
+        g_source_remove (ctx->timeout_id);
+        ctx->timeout_id = 0;
+    }
+
+    if (ctx->indication_id) {
+        g_autoptr(QmiMessageDmsSetEventReportInput) input = NULL;
+
+        g_signal_handler_disconnect (ctx->client, ctx->indication_id);
+        ctx->indication_id = 0;
+
+        input = qmi_message_dms_set_event_report_input_new ();
+        qmi_message_dms_set_event_report_input_set_operating_mode_reporting (input, FALSE, NULL);
+        qmi_client_dms_set_event_report (ctx->client, input, 5, NULL, NULL, NULL);
+    }
+
+    mm_obj_dbg (self, "check current device operating mode...");
+    qmi_client_dms_get_operating_mode (ctx->client,
+                                       NULL,
+                                       5,
+                                       NULL,
+                                       (GAsyncReadyCallback)dms_check_current_operating_mode_ready,
+                                       task);
+    
 }
 
 static void
