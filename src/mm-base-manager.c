@@ -866,7 +866,7 @@ scan_devices_auth_ready (MMAuthProvider *authp,
     else {
 #if defined WITH_UDEV
         if (!mm_context_get_test_no_udev ()) {
-            /* Otherwise relaunch device scan */
+            mm_obj_info (ctx->self, "processing user request to launch device scan");
             mm_base_manager_start (MM_BASE_MANAGER (ctx->self), TRUE);
             mm_gdbus_org_freedesktop_modem_manager1_complete_scan_devices (
                 MM_GDBUS_ORG_FREEDESKTOP_MODEM_MANAGER1 (ctx->self),
@@ -1276,6 +1276,7 @@ base_manager_inhibit_device (InhibitDeviceContext *ctx)
         return;
     }
 
+    mm_obj_info (ctx->self, "processing user request to inhibit uid '%s'", ctx->uid);
     mm_device_inhibit (device,
                        (GAsyncReadyCallback) device_inhibit_ready,
                        ctx);
@@ -1297,8 +1298,9 @@ base_manager_uninhibit_device (InhibitDeviceContext *ctx)
         return;
     }
 
-    mm_obj_msg (ctx->self, "device inhibition teardown for uid '%s'", ctx->uid);
+    mm_obj_info (ctx->self, "processing user request to uninhibit uid '%s'", ctx->uid);
     remove_device_inhibition (ctx->self, ctx->uid);
+    mm_obj_msg (ctx->self, "device inhibition teardown for uid '%s'", ctx->uid);
 
     mm_gdbus_org_freedesktop_modem_manager1_complete_inhibit_device (
         MM_GDBUS_ORG_FREEDESKTOP_MODEM_MANAGER1 (ctx->self),
