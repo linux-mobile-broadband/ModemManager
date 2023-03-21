@@ -682,6 +682,41 @@ initialize_preallocated_links_ready (MMPortQmi    *self,
     }
 }
 
+static QmiDeviceAddLinkFlags
+get_rmnet_device_add_link_flags (MMPortQmi *self)
+{
+    QmiDeviceAddLinkFlags flags = QMI_DEVICE_ADD_LINK_FLAGS_NONE;
+    g_autofree gchar *flags_str = NULL;
+
+    if (g_strcmp0 (self->priv->net_driver, "ipa") == 0) {
+        g_autofree gchar *tx_sysfs_path = NULL;
+        g_autofree gchar *rx_sysfs_path = NULL;
+        g_autofree gchar *tx_sysfs_str = NULL;
+        g_autofree gchar *rx_sysfs_str = NULL;
+
+        tx_sysfs_path = g_build_filename (self->priv->net_sysfs_path, "device", "feature", "tx_offload", NULL);
+        rx_sysfs_path = g_build_filename (self->priv->net_sysfs_path, "device", "feature", "rx_offload", NULL);
+
+        if (g_file_get_contents (rx_sysfs_path, &rx_sysfs_str, NULL, NULL) && rx_sysfs_str) {
+            if (g_str_has_prefix (rx_sysfs_str, "MAPv4"))
+                flags |= QMI_DEVICE_ADD_LINK_FLAGS_INGRESS_MAP_CKSUMV4;
+            else if (g_str_has_prefix (rx_sysfs_str, "MAPv5"))
+                flags |= QMI_DEVICE_ADD_LINK_FLAGS_INGRESS_MAP_CKSUMV5;
+        }
+
+        if (g_file_get_contents (tx_sysfs_path, &tx_sysfs_str, NULL, NULL) && tx_sysfs_str) {
+            if (g_str_has_prefix (tx_sysfs_str, "MAPv4"))
+                flags |= QMI_DEVICE_ADD_LINK_FLAGS_EGRESS_MAP_CKSUMV4;
+            else if (g_str_has_prefix (tx_sysfs_str, "MAPv5"))
+                flags |= QMI_DEVICE_ADD_LINK_FLAGS_EGRESS_MAP_CKSUMV5;
+        }
+    }
+
+    flags_str = qmi_device_add_link_flags_build_string_from_mask (flags);
+    mm_obj_dbg (self, "Creating RMNET link with flags: %s", flags_str);
+    return flags;
+}
+
 void
 mm_port_qmi_setup_link (MMPortQmi           *self,
                         MMPort              *data,
@@ -719,23 +754,11 @@ mm_port_qmi_setup_link (MMPortQmi           *self,
 
     /* When using rmnet, just try to add link in the QmiDevice */
     if (self->priv->kernel_data_modes & MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET) {
-        QmiDeviceAddLinkFlags flags = QMI_DEVICE_ADD_LINK_FLAGS_NONE;
-
-        /* This may not be fully right, but it's the only way forward we know
-         * right now for the Qualcomm SoCs based on QRTR+IPA, where QMAPV4 is
-         * used and the device has checksum offload enabled by default, so we
-         * should create the link with special flags. Ideally, we would have a
-         * way to know in advance whether the checksum offload flags are needed
-         * or not.
-         */
-        if (self->priv->dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV4)
-            flags = (QMI_DEVICE_ADD_LINK_FLAGS_INGRESS_MAP_CKSUMV4 | QMI_DEVICE_ADD_LINK_FLAGS_EGRESS_MAP_CKSUMV4);
-
         qmi_device_add_link_with_flags (self->priv->qmi_device,
                                         QMI_DEVICE_MUX_ID_AUTOMATIC,
                                         mm_kernel_device_get_name (mm_port_peek_kernel_device (data)),
                                         link_prefix_hint,
-                                        flags,
+                                        get_rmnet_device_add_link_flags (self),
                                         NULL,
                                         (GAsyncReadyCallback) device_add_link_ready,
                                         task);
