@@ -2070,7 +2070,7 @@ dms_check_current_operating_mode_ready (QmiClientDms *client,
     g_object_unref (task);
 }
 
-static void
+static gboolean
 dms_set_operating_mode_timeout_cb (MMBroadbandModemQmi *self)
 {
     GTask                   *task;
@@ -2105,7 +2105,8 @@ dms_set_operating_mode_timeout_cb (MMBroadbandModemQmi *self)
                                        NULL,
                                        (GAsyncReadyCallback)dms_check_current_operating_mode_ready,
                                        task);
-    
+
+    return G_SOURCE_REMOVE;
 }
 
 static void
