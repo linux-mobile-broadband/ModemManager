@@ -1997,16 +1997,8 @@ modem_power_up_down_off_finish (MMIfaceModem  *self,
 }
 
 static void
-set_operating_mode_complete (MMBroadbandModemQmi *self,
-                             GError              *error)
+set_operating_mode_context_reset (SetOperatingModeContext *ctx)
 {
-    GTask                   *task;
-    SetOperatingModeContext *ctx;
-
-    g_assert (self->priv->set_operating_mode_task);
-    task = g_steal_pointer (&self->priv->set_operating_mode_task);
-    ctx = g_task_get_task_data (task);
-
     if (ctx->timeout_id) {
         g_source_remove (ctx->timeout_id);
         ctx->timeout_id = 0;
@@ -2022,12 +2014,6 @@ set_operating_mode_complete (MMBroadbandModemQmi *self,
         qmi_message_dms_set_event_report_input_set_operating_mode_reporting (input, FALSE, NULL);
         qmi_client_dms_set_event_report (ctx->client, input, 5, NULL, NULL, NULL);
     }
-
-    if (error)
-        g_task_return_error (task, error);
-    else
-        g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
 }
 
 static void
@@ -2082,21 +2068,7 @@ dms_set_operating_mode_timeout_cb (MMBroadbandModemQmi *self)
 
     mm_obj_warn (self, "Power update operation timed out");
 
-    if (ctx->timeout_id) {
-        g_source_remove (ctx->timeout_id);
-        ctx->timeout_id = 0;
-    }
-
-    if (ctx->indication_id) {
-        g_autoptr(QmiMessageDmsSetEventReportInput) input = NULL;
-
-        g_signal_handler_disconnect (ctx->client, ctx->indication_id);
-        ctx->indication_id = 0;
-
-        input = qmi_message_dms_set_event_report_input_new ();
-        qmi_message_dms_set_event_report_input_set_operating_mode_reporting (input, FALSE, NULL);
-        qmi_client_dms_set_event_report (ctx->client, input, 5, NULL, NULL, NULL);
-    }
+    set_operating_mode_context_reset (ctx);
 
     mm_obj_dbg (self, "check current device operating mode...");
     qmi_client_dms_get_operating_mode (ctx->client,
@@ -2107,6 +2079,26 @@ dms_set_operating_mode_timeout_cb (MMBroadbandModemQmi *self)
                                        task);
 
     return G_SOURCE_REMOVE;
+}
+
+static void
+set_operating_mode_complete (MMBroadbandModemQmi *self,
+                             GError              *error)
+{
+    GTask                   *task;
+    SetOperatingModeContext *ctx;
+
+    g_assert (self->priv->set_operating_mode_task);
+    task = g_steal_pointer (&self->priv->set_operating_mode_task);
+    ctx = g_task_get_task_data (task);
+
+    set_operating_mode_context_reset (ctx);
+
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
