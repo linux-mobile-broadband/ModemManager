@@ -758,11 +758,19 @@ serial_probe_qcdm (MMPortProbe *self)
     if (port_probe_task_return_error_if_cancelled (self))
         return G_SOURCE_REMOVE;
 
-    /* Check if port requires QCDM probing */
+    /* If the plugin specifies QCDM is not required, we can right away complete the QCDM
+     * probing task. */
     if (!ctx->qcdm_required) {
         mm_obj_dbg (self, "Maybe a QCDM port, but plugin does not require probing and grabbing...");
-        mm_port_probe_set_result_qcdm (self, TRUE);
-        self->priv->is_ignored = TRUE;
+        /* If we had a port type hint, flag the port as QCDM capable but ignored. Otherwise,
+         * no QCDM capable and not ignored. The outcome is really the same, i.e. the port is not
+         * used any more, but the way it's reported in DBus will be different (i.e. "ignored" vs
+         "unknown" */
+        if (self->priv->maybe_qcdm) {
+            mm_port_probe_set_result_qcdm (self, TRUE);
+            self->priv->is_ignored = TRUE;
+        } else
+            mm_port_probe_set_result_qcdm (self, FALSE);
         /* Reschedule probing */
         serial_probe_schedule (self);
         return G_SOURCE_REMOVE;
