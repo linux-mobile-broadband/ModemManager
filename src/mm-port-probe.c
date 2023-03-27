@@ -101,9 +101,7 @@ struct _MMPortProbePrivate {
     gboolean is_ignored;
     gboolean is_gps;
     gboolean is_audio;
-    gboolean maybe_at_primary;
-    gboolean maybe_at_secondary;
-    gboolean maybe_at_ppp;
+    gboolean maybe_at;
     gboolean maybe_qcdm;
     gboolean maybe_qmi;
     gboolean maybe_mbim;
@@ -1505,7 +1503,7 @@ mm_port_probe_run (MMPortProbe                *self,
     }
 
     /* If this is a port flagged as being an AT port, don't do any other probing */
-    if (self->priv->maybe_at_primary || self->priv->maybe_at_secondary || self->priv->maybe_at_ppp) {
+    if (self->priv->maybe_at) {
         mm_obj_dbg (self, "no QCDM/QMI/MBIM probing in possible AT port");
         mm_port_probe_set_result_qcdm (self, FALSE);
         mm_port_probe_set_result_qmi  (self, FALSE);
@@ -1897,9 +1895,9 @@ set_property (GObject *object,
         self->priv->is_ignored = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_IGNORE);
         self->priv->is_gps = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_GPS);
         self->priv->is_audio = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_AUDIO);
-        self->priv->maybe_at_primary = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_AT_PRIMARY);
-        self->priv->maybe_at_secondary = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_AT_SECONDARY);
-        self->priv->maybe_at_ppp = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_AT_PPP);
+        self->priv->maybe_at = (mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_AT_PRIMARY) ||
+                                mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_AT_SECONDARY) ||
+                                mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_AT_PPP));
         self->priv->maybe_qcdm = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_QCDM);
         self->priv->maybe_qmi = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_QMI);
         self->priv->maybe_mbim = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_MBIM);
