@@ -252,6 +252,24 @@
  */
 #define ID_MM_TTY_FLOW_CONTROL "ID_MM_TTY_FLOW_CONTROL"
 
+/**
+ * ID_MM_REQUIRED:
+ *
+ * This is a port-specific tag that allows users to specify that the modem
+ * must be able to successfully probe and use the given control port.
+ *
+ * If this tag is set and the port probing procedure fails, the modem object
+ * will not be created, which is the same as if the port didn't exist in the
+ * first place.
+ *
+ * E.g. this tag may be set on a QMI control port if we want to make sure the
+ * modem object exposed by ModemManager is QMI-capable and never an AT-based
+ * modem created due to falling back on a failed QMI port probing procedure.
+ *
+ * Since: 1.22
+ */
+#define ID_MM_REQUIRED "ID_MM_REQUIRED"
+
 /*
  * The following symbols are deprecated. We don't add them to -compat
  * because this -tags file is not really part of the installed API.

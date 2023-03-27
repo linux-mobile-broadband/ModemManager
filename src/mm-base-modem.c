@@ -470,8 +470,21 @@ mm_base_modem_grab_port (MMBaseModem         *self,
                          MMPortSerialAtFlag   at_pflags,
                          GError             **error)
 {
-    if (!base_modem_internal_grab_port (self, kernel_device, FALSE, ptype, at_pflags, error))
+    g_autoptr(GError) inner_error = NULL;
+
+    if (!base_modem_internal_grab_port (self, kernel_device, FALSE, ptype, at_pflags, &inner_error)) {
+        /* If the port was REQUIRED via udev tags and we failed to grab it, we will report
+         * a fatal error. */
+        if (mm_kernel_device_get_property_as_boolean (kernel_device, ID_MM_REQUIRED)) {
+            mm_obj_err (self, "required port '%s/%s' failed to be grabbed",
+                        mm_kernel_device_get_subsystem (kernel_device),
+                        mm_kernel_device_get_name      (kernel_device));
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED,
+                         "Required port failed to be grabbed");
+        } else
+            g_propagate_error (error, g_steal_pointer (&inner_error));
         return FALSE;
+    }
 
     mm_obj_dbg (self, "port '%s/%s' grabbed",
                 mm_kernel_device_get_subsystem (kernel_device),

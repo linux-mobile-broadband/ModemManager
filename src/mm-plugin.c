@@ -1084,6 +1084,15 @@ mm_plugin_create_modem (MMPlugin  *self,
         next:
             if (!grabbed) {
                 mm_obj_warn (self, "could not grab port %s: %s", name, inner_error ? inner_error->message : "unknown error");
+
+                /* An ABORTED error is emitted exclusively when the port grabbing operation
+                 * detects that a REQUIRED port is unusable. */
+                if (g_error_matches (inner_error, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED)) {
+                    g_propagate_error (error, inner_error);
+                    g_clear_object (&modem);
+                    return NULL;
+                }
+
                 g_clear_error (&inner_error);
             }
         }
