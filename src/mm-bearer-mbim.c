@@ -714,8 +714,12 @@ connect_set_ready (MbimDevice   *device,
                     mbim_nw_error_get_string (nw_error));
         /* If the response reports an ACTIVATED state, we're good even if
          * there is a nw_error set (e.g. asking for IPv4v6 may return a
-         * 'pdp-type-ipv4-only-allowed' nw_error). */
-        if (activation_state != MBIM_ACTIVATION_STATE_ACTIVATED &&
+         * 'pdp-type-ipv4-only-allowed' nw_error).
+         * If the nw_error is not set (MBIM_NW_ERROR_NONE), we prefer to
+         * return any operation error (e.g. 'OperationNotAllowed') instead
+         * of MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN ('Unknown error'). */
+        if (nw_error != MBIM_NW_ERROR_NONE &&
+            activation_state != MBIM_ACTIVATION_STATE_ACTIVATED &&
             activation_state != MBIM_ACTIVATION_STATE_ACTIVATING) {
             g_clear_error (&error);
             error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error, self);
