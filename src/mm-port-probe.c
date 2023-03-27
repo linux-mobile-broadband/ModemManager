@@ -747,9 +747,8 @@ serial_probe_qcdm (MMPortProbe *self)
     GByteArray          *verinfo2;
     gint                 len;
     guint8               marker = 0x7E;
+    MMPortSubsys         subsys = MM_PORT_SUBSYS_TTY;
     PortProbeRunContext *ctx;
-    MMPortSubsys subsys = MM_PORT_SUBSYS_TTY;
-
 
     g_assert (self->priv->task);
     ctx = g_task_get_task_data (self->priv->task);
@@ -761,94 +760,91 @@ serial_probe_qcdm (MMPortProbe *self)
 
     /* Check if port requires QCDM probing */
     if (!ctx->qcdm_required) {
-        /* Ok, this is probably a QCDM port */
-        mm_obj_dbg (self, "Likely a QCDM port, but plugin does not require probing and grabbing...");
+        mm_obj_dbg (self, "Maybe a QCDM port, but plugin does not require probing and grabbing...");
         mm_port_probe_set_result_qcdm (self, TRUE);
         self->priv->is_ignored = TRUE;
         /* Reschedule probing */
         serial_probe_schedule (self);
-
-        return G_SOURCE_REMOVE;
-    } else {
-        mm_obj_dbg (self, "probing QCDM...");
-
-        /* If open, close the AT port */
-        if (ctx->serial) {
-            /* Explicitly clear the buffer full signal handler */
-            if (ctx->buffer_full_id) {
-                g_signal_handler_disconnect (ctx->serial, ctx->buffer_full_id);
-                ctx->buffer_full_id = 0;
-            }
-            mm_port_serial_close (ctx->serial);
-            g_object_unref (ctx->serial);
-        }
-
-        if (g_str_equal (mm_kernel_device_get_subsystem (self->priv->port), "wwan"))
-            subsys = MM_PORT_SUBSYS_WWAN;
-
-        /* Open the QCDM port */
-        ctx->serial = MM_PORT_SERIAL (mm_port_serial_qcdm_new (mm_kernel_device_get_name (self->priv->port), subsys));
-        if (!ctx->serial) {
-            port_probe_task_return_error (self,
-                                          g_error_new (MM_CORE_ERROR,
-                                                       MM_CORE_ERROR_FAILED,
-                                                       "(%s/%s) Couldn't create QCDM port",
-                                                       mm_kernel_device_get_subsystem (self->priv->port),
-                                                       mm_kernel_device_get_name (self->priv->port)));
-            return G_SOURCE_REMOVE;
-        }
-
-        /* Setup port if needed */
-        common_serial_port_setup (self, ctx->serial);
-
-        /* Try to open the port */
-        if (!mm_port_serial_open (ctx->serial, &error)) {
-            port_probe_task_return_error (self,
-                                          g_error_new (MM_SERIAL_ERROR,
-                                                       MM_SERIAL_ERROR_OPEN_FAILED,
-                                                       "(%s/%s) Failed to open QCDM port: %s",
-                                                       mm_kernel_device_get_subsystem (self->priv->port),
-                                                       mm_kernel_device_get_name (self->priv->port),
-                                                       (error ? error->message : "unknown error")));
-            g_clear_error (&error);
-            return G_SOURCE_REMOVE;
-        }
-
-        /* Build up the probe command; 0x7E is the frame marker, so put one at the
-         * beginning of the buffer to ensure that the device discards any AT
-         * commands that probing might have sent earlier.  Should help devices
-         * respond more quickly and speed up QCDM probing.
-         */
-        verinfo = g_byte_array_sized_new (10);
-        g_byte_array_append (verinfo, &marker, 1);
-        len = qcdm_cmd_version_info_new ((char *) (verinfo->data + 1), 9);
-        if (len <= 0) {
-            g_byte_array_unref (verinfo);
-            port_probe_task_return_error (self,
-                                          g_error_new (MM_SERIAL_ERROR,
-                                                       MM_SERIAL_ERROR_OPEN_FAILED,
-                                                       "(%s/%s) Failed to create QCDM version info command",
-                                                       mm_kernel_device_get_subsystem (self->priv->port),
-                                                       mm_kernel_device_get_name (self->priv->port)));
-            return G_SOURCE_REMOVE;
-        }
-        verinfo->len = len + 1;
-
-        /* Queuing the command takes ownership over it; save it for the second try */
-        verinfo2 = g_byte_array_sized_new (verinfo->len);
-        g_byte_array_append (verinfo2, verinfo->data, verinfo->len);
-        g_object_set_data_full (G_OBJECT (self), "cmd2", verinfo2, (GDestroyNotify) g_byte_array_unref);
-
-        mm_port_serial_qcdm_command (MM_PORT_SERIAL_QCDM (ctx->serial),
-                                     verinfo,
-                                     3,
-                                     NULL,
-                                     (GAsyncReadyCallback) serial_probe_qcdm_parse_response,
-                                     self);
-        g_byte_array_unref (verinfo);
-
         return G_SOURCE_REMOVE;
     }
+
+    mm_obj_dbg (self, "probing QCDM...");
+
+    /* If open, close the AT port */
+    if (ctx->serial) {
+        /* Explicitly clear the buffer full signal handler */
+        if (ctx->buffer_full_id) {
+            g_signal_handler_disconnect (ctx->serial, ctx->buffer_full_id);
+            ctx->buffer_full_id = 0;
+        }
+        mm_port_serial_close (ctx->serial);
+        g_object_unref (ctx->serial);
+    }
+
+    if (g_str_equal (mm_kernel_device_get_subsystem (self->priv->port), "wwan"))
+        subsys = MM_PORT_SUBSYS_WWAN;
+
+    /* Open the QCDM port */
+    ctx->serial = MM_PORT_SERIAL (mm_port_serial_qcdm_new (mm_kernel_device_get_name (self->priv->port), subsys));
+    if (!ctx->serial) {
+        port_probe_task_return_error (self,
+                                      g_error_new (MM_CORE_ERROR,
+                                                   MM_CORE_ERROR_FAILED,
+                                                   "(%s/%s) Couldn't create QCDM port",
+                                                   mm_kernel_device_get_subsystem (self->priv->port),
+                                                   mm_kernel_device_get_name (self->priv->port)));
+        return G_SOURCE_REMOVE;
+    }
+
+    /* Setup port if needed */
+    common_serial_port_setup (self, ctx->serial);
+
+    /* Try to open the port */
+    if (!mm_port_serial_open (ctx->serial, &error)) {
+        port_probe_task_return_error (self,
+                                      g_error_new (MM_SERIAL_ERROR,
+                                                   MM_SERIAL_ERROR_OPEN_FAILED,
+                                                   "(%s/%s) Failed to open QCDM port: %s",
+                                                   mm_kernel_device_get_subsystem (self->priv->port),
+                                                   mm_kernel_device_get_name (self->priv->port),
+                                                   (error ? error->message : "unknown error")));
+        g_clear_error (&error);
+        return G_SOURCE_REMOVE;
+    }
+
+    /* Build up the probe command; 0x7E is the frame marker, so put one at the
+     * beginning of the buffer to ensure that the device discards any AT
+     * commands that probing might have sent earlier.  Should help devices
+     * respond more quickly and speed up QCDM probing.
+     */
+    verinfo = g_byte_array_sized_new (10);
+    g_byte_array_append (verinfo, &marker, 1);
+    len = qcdm_cmd_version_info_new ((char *) (verinfo->data + 1), 9);
+    if (len <= 0) {
+        g_byte_array_unref (verinfo);
+        port_probe_task_return_error (self,
+                                      g_error_new (MM_SERIAL_ERROR,
+                                                   MM_SERIAL_ERROR_OPEN_FAILED,
+                                                   "(%s/%s) Failed to create QCDM version info command",
+                                                   mm_kernel_device_get_subsystem (self->priv->port),
+                                                   mm_kernel_device_get_name (self->priv->port)));
+        return G_SOURCE_REMOVE;
+    }
+    verinfo->len = len + 1;
+
+    /* Queuing the command takes ownership over it; save it for the second try */
+    verinfo2 = g_byte_array_sized_new (verinfo->len);
+    g_byte_array_append (verinfo2, verinfo->data, verinfo->len);
+    g_object_set_data_full (G_OBJECT (self), "cmd2", verinfo2, (GDestroyNotify) g_byte_array_unref);
+
+    mm_port_serial_qcdm_command (MM_PORT_SERIAL_QCDM (ctx->serial),
+                                 verinfo,
+                                 3,
+                                 NULL,
+                                 (GAsyncReadyCallback) serial_probe_qcdm_parse_response,
+                                 self);
+    g_byte_array_unref (verinfo);
+    return G_SOURCE_REMOVE;
 }
 
 /***************************************************************/
