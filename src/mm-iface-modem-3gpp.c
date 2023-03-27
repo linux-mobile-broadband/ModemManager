@@ -3188,10 +3188,12 @@ load_enabled_facility_locks_ready (MMIfaceModem3gpp *self,
          * which notifies about such update. There is no need to ref self as the
          * SIM itself is an object which exists as long as self exists. */
         g_object_get (self, MM_IFACE_MODEM_SIM, &sim, NULL);
-        g_signal_connect (sim,
-                          MM_BASE_SIM_PIN_LOCK_ENABLED,
-                          G_CALLBACK (sim_pin_lock_enabled_cb),
-                          ctx->skeleton);
+
+        if (sim)
+            g_signal_connect (sim,
+                              MM_BASE_SIM_PIN_LOCK_ENABLED,
+                              G_CALLBACK (sim_pin_lock_enabled_cb),
+                              ctx->skeleton);
     }
 
     /* Go on to next step */
