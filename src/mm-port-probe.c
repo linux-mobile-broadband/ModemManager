@@ -1853,6 +1853,8 @@ initialize_port_type_hints (MMPortProbe *self)
     gboolean           auto_maybe_qmi = FALSE;
     gboolean           auto_maybe_mbim = FALSE;
     gboolean           auto_maybe_at = FALSE;
+    gboolean           auto_maybe_qcdm = FALSE;
+    gboolean           auto_ignored = FALSE;
 
 #define ADD_HINT_FROM_UDEV_TAG(TAG, FIELD) do {                                 \
         if (!self->priv->FIELD &&                                               \
@@ -1897,9 +1899,54 @@ initialize_port_type_hints (MMPortProbe *self)
             mm_obj_dbg (self, "port may be AT based on the driver in use: %s", driver);
             auto_maybe_at = TRUE;
         }
+    } else if (!g_strcmp0 (mm_kernel_device_get_subsystem (self->priv->port), "wwan")) {
+        /* Linux >= 5.14 has at 'type' attribute specifying the type of port */
+        if (mm_kernel_device_has_attribute (self->priv->port, "type")) {
+            const gchar *type;
+
+            type = mm_kernel_device_get_attribute (self->priv->port, "type");
+            if (!g_strcmp0 (type, "AT")) {
+                mm_obj_dbg (self, "port may be AT based on the wwan type attribute");
+                auto_maybe_at = TRUE;
+            } else if (!g_strcmp0 (type, "MBIM")) {
+                mm_obj_dbg (self, "port may be MBIM based on the wwan type attribute");
+                auto_maybe_mbim = TRUE;
+            } else if (!g_strcmp0 (type, "QMI")) {
+                mm_obj_dbg (self, "port may be QMI based on the wwan type attribute");
+                auto_maybe_qmi = TRUE;
+            } else if (!g_strcmp0 (type, "QCDM")) {
+                mm_obj_dbg (self, "port may be QCDM based on the wwan type attribute");
+                auto_maybe_qcdm = TRUE;
+            } else if (!g_strcmp0 (type, "FIREHOSE")) {
+                mm_obj_dbg (self, "port may be FIREHOSE based on the wwan type attribute");
+                auto_ignored = TRUE;
+            }
+        }
+        /* Linux 5.13 does not have 'type' attribute yet, match kernel name instead */
+        else {
+            const gchar *name;
+
+            name = mm_kernel_device_get_name (self->priv->port);
+            if (g_str_has_suffix (name, "AT")) {
+                mm_obj_dbg (self, "port may be AT based on the wwan device name");
+                auto_maybe_at = TRUE;
+            } else if (g_str_has_suffix (name, "MBIM")) {
+                mm_obj_dbg (self, "port may be MBIM based on the wwan device name");
+                auto_maybe_mbim = TRUE;
+            } else if (g_str_has_suffix (name, "QMI")) {
+                mm_obj_dbg (self, "port may be QMI based on the wwan device name");
+                auto_maybe_qmi = TRUE;
+            } else if (g_str_has_suffix (name, "QCDM")) {
+                mm_obj_dbg (self, "port may be QCDM based on the wwan device name");
+                auto_maybe_qcdm = TRUE;
+            } else if (g_str_has_suffix (name, "FIREHOSE")) {
+                mm_obj_dbg (self, "port may be FIREHOSE based on the wwan device name");
+                auto_ignored = TRUE;
+            }
+        }
     }
 
-    g_assert ((auto_maybe_qmi + auto_maybe_mbim + auto_maybe_at) <= 1);
+    g_assert ((auto_maybe_qmi + auto_maybe_mbim + auto_maybe_at + auto_maybe_qcdm + auto_ignored) <= 1);
 
 #define PROCESS_AUTO_HINTS(TYPE, FIELD) do {                            \
         if (auto_##FIELD) {                                             \
@@ -1913,6 +1960,7 @@ initialize_port_type_hints (MMPortProbe *self)
     PROCESS_AUTO_HINTS ("QMI",  maybe_qmi);
     PROCESS_AUTO_HINTS ("MBIM", maybe_mbim);
     PROCESS_AUTO_HINTS ("AT",   maybe_at);
+    PROCESS_AUTO_HINTS ("QCDM", maybe_qcdm);
 
 #undef PROCESS_AUTO_HINTS
 
@@ -1927,6 +1975,9 @@ initialize_port_type_hints (MMPortProbe *self)
     /* Regardless of the type, the port may be ignored */
     if (mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_IGNORE)) {
         mm_obj_dbg (self, "port is ignored via udev tag");
+        self->priv->is_ignored = TRUE;
+    } else if (auto_ignored) {
+        mm_obj_dbg (self, "port is ignored via automatic rules");
         self->priv->is_ignored = TRUE;
     }
 }
