@@ -1850,11 +1850,14 @@ initialize_port_type_hints (MMPortProbe *self)
 {
     g_autoptr(GString) udev_tags = NULL;
     guint              n_udev_hints = 0;
+    gboolean           auto_maybe_qmi = FALSE;
+    gboolean           auto_maybe_mbim = FALSE;
+    gboolean           auto_maybe_at = FALSE;
 
 #define ADD_HINT_FROM_UDEV_TAG(TAG, FIELD) do {                                 \
         if (!self->priv->FIELD &&                                               \
             mm_kernel_device_get_property_as_boolean (self->priv->port, TAG)) { \
-            mm_obj_dbg (self, "udev tag detected: %s", TAG);                    \
+            mm_obj_dbg (self, "port type hint detected in udev tag: %s", TAG);  \
             self->priv->FIELD = TRUE;                                           \
             n_udev_hints++;                                                     \
             if (!udev_tags)                                                     \
@@ -1878,9 +1881,54 @@ initialize_port_type_hints (MMPortProbe *self)
     if (n_udev_hints > 1)
         mm_obj_warn (self, "multiple incompatible port type hints configured via udev: %s", udev_tags->str);
 
-    ADD_HINT_FROM_UDEV_TAG (ID_MM_PORT_IGNORE, is_ignored);
+    /* Process automatic port type hints, and warn if the hint doesn't match the
+     * one provided via udev. The udev-provided hints are always preferred. */
+    if (!g_strcmp0 (mm_kernel_device_get_subsystem (self->priv->port), "usbmisc")) {
+        const gchar *driver;
 
-#undef ADD_HINT_FROM_UDEV_TAG
+        driver = mm_kernel_device_get_driver (self->priv->port);
+        if (!g_strcmp0 (driver, "qmi_wwan")) {
+            mm_obj_dbg (self, "port may be QMI based on the driver in use");
+            auto_maybe_qmi = TRUE;
+        } else if (!g_strcmp0 (driver, "cdc_mbim")) {
+            mm_obj_dbg (self, "port may be MBIM based on the driver in use");
+            auto_maybe_mbim = TRUE;
+        } else {
+            mm_obj_dbg (self, "port may be AT based on the driver in use: %s", driver);
+            auto_maybe_at = TRUE;
+        }
+    }
+
+    g_assert ((auto_maybe_qmi + auto_maybe_mbim + auto_maybe_at) <= 1);
+
+#define PROCESS_AUTO_HINTS(TYPE, FIELD) do {                            \
+        if (auto_##FIELD) {                                             \
+            if (n_udev_hints > 0 && !self->priv->FIELD)                 \
+                mm_obj_warn (self, "overriding type in possible " TYPE " port with udev tag: %s", udev_tags->str); \
+            else                                                        \
+                self->priv->FIELD = TRUE;                               \
+        }                                                               \
+    } while (0)
+
+    PROCESS_AUTO_HINTS ("QMI",  maybe_qmi);
+    PROCESS_AUTO_HINTS ("MBIM", maybe_mbim);
+    PROCESS_AUTO_HINTS ("AT",   maybe_at);
+
+#undef PROCESS_AUTO_HINTS
+
+    mm_obj_dbg (self, "port type hints loaded: AT %s, QMI %s, MBIM %s, QCDM %s, AUDIO %s, GPS %s",
+                self->priv->maybe_at ? "yes" : "no",
+                self->priv->maybe_qmi ? "yes" : "no",
+                self->priv->maybe_mbim ? "yes" : "no",
+                self->priv->maybe_qcdm ? "yes" : "no",
+                self->priv->is_audio ? "yes" : "no",
+                self->priv->is_gps ? "yes" : "no");
+
+    /* Regardless of the type, the port may be ignored */
+    if (mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_IGNORE)) {
+        mm_obj_dbg (self, "port is ignored via udev tag");
+        self->priv->is_ignored = TRUE;
+    }
 }
 
 /*****************************************************************************/

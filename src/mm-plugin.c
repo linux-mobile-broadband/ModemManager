@@ -797,7 +797,7 @@ mm_plugin_supports_port (MMPlugin            *self,
         return;
     }
 
-    /* Build flags depending on what probing needed */
+    /* Build flags depending on what probing is requested by the plugin */
     probe_run_flags = MM_PORT_PROBE_NONE;
     if (g_str_equal (mm_kernel_device_get_subsystem (port), "tty")) {
         if (self->priv->at)
@@ -807,11 +807,11 @@ mm_plugin_supports_port (MMPlugin            *self,
         if (self->priv->qcdm || self->priv->qcdm_required)
             probe_run_flags |= MM_PORT_PROBE_QCDM;
     } else if (g_str_equal (mm_kernel_device_get_subsystem (port), "usbmisc")) {
-        if (self->priv->qmi && !g_strcmp0 (mm_kernel_device_get_driver (port), "qmi_wwan"))
+        if (self->priv->qmi)
             probe_run_flags |= MM_PORT_PROBE_QMI;
-        else if (self->priv->mbim && !g_strcmp0 (mm_kernel_device_get_driver (port), "cdc_mbim"))
+        if (self->priv->mbim)
             probe_run_flags |= MM_PORT_PROBE_MBIM;
-        else
+        if (self->priv->at)
             probe_run_flags |= MM_PORT_PROBE_AT;
     } else if (g_str_equal (mm_kernel_device_get_subsystem (port), "rpmsg")) {
         if (self->priv->at)
