@@ -1845,6 +1845,44 @@ mm_port_probe_get_port_subsys (MMPortProbe *self)
     return mm_kernel_device_get_subsystem (self->priv->port);
 }
 
+static void
+initialize_port_type_hints (MMPortProbe *self)
+{
+    g_autoptr(GString) udev_tags = NULL;
+    guint              n_udev_hints = 0;
+
+#define ADD_HINT_FROM_UDEV_TAG(TAG, FIELD) do {                                 \
+        if (!self->priv->FIELD &&                                               \
+            mm_kernel_device_get_property_as_boolean (self->priv->port, TAG)) { \
+            mm_obj_dbg (self, "udev tag detected: %s", TAG);                    \
+            self->priv->FIELD = TRUE;                                           \
+            n_udev_hints++;                                                     \
+            if (!udev_tags)                                                     \
+                udev_tags = g_string_new (TAG);                                 \
+            else                                                                \
+                g_string_append_printf (udev_tags, ", %s", TAG);                \
+        }                                                                       \
+    } while (0)
+
+    /* Process udev-configured port type hints */
+    ADD_HINT_FROM_UDEV_TAG (ID_MM_PORT_TYPE_GPS,           is_gps);
+    ADD_HINT_FROM_UDEV_TAG (ID_MM_PORT_TYPE_AUDIO,         is_audio);
+    ADD_HINT_FROM_UDEV_TAG (ID_MM_PORT_TYPE_AT_PRIMARY,    maybe_at);
+    ADD_HINT_FROM_UDEV_TAG (ID_MM_PORT_TYPE_AT_SECONDARY,  maybe_at);
+    ADD_HINT_FROM_UDEV_TAG (ID_MM_PORT_TYPE_AT_PPP,        maybe_at);
+    ADD_HINT_FROM_UDEV_TAG (ID_MM_PORT_TYPE_QCDM,          maybe_qcdm);
+    ADD_HINT_FROM_UDEV_TAG (ID_MM_PORT_TYPE_QMI,           maybe_qmi);
+    ADD_HINT_FROM_UDEV_TAG (ID_MM_PORT_TYPE_MBIM,          maybe_mbim);
+
+    /* Warn if more than one given at the same time */
+    if (n_udev_hints > 1)
+        mm_obj_warn (self, "multiple incompatible port type hints configured via udev: %s", udev_tags->str);
+
+    ADD_HINT_FROM_UDEV_TAG (ID_MM_PORT_IGNORE, is_ignored);
+
+#undef ADD_HINT_FROM_UDEV_TAG
+}
+
 /*****************************************************************************/
 
 static gchar *
@@ -1892,15 +1930,7 @@ set_property (GObject *object,
     case PROP_PORT:
         /* construct only */
         self->priv->port = g_value_dup_object (value);
-        self->priv->is_ignored = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_IGNORE);
-        self->priv->is_gps = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_GPS);
-        self->priv->is_audio = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_AUDIO);
-        self->priv->maybe_at = (mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_AT_PRIMARY) ||
-                                mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_AT_SECONDARY) ||
-                                mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_AT_PPP));
-        self->priv->maybe_qcdm = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_QCDM);
-        self->priv->maybe_qmi = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_QMI);
-        self->priv->maybe_mbim = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_MBIM);
+        initialize_port_type_hints (self);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
