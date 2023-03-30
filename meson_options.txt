@@ -100,3 +100,5 @@ option('man', type: 'boolean', value: true, description: 'build manual pages')
 option('gtk_doc', type: 'boolean', value: false, description: 'use gtk-doc to build documentation')
 
 option('bash_completion', type: 'boolean', value: true, description: 'install bash completion files')
+
+option('fuzzer', type: 'boolean', value: false, description: 'build fuzzer tests')

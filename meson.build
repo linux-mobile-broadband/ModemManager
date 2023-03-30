@@ -423,6 +423,8 @@ if enable_gtk_doc
   subdir('docs/reference/libmm-glib')
 endif
 
+enable_fuzzer = get_option('fuzzer')
+
 configure_file(
   output: 'config.h',
   configuration: config_h,
@@ -465,4 +467,5 @@ summary({
   'bash completion': enable_bash_completion,
   'vala bindings': enable_vapi,
   'code coverage': get_option('b_coverage'),
+  'fuzzer': enable_fuzzer,
 }, section: 'Miscellaneous')

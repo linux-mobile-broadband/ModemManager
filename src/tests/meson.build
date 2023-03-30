@@ -37,3 +37,18 @@ foreach test_unit, test_deps: test_units
 
   test(test_name, exe)
 endforeach
+
+if get_option('fuzzer')
+  fuzzer_tests = ['test-sms-part-3gpp-fuzzer',
+                  'test-sms-part-3gpp-tr-fuzzer',
+                  'test-sms-part-cdma-fuzzer']
+  foreach fuzzer_test: fuzzer_tests
+    exe = executable(
+      fuzzer_test,
+      sources: fuzzer_test + '.c',
+      include_directories: top_inc,
+      dependencies: libhelpers_dep,
+      link_args : '-fsanitize=fuzzer',
+    )
+  endforeach
+endif
