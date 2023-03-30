@@ -26,7 +26,8 @@
 #include <ModemManager.h>
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
-#include "mm-log-test.h"
+
+#include "mm-log.h"
 #include "mm-sms-part-3gpp.h"
 
 #define PROGRAM_NAME    "mmsmspdu"
@@ -174,6 +175,45 @@ print_version_and_exit (void)
              "There is NO WARRANTY, to the extent permitted by law.\n"
              "\n");
     exit (EXIT_SUCCESS);
+}
+
+void
+_mm_log (gpointer     obj,
+         const gchar *module,
+         const gchar *loc,
+         const gchar *func,
+         guint32      level,
+         const gchar *fmt,
+         ...)
+{
+    va_list           args;
+    g_autofree gchar *msg = NULL;
+    const gchar      *level_str = NULL;
+
+    if (!verbose_flag)
+        return;
+
+    switch (level) {
+    case MM_LOG_LEVEL_DEBUG:
+        level_str = "debug";
+        break;
+    case MM_LOG_LEVEL_WARN:
+        level_str = "warning";
+        break;
+    case MM_LOG_LEVEL_INFO:
+        level_str = "info";
+        break;
+    case MM_LOG_LEVEL_ERR:
+        level_str = "error";
+        break;
+    default:
+        break;
+    }
+
+    va_start (args, fmt);
+    msg = g_strdup_vprintf (fmt, args);
+    va_end (args);
+    g_print ("[%s] %s\n", level_str ? level_str : "unknown", msg);
 }
 
 int main (int argc, char **argv)
