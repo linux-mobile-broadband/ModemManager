@@ -915,6 +915,12 @@ read_bearer_data_user_data (MMSmsPart              *sms_part,
         guint i;
         guint num_bytes;
 
+        if (num_fields == 0) {
+            mm_obj_dbg (log_object, "            text: ''");
+            mm_sms_part_set_text (sms_part, "");
+            break;
+        }
+
         /* 2 bytes per field! */
         num_bytes = num_fields * 2;
 
