@@ -5027,7 +5027,7 @@ basic_connect_notification_subscriber_ready_status (MMBroadbandModemMbim *self,
 }
 
 /*****************************************************************************/
-/* Packet service updates */
+/* Speed updates */
 
 void
 mm_broadband_modem_mbim_get_speeds (MMBroadbandModemMbim *self,
@@ -5054,6 +5054,34 @@ bearer_list_report_speeds (MMBaseBearer         *bearer,
 }
 
 static void
+update_bearer_speeds (MMBroadbandModemMbim *self,
+                      guint64               uplink_speed,
+                      guint64               downlink_speed)
+{
+    g_autoptr(MMBearerList) bearer_list = NULL;
+
+    if ((self->priv->packet_service_uplink_speed == uplink_speed) &&
+        (self->priv->packet_service_downlink_speed == downlink_speed))
+        return;
+
+    self->priv->packet_service_uplink_speed = uplink_speed;
+    self->priv->packet_service_downlink_speed = downlink_speed;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_BEARER_LIST, &bearer_list,
+                  NULL);
+    if (!bearer_list)
+        return;
+
+    mm_bearer_list_foreach (bearer_list,
+                            (MMBearerListForeachFunc)bearer_list_report_speeds,
+                            self);
+}
+
+/*****************************************************************************/
+/* Packet service updates */
+
+static void
 basic_connect_notification_packet_service (MMBroadbandModemMbim *self,
                                            MbimDevice           *device,
                                            MbimMessage          *notification)
@@ -5072,7 +5100,6 @@ basic_connect_notification_packet_service (MMBroadbandModemMbim *self,
     g_autofree gchar       *frequency_range_str = NULL;
     const gchar            *nw_error_str;
     g_autoptr(GError)       error = NULL;
-    g_autoptr(MMBearerList) bearer_list = NULL;
 
     if (mbim_device_check_ms_mbimex_version (device, 3, 0)) {
         if (!mbim_message_ms_basic_connect_v3_packet_service_notification_parse (
@@ -5154,15 +5181,7 @@ basic_connect_notification_packet_service (MMBroadbandModemMbim *self,
 
     update_packet_service_info (self, packet_service_state);
 
-    self->priv->packet_service_uplink_speed = uplink_speed;
-    self->priv->packet_service_downlink_speed = downlink_speed;
-    g_object_get (self,
-                  MM_IFACE_MODEM_BEARER_LIST, &bearer_list,
-                  NULL);
-    if (bearer_list)
-        mm_bearer_list_foreach (bearer_list,
-                                (MMBearerListForeachFunc)bearer_list_report_speeds,
-                                self);
+    update_bearer_speeds (self, uplink_speed, downlink_speed);
 }
 
 static void
