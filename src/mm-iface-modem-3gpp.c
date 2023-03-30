@@ -73,6 +73,8 @@ typedef struct {
     /* Registration checks */
     guint    check_timeout_source;
     gboolean check_running;
+    /* Packet service state */
+    gboolean packet_service_state_update_supported;
 } Private;
 
 static void
@@ -298,6 +300,7 @@ get_consolidated_packet_service_state (MMIfaceModem3gpp *self)
     Private *priv;
 
     priv = get_private (self);
+    g_assert (!priv->packet_service_state_update_supported);
 
     /* If registered in any of PS, EPS or 5GS, then packet service domain is
      * implicitly attached. */
@@ -2063,6 +2066,9 @@ mm_iface_modem_3gpp_update_location (MMIfaceModem3gpp *self,
 
 /*****************************************************************************/
 
+static void update_packet_service_state (MMIfaceModem3gpp              *self,
+                                         MMModem3gppPacketServiceState  new_state);
+
 static void
 update_registration_reload_current_registration_info_ready (MMIfaceModem3gpp *self,
                                                             GAsyncResult     *res,
@@ -2074,6 +2080,10 @@ update_registration_reload_current_registration_info_ready (MMIfaceModem3gpp *se
     priv = get_private (self);
 
     new_state = GPOINTER_TO_UINT (user_data);
+
+    /* Update packet service state if we don't support external updates */
+    if (!priv->packet_service_state_update_supported)
+        update_packet_service_state (self, get_consolidated_packet_service_state (self));
 
     mm_obj_msg (self, "3GPP registration state changed (registering -> %s)",
                 mm_modem_3gpp_registration_state_get_string (new_state));
@@ -2087,8 +2097,7 @@ update_registration_reload_current_registration_info_ready (MMIfaceModem3gpp *se
     /* The properties in the interface are bound to the properties
      * in the skeleton, so just updating here is enough */
     g_object_set (self,
-                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE,   new_state,
-                  MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE, get_consolidated_packet_service_state (self),
+                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, new_state,
                   NULL);
 
     mm_iface_modem_update_subsystem_state (MM_IFACE_MODEM (self),
@@ -2107,11 +2116,15 @@ update_non_registered_state (MMIfaceModem3gpp             *self,
     /* Not registered neither in home nor roaming network */
     mm_iface_modem_3gpp_clear_current_operator (self);
 
+    /* No packet service if we're not registered. This change is done
+     * also when the device itself supports reporting the packet service
+     * state updates. */
+    update_packet_service_state (self, MM_MODEM_3GPP_PACKET_SERVICE_STATE_DETACHED);
+
     /* The property in the interface is bound to the property
      * in the skeleton, so just updating here is enough */
     g_object_set (self,
-                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE,   new_state,
-                  MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE, MM_MODEM_3GPP_PACKET_SERVICE_STATE_DETACHED,
+                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, new_state,
                   NULL);
 
     mm_iface_modem_update_subsystem_state (
@@ -2127,20 +2140,32 @@ static void
 update_registration_state (MMIfaceModem3gpp             *self,
                            MMModem3gppRegistrationState  new_state)
 {
-    Private                       *priv;
-    MMModem3gppRegistrationState   old_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-    MMModem3gppPacketServiceState  old_packet_service_state = MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN;
+    Private                      *priv;
+    MMModem3gppRegistrationState  old_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
 
     priv = get_private (self);
 
     g_object_get (self,
-                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE,   &old_state,
-                  MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE, &old_packet_service_state,
+                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, &old_state,
                   NULL);
 
     /* Only set new state if different */
-    if (new_state == old_state && old_packet_service_state == get_consolidated_packet_service_state (self))
-        return;
+    if (new_state == old_state) {
+        MMModem3gppPacketServiceState old_packet_service_state = MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN;
+
+        /* If packet service updates are expected, we can ignore the packet service state as that
+         * info won't be used to build a consolidated packet service state */
+        if (priv->packet_service_state_update_supported)
+            return;
+
+        /* If packet service updates are not expected, also check whether there are changes
+         * in the consolidate packet service state */
+        g_object_get (self,
+                      MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE, &old_packet_service_state,
+                      NULL);
+        if (old_packet_service_state == get_consolidated_packet_service_state (self))
+            return;
+    }
 
     if (mm_modem_3gpp_registration_state_is_registered (new_state)) {
         MMModemState modem_state;
@@ -2217,6 +2242,45 @@ void
 mm_iface_modem_3gpp_apply_deferred_registration_state (MMIfaceModem3gpp *self)
 {
     update_registration_state (self, get_consolidated_reg_state (self));
+}
+
+/*****************************************************************************/
+/* Packet service state as reported by the device */
+
+static void
+update_packet_service_state (MMIfaceModem3gpp              *self,
+                             MMModem3gppPacketServiceState  new_state)
+{
+    MMModem3gppPacketServiceState old_state = MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE, &old_state,
+                  NULL);
+
+    /* Only set new state if different */
+    if (old_state == new_state)
+        return;
+
+    mm_obj_msg (self, "3GPP packet service state changed (%s -> %s)",
+                mm_modem_3gpp_packet_service_state_get_string (old_state),
+                mm_modem_3gpp_packet_service_state_get_string (new_state));
+
+    /* The properties in the interface are bound to the properties
+     * in the skeleton, so just updating here is enough */
+    g_object_set (self,
+                  MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE, new_state,
+                  NULL);
+}
+
+void
+mm_iface_modem_3gpp_update_packet_service_state (MMIfaceModem3gpp              *self,
+                                                 MMModem3gppPacketServiceState  new_state)
+{
+    Private *priv;
+
+    priv = get_private (self);
+    priv->packet_service_state_update_supported = TRUE;
+    update_packet_service_state (self, new_state);
 }
 
 /*****************************************************************************/

@@ -342,6 +342,9 @@ void mm_iface_modem_3gpp_update_5gs_registration_state     (MMIfaceModem3gpp    
                                                             gboolean                      deferred);
 void mm_iface_modem_3gpp_apply_deferred_registration_state (MMIfaceModem3gpp             *self);
 
+void mm_iface_modem_3gpp_update_packet_service_state (MMIfaceModem3gpp              *self,
+                                                      MMModem3gppPacketServiceState  state);
+
 void mm_iface_modem_3gpp_update_subscription_state (MMIfaceModem3gpp *self,
                                                     MMModem3gppSubscriptionState state);
 void mm_iface_modem_3gpp_update_access_technologies (MMIfaceModem3gpp *self,
