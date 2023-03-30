@@ -402,6 +402,16 @@ test_empty_ascii_user_data (void)
     common_test_valid_part_from_pdu (pdu, sizeof (pdu));
 }
 
+static void
+test_invalid_ascii_user_data (void)
+{
+    static const guint8 pdu[] = {
+        0x0, 0x8, 0x4, 0x1, 0x2, 0x10, 0xe };
+
+    /* valid but don't care about exact details */
+    common_test_valid_part_from_pdu (pdu, sizeof (pdu));
+}
+
 /********************* PDU CREATOR TESTS *********************/
 
 static void
@@ -609,6 +619,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/SMS/CDMA/PDU-Parser/unicode-encoding", test_unicode_encoding);
     g_test_add_func ("/MM/SMS/CDMA/PDU-Parser/empty-unicode-user-data", test_empty_unicode_user_data);
     g_test_add_func ("/MM/SMS/CDMA/PDU-Parser/empty-ascii-user-data", test_empty_ascii_user_data);
+    g_test_add_func ("/MM/SMS/CDMA/PDU-Parser/invalid-ascii-user-data", test_invalid_ascii_user_data);
 
     g_test_add_func ("/MM/SMS/CDMA/PDU-Creator/ascii-encoding", test_create_pdu_text_ascii_encoding);
     g_test_add_func ("/MM/SMS/CDMA/PDU-Creator/latin-encoding", test_create_pdu_text_latin_encoding);
