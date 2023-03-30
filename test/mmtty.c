@@ -281,6 +281,9 @@ _mm_log (gpointer     obj,
         return;
 
     switch (level) {
+    case MM_LOG_LEVEL_MSG:
+        level_str = "message";
+        break;
     case MM_LOG_LEVEL_DEBUG:
         level_str = "debug";
         break;
