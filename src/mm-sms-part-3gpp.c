@@ -123,7 +123,7 @@ sms_string_to_bcd_semi_octets (guint8 *buf, gsize buflen, const char *string)
 /* len is in semi-octets */
 static gchar *
 sms_decode_address (const guint8  *address,
-                    gint           len,
+                    gint           len_digits,
                     GError       **error)
 {
     guint8 addrtype, addrplan;
@@ -138,23 +138,23 @@ sms_decode_address (const guint8  *address,
         guint8                *unpacked = NULL;
         guint32                unpacked_len;
 
-        unpacked = mm_charset_gsm_unpack (address, (len * 4) / 7, 0, &unpacked_len);
+        unpacked = mm_charset_gsm_unpack (address, (len_digits * 4) / 7, 0, &unpacked_len);
         unpacked_array = g_byte_array_new_take (unpacked, unpacked_len);
         utf8 = mm_modem_charset_bytearray_to_utf8 (unpacked_array, MM_MODEM_CHARSET_GSM, FALSE, error);
     } else if (addrtype == SMS_NUMBER_TYPE_INTL &&
                addrplan == SMS_NUMBER_PLAN_TELEPHONE) {
         /* International telphone number, format as "+1234567890" */
-        utf8 = g_malloc (len + 3); /* '+' + digits + possible trailing 0xf + NUL */
+        utf8 = g_malloc (len_digits + 3); /* '+' + digits + possible trailing 0xf + NUL */
         utf8[0] = '+';
-        sms_semi_octets_to_bcd_string (utf8 + 1, address, (len + 1) / 2);
+        sms_semi_octets_to_bcd_string (utf8 + 1, address, (len_digits + 1) / 2);
     } else {
         /*
          * All non-alphanumeric types and plans are just digits, but
          * don't apply any special formatting if we don't know the
          * format.
          */
-        utf8 = g_malloc (len + 2); /* digits + possible trailing 0xf + NUL */
-        sms_semi_octets_to_bcd_string (utf8, address, (len + 1) / 2);
+        utf8 = g_malloc (len_digits + 2); /* digits + possible trailing 0xf + NUL */
+        sms_semi_octets_to_bcd_string (utf8, address, (len_digits + 1) / 2);
     }
 
     return utf8;
@@ -509,7 +509,8 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint         index,
         mm_sms_part_free (sms_part);
         return NULL;
     }
-    PDU_SIZE_CHECK (offset + tp_addr_size_bytes, "cannot read number");
+    /* +1 due to the Type of Address byte */
+    PDU_SIZE_CHECK (offset + 1 + tp_addr_size_bytes, "cannot read number");
     address = sms_decode_address (&pdu[offset], tp_addr_size_digits, error);
     if (!address) {
         g_prefix_error (error, "Couldn't read address: ");
@@ -518,7 +519,7 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint         index,
     }
     mm_sms_part_take_number (sms_part, g_steal_pointer (&address));
     mm_obj_dbg (log_object, "  number parsed: %s", mm_sms_part_get_number (sms_part));
-    offset += (1 + tp_addr_size_bytes); /* +1 due to the Type of Address byte */
+    offset += (1 + tp_addr_size_bytes);
 
     /* ---------------------------------------------------------------------- */
     /* Get timestamps and indexes for TP-PID, TP-DCS and TP-UDL/TP-UD */

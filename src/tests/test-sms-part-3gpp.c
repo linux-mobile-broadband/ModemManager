@@ -449,6 +449,14 @@ test_pdu_no_address (void)
     common_test_invalid_pdu (pdu, G_N_ELEMENTS (pdu));
 }
 
+static void
+test_pdu_wrong_address_size (void)
+{
+    static const guint8 pdu[] = { 0x00, 0x1C, 0x01, 0x1C };
+
+    common_test_invalid_pdu (pdu, G_N_ELEMENTS (pdu));
+}
+
 /********************* SMS ADDRESS ENCODER TESTS *********************/
 
 static void
@@ -746,6 +754,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/SMS/3GPP/PDU-Parser/pdu-not-stored", test_pdu_not_stored);
     g_test_add_func ("/MM/SMS/3GPP/PDU-Parser/pdu-insufficient-data", test_pdu_insufficient_data);
     g_test_add_func ("/MM/SMS/3GPP/PDU-Parser/pdu-no-address", test_pdu_no_address);
+    g_test_add_func ("/MM/SMS/3GPP/PDU-Parser/pdu-wrong-address-size", test_pdu_wrong_address_size);
 
     g_test_add_func ("/MM/SMS/3GPP/Address-Encoder/smsc-intl", test_address_encode_smsc_intl);
     g_test_add_func ("/MM/SMS/3GPP/Address-Encoder/smsc-unknown", test_address_encode_smsc_unknown);
