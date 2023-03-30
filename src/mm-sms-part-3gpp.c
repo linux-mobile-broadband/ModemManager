@@ -500,7 +500,15 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint         index,
     PDU_SIZE_CHECK (offset + 1, "cannot read number of digits in number");
     tp_addr_size_digits = pdu[offset++];
     tp_addr_size_bytes = (tp_addr_size_digits + 1) >> 1;
+    mm_obj_dbg (log_object, "  address size: %u digits (%u bytes)",
+                tp_addr_size_digits, tp_addr_size_bytes);
 
+    if (tp_addr_size_bytes == 0) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Couldn't read address: field missing");
+        mm_sms_part_free (sms_part);
+        return NULL;
+    }
     PDU_SIZE_CHECK (offset + tp_addr_size_bytes, "cannot read number");
     address = sms_decode_address (&pdu[offset], tp_addr_size_digits, error);
     if (!address) {
