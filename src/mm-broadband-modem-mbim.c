@@ -4628,7 +4628,7 @@ update_access_technologies (MMBroadbandModemMbim *self)
 }
 
 /*****************************************************************************/
-/* Registration info updates */
+/* Packet service updates */
 
 static void update_registration_info (MMBroadbandModemMbim *self,
                                       gboolean              scheduled,
@@ -4636,6 +4636,31 @@ static void update_registration_info (MMBroadbandModemMbim *self,
                                       MbimDataClass         available_data_classes,
                                       gchar                *operator_id_take,
                                       gchar                *operator_name_take);
+
+static void
+update_packet_service_info (MMBroadbandModemMbim    *self,
+                            MbimPacketServiceState   packet_service_state)
+{
+    MMModem3gppPacketServiceState state;
+
+    if (packet_service_state == self->priv->packet_service_state)
+        return;
+
+    self->priv->packet_service_state = packet_service_state;
+    state = mm_modem_3gpp_packet_service_state_from_mbim_packet_service_state (packet_service_state);
+    mm_iface_modem_3gpp_update_packet_service_state (MM_IFACE_MODEM_3GPP (self), state);
+
+    /* PS reg state depends on the packet service state */
+    update_registration_info (self,
+                              FALSE,
+                              self->priv->reg_state,
+                              self->priv->available_data_classes,
+                              g_strdup (self->priv->current_operator_id),
+                              g_strdup (self->priv->current_operator_name));
+}
+
+/*****************************************************************************/
+/* Registration info updates */
 
 static void
 enabling_state_changed (MMBroadbandModemMbim *self)
@@ -5127,15 +5152,7 @@ basic_connect_notification_packet_service (MMBroadbandModemMbim *self,
     }
     update_access_technologies (self);
 
-    if (self->priv->packet_service_state != packet_service_state) {
-        self->priv->packet_service_state = packet_service_state;
-        update_registration_info (self,
-                                  FALSE,
-                                  self->priv->reg_state,
-                                  self->priv->available_data_classes,
-                                  g_strdup (self->priv->current_operator_id),
-                                  g_strdup (self->priv->current_operator_name));
-    }
+    update_packet_service_info (self, packet_service_state);
 
     self->priv->packet_service_uplink_speed = uplink_speed;
     self->priv->packet_service_downlink_speed = downlink_speed;

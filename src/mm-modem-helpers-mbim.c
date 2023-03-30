@@ -129,6 +129,24 @@ mm_modem_3gpp_registration_state_from_mbim_register_state (MbimRegisterState sta
 
 /*****************************************************************************/
 
+MMModem3gppPacketServiceState
+mm_modem_3gpp_packet_service_state_from_mbim_packet_service_state (MbimPacketServiceState state)
+{
+    switch (state) {
+    case MBIM_PACKET_SERVICE_STATE_ATTACHED:
+        return MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED;
+    case MBIM_PACKET_SERVICE_STATE_ATTACHING:
+    case MBIM_PACKET_SERVICE_STATE_DETACHING:
+    case MBIM_PACKET_SERVICE_STATE_DETACHED:
+        return MM_MODEM_3GPP_PACKET_SERVICE_STATE_DETACHED;
+    case MBIM_PACKET_SERVICE_STATE_UNKNOWN:
+    default:
+        return MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN;
+    }
+}
+
+/*****************************************************************************/
+
 MMModemMode
 mm_modem_mode_from_mbim_data_class (MbimDataClass  data_class,
                                     const gchar   *caps_custom_data_class)
