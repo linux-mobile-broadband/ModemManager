@@ -692,6 +692,7 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint         index,
 
         bit_offset = 0;
         if (has_udh) {
+            guint udhl_elements;
             guint udhl, end;
 
             udhl = pdu[tp_user_data_offset] + 1;
@@ -753,9 +754,18 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint         index,
                  * user data to get a multiple of 7 (the padding).
                  */
                 bit_offset = (7 - udhl % 7) % 7;
-                tp_user_data_size_elements -= (udhl * 8 + bit_offset) / 7;
+                udhl_elements = (udhl * 8 + bit_offset) / 7;
             } else
-                tp_user_data_size_elements -= udhl;
+                udhl_elements = udhl;
+
+            if (udhl_elements >= tp_user_data_size_elements) {
+                g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                             "udhl length (%u) is greater than data size (%u)",
+                             udhl_elements, tp_user_data_size_elements);
+                mm_sms_part_free (sms_part);
+                return NULL;
+            }
+            tp_user_data_size_elements -= udhl_elements;
         }
 
         switch (user_data_encoding) {
