@@ -675,7 +675,7 @@ read_cause_codes (MMSmsPart              *sms_part,
     guint8 cause_code;
     MMSmsDeliveryState delivery_state;
 
-    g_assert (parameter->parameter_id == PARAMETER_ID_BEARER_REPLY_OPTION);
+    g_assert (parameter->parameter_id == PARAMETER_ID_CAUSE_CODES);
 
     if (parameter->parameter_len != 1 && parameter->parameter_len != 2) {
         mm_obj_dbg (log_object, "        invalid cause codes length found (%u): ignoring",
