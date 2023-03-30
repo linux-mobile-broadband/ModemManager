@@ -869,6 +869,12 @@ read_bearer_data_user_data (MMSmsPart              *sms_part,
         gchar *text;
         guint i;
 
+        if (num_fields == 0) {
+            mm_obj_dbg (log_object, "            text: ''");
+            mm_sms_part_set_text (sms_part, "");
+            break;
+        }
+
         SUBPARAMETER_SIZE_CHECK (byte_offset + ((bit_offset + (num_fields * 7)) / 8));
 
         text = g_malloc (num_fields + 1);
@@ -887,6 +893,12 @@ read_bearer_data_user_data (MMSmsPart              *sms_part,
         gchar *latin;
         gchar *text;
         guint i;
+
+        if (num_fields == 0) {
+            mm_obj_dbg (log_object, "            text: ''");
+            mm_sms_part_set_text (sms_part, "");
+            break;
+        }
 
         SUBPARAMETER_SIZE_CHECK (byte_offset + 1 + ((bit_offset + (num_fields * 8)) / 8));
 
