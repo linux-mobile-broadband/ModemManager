@@ -695,6 +695,7 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint         index,
             guint udhl_elements;
             guint udhl, end;
 
+            PDU_SIZE_CHECK (tp_user_data_offset + 1, "cannot read UDH length");
             udhl = pdu[tp_user_data_offset] + 1;
             end = tp_user_data_offset + udhl;
 
