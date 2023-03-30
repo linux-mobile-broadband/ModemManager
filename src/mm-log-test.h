@@ -26,7 +26,7 @@ _mm_log (gpointer     obj,
          const gchar *module,
          const gchar *loc,
          const gchar *func,
-         guint32      level,
+         MMLogLevel   level,
          const gchar *fmt,
          ...)
 {
