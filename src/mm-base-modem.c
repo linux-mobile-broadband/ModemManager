@@ -945,14 +945,6 @@ mm_base_modem_peek_cancellable (MMBaseModem *self)
     return self->priv->cancellable;
 }
 
-GCancellable *
-mm_base_modem_get_cancellable  (MMBaseModem *self)
-{
-    g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
-
-    return g_object_ref (self->priv->cancellable);
-}
-
 MMPortSerialAt *
 mm_base_modem_get_port_primary (MMBaseModem *self)
 {

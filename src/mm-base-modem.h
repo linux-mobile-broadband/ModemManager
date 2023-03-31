@@ -213,7 +213,6 @@ guint mm_base_modem_get_product_id          (MMBaseModem *self);
 guint mm_base_modem_get_subsystem_vendor_id (MMBaseModem *self);
 
 GCancellable *mm_base_modem_peek_cancellable (MMBaseModem *self);
-GCancellable *mm_base_modem_get_cancellable  (MMBaseModem *self);
 
 void     mm_base_modem_authorize        (MMBaseModem *self,
                                          GDBusMethodInvocation *invocation,
