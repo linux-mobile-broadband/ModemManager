@@ -178,18 +178,9 @@ struct _MMBroadbandModemQmiPrivate {
     guint profile_changed_indication_id;
     gint  profile_changed_indication_ignored;
 
-    /* PS registration helpers when using NAS System Info and DSD
+    /* Packet service state helpers when using NAS System Info and DSD
      * (not applicable when using NAS Serving System) */
     gboolean dsd_supported;
-    gboolean dsd_data_rat_available;
-    MMModem3gppRegistrationState system_info_registration_state_cs;
-    MMModem3gppRegistrationState system_info_registration_state_ps;
-    MMModem3gppRegistrationState system_info_registration_state_eps;
-    MMModem3gppRegistrationState system_info_registration_state_5gs;
-    MMModemAccessTechnology access_tech;
-    guint16 location_area_code;
-    guint16 tracking_area_code;
-    guint32 cell_id;
 };
 
 /*****************************************************************************/
@@ -3662,45 +3653,6 @@ get_serving_system_3gpp_ready (QmiClientNas *client,
 }
 
 static void
-consolidated_update_registration_state (MMBroadbandModemQmi *self)
-{
-    MMModem3gppRegistrationState state_ps;
-    MMModem3gppRegistrationState state_eps;
-    MMModem3gppRegistrationState state_5gs;
-
-    /* CS state unaffected by DSD state */
-    mm_iface_modem_3gpp_update_cs_registration_state  (MM_IFACE_MODEM_3GPP (self), self->priv->system_info_registration_state_cs, TRUE);
-
-    /* If DSD supported but data RAT not set, no transition to HOME/ROAMING, force IDLE */
-    state_ps = self->priv->system_info_registration_state_ps;
-    state_eps = self->priv->system_info_registration_state_eps;
-    state_5gs = self->priv->system_info_registration_state_5gs;
-    if (self->priv->dsd_supported && !self->priv->dsd_data_rat_available) {
-        if ((state_ps == MM_MODEM_3GPP_REGISTRATION_STATE_HOME || state_ps == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)) {
-            mm_obj_dbg (self, "fallback PS registration state to idle: DSD data RAT unavailable");
-            state_ps  = MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
-        }
-        if ((state_eps == MM_MODEM_3GPP_REGISTRATION_STATE_HOME || state_eps == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)) {
-            mm_obj_dbg (self, "fallback EPS registration state to idle: DSD data RAT unavailable");
-            state_eps  = MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
-        }
-        if ((state_5gs == MM_MODEM_3GPP_REGISTRATION_STATE_HOME || state_5gs == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)) {
-            mm_obj_dbg (self, "fallback 5GS registration state to idle: DSD data RAT unavailable");
-            state_5gs  = MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
-        }
-    } else if (!self->priv->dsd_supported)
-        mm_obj_dbg (self, "updating PS/EPS/5GS registration state: DSD unsupported");
-    else if (self->priv->dsd_data_rat_available)
-        mm_obj_dbg (self, "updating PS/EPS/5GS registration state: DSD data RAT available");
-    else
-        g_assert_not_reached ();
-    mm_iface_modem_3gpp_update_ps_registration_state  (MM_IFACE_MODEM_3GPP (self), state_ps, TRUE);
-    mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), state_eps, TRUE);
-    mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self), state_5gs, TRUE);
-    mm_iface_modem_3gpp_apply_deferred_registration_state (MM_IFACE_MODEM_3GPP (self));
-}
-
-static void
 common_process_system_info_3gpp (MMBroadbandModemQmi              *self,
                                  QmiMessageNasGetSystemInfoOutput *response_output,
                                  QmiIndicationNasSystemInfoOutput *indication_output)
@@ -3734,18 +3686,14 @@ common_process_system_info_3gpp (MMBroadbandModemQmi              *self,
         self->priv->current_operator_id = operator_id;
     }
 
-    /* Store latest registration states and update them */
-    self->priv->system_info_registration_state_cs = registration_state_cs;
-    self->priv->system_info_registration_state_ps = registration_state_ps;
-    self->priv->system_info_registration_state_eps = registration_state_eps;
-    self->priv->system_info_registration_state_5gs = registration_state_5gs;
-    consolidated_update_registration_state (self);
+    /* Update registration states */
+    mm_iface_modem_3gpp_update_cs_registration_state  (MM_IFACE_MODEM_3GPP (self), registration_state_cs, TRUE);
+    mm_iface_modem_3gpp_update_ps_registration_state  (MM_IFACE_MODEM_3GPP (self), registration_state_ps, TRUE);
+    mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), registration_state_eps, TRUE);
+    mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self), registration_state_5gs, TRUE);
+    mm_iface_modem_3gpp_apply_deferred_registration_state (MM_IFACE_MODEM_3GPP (self));
 
-    /* Store act and location info and update them */
-    self->priv->access_tech = act;
-    self->priv->location_area_code = lac;
-    self->priv->tracking_area_code = tac;
-    self->priv->cell_id = cid;
+    /* Update act and location info */
     mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), act);
     mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, tac, cid);
 }
@@ -3804,10 +3752,9 @@ common_process_system_status_3gpp (MMBroadbandModemQmi                *self,
     }
 
     /* Store DSD data RAT availability and update PS/EPS/5GS states accordingly */
-    self->priv->dsd_data_rat_available = data_rat_available;
-    consolidated_update_registration_state (self);
-    mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), self->priv->access_tech);
-    mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), self->priv->location_area_code, self->priv->tracking_area_code, self->priv->cell_id);
+    mm_iface_modem_3gpp_update_packet_service_state (
+        MM_IFACE_MODEM_3GPP (self),
+        data_rat_available ? MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED : MM_MODEM_3GPP_PACKET_SERVICE_STATE_DETACHED);
 }
 
 static void
@@ -13600,11 +13547,6 @@ mm_broadband_modem_qmi_init (MMBroadbandModemQmi *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BROADBAND_MODEM_QMI,
                                               MMBroadbandModemQmiPrivate);
-    self->priv->system_info_registration_state_cs = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-    self->priv->system_info_registration_state_ps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-    self->priv->system_info_registration_state_eps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-    self->priv->system_info_registration_state_5gs = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-    self->priv->access_tech = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
 }
 
 static void
