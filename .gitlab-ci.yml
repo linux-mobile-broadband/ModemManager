@@ -28,10 +28,9 @@ build container:
   stage: container prep
   only:
     - main
-    - branches
     - merge_requests
     - tags
-    - pushes
+    - schedules
 
 before_script:
     - export BUILD_MBIM=true
