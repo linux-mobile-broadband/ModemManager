@@ -2909,8 +2909,8 @@ mm_qmi_uim_get_card_status_output_parse (gpointer                           log_
                                          guint                             *o_pers_retries,
                                          GError                           **error)
 {
-    QmiMessageUimGetCardStatusOutputCardStatusCardsElement                    *card;
-    QmiMessageUimGetCardStatusOutputCardStatusCardsElementApplicationsElement *app;
+    QmiMessageUimGetCardStatusOutputCardStatusCardsElement                      *card;
+    QmiMessageUimGetCardStatusOutputCardStatusCardsElementApplicationsElementV2 *app;
     GArray      *cards;
     guint16      index_gw_primary = 0xFFFF;
     guint8       gw_primary_slot_i = 0;
@@ -3014,7 +3014,7 @@ mm_qmi_uim_get_card_status_output_parse (gpointer                           log_
         return FALSE;
     }
 
-    app = &g_array_index (card->applications, QmiMessageUimGetCardStatusOutputCardStatusCardsElementApplicationsElement, gw_primary_application_i);
+    app = &g_array_index (card->applications, QmiMessageUimGetCardStatusOutputCardStatusCardsElementApplicationsElementV2, gw_primary_application_i);
     if ((app->type != QMI_UIM_CARD_APPLICATION_TYPE_SIM) && (app->type != QMI_UIM_CARD_APPLICATION_TYPE_USIM)) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "Unsupported application type found in GW primary application index: %s",
@@ -3122,31 +3122,37 @@ mm_qmi_uim_get_card_status_output_parse (gpointer                           log_
             pin = app->personalization_state == QMI_UIM_CARD_APPLICATION_PERSONALIZATION_STATE_CODE_REQUIRED;
 
             switch (app->personalization_feature) {
-            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_NETWORK:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_STATUS_GW_NETWORK:
                 lock = (pin ? MM_MODEM_LOCK_PH_NET_PIN : MM_MODEM_LOCK_PH_NET_PUK);
                 break;
-            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_NETWORK_SUBSET:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_STATUS_GW_NETWORK_SUBSET:
                 lock = (pin ? MM_MODEM_LOCK_PH_NETSUB_PIN : MM_MODEM_LOCK_PH_NETSUB_PUK);
                 break;
-            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_SERVICE_PROVIDER:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_STATUS_GW_SERVICE_PROVIDER:
                 lock = (pin ? MM_MODEM_LOCK_PH_SP_PIN : MM_MODEM_LOCK_PH_SP_PUK);
                 break;
-            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_CORPORATE:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_STATUS_GW_CORPORATE:
                 lock = (pin ? MM_MODEM_LOCK_PH_CORP_PIN : MM_MODEM_LOCK_PH_CORP_PUK);
                 break;
-            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_UIM:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_STATUS_GW_UIM:
                 if (pin) {
                     lock = MM_MODEM_LOCK_PH_SIM_PIN;
                     break;
                 }
                 /* fall through */
-            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_NETWORK_TYPE_1:
-            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_NETWORK_TYPE_2:
-            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_HRPD:
-            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_SERVICE_PROVIDER:
-            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_CORPORATE:
-            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_RUIM:
-            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_UNKNOWN:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_STATUS_1X_NETWORK_TYPE_1:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_STATUS_1X_NETWORK_TYPE_2:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_STATUS_1X_HRPD:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_STATUS_1X_SERVICE_PROVIDER:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_STATUS_1X_CORPORATE:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_STATUS_1X_RUIM:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_STATUS_UNKNOWN:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_STATUS_GW_SERVICE_PROVIDER_NAME:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_STATUS_GW_SP_EHPLMN:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_STATUS_GW_ICCID:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_STATUS_GW_IMPI:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_STATUS_GW_NETWORK_SUBSET_SERVICE_PROVIDER:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_STATUS_GW_CARRIER:
             default:
                 g_set_error (error,
                              MM_MOBILE_EQUIPMENT_ERROR,
@@ -3237,7 +3243,12 @@ mm_qmi_uim_get_configuration_output_parse (gpointer                             
         case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_SERVICE_PROVIDER:
         case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_CORPORATE:
         case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_RUIM:
-        case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_UNKNOWN:
+        case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_SERVICE_PROVIDER_NAME:
+        case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_SP_EHPLMN:
+        case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_ICCID:
+        case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_IMPI:
+        case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_NETWORK_SUBSET_SERVICE_PROVIDER:
+        case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_CARRIER:
             mm_obj_dbg (log_object, "ignoring lock in UIM feature: %s",
                         qmi_uim_card_application_personalization_feature_get_string (element->feature));
             break;
@@ -3251,25 +3262,31 @@ mm_qmi_uim_get_configuration_output_parse (gpointer                             
 
 /*****************************************************************************/
 
-QmiUimCardApplicationPersonalizationFeature
-qmi_personalization_feature_from_mm_modem_3gpp_facility (MMModem3gppFacility facility)
+gboolean
+qmi_personalization_feature_from_mm_modem_3gpp_facility (MMModem3gppFacility                          facility,
+                                                         QmiUimCardApplicationPersonalizationFeature *o_feature)
 {
     switch (facility) {
     case MM_MODEM_3GPP_FACILITY_NET_PERS:
-        return QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_NETWORK;
+        *o_feature = QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_NETWORK;
+        return TRUE;
     case MM_MODEM_3GPP_FACILITY_NET_SUB_PERS:
-        return QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_NETWORK_SUBSET;
+        *o_feature = QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_NETWORK_SUBSET;
+        return TRUE;
     case MM_MODEM_3GPP_FACILITY_PROVIDER_PERS:
-        return QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_SERVICE_PROVIDER;
+        *o_feature = QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_SERVICE_PROVIDER;
+        return TRUE;
     case MM_MODEM_3GPP_FACILITY_CORP_PERS:
-        return QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_CORPORATE;
+        *o_feature = QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_CORPORATE;
+        return TRUE;
     case MM_MODEM_3GPP_FACILITY_PH_SIM:
-        return QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_UIM;
+        *o_feature = QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_UIM;
+        return TRUE;
     case MM_MODEM_3GPP_FACILITY_NONE:
     case MM_MODEM_3GPP_FACILITY_SIM:
     case MM_MODEM_3GPP_FACILITY_FIXED_DIALING:
     case MM_MODEM_3GPP_FACILITY_PH_FSIM:
     default:
-        return QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_UNKNOWN;
+        return FALSE;
     }
 }

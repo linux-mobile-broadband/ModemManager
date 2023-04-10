@@ -3018,8 +3018,7 @@ modem_3gpp_disable_facility_lock (MMIfaceModem3gpp *self,
     task = g_task_new (self, NULL, callback, user_data);
 
     /* Choose facility to disable */
-    feature = qmi_personalization_feature_from_mm_modem_3gpp_facility (facility);
-    if (feature == QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_UNKNOWN) {
+    if (!qmi_personalization_feature_from_mm_modem_3gpp_facility (facility, &feature)) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
                                  "Not supported type of facility lock.");
         g_object_unref (task);
