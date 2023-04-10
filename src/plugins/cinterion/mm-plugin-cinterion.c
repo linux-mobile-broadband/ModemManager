@@ -61,7 +61,7 @@ cinterion_custom_init_finish (MMPortProbe   *probe,
 
 /* is_port_already_tagged checks whether a port provided by probe has
  * already tags assigned. */
-gboolean
+static gboolean
 is_port_already_tagged (MMPortProbe *probe)
 {
     if (CHECK_PORT_HAS_TAG (probe, ID_MM_PORT_TYPE_AT_PRIMARY) ||
