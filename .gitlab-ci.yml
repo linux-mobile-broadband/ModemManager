@@ -243,6 +243,24 @@ build-single-plugins-builtin:
         ninja -C build_$PLUGIN;
       done
 
+build-debug:
+  stage: build
+  extends:
+  - .fdo.distribution-image@ubuntu
+  - .common_variables
+  only:
+    - main
+    - merge_requests
+    - tags
+    - schedules
+  script:
+    - *prepare_deps
+    - meson setup build --buildtype=debug --prefix=/usr -Dwerror=true -Dgtk_doc=true -Dpolkit=strict -Dsystemdsystemunitdir=/lib/systemd/system
+    - ninja -C build
+    - ninja -C build test
+    - ninja -C build install
+    - ninja -C build uninstall
+
 build-release:
   stage: build
   extends:
