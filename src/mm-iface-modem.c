@@ -1631,6 +1631,21 @@ static gboolean periodic_signal_check_run     (MMIfaceModem *self);
 static void     periodic_signal_check_step    (GTask        *task);
 
 static void
+periodic_signal_check_complete (GTask *task)
+{
+    MMIfaceModem *self;
+    Private      *priv;
+
+    self = g_task_get_source_object (task);
+    priv = get_private (self);
+    g_assert (priv->signal_check_running);
+    priv->signal_check_running = FALSE;
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
 load_access_technologies_ready (MMIfaceModem *self,
                                 GAsyncResult *res,
                                 GTask        *task)
@@ -1739,8 +1754,7 @@ periodic_signal_check_step (GTask *task)
          * do anything else. */
         if (!priv->signal_check_enabled) {
             mm_obj_dbg (self, "periodic signal quality and access technology checks not rescheduled: disabled");
-            g_task_return_boolean (task, FALSE);
-            g_object_unref (task);
+            periodic_signal_check_complete (task);
             return;
         }
 
@@ -1781,8 +1795,7 @@ periodic_signal_check_step (GTask *task)
                                                                        self);
         }
 
-        g_task_return_boolean (task, TRUE);
-        g_object_unref (task);
+        periodic_signal_check_complete (task);
         return;
 
     default:
@@ -1807,6 +1820,9 @@ periodic_signal_check_run (MMIfaceModem *self)
     ctx->access_technologies      = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     ctx->access_technologies_mask = MM_MODEM_ACCESS_TECHNOLOGY_ANY;
     g_task_set_task_data (task, ctx, (GDestroyNotify) g_free);
+
+    g_assert (!priv->signal_check_running);
+    priv->signal_check_running = TRUE;
 
     periodic_signal_check_step (task);
 
@@ -1836,7 +1852,6 @@ mm_iface_modem_refresh_signal (MMIfaceModem *self)
     }
 
     mm_obj_dbg (self, "periodic signal check refresh requested");
-    priv->signal_check_running = TRUE;
 
     /* Remove the scheduled timeout as we're going to refresh
      * right away */
