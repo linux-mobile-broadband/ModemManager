@@ -186,14 +186,14 @@ grab_port (MMPlugin *self,
     ptype = mm_port_probe_get_port_type (probe);
 
     if (g_object_get_data (G_OBJECT (probe), ID_MM_PORT_TYPE_AT_PRIMARY)) {
-        mm_obj_dbg ("(%s/%s)' Port flagged as primary",
-                mm_port_probe_get_port_subsys (probe),
-                mm_port_probe_get_port_name (probe));
+        mm_obj_dbg (self, "(%s/%s)' Port flagged as primary",
+                    mm_port_probe_get_port_subsys (probe),
+                    mm_port_probe_get_port_name (probe));
         pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
     } else if (g_object_get_data (G_OBJECT (probe), ID_MM_PORT_TYPE_AT_PPP)) {
-        mm_obj_dbg ("(%s/%s)' Port flagged as PPP",
-                mm_port_probe_get_port_subsys (probe),
-                mm_port_probe_get_port_name (probe));
+        mm_obj_dbg (self, "(%s/%s)' Port flagged as PPP",
+                    mm_port_probe_get_port_subsys (probe),
+                    mm_port_probe_get_port_name (probe));
         pflags = MM_PORT_SERIAL_AT_FLAG_PPP;
     } /* else unknown or set via generic udev tags */
 
