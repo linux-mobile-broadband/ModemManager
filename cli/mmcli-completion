@@ -102,6 +102,10 @@ _mmcli()
             _filedir
             return 0
             ;;
+        '--messaging-create-sms-with-text')
+            _filedir
+            return 0
+            ;;
         '--messaging-delete-sms')
             COMPREPLY=( $(compgen -W "[PATH|INDEX]" -- $cur) )
             return 0
