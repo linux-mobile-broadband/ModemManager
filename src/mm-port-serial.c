@@ -943,7 +943,14 @@ common_input_available (MMPortSerial *self,
         mm_obj_dbg (self, "unexpected port hangup!");
         if (self->priv->response->len)
             g_byte_array_remove_range (self->priv->response, 0, self->priv->response->len);
-        port_serial_close_force (self);
+        /* The completion of the commands with an error may end up fully disposing the
+         * serial port object. In order to cope with that, we make sure we have
+         * our own reference to the object while the close runs. */
+        g_object_ref (self);
+        {
+            port_serial_close_force (self);
+        }
+        g_object_unref (self);
         return G_SOURCE_REMOVE;
     }
 
