@@ -38,6 +38,14 @@ ATTRS{idVendor}=="1199", ATTRS{idProduct}=="9079", ENV{.MM_USBIFNUM}=="03", SUBS
 ATTRS{idVendor}=="1199", ATTRS{idProduct}=="9079", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="1199", ATTRS{idProduct}=="9079", ENV{.MM_USBIFNUM}=="00", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_QCDM}="1"
 
+# HL7812 port hints
+#  if 04: raw NMEA port
+#  if 02: at_ppp port
+#  if 00: primary port
+ATTRS{idVendor}=="1199", ATTRS{idProduct}=="c001", ENV{.MM_USBIFNUM}=="04", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="1199", ATTRS{idProduct}=="c001", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PPP}="1"
+ATTRS{idVendor}=="1199", ATTRS{idProduct}=="c001", ENV{.MM_USBIFNUM}=="00", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+
 GOTO="mm_sierra_end"
 
 LABEL="mm_sierra_comneon"
