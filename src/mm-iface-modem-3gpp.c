@@ -37,6 +37,7 @@
  *  -  'apn-type' may not always be supported.
  *  -  'access-type-preference' may not always be reported.
  *  -  'profile-id' will not be known in the requested settings
+ *  -  'profile-name' might not be known in the requested settings
  *  -  we ignore settings not applicable to profiles, like 'allow-roaming' or
  *     'rm-protocol'.
  *  -  we apply very loose matching for all fields.
@@ -44,6 +45,7 @@
 #define MM_BEARER_PROPERTIES_CMP_FLAGS_EPS              \
     (MM_BEARER_PROPERTIES_CMP_FLAGS_LOOSE |             \
      MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PROFILE_ID |     \
+     MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PROFILE_NAME |   \
      MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PASSWORD |       \
      MM_BEARER_PROPERTIES_CMP_FLAGS_NO_ALLOW_ROAMING |  \
      MM_BEARER_PROPERTIES_CMP_FLAGS_NO_APN_TYPE |       \
