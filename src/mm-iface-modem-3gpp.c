@@ -135,8 +135,8 @@ GET_NETWORK_SUPPORTED (5gs, 5GS)
 
 typedef struct {
     MMModem3gppPacketServiceState final_state;
-    gulong packet_service_state_changed_id;
-    guint packet_service_state_changed_wait_id;
+    gulong state_changed_id;
+    guint timeout_id;
 } WaitForPacketServiceStateContext;
 
 MMModem3gppPacketServiceState
@@ -166,15 +166,15 @@ wait_for_packet_service_state_context_complete (GTask                         *t
     self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
-    if (ctx->packet_service_state_changed_id) {
-        if (g_signal_handler_is_connected (self, ctx->packet_service_state_changed_id))
-            g_signal_handler_disconnect (self, ctx->packet_service_state_changed_id);
-        ctx->packet_service_state_changed_id = 0;
+    if (ctx->state_changed_id) {
+        if (g_signal_handler_is_connected (self, ctx->state_changed_id))
+            g_signal_handler_disconnect (self, ctx->state_changed_id);
+        ctx->state_changed_id = 0;
     }
 
-    if (ctx->packet_service_state_changed_wait_id) {
-        g_source_remove (ctx->packet_service_state_changed_wait_id);
-        ctx->packet_service_state_changed_wait_id = 0;
+    if (ctx->timeout_id) {
+        g_source_remove (ctx->timeout_id);
+        ctx->timeout_id = 0;
     }
 
     if (error)
@@ -253,14 +253,14 @@ mm_iface_modem_3gpp_wait_for_packet_service_state (MMIfaceModem3gpp             
     g_task_set_task_data (task, ctx, g_free);
 
     /* Want to get notified when packet service state changes */
-    ctx->packet_service_state_changed_id = g_signal_connect (self,
-                                                             "notify::" MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE,
-                                                             G_CALLBACK (packet_service_state_changed),
-                                                             task);
+    ctx->state_changed_id = g_signal_connect (self,
+                                              "notify::" MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE,
+                                              G_CALLBACK (packet_service_state_changed),
+                                              task);
     /* But we don't want to wait forever */
-    ctx->packet_service_state_changed_wait_id = g_timeout_add_seconds (10,
-                                                                       (GSourceFunc)packet_service_state_changed_wait_expired,
-                                                                       task);
+    ctx->timeout_id = g_timeout_add_seconds (10,
+                                             (GSourceFunc)packet_service_state_changed_wait_expired,
+                                             task);
 }
 
 /*****************************************************************************/
