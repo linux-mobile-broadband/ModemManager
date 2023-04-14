@@ -135,8 +135,9 @@ GET_NETWORK_SUPPORTED (5gs, 5GS)
 
 typedef struct {
     MMModem3gppPacketServiceState final_state;
-    gulong state_changed_id;
-    guint timeout_id;
+    gulong                        state_changed_id;
+    guint                         timeout_id;
+    gulong                        cancellable_id;
 } WaitForPacketServiceStateContext;
 
 MMModem3gppPacketServiceState
@@ -166,29 +167,61 @@ wait_for_packet_service_state_context_complete (GTask                         *t
     self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
-    if (ctx->state_changed_id) {
-        if (g_signal_handler_is_connected (self, ctx->state_changed_id))
-            g_signal_handler_disconnect (self, ctx->state_changed_id);
-        ctx->state_changed_id = 0;
+    g_assert (ctx->state_changed_id);
+    if (g_signal_handler_is_connected (self, ctx->state_changed_id))
+        g_signal_handler_disconnect (self, ctx->state_changed_id);
+    ctx->state_changed_id = 0;
+
+    g_assert (ctx->timeout_id);
+    g_source_remove (ctx->timeout_id);
+    ctx->timeout_id = 0;
+
+    if (!g_task_return_error_if_cancelled (task)) {
+        if (ctx->cancellable_id) {
+            g_cancellable_disconnect (g_task_get_cancellable (task), ctx->cancellable_id);
+            ctx->cancellable_id = 0;
+        }
+        if (error)
+            g_task_return_error (task, error);
+        else
+            g_task_return_int (task, state);
     }
-
-    if (ctx->timeout_id) {
-        g_source_remove (ctx->timeout_id);
-        ctx->timeout_id = 0;
-    }
-
-    if (error)
-        g_task_return_error (task, error);
-    else
-        g_task_return_int (task, state);
-
     g_object_unref (task);
 }
 
-static gboolean
-packet_service_state_changed_wait_expired (GTask *task)
+static void
+packet_service_wait_cancelled (GCancellable *cancellable,
+                               GTask        *task)
 {
-    GError *error;
+    MMIfaceModem3gpp                 *self;
+    WaitForPacketServiceStateContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    mm_obj_dbg (self, "wait for packet service state '%s': cancelled",
+                (ctx->final_state == MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN) ?
+                "any" : mm_modem_3gpp_packet_service_state_get_string (ctx->final_state));
+
+    /* Given that the cancellable is the same one as in the task, we can complete the operation here
+     * without specifying an exact error. The task will itself be completed with a cancelled error. */
+    g_assert (g_task_get_cancellable (task) == cancellable);
+    wait_for_packet_service_state_context_complete (task, MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN, NULL);
+}
+
+static gboolean
+packet_service_wait_timeout (GTask *task)
+{
+    MMIfaceModem3gpp                 *self;
+    WaitForPacketServiceStateContext *ctx;
+    GError                           *error;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    mm_obj_dbg (self, "wait for packet service state '%s': timed out",
+                (ctx->final_state == MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN) ?
+                "any" : mm_modem_3gpp_packet_service_state_get_string (ctx->final_state));
 
     error = g_error_new (MM_CORE_ERROR,
                          MM_CORE_ERROR_RETRY,
@@ -218,6 +251,10 @@ packet_service_state_changed (MMIfaceModem3gpp *self,
         (state != ctx->final_state))
         return;
 
+    mm_obj_dbg (self, "wait for packet service state '%s': finished",
+                (ctx->final_state == MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN) ?
+                "any" : mm_modem_3gpp_packet_service_state_get_string (ctx->final_state));
+
     /* Done! */
     wait_for_packet_service_state_context_complete (task, state, NULL);
 }
@@ -225,6 +262,7 @@ packet_service_state_changed (MMIfaceModem3gpp *self,
 void
 mm_iface_modem_3gpp_wait_for_packet_service_state (MMIfaceModem3gpp              *self,
                                                    MMModem3gppPacketServiceState  final_state,
+                                                   GCancellable                  *cancellable,
                                                    GAsyncReadyCallback            callback,
                                                    gpointer                       user_data)
 {
@@ -232,7 +270,7 @@ mm_iface_modem_3gpp_wait_for_packet_service_state (MMIfaceModem3gpp             
     WaitForPacketServiceStateContext *ctx;
     GTask                            *task;
 
-    task = g_task_new (self, NULL, callback, user_data);
+    task = g_task_new (self, cancellable, callback, user_data);
 
     g_object_get (self,
                   MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE, &state,
@@ -252,6 +290,10 @@ mm_iface_modem_3gpp_wait_for_packet_service_state (MMIfaceModem3gpp             
 
     g_task_set_task_data (task, ctx, g_free);
 
+    /* Ownership of the task will be shared among the signal handler, the timeout,
+     * and the cancellable. As soon as one of them is triggered, it should cancel the
+     * other two. */
+
     /* Want to get notified when packet service state changes */
     ctx->state_changed_id = g_signal_connect (self,
                                               "notify::" MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE,
@@ -259,8 +301,23 @@ mm_iface_modem_3gpp_wait_for_packet_service_state (MMIfaceModem3gpp             
                                               task);
     /* But we don't want to wait forever */
     ctx->timeout_id = g_timeout_add_seconds (10,
-                                             (GSourceFunc)packet_service_state_changed_wait_expired,
+                                             (GSourceFunc)packet_service_wait_timeout,
                                              task);
+
+    /* And we want it to be cancellable */
+    if (cancellable) {
+        ctx->cancellable_id = g_cancellable_connect (cancellable,
+                                                     (GCallback) packet_service_wait_cancelled,
+                                                     task,
+                                                     NULL);
+        /* Do nothing if already cancelled, packet_service_wait_cancelled() will already be called */
+        if (!ctx->cancellable_id)
+            return;
+    }
+
+    mm_obj_dbg (self, "wait for packet service state '%s': started",
+                (final_state == MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN) ?
+                "any" : mm_modem_3gpp_packet_service_state_get_string (final_state));
 }
 
 /*****************************************************************************/

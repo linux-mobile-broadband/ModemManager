@@ -228,7 +228,7 @@ typedef struct {
 static void
 packet_service_attach_in_3gpp_network_context_free (PacketServiceAttachIn3gppNetworkContext *ctx)
 {
-    g_assert (!ctx->error);
+    g_clear_error (&ctx->error);
     g_slice_free (PacketServiceAttachIn3gppNetworkContext, ctx);
 }
 
@@ -296,6 +296,11 @@ packet_service_attach_in_3gpp_network_step (GTask *task)
     self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
+        return;
+    }
+
     switch (ctx->step) {
         case PACKET_SERVICE_ATTACH_IN_3GPP_NETWORK_STEP_FIRST:
             ctx->step++;
@@ -305,6 +310,7 @@ packet_service_attach_in_3gpp_network_step (GTask *task)
             g_assert (!ctx->error);
             mm_iface_modem_3gpp_wait_for_packet_service_state (MM_IFACE_MODEM_3GPP (self),
                                                                MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED,
+                                                               g_task_get_cancellable (task),
                                                                (GAsyncReadyCallback)wait_for_packet_service_state_ready,
                                                                task);
             return;
@@ -322,6 +328,7 @@ packet_service_attach_in_3gpp_network_step (GTask *task)
             g_assert (!ctx->error);
             mm_iface_modem_3gpp_wait_for_packet_service_state (MM_IFACE_MODEM_3GPP (self),
                                                                MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED,
+                                                               g_task_get_cancellable (task),
                                                                (GAsyncReadyCallback)wait_for_packet_service_state_ready,
                                                                task);
             return;
@@ -341,13 +348,14 @@ packet_service_attach_in_3gpp_network_step (GTask *task)
 
 static void
 packet_service_attach_in_3gpp_network (MMIfaceModemSimple  *self,
+                                       GCancellable        *cancellable,
                                        GAsyncReadyCallback  callback,
                                        gpointer             user_data)
 {
     PacketServiceAttachIn3gppNetworkContext *ctx;
     GTask                                   *task;
 
-    task = g_task_new (self, NULL, callback, user_data);
+    task = g_task_new (self, cancellable, callback, user_data);
     ctx = g_slice_new0 (PacketServiceAttachIn3gppNetworkContext);
     ctx->step = PACKET_SERVICE_ATTACH_IN_3GPP_NETWORK_STEP_FIRST;
     g_task_set_task_data (task, ctx, (GDestroyNotify)packet_service_attach_in_3gpp_network_context_free);
@@ -777,6 +785,7 @@ connection_step (ConnectionContext *ctx)
         if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self))) {
             packet_service_attach_in_3gpp_network (
                 ctx->self,
+                ctx->cancellable,
                 (GAsyncReadyCallback)packet_service_attach_in_3gpp_network_ready,
                 ctx);
             return;

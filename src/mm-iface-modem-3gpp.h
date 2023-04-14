@@ -407,6 +407,7 @@ gboolean mm_iface_modem_3gpp_set_packet_service_state_finish (MMIfaceModem3gpp  
 /* Allow waiting for packet service */
 void                          mm_iface_modem_3gpp_wait_for_packet_service_state        (MMIfaceModem3gpp              *self,
                                                                                         MMModem3gppPacketServiceState  final_state,
+                                                                                        GCancellable                  *cancellable,
                                                                                         GAsyncReadyCallback            callback,
                                                                                         gpointer                       user_data);
 MMModem3gppPacketServiceState mm_iface_modem_3gpp_wait_for_packet_service_state_finish (MMIfaceModem3gpp  *self,
