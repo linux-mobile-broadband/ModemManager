@@ -411,9 +411,9 @@ mm_location_3gpp_new_from_string_variant (GVariant *string,
                                                      strtoul (split[0], NULL, 10),
                                                      strlen (split[1]) == 3 ? 3 : 2,
                                                      strtoul (split[1], NULL, 10));
-        self->priv->location_area_code = strtol (split[2], NULL, 16);
-        self->priv->cell_id = strtol (split[3], NULL, 16);
-        self->priv->tracking_area_code = strtol (split[4], NULL, 16);
+        self->priv->location_area_code = strtoul (split[2], NULL, 16);
+        self->priv->cell_id = strtoul (split[3], NULL, 16);
+        self->priv->tracking_area_code = strtoul (split[4], NULL, 16);
     }
 
     g_strfreev (split);
