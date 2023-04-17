@@ -11235,6 +11235,7 @@ schedule_initial_registration_checks (MMBroadbandModem *self)
 typedef enum {
     /* When user requests a disable operation, the process starts here */
     DISABLING_STEP_FIRST,
+    DISABLING_STEP_IFACE_SIMPLE_ABORT_ONGOING,
     DISABLING_STEP_WAIT_FOR_FINAL_STATE,
     DISABLING_STEP_DISCONNECT_BEARERS,
     /* When the disabling is launched due to a failed enable, the process
@@ -11420,6 +11421,14 @@ disabling_step (GTask *task)
 
     switch (ctx->step) {
     case DISABLING_STEP_FIRST:
+        ctx->step++;
+        /* fall through */
+
+    case DISABLING_STEP_IFACE_SIMPLE_ABORT_ONGOING:
+        /* Connection requests via the Simple interface must be aborted as soon
+         * as possible, because certain steps may be explicitly waiting for new
+         * state transitions and such. */
+        mm_iface_modem_simple_abort_ongoing (MM_IFACE_MODEM_SIMPLE (ctx->self));
         ctx->step++;
         /* fall through */
 

@@ -65,6 +65,21 @@ get_private (MMIfaceModemSimple *self)
 }
 
 /*****************************************************************************/
+/* Abort ongoing requests, if any */
+
+void
+mm_iface_modem_simple_abort_ongoing (MMIfaceModemSimple *self)
+{
+    Private *priv;
+
+    priv = get_private (self);
+    if (priv->ongoing_connect) {
+        g_cancellable_cancel (priv->ongoing_connect);
+        g_clear_object (&priv->ongoing_connect);
+    }
+}
+
+/*****************************************************************************/
 /* Register in either a CDMA or a 3GPP network (or both) */
 
 typedef struct {
@@ -1010,7 +1025,6 @@ disconnect_auth_ready (MMBaseModem          *self,
 {
     g_autoptr(MMBearerList)  list = NULL;
     GError                  *error = NULL;
-    Private                 *priv;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -1020,11 +1034,8 @@ disconnect_auth_ready (MMBaseModem          *self,
 
     /* If not disconnecting a specific bearer, also cancel any ongoing
      * connection attempt. */
-    priv = get_private (MM_IFACE_MODEM_SIMPLE (self));
-    if (!ctx->bearer_path && priv->ongoing_connect) {
-        g_cancellable_cancel (priv->ongoing_connect);
-        g_clear_object (&priv->ongoing_connect);
-    }
+    if (!ctx->bearer_path)
+        mm_iface_modem_simple_abort_ongoing (MM_IFACE_MODEM_SIMPLE (self));
 
     g_object_get (self,
                   MM_IFACE_MODEM_BEARER_LIST, &list,

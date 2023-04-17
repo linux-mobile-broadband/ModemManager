@@ -39,6 +39,9 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModemSimple, g_object_unref)
 /* Initialize Modem Simple interface */
 void mm_iface_modem_simple_initialize (MMIfaceModemSimple *self);
 
+/* Abort ongoing operations in Modem Simple interface */
+void mm_iface_modem_simple_abort_ongoing (MMIfaceModemSimple *self);
+
 /* Shutdown Modem Simple interface */
 void mm_iface_modem_simple_shutdown (MMIfaceModemSimple *self);
 
