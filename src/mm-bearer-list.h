@@ -79,12 +79,13 @@ MMBaseBearer *mm_bearer_list_find_by_profile_id (MMBearerList       *self,
 MMBaseBearer *mm_bearer_list_find_by_apn_type   (MMBearerList       *self,
                                                  MMBearerApnType     apn_type);
 
-void     mm_bearer_list_disconnect_all_bearers        (MMBearerList *self,
-                                                       GAsyncReadyCallback callback,
-                                                       gpointer user_data);
-gboolean mm_bearer_list_disconnect_all_bearers_finish (MMBearerList *self,
-                                                       GAsyncResult *res,
-                                                       GError **error);
+void     mm_bearer_list_disconnect_bearers        (MMBearerList        *self,
+                                                   const gchar         *bearer_path,
+                                                   GAsyncReadyCallback  callback,
+                                                   gpointer             user_data);
+gboolean mm_bearer_list_disconnect_bearers_finish (MMBearerList        *self,
+                                                   GAsyncResult        *res,
+                                                   GError             **error);
 
 #if defined WITH_SUSPEND_RESUME
 

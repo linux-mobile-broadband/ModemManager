@@ -11339,14 +11339,14 @@ INTERFACE_DISABLE_READY_FN (iface_modem_time,                 MM_IFACE_MODEM_TIM
 INTERFACE_DISABLE_READY_FN (iface_modem_oma,                  MM_IFACE_MODEM_OMA,                  FALSE)
 
 static void
-bearer_list_disconnect_all_bearers_ready (MMBearerList *list,
-                                          GAsyncResult *res,
-                                          GTask *task)
+bearer_list_disconnect_bearers_ready (MMBearerList *list,
+                                      GAsyncResult *res,
+                                      GTask        *task)
 {
     DisablingContext *ctx;
-    GError *error = NULL;
+    GError           *error = NULL;
 
-    if (!mm_bearer_list_disconnect_all_bearers_finish (list, res, &error)) {
+    if (!mm_bearer_list_disconnect_bearers_finish (list, res, &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -11442,9 +11442,10 @@ disabling_step (GTask *task)
             return;
         }
         if (ctx->self->priv->modem_bearer_list) {
-            mm_bearer_list_disconnect_all_bearers (
+            mm_bearer_list_disconnect_bearers (
                 ctx->self->priv->modem_bearer_list,
-                (GAsyncReadyCallback)bearer_list_disconnect_all_bearers_ready,
+                NULL, /* all bearers */
+                (GAsyncReadyCallback)bearer_list_disconnect_bearers_ready,
                 task);
             return;
         }
