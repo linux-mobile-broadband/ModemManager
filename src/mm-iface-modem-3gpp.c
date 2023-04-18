@@ -2452,8 +2452,9 @@ void
 mm_iface_modem_3gpp_update_initial_eps_bearer (MMIfaceModem3gpp   *self,
                                                MMBearerProperties *properties)
 {
-    MmGdbusModem3gpp *skeleton = NULL;
-    MMBaseBearer     *old_bearer = NULL;
+    g_autoptr(MmGdbusModem3gppSkeleton) skeleton = NULL;
+    g_autoptr(MMBaseBearer)             old_bearer = NULL;
+    g_autoptr(MMBaseBearer)             new_bearer = NULL;
 
     g_object_get (self,
                   MM_IFACE_MODEM_3GPP_DBUS_SKELETON,      &skeleton,
@@ -2467,30 +2468,25 @@ mm_iface_modem_3gpp_update_initial_eps_bearer (MMIfaceModem3gpp   *self,
          mm_bearer_properties_cmp (properties,
                                    mm_base_bearer_peek_config (MM_BASE_BEARER (old_bearer)),
                                    MM_BEARER_PROPERTIES_CMP_FLAGS_EPS)))
-        goto out;
+        return;
 
-    if (properties) {
-        MMBaseBearer *new_bearer;
-
-        mm_obj_dbg (self, "updating initial EPS bearer...");
-        g_assert (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->create_initial_eps_bearer);
-        new_bearer = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->create_initial_eps_bearer (self, properties);
-        g_object_set (self,
-                      MM_IFACE_MODEM_3GPP_INITIAL_EPS_BEARER, new_bearer,
-                      NULL);
-        mm_gdbus_modem3gpp_set_initial_eps_bearer (skeleton, mm_base_bearer_get_path (new_bearer));
-        g_object_unref (new_bearer);
-    } else {
+    if (!properties) {
         mm_obj_dbg (self, "clearing initial EPS bearer...");
         g_object_set (self,
                       MM_IFACE_MODEM_3GPP_INITIAL_EPS_BEARER, NULL,
                       NULL);
-        mm_gdbus_modem3gpp_set_initial_eps_bearer (skeleton, NULL);
+        mm_gdbus_modem3gpp_set_initial_eps_bearer (MM_GDBUS_MODEM3GPP (skeleton), NULL);
+        return;
     }
 
-out:
-    g_clear_object (&old_bearer);
-    g_object_unref (skeleton);
+    mm_obj_dbg (self, "updating initial EPS bearer...");
+    g_assert (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->create_initial_eps_bearer);
+    new_bearer = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->create_initial_eps_bearer (self, properties);
+    g_object_set (self,
+                  MM_IFACE_MODEM_3GPP_INITIAL_EPS_BEARER, new_bearer,
+                  NULL);
+    mm_gdbus_modem3gpp_set_initial_eps_bearer (MM_GDBUS_MODEM3GPP (skeleton),
+                                               mm_base_bearer_get_path (new_bearer));
 }
 
 static void
