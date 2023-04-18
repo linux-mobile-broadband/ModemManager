@@ -61,6 +61,8 @@
 static GQuark private_quark;
 
 typedef struct {
+    /* Interface enabled or disabled */
+    gboolean iface_enabled;
     /* Registration state */
     MMModem3gppRegistrationState  state_cs;
     MMModem3gppRegistrationState  state_ps;
@@ -2071,6 +2073,8 @@ mm_iface_modem_3gpp_update_access_technologies (MMIfaceModem3gpp        *self,
     MMModem3gppRegistrationState  state;
 
     priv = get_private (self);
+    if (!priv->iface_enabled)
+        return;
 
     g_object_get (self,
                   MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, &state,
@@ -2099,6 +2103,8 @@ mm_iface_modem_3gpp_update_location (MMIfaceModem3gpp *self,
     MMModem3gppRegistrationState  state;
 
     priv = get_private (self);
+    if (!priv->iface_enabled)
+        return;
 
     if (!MM_IS_IFACE_MODEM_LOCATION (self))
         return;
@@ -2135,6 +2141,8 @@ update_registration_reload_current_registration_info_ready (MMIfaceModem3gpp *se
     MMModem3gppRegistrationState  new_state;
 
     priv = get_private (self);
+    if (!priv->iface_enabled)
+        return;
 
     new_state = GPOINTER_TO_UINT (user_data);
 
@@ -2170,6 +2178,12 @@ update_non_registered_state (MMIfaceModem3gpp             *self,
                              MMModem3gppRegistrationState  old_state,
                              MMModem3gppRegistrationState  new_state)
 {
+    Private *priv;
+
+    priv = get_private (self);
+    if (!priv->iface_enabled)
+        return;
+
     /* Not registered neither in home nor roaming network */
     mm_iface_modem_3gpp_clear_current_operator (self);
 
@@ -2201,6 +2215,8 @@ update_registration_state (MMIfaceModem3gpp             *self,
     MMModem3gppRegistrationState  old_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
 
     priv = get_private (self);
+    if (!priv->iface_enabled)
+        return;
 
     g_object_get (self,
                   MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, &old_state,
@@ -2284,6 +2300,8 @@ update_registration_state (MMIfaceModem3gpp             *self,
             return;                                                                                   \
                                                                                                       \
         priv = get_private (self);                                                                    \
+        if (!priv->iface_enabled)                                                                       \
+            return;                                                                                   \
         priv->state_##domain = state;                                                                 \
                                                                                                       \
         if (!deferred)                                                                                \
@@ -2308,7 +2326,12 @@ static void
 update_packet_service_state (MMIfaceModem3gpp              *self,
                              MMModem3gppPacketServiceState  new_state)
 {
-    MMModem3gppPacketServiceState old_state = MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN;
+    MMModem3gppPacketServiceState  old_state = MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN;
+    Private                       *priv;
+
+    priv = get_private (self);
+    if (!priv->iface_enabled)
+        return;
 
     g_object_get (self,
                   MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE, &old_state,
@@ -2423,9 +2446,14 @@ mm_iface_modem_3gpp_update_pco_list (MMIfaceModem3gpp *self,
                                      const GList *pco_list)
 {
     MmGdbusModem3gpp *skeleton = NULL;
-    GVariantBuilder builder;
-    GVariant *variant;
-    const GList *iter;
+    GVariantBuilder   builder;
+    GVariant         *variant;
+    const GList      *iter;
+    Private          *priv;
+
+    priv = get_private (self);
+    if (!priv->iface_enabled)
+        return;
 
     g_object_get (self,
                   MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &skeleton,
@@ -2588,9 +2616,11 @@ static void
 interface_disabling_step (GTask *task)
 {
     MMIfaceModem3gpp *self;
+    Private          *priv;
     DisablingContext *ctx;
 
     self = g_task_get_source_object (task);
+    priv = get_private (self);
     ctx = g_task_get_task_data (task);
 
     switch (ctx->step) {
@@ -2668,6 +2698,9 @@ interface_disabling_step (GTask *task)
         /* fall through */
 
     case DISABLING_STEP_LAST:
+        /* Interface state is assumed enabled until the very end of the disabling sequence,
+         * so that updates are taken into account and not ignored. */
+        priv->iface_enabled = FALSE;
         /* We are done without errors! */
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
@@ -2861,19 +2894,25 @@ static void
 interface_enabling_step (GTask *task)
 {
     MMIfaceModem3gpp *self;
+    Private          *priv;
     EnablingContext  *ctx;
 
     self = g_task_get_source_object (task);
+    priv = get_private (self);
     ctx  = g_task_get_task_data (task);
 
     /* Don't run new steps if we're cancelled */
     if (g_task_return_error_if_cancelled (task)) {
+        priv->iface_enabled = FALSE;
         g_object_unref (task);
         return;
     }
 
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
+        /* Interface state is assumed enabled from the very beginning of the enabling sequence,
+         * so that updates are taken into account and not ignored. */
+        priv->iface_enabled = TRUE;
         ctx->step++;
         /* fall through */
 
