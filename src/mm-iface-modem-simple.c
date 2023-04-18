@@ -93,7 +93,7 @@ static void
 register_in_network_context_free (RegisterInNetworkContext *ctx)
 {
     g_free (ctx->operator_id);
-    g_free (ctx);
+    g_slice_free (RegisterInNetworkContext, ctx);
 }
 
 static gboolean
@@ -123,6 +123,7 @@ register_in_cdma_network_ready (MMIfaceModemCdma *self,
     }
 
     /* Registered we are! */
+    mm_obj_dbg (self, "registration in network: successful (cdma)");
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
@@ -144,6 +145,7 @@ register_in_3gpp_network_ready (MMIfaceModem3gpp *self,
     }
 
     /* Registered we are! */
+    mm_obj_dbg (self, "registration in network: successful (3gpp)");
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
@@ -152,10 +154,16 @@ static void
 check_next_registration (GTask *task)
 {
     RegisterInNetworkContext *ctx;
-    MMIfaceModemSimple *self;
+    MMIfaceModemSimple       *self;
 
     self = MM_IFACE_MODEM_SIMPLE (g_task_get_source_object (task));
     ctx = g_task_get_task_data (task);
+
+    if (g_task_return_error_if_cancelled (task)) {
+        mm_obj_dbg (self, "registration in network: cancelled");
+        g_object_unref (task);
+        return;
+    }
 
     if (ctx->remaining_tries_cdma > ctx->remaining_tries_3gpp &&
         ctx->remaining_tries_cdma > 0) {
@@ -179,6 +187,7 @@ check_next_registration (GTask *task)
     }
 
     /* No more tries of anything */
+    mm_obj_dbg (self, "registration in network: timed out");
     g_task_return_error (
         task,
         mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT, self));
@@ -186,15 +195,16 @@ check_next_registration (GTask *task)
 }
 
 static void
-register_in_3gpp_or_cdma_network (MMIfaceModemSimple *self,
-                                  const gchar *operator_id,
-                                  GAsyncReadyCallback callback,
-                                  gpointer user_data)
+register_in_3gpp_or_cdma_network (MMIfaceModemSimple  *self,
+                                  const gchar         *operator_id,
+                                  GCancellable        *cancellable,
+                                  GAsyncReadyCallback  callback,
+                                  gpointer             user_data)
 {
     RegisterInNetworkContext *ctx;
-    GTask *task;
+    GTask                    *task;
 
-    ctx = g_new0 (RegisterInNetworkContext, 1);
+    ctx = g_slice_new0 (RegisterInNetworkContext);
     ctx->operator_id = g_strdup (operator_id);
 
     /* 3GPP-only modems... */
@@ -216,10 +226,8 @@ register_in_3gpp_or_cdma_network (MMIfaceModemSimple *self,
         ctx->remaining_tries_3gpp = 6;
     }
 
-    task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task,
-                          ctx,
-                          (GDestroyNotify)register_in_network_context_free);
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)register_in_network_context_free);
 
     check_next_registration (task);
 }
@@ -312,6 +320,7 @@ packet_service_attach_in_3gpp_network_step (GTask *task)
     ctx = g_task_get_task_data (task);
 
     if (g_task_return_error_if_cancelled (task)) {
+        mm_obj_dbg (self, "packet service attach in 3gpp network: cancelled");
         g_object_unref (task);
         return;
     }
@@ -349,10 +358,13 @@ packet_service_attach_in_3gpp_network_step (GTask *task)
             return;
 
         case PACKET_SERVICE_ATTACH_IN_3GPP_NETWORK_STEP_LAST:
-            if (ctx->error)
+            if (ctx->error) {
+                mm_obj_dbg (self, "packet service attach in 3gpp network: failed: %s", ctx->error->message);
                 g_task_return_error (task, g_steal_pointer (&ctx->error));
-            else
+            } else {
+                mm_obj_dbg (self, "packet service attach in 3gpp network: finished");
                 g_task_return_boolean (task, TRUE);
+            }
             g_object_unref (task);
             return;
 
@@ -784,6 +796,7 @@ connection_step (ConnectionContext *ctx)
             register_in_3gpp_or_cdma_network (
                 ctx->self,
                 mm_simple_connect_properties_get_operator_id (ctx->properties),
+                ctx->cancellable,
                 (GAsyncReadyCallback)register_in_3gpp_or_cdma_network_ready,
                 ctx);
             return;
