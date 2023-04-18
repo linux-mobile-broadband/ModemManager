@@ -3160,20 +3160,20 @@ typedef enum {
 } InitializationStep;
 
 struct _InitializationContext {
-    MmGdbusModem3gpp *skeleton;
-    InitializationStep step;
+    MmGdbusModem3gpp   *skeleton;
+    InitializationStep  step;
 };
 
 static void
 initialization_context_free (InitializationContext *ctx)
 {
-    g_object_unref (ctx->skeleton);
-    g_free (ctx);
+    g_clear_object (&ctx->skeleton);
+    g_slice_free (InitializationContext, ctx);
 }
 
 static void
-sim_pin_lock_enabled_cb (MMBaseSim *self,
-                         gboolean enabled,
+sim_pin_lock_enabled_cb (MMBaseSim        *self,
+                         gboolean          enabled,
                          MmGdbusModem3gpp *skeleton)
 {
     MMModem3gppFacility facilities;
@@ -3267,8 +3267,8 @@ load_enabled_facility_locks_ready (MMIfaceModem3gpp *self,
                                    GTask            *task)
 {
     InitializationContext *ctx;
-    g_autoptr(GError)      error = NULL;
     MMModem3gppFacility    facilities;
+    g_autoptr(GError)      error = NULL;
 
     ctx = g_task_get_task_data (task);
 
@@ -3323,9 +3323,9 @@ load_imei_ready (MMIfaceModem3gpp *self,
 static void
 interface_initialization_step (GTask *task)
 {
-    MMIfaceModem3gpp *self;
+    MMIfaceModem3gpp      *self;
     InitializationContext *ctx;
-    MMModemState modem_state;
+    MMModemState           modem_state;
 
     /* Don't run new steps if we're cancelled */
     if (g_task_return_error_if_cancelled (task)) {
@@ -3334,7 +3334,7 @@ interface_initialization_step (GTask *task)
     }
 
     self = g_task_get_source_object (task);
-    ctx = g_task_get_task_data (task);
+    ctx  = g_task_get_task_data (task);
 
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
@@ -3475,22 +3475,22 @@ interface_initialization_step (GTask *task)
 }
 
 gboolean
-mm_iface_modem_3gpp_initialize_finish (MMIfaceModem3gpp *self,
-                                       GAsyncResult *res,
-                                       GError **error)
+mm_iface_modem_3gpp_initialize_finish (MMIfaceModem3gpp  *self,
+                                       GAsyncResult      *res,
+                                       GError           **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 void
-mm_iface_modem_3gpp_initialize (MMIfaceModem3gpp *self,
-                                GCancellable *cancellable,
-                                GAsyncReadyCallback callback,
-                                gpointer user_data)
+mm_iface_modem_3gpp_initialize (MMIfaceModem3gpp    *self,
+                                GCancellable        *cancellable,
+                                GAsyncReadyCallback  callback,
+                                gpointer             user_data)
 {
-    MmGdbusModem3gpp *skeleton = NULL;
+    MmGdbusModem3gpp      *skeleton = NULL;
     InitializationContext *ctx;
-    GTask *task;
+    GTask                 *task;
 
     /* Did we already create it? */
     g_object_get (self,
@@ -3523,7 +3523,7 @@ mm_iface_modem_3gpp_initialize (MMIfaceModem3gpp *self,
                       NULL);
     }
 
-    ctx = g_new0 (InitializationContext, 1);
+    ctx = g_slice_new0 (InitializationContext);
     ctx->step = INITIALIZATION_STEP_FIRST;
     ctx->skeleton = skeleton;
 
