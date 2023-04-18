@@ -2540,22 +2540,21 @@ typedef enum {
 } DisablingStep;
 
 struct _DisablingContext {
-    DisablingStep step;
-    MmGdbusModem *skeleton;
+    DisablingStep  step;
+    MmGdbusModem  *skeleton;
 };
 
 static void
 disabling_context_free (DisablingContext *ctx)
 {
-    if (ctx->skeleton)
-        g_object_unref (ctx->skeleton);
-    g_free (ctx);
+    g_clear_object (&ctx->skeleton);
+    g_slice_free (DisablingContext, ctx);
 }
 
 gboolean
-mm_iface_modem_3gpp_disable_finish (MMIfaceModem3gpp *self,
-                                    GAsyncResult *res,
-                                    GError **error)
+mm_iface_modem_3gpp_disable_finish (MMIfaceModem3gpp  *self,
+                                    GAsyncResult      *res,
+                                    GError           **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
@@ -2564,17 +2563,15 @@ mm_iface_modem_3gpp_disable_finish (MMIfaceModem3gpp *self,
 #define VOID_REPLY_READY_FN(NAME,DISPLAY)                               \
     static void                                                         \
     NAME##_ready (MMIfaceModem3gpp *self,                               \
-                  GAsyncResult *res,                                    \
-                  GTask *task)                                          \
+                  GAsyncResult     *res,                                \
+                  GTask            *task)                               \
     {                                                                   \
-        DisablingContext *ctx;                                          \
-        GError *error = NULL;                                           \
+        DisablingContext  *ctx;                                         \
+        g_autoptr(GError)  error = NULL;                                \
                                                                         \
         MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->NAME##_finish (self, res, &error); \
-        if (error) {                                                    \
+        if (error)                                                      \
             mm_obj_dbg (self, "couldn't %s: %s", DISPLAY, error->message);      \
-            g_error_free (error);                                       \
-        }                                                               \
                                                                         \
         /* Go on to next step */                                        \
         ctx = g_task_get_task_data (task);                              \
@@ -2688,14 +2685,14 @@ interface_disabling_step (GTask *task)
 }
 
 void
-mm_iface_modem_3gpp_disable (MMIfaceModem3gpp *self,
-                             GAsyncReadyCallback callback,
-                             gpointer user_data)
+mm_iface_modem_3gpp_disable (MMIfaceModem3gpp    *self,
+                             GAsyncReadyCallback  callback,
+                             gpointer             user_data)
 {
     DisablingContext *ctx;
-    GTask *task;
+    GTask            *task;
 
-    ctx = g_new0 (DisablingContext, 1);
+    ctx = g_slice_new0 (DisablingContext);
     ctx->step = DISABLING_STEP_FIRST;
 
     task = g_task_new (self, NULL, callback, user_data);
@@ -2705,9 +2702,7 @@ mm_iface_modem_3gpp_disable (MMIfaceModem3gpp *self,
                   MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &ctx->skeleton,
                   NULL);
     if (!ctx->skeleton) {
-        g_task_return_new_error (task,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                  "Couldn't get interface skeleton");
         g_object_unref (task);
         return;
@@ -2732,41 +2727,38 @@ typedef enum {
 } EnablingStep;
 
 struct _EnablingContext {
-    EnablingStep step;
+    EnablingStep      step;
     MmGdbusModem3gpp *skeleton;
 };
 
 static void
 enabling_context_free (EnablingContext *ctx)
 {
-    if (ctx->skeleton)
-        g_object_unref (ctx->skeleton);
-    g_free (ctx);
+    g_clear_object (&ctx->skeleton);
+    g_slice_free (EnablingContext, ctx);
 }
 
 gboolean
-mm_iface_modem_3gpp_enable_finish (MMIfaceModem3gpp *self,
-                                   GAsyncResult *res,
-                                   GError **error)
+mm_iface_modem_3gpp_enable_finish (MMIfaceModem3gpp  *self,
+                                   GAsyncResult      *res,
+                                   GError           **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 setup_unsolicited_events_ready (MMIfaceModem3gpp *self,
-                                GAsyncResult *res,
-                                GTask *task)
+                                GAsyncResult     *res,
+                                GTask            *task)
 {
-    EnablingContext *ctx;
-    GError *error = NULL;
+    EnablingContext   *ctx;
+    g_autoptr(GError)  error = NULL;
 
     ctx = g_task_get_task_data (task);
 
     MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->setup_unsolicited_events_finish (self, res, &error);
     if (error) {
-        /* This error shouldn't be treated as critical */
         mm_obj_dbg (self, "setting up unsolicited events failed: %s", error->message);
-        g_error_free (error);
 
         /* If we get an error setting up unsolicited events, don't even bother trying to
          * enable them. */
@@ -2782,18 +2774,15 @@ setup_unsolicited_events_ready (MMIfaceModem3gpp *self,
 
 static void
 enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
-                                 GAsyncResult *res,
-                                 GTask *task)
+                                 GAsyncResult     *res,
+                                 GTask            *task)
 {
-    EnablingContext *ctx;
-    GError *error = NULL;
+    EnablingContext   *ctx;
+    g_autoptr(GError)  error = NULL;
 
     MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->enable_unsolicited_events_finish (self, res, &error);
-    if (error) {
-        /* This error shouldn't be treated as critical */
+    if (error)
         mm_obj_dbg (self, "enabling unsolicited events failed: %s", error->message);
-        g_error_free (error);
-    }
 
     /* Go on to next step */
     ctx = g_task_get_task_data (task);
@@ -2803,26 +2792,24 @@ enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
 
 static void
 setup_unsolicited_registration_events_ready (MMIfaceModem3gpp *self,
-                                             GAsyncResult *res,
-                                             GTask *task)
+                                             GAsyncResult     *res,
+                                             GTask            *task)
 {
-    EnablingContext *ctx;
-    GError *error = NULL;
+    EnablingContext   *ctx;
+    g_autoptr(GError)  error = NULL;
 
     ctx = g_task_get_task_data (task);
 
     MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->setup_unsolicited_registration_events_finish (self, res, &error);
     if (error) {
-        /* This error shouldn't be treated as critical */
         mm_obj_dbg (self, "setting up unsolicited registration events failed: %s", error->message);
-        g_error_free (error);
+        /* If error, setup periodic registration checks */
+        periodic_registration_check_enable (self);
 
         /* If we get an error setting up unsolicited events, don't even bother trying to
          * enable them. */
         ctx->step = ENABLING_STEP_ENABLE_UNSOLICITED_REGISTRATION_EVENTS + 1;
         interface_enabling_step (task);
-        /* If error, setup periodic registration checks */
-        periodic_registration_check_enable (self);
         return;
     }
 
@@ -2833,17 +2820,15 @@ setup_unsolicited_registration_events_ready (MMIfaceModem3gpp *self,
 
 static void
 enable_unsolicited_registration_events_ready (MMIfaceModem3gpp *self,
-                                              GAsyncResult *res,
-                                              GTask *task)
+                                              GAsyncResult     *res,
+                                              GTask            *task)
 {
-    EnablingContext *ctx;
-    GError *error = NULL;
+    EnablingContext   *ctx;
+    g_autoptr(GError)  error = NULL;
 
     MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->enable_unsolicited_registration_events_finish (self, res, &error);
     if (error) {
-        /* This error shouldn't be treated as critical */
         mm_obj_dbg (self, "enabling unsolicited registration events failed: %s", error->message);
-        g_error_free (error);
         /* If error, setup periodic registration checks */
         periodic_registration_check_enable (self);
     }
@@ -2859,23 +2844,18 @@ load_initial_eps_bearer_ready (MMIfaceModem3gpp *self,
                                GAsyncResult     *res,
                                GTask            *task)
 {
-    MMBearerProperties *properties;
-    EnablingContext    *ctx;
-    GError             *error = NULL;
+    EnablingContext               *ctx;
+    g_autoptr(MMBearerProperties)  properties = NULL;
+    g_autoptr(GError)              error = NULL;
 
     ctx = g_task_get_task_data (task);
 
     properties = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_finish (self, res, &error);
-    if (!properties) {
+    if (!properties)
         mm_obj_dbg (self, "couldn't load initial default bearer properties: %s", error->message);
-        g_error_free (error);
-        goto out;
-    }
+    else
+        mm_iface_modem_3gpp_update_initial_eps_bearer (self, properties);
 
-    mm_iface_modem_3gpp_update_initial_eps_bearer (self, properties);
-    g_object_unref (properties);
-
-out:
     /* Go on to next step */
     ctx->step++;
     interface_enabling_step (task);
@@ -2885,16 +2865,16 @@ static void
 interface_enabling_step (GTask *task)
 {
     MMIfaceModem3gpp *self;
-    EnablingContext *ctx;
+    EnablingContext  *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     /* Don't run new steps if we're cancelled */
     if (g_task_return_error_if_cancelled (task)) {
         g_object_unref (task);
         return;
     }
-
-    self = g_task_get_source_object (task);
-    ctx = g_task_get_task_data (task);
 
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
@@ -2979,15 +2959,15 @@ interface_enabling_step (GTask *task)
 }
 
 void
-mm_iface_modem_3gpp_enable (MMIfaceModem3gpp *self,
-                            GCancellable *cancellable,
-                            GAsyncReadyCallback callback,
-                            gpointer user_data)
+mm_iface_modem_3gpp_enable (MMIfaceModem3gpp    *self,
+                            GCancellable        *cancellable,
+                            GAsyncReadyCallback  callback,
+                            gpointer             user_data)
 {
     EnablingContext *ctx;
-    GTask *task;
+    GTask           *task;
 
-    ctx = g_new0 (EnablingContext, 1);
+    ctx = g_slice_new0 (EnablingContext);
     ctx->step = ENABLING_STEP_FIRST;
 
     task = g_task_new (self, cancellable, callback, user_data);
@@ -2997,9 +2977,7 @@ mm_iface_modem_3gpp_enable (MMIfaceModem3gpp *self,
                   MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &ctx->skeleton,
                   NULL);
     if (!ctx->skeleton) {
-        g_task_return_new_error (task,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                  "Couldn't get interface skeleton");
         g_object_unref (task);
         return;
