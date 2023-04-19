@@ -137,31 +137,31 @@ struct _MMBroadbandModemMbimPrivate {
     ProcessNotificationFlag setup_flags;
     ProcessNotificationFlag enable_flags;
 
+    /* Runtime cached state while enabled, to be cleaned up once disabled */
+    gchar *current_operator_id;
+    gchar *current_operator_name;
     GList *pco_list;
-
-    /* 3GPP registration helpers */
-    gchar         *current_operator_id;
-    gchar         *current_operator_name;
-    gchar         *requested_operator_id;
-    MbimDataClass  requested_data_class; /* 0 for defaults/auto */
-    GTask         *pending_allowed_modes_action;
-    gulong         enabling_signal_id;
-
-    /* USSD helpers */
-    GTask *pending_ussd_action;
-
-    /* SIM hot swap setup */
-    gboolean sim_hot_swap_configured;
-
-    /* Access technology and registration updates */
     MbimDataClass available_data_classes;
     MbimDataClass highest_available_data_class;
     MbimRegisterState reg_state;
     MbimPacketServiceState packet_service_state;
     guint64 packet_service_uplink_speed;
     guint64 packet_service_downlink_speed;
-
     MbimSubscriberReadyState last_ready_state;
+
+    /* 3GPP registration helpers */
+    gulong         enabling_signal_id;
+    gchar         *requested_operator_id;
+    MbimDataClass  requested_data_class; /* 0 for defaults/auto */
+
+    /* Allowed modes helpers */
+    GTask *pending_allowed_modes_action;
+
+    /* USSD helpers */
+    GTask *pending_ussd_action;
+
+    /* SIM hot swap setup */
+    gboolean sim_hot_swap_configured;
 
     /* For notifying when the mbim-proxy connection is dead */
     gulong mbim_device_removed_id;
@@ -5725,6 +5725,27 @@ common_setup_cleanup_unsolicited_events_3gpp_finish (MMIfaceModem3gpp *self,
 }
 
 static void
+cleanup_enabled_cache (MMBroadbandModemMbim *self)
+{
+    g_clear_pointer (&self->priv->current_operator_id, g_free);
+    g_clear_pointer (&self->priv->current_operator_name, g_free);
+    g_list_free_full (self->priv->pco_list, g_object_unref);
+    self->priv->pco_list = NULL;
+    self->priv->available_data_classes = MBIM_DATA_CLASS_NONE;
+    self->priv->highest_available_data_class = MBIM_DATA_CLASS_NONE;
+    self->priv->reg_state = MBIM_REGISTER_STATE_UNKNOWN;
+    self->priv->packet_service_state = MBIM_PACKET_SERVICE_STATE_UNKNOWN;
+    self->priv->packet_service_uplink_speed = 0;
+    self->priv->packet_service_downlink_speed = 0;
+
+    /* NOTE: FLAG_SUBSCRIBER_INFO is managed both via 3GPP unsolicited
+     * events and via SIM hot swap setup. We only reset the last ready state
+     * if SIM hot swap context is not using it. */
+    if (!self->priv->sim_hot_swap_configured)
+        self->priv->last_ready_state = MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED;
+}
+
+static void
 cleanup_unsolicited_events_3gpp (MMIfaceModem3gpp *_self,
                                  GAsyncReadyCallback callback,
                                  gpointer user_data)
@@ -5747,6 +5768,9 @@ cleanup_unsolicited_events_3gpp (MMIfaceModem3gpp *_self,
     if (self->priv->is_slot_info_status_supported)
         self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS;
     common_setup_cleanup_unsolicited_events (self, FALSE, callback, user_data);
+
+    /* Runtime cached state while enabled, to be cleaned up once disabled */
+    cleanup_enabled_cache (self);
 }
 
 static void
@@ -9412,7 +9436,11 @@ mm_broadband_modem_mbim_init (MMBroadbandModemMbim *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BROADBAND_MODEM_MBIM,
                                               MMBroadbandModemMbimPrivate);
+    self->priv->available_data_classes = MBIM_DATA_CLASS_NONE;
+    self->priv->highest_available_data_class = MBIM_DATA_CLASS_NONE;
+    self->priv->reg_state = MBIM_REGISTER_STATE_UNKNOWN;
     self->priv->packet_service_state = MBIM_PACKET_SERVICE_STATE_UNKNOWN;
+    self->priv->last_ready_state = MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED;
 }
 
 static void
