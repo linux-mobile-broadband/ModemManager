@@ -6393,13 +6393,12 @@ register_state_set_ready (MbimDevice *device,
                           GAsyncResult *res,
                           GTask *task)
 {
-    MMBroadbandModemMbim *self;
-    MbimMessage          *response;
-    GError               *error = NULL;
+    MMBroadbandModemMbim   *self;
+    g_autoptr(MbimMessage)  response = NULL;
+    GError                 *error = NULL;
 
     self = g_task_get_source_object (task);
 
-    response = mbim_device_command_finish (device, res, &error);
     /* According to Mobile Broadband Interface Model specification 1.0,
      * Errata 1, table 10.5.9.8: Status codes for MBIM_CID_REGISTER_STATE,
      * NwError field of MBIM_REGISTRATION_STATE_INFO structure is valid
@@ -6410,9 +6409,8 @@ register_state_set_ready (MbimDevice *device,
      * However, some modems do not set this value to 0 when registered,
      * causing ModemManager to drop to idle state, while modem itself is
      * registered.
-     * Also NwError "0" is defined in 3GPP TS 24.008 as "Unknown error",
-     * not "No error", making it unsuitable as condition for registration check.
      */
+    response = mbim_device_command_finish (device, res, &error);
     if (response &&
         !mbim_message_response_get_result (response,
                                            MBIM_MESSAGE_TYPE_COMMAND_DONE,
@@ -6432,12 +6430,21 @@ register_state_set_ready (MbimDevice *device,
                 NULL, /* provider_name */
                 NULL, /* roaming_text */
                 NULL, /* registration_flag */
-                &error))
-            error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error, self);
+                &error)) {
+            /* NwError "0" is defined in 3GPP TS 24.008 as "Unknown error",
+             * not "No error", making it unsuitable as condition for registration check.
+             * Still, there are certain modems (e.g. Fibocom NL668) that will
+             * report Failure+NwError=0 even after the modem has already reported a
+             * succesful registration via indications after the set operation. If
+             * that is the case, log about it and ignore the error; we are anyway
+             * reloading the registration info after the set, so it should not be
+             * a big issue. */
+            if (nw_error == 0)
+                mm_obj_dbg (self, "ignored failure reported in register operation");
+            else
+                error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error, self);
+        }
     }
-
-    if (response)
-        mbim_message_unref (response);
 
     if (error)
         g_task_return_error (task, error);
