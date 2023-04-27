@@ -24,6 +24,7 @@ gen_sources += custom_target(
   command: [
     python,
     mm_mkenums,
+    '--enums-only',
     '--fhead', '#include "mm-enums-types.h"\n',
     '--template', files(templates_dir / enums_types + '.c.template'),
     '@INPUT@'],
@@ -37,9 +38,44 @@ gen_headers += custom_target(
   command: [
     python,
     mm_mkenums,
+    '--enums-only',
     '--fhead', '#include <ModemManager.h>\n#ifndef __MM_ENUMS_TYPES_H__\n#define __MM_ENUMS_TYPES_H__\n',
     '--template', files(templates_dir / enums_types + '.h.template'),
     '--ftail', '#endif /* __MM_ENUMS_TYPES_H__ */\n',
+    '@INPUT@'],
+  capture: true,
+  install: true,
+  install_dir: mm_glib_pkgincludedir,
+)
+
+# Flag types
+enums_types = 'mm-flags-types'
+
+gen_sources += custom_target(
+  enums_types + '.c',
+  input: mm_enums_header,
+  output: enums_types + '.c',
+  command: [
+    python,
+    mm_mkenums,
+    '--flags-only',
+    '--fhead', '#include "mm-flags-types.h"\n',
+    '--template', files(templates_dir / enums_types + '.c.template'),
+    '@INPUT@'],
+  capture: true,
+)
+
+gen_headers += custom_target(
+  enums_types + '.h',
+  input: mm_enums_header,
+  output: enums_types + '.h',
+  command: [
+    python,
+    mm_mkenums,
+    '--flags-only',
+    '--fhead', '#include <ModemManager.h>\n#ifndef __MM_FLAGS_TYPES_H__\n#define __MM_FLAGS_TYPES_H__\n',
+    '--template', files(templates_dir / enums_types + '.h.template'),
+    '--ftail', '#endif /* __MM_FLAGS_TYPES_H__ */\n',
     '@INPUT@'],
   capture: true,
   install: true,

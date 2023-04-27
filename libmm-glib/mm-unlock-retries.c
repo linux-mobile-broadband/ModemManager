@@ -25,6 +25,7 @@
 #include <stdlib.h>
 
 #include "mm-enums-types.h"
+#include "mm-flags-types.h"
 #include "mm-unlock-retries.h"
 
 /**

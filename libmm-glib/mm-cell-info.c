@@ -29,6 +29,7 @@
 #include "mm-cell-info-nr5g.h"
 
 #include "mm-enums-types.h"
+#include "mm-flags-types.h"
 #include "mm-errors-types.h"
 
 /**

@@ -26,6 +26,7 @@
 
 #include "mm-errors-types.h"
 #include "mm-enums-types.h"
+#include "mm-flags-types.h"
 #include "mm-common-helpers.h"
 #include "mm-kernel-event-properties.h"
 

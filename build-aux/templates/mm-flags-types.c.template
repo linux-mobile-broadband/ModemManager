@@ -31,17 +31,42 @@ GType
     return g_define_type_id_initialized;
 }
 
-const gchar *
-@enum_name@_get_string (@EnumName@ val)
+gchar *
+@enum_name@_build_string_from_mask (@EnumName@ mask)
 {
     guint i;
+    gboolean first = TRUE;
+    GString *str = NULL;
 
     for (i = 0; @enum_name@_values[i].value_nick; i++) {
-        if ((gint)val == @enum_name@_values[i].value)
-            return @enum_name@_values[i].value_nick;
+        /* We also look for exact matches */
+        if (mask == @enum_name@_values[i].value) {
+            if (str)
+                g_string_free (str, TRUE);
+            return g_strdup (@enum_name@_values[i].value_nick);
+        }
+
+        /* Build list with single-bit masks */
+        if (mask & @enum_name@_values[i].value) {
+            guint c;
+            gulong number = @enum_name@_values[i].value;
+
+            for (c = 0; number; c++)
+                number &= number - 1;
+
+            if (c == 1) {
+                if (!str)
+                    str = g_string_new ("");
+                g_string_append_printf (str, "%s%s",
+                                        first ? "" : ", ",
+                                        @enum_name@_values[i].value_nick);
+                if (first)
+                    first = FALSE;
+            }
+        }
     }
 
-    return NULL;
+    return (str ? g_string_free (str, FALSE) : NULL);
 }
 
 /*** END value-tail ***/

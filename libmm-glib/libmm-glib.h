@@ -98,6 +98,7 @@
 /* generated */
 #include <mm-errors-types.h>
 #include <mm-enums-types.h>
+#include <mm-flags-types.h>
 #include <mm-gdbus-manager.h>
 #include <mm-gdbus-modem.h>
 #include <mm-gdbus-bearer.h>

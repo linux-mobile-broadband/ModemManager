@@ -25,6 +25,7 @@
 #include <libmm-glib.h>
 
 #include "mm-enums-types.h"
+#include "mm-flags-types.h"
 #include "mm-modem-helpers-qmi.h"
 #include "mm-log-test.h"
 

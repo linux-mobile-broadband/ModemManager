@@ -16,6 +16,7 @@
 #include "mm-modem-helpers-mbim.h"
 #include "mm-modem-helpers.h"
 #include "mm-enums-types.h"
+#include "mm-flags-types.h"
 #include "mm-errors-types.h"
 #include "mm-error-helpers.h"
 #include "mm-log-object.h"
