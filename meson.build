@@ -50,14 +50,18 @@ mm_gir_version = '1.0'
 gnome = import('gnome')
 i18n = import('i18n')
 pkg = import('pkgconfig')
+python = import('python').find_installation('python3')
 
 source_root = meson.current_source_dir()
 build_root = meson.current_build_dir()
 
 build_aux_dir = source_root / 'build-aux'
+templates_dir = source_root / 'build-aux/templates'
 po_dir = source_root / 'po'
 src_dir = source_root / 'src'
 plugins_dir = source_root / 'src/plugins'
+
+mm_mkenums = find_program(source_root / 'build-aux/mm-mkenums')
 
 top_inc = include_directories('.')
 

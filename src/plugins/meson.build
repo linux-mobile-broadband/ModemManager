@@ -193,19 +193,31 @@ if plugins_shared['telit']
 
   enums_types = 'mm-telit-enums-types'
 
-  sources += gnome.mkenums(
+  sources += custom_target(
     enums_types + '.c',
-    sources: headers,
-    c_template: build_aux_dir / enums_types + '.c.template',
-	fhead: '#include "mm-telit-enums-types.h"',
+    input: headers,
+    output: enums_types + '.c',
+    command: [
+      python,
+      mm_mkenums,
+      '--fhead', '#include "mm-telit-enums-types.h"\n',
+      '--template', files(templates_dir / enums_types + '.c.template'),
+      '@INPUT@'],
+    capture: true,
   )
 
-  sources += gnome.mkenums(
+  sources += custom_target(
     enums_types + '.h',
-    sources: headers,
-    h_template: build_aux_dir / enums_types + '.h.template',
-    fhead: '#include "mm-modem-helpers-telit.h"\n#ifndef __MM_TELIT_ENUMS_TYPES_H__\n#define __MM_TELIT_ENUMS_TYPES_H__\n',
-    ftail: '#endif /* __MM_TELIT_ENUMS_TYPES_H__ */\n',
+    input: headers,
+    output: enums_types + '.h',
+    command: [
+      python,
+      mm_mkenums,
+      '--fhead', '#include "mm-modem-helpers-telit.h"\n#ifndef __MM_TELIT_ENUMS_TYPES_H__\n#define __MM_TELIT_ENUMS_TYPES_H__\n',
+      '--template', files(templates_dir / enums_types + '.h.template'),
+      '--ftail', '#endif /* __MM_TELIT_ENUMS_TYPES_H__ */\n',
+      '@INPUT@'],
+    capture: true,
   )
 
   if enable_mbim
@@ -462,19 +474,31 @@ if plugins_options['huawei']
   enums_types = 'mm-huawei-enums-types'
 
   enums_sources = []
-  enums_sources += gnome.mkenums(
+  enums_sources += custom_target(
     enums_types + '.c',
-    sources: headers,
-    c_template: build_aux_dir / enums_types + '.c.template',
-	fhead: '#include "mm-huawei-enums-types.h"',
+    input: headers,
+    output: enums_types + '.c',
+    command: [
+      python,
+      mm_mkenums,
+      '--fhead', '#include "mm-huawei-enums-types.h"\n',
+      '--template', files(templates_dir / enums_types + '.c.template'),
+      '@INPUT@'],
+    capture: true,
   )
 
-  enums_sources += gnome.mkenums(
+  enums_sources += custom_target(
     enums_types + '.h',
-    sources: headers,
-    h_template: build_aux_dir / enums_types + '.h.template',
-    fhead: '#include "mm-modem-helpers-huawei.h"\n#ifndef __MM_HUAWEI_ENUMS_TYPES_H__\n#define __MM_HUAWEI_ENUMS_TYPES_H__\n',
-    ftail: '#endif /* __MM_HUAWEI_ENUMS_TYPES_H__ */\n',
+    input: headers,
+    output: enums_types + '.h',
+    command: [
+      python,
+      mm_mkenums,
+      '--fhead', '#include "mm-modem-helpers-huawei.h"\n#ifndef __MM_HUAWEI_ENUMS_TYPES_H__\n#define __MM_HUAWEI_ENUMS_TYPES_H__\n',
+      '--template', files(templates_dir / enums_types + '.h.template'),
+      '--ftail', '#endif /* __MM_HUAWEI_ENUMS_TYPES_H__ */\n',
+      '@INPUT@'],
+    capture: true,
   )
 
   plugins += {'plugin-huawei': {
@@ -873,19 +897,31 @@ if plugins_options['ublox']
 
   enums_types = 'mm-ublox-enums-types'
 
-  sources += gnome.mkenums(
+  sources += custom_target(
     enums_types + '.c',
-    sources: headers,
-    c_template: build_aux_dir / enums_types + '.c.template',
-    fhead: '#include "mm-ublox-enums-types.h"',
+    input: headers,
+    output: enums_types + '.c',
+    command: [
+      python,
+      mm_mkenums,
+      '--fhead', '#include "mm-ublox-enums-types.h"\n',
+      '--template', files(templates_dir / enums_types + '.c.template'),
+      '@INPUT@'],
+    capture: true,
   )
 
-  sources += gnome.mkenums(
+  sources += custom_target(
     enums_types + '.h',
-    sources: headers,
-    h_template: build_aux_dir / enums_types + '.h.template',
-    fhead: '#include "mm-modem-helpers-ublox.h"\n#ifndef __MM_UBLOX_ENUMS_TYPES_H__\n#define __MM_UBLOX_ENUMS_TYPES_H__\n',
-    ftail: '#endif /* __MM_UBLOX_ENUMS_TYPES_H__ */\n',
+    input: headers,
+    output: enums_types + '.h',
+    command: [
+      python,
+      mm_mkenums,
+      '--fhead', '#include "mm-modem-helpers-ublox.h"\n#ifndef __MM_UBLOX_ENUMS_TYPES_H__\n#define __MM_UBLOX_ENUMS_TYPES_H__\n',
+      '--template', files(templates_dir / enums_types + '.h.template'),
+      '--ftail', '#endif /* __MM_UBLOX_ENUMS_TYPES_H__ */\n',
+      '@INPUT@'],
+    capture: true,
   )
 
   plugins += {'plugin-ublox': {

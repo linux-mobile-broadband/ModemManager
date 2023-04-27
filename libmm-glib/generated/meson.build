@@ -17,50 +17,80 @@ gen_docs = []
 # Enum types
 enums_types = 'mm-enums-types'
 
-gen_sources += gnome.mkenums(
+gen_sources += custom_target(
   enums_types + '.c',
-  sources: mm_enums_header,
-  c_template: build_aux_dir / enums_types + '.c.template',
-  fhead: '#include "mm-enums-types.h"\n',
+  input: mm_enums_header,
+  output: enums_types + '.c',
+  command: [
+    python,
+    mm_mkenums,
+    '--fhead', '#include "mm-enums-types.h"\n',
+    '--template', files(templates_dir / enums_types + '.c.template'),
+    '@INPUT@'],
+  capture: true,
 )
 
-gen_headers += gnome.mkenums(
+gen_headers += custom_target(
   enums_types + '.h',
-  sources: mm_enums_header,
-  h_template: build_aux_dir / enums_types + '.h.template',
-  fhead: '#include <ModemManager.h>\n#ifndef __MM_ENUMS_TYPES_H__\n#define __MM_ENUMS_TYPES_H__\n',
-  ftail: '#endif /* __MM_ENUMS_TYPES_H__ */\n',
-  install_header: true,
+  input: mm_enums_header,
+  output: enums_types + '.h',
+  command: [
+    python,
+    mm_mkenums,
+    '--fhead', '#include <ModemManager.h>\n#ifndef __MM_ENUMS_TYPES_H__\n#define __MM_ENUMS_TYPES_H__\n',
+    '--template', files(templates_dir / enums_types + '.h.template'),
+    '--ftail', '#endif /* __MM_ENUMS_TYPES_H__ */\n',
+    '@INPUT@'],
+  capture: true,
+  install: true,
   install_dir: mm_glib_pkgincludedir,
 )
 
 # Error types & quarks
 errors_types = 'mm-errors-types'
 
-gen_sources += gnome.mkenums(
-  enums_types + '.c',
-  sources: mm_errors_header,
-  c_template: build_aux_dir / errors_types + '.c.template',
-  fhead: '#include <ModemManager.h>\n#include "mm-errors-types.h"\n',
+gen_sources += custom_target(
+  errors_types + '.c',
+  input: mm_errors_header,
+  output: errors_types + '.c',
+  command: [
+    python,
+    mm_mkenums,
+    '--fhead', '#include <ModemManager.h>\n#include "mm-errors-types.h"\n',
+    '--template', files(templates_dir / errors_types + '.c.template'),
+    '@INPUT@'],
+  capture: true,
 )
 
-gen_headers += gnome.mkenums(
+gen_headers += custom_target(
   errors_types + '.h',
-  sources: mm_errors_header,
-  h_template: build_aux_dir / errors_types + '.h.template',
-  fhead: '#ifndef __MM_ERRORS_TYPES_H__\n#define __MM_ERRORS_TYPES_H__\n',
-  ftail: '#endif /* __MM_ERRORS_TYPES_H__ */\n',
-  install_header: true,
+  input: mm_errors_header,
+  output: errors_types + '.h',
+  command: [
+    python,
+    mm_mkenums,
+    '--fhead', '#ifndef __MM_ERRORS_TYPES_H__\n#define __MM_ERRORS_TYPES_H__\n',
+    '--template', files(templates_dir / errors_types + '.h.template'),
+    '--ftail', '#endif /* __MM_ERRORS_TYPES_H__ */\n',
+    '@INPUT@'],
+  capture: true,
+  install: true,
   install_dir: mm_glib_pkgincludedir,
 )
 
 errors_quarks = 'mm-errors-quarks'
 
-gen_sources += gnome.mkenums(
+gen_sources += custom_target(
   errors_quarks + '.c',
-  sources: mm_errors_header,
-  c_template: build_aux_dir / errors_quarks + '.c.template',
-  fhead: '#include <ModemManager.h>\n#include "mm-errors-types.h"\n',
+  input: mm_errors_header,
+  output: errors_quarks + '.c',
+  command: [
+    python,
+    mm_mkenums,
+    '--fhead', '#include <ModemManager.h>\n#include "mm-errors-types.h"\n',
+    '--template', files(templates_dir / errors_quarks + '.c.template'),
+    '@INPUT@'],
+  capture: true,
 )
 
 gdbus_ifaces = {
