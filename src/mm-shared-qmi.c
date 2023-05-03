@@ -330,12 +330,6 @@ initiate_network_register_ready (QmiClientNas *client,
      * will cancel the others.
      */
 
-    if (ctx->cancellable)
-        ctx->cancellable_id = g_cancellable_connect (ctx->cancellable,
-                                                     G_CALLBACK (register_in_network_cancelled),
-                                                     task,
-                                                     NULL);
-
     ctx->serving_system_indication_id = g_signal_connect_swapped (client,
                                                                   "serving-system",
                                                                   G_CALLBACK (register_in_network_ready),
@@ -344,6 +338,15 @@ initiate_network_register_ready (QmiClientNas *client,
     ctx->timeout_id = g_timeout_add_seconds (REGISTER_IN_NETWORK_TIMEOUT_SECS,
                                              (GSourceFunc) register_in_network_timeout,
                                              task);
+
+    /* The cancellable may already be cancelled, and if so the given callback will be called
+     * right away. So make sure this cancellable is always configured last, so that it clears the
+     * timeout or signal handler upon early cancellation. */
+    if (ctx->cancellable)
+        ctx->cancellable_id = g_cancellable_connect (ctx->cancellable,
+                                                     G_CALLBACK (register_in_network_cancelled),
+                                                     task,
+                                                     NULL);
 
 out:
 
