@@ -210,8 +210,8 @@ register_in_network_cancelled (GCancellable *cancellable,
     ctx = g_task_get_task_data (task);
 
     g_assert (ctx->cancellable);
-    g_assert (ctx->cancellable_id);
-    ctx->cancellable_id = 0;
+    if (ctx->cancellable_id)
+        ctx->cancellable_id = 0;
 
     g_assert (ctx->timeout_id);
     g_source_remove (ctx->timeout_id);
@@ -241,9 +241,10 @@ register_in_network_timeout (GTask *task)
     g_signal_handler_disconnect (ctx->client, ctx->serving_system_indication_id);
     ctx->serving_system_indication_id = 0;
 
-    g_assert (!ctx->cancellable || ctx->cancellable_id);
-    g_cancellable_disconnect (ctx->cancellable, ctx->cancellable_id);
-    ctx->cancellable_id = 0;
+    if (ctx->cancellable && ctx->cancellable_id) {
+        g_cancellable_disconnect (ctx->cancellable, ctx->cancellable_id);
+        ctx->cancellable_id = 0;
+    }
 
     /* the 3GPP interface will take care of checking if the registration is
      * the one we asked for */
@@ -283,9 +284,10 @@ register_in_network_ready (GTask                               *task,
     g_source_remove (ctx->timeout_id);
     ctx->timeout_id = 0;
 
-    g_assert (!ctx->cancellable || ctx->cancellable_id);
-    g_cancellable_disconnect (ctx->cancellable, ctx->cancellable_id);
-    ctx->cancellable_id = 0;
+    if (ctx->cancellable && ctx->cancellable_id) {
+        g_cancellable_disconnect (ctx->cancellable, ctx->cancellable_id);
+        ctx->cancellable_id = 0;
+    }
 
     /* the 3GPP interface will take care of checking if the registration is
      * the one we asked for */
