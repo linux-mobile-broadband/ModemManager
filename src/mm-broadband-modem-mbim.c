@@ -6759,18 +6759,6 @@ modem_signal_load_values (MMIfaceModemSignal  *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
-        message = mbim_message_signal_state_query_new (NULL);
-        mbim_device_command (device,
-                             message,
-                             5,
-                             NULL,
-                             (GAsyncReadyCallback)signal_state_query_ready,
-                             task);
-        mbim_message_unref (message);
-        return;
-    }
-
     if (MM_BROADBAND_MODEM_MBIM (self)->priv->is_atds_signal_supported) {
         message = mbim_message_atds_signal_query_new (NULL);
         mbim_device_command (device,

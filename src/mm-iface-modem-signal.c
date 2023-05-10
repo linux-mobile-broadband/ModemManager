@@ -249,7 +249,7 @@ load_values_ready (MMIfaceModemSignal *self,
 }
 
 static gboolean
-query_signal_values (MMIfaceModemSignal *self)
+polling_context_cb (MMIfaceModemSignal *self)
 {
     MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->load_values (
         self,
@@ -285,10 +285,10 @@ polling_restart (MMIfaceModemSignal *self)
     /* Start/restart polling */
     if (priv->timeout_source)
         g_source_remove (priv->timeout_source);
-    priv->timeout_source = g_timeout_add_seconds (priv->rate, (GSourceFunc) query_signal_values, self);
+    priv->timeout_source = g_timeout_add_seconds (priv->rate, (GSourceFunc) polling_context_cb, self);
 
     /* Also launch right away */
-    query_signal_values (self);
+    polling_context_cb (self);
 }
 
 /*****************************************************************************/
@@ -311,11 +311,8 @@ setup_thresholds_ready (MMIfaceModemSignal *self,
 
     if (!MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->setup_thresholds_finish (self, res, &error))
         g_task_return_error (task, error);
-    else {
-        /* launch a query right away */
-        query_signal_values (self);
+    else
         g_task_return_boolean (task, TRUE);
-    }
     g_object_unref (task);
 }
 
