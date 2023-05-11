@@ -6850,8 +6850,13 @@ modem_signal_setup_thresholds (MMIfaceModemSignal  *self,
     if (error_rate_threshold)
         coded_error_rate_threshold = 1; /* minimum value when enabled */
 
+    /* setting signal strength interval to 0 disables threshold-based
+     * notifications on certain modems (FM350).
+     * hence, it is being set to 5 as per FBC's recommendation.
+     * typically, setting this parameter to 0 should make the modem
+     * set the value to its internal default as per spec. */
     message = (mbim_message_signal_state_set_new (
-                   0, /* signal strength interval set to default always */
+                   5, /* non-zero default signal strength interval */
                    coded_rssi_threshold,
                    coded_error_rate_threshold,
                    NULL));
