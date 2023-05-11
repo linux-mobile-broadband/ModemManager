@@ -4987,10 +4987,10 @@ basic_connect_notification_subscriber_ready_status (MMBroadbandModemMbim *self,
                 NULL, /* telephone_numbers_count */
                 &telephone_numbers,
                 &error)) {
-            mm_obj_warn (self, "Failed processing MBIMEx v3.0 subscriber ready status response: %s", error->message);
+            mm_obj_warn (self, "Failed processing MBIMEx v3.0 subscriber ready status notification: %s", error->message);
             return;
         }
-        mm_obj_dbg (self, "processed MBIMEx v3.0 subscriber ready status response");
+        mm_obj_dbg (self, "processed MBIMEx v3.0 subscriber ready status notification");
     } else {
         if (!mbim_message_subscriber_ready_status_notification_parse (
                 notification,
