@@ -102,6 +102,7 @@
  * @MM_CORE_ERROR_RETRY: Operation cannot yet be performed, retry later.
  * @MM_CORE_ERROR_EXISTS: Item already exists.
  * @MM_CORE_ERROR_WRONG_SIM_STATE: Operation cannot be executed in the current SIM state. Since 1.20.
+ * @MM_CORE_ERROR_RESET_AND_RETRY: Operation cannot yet be performed, reset the retry count and retry later. Since 1.22.
  *
  * Common errors that may be reported by ModemManager.
  *
@@ -123,6 +124,7 @@ typedef enum { /*< underscore_name=mm_core_error >*/
     MM_CORE_ERROR_RETRY           = 12, /*< nick=Retry         >*/
     MM_CORE_ERROR_EXISTS          = 13, /*< nick=Exists        >*/
     MM_CORE_ERROR_WRONG_SIM_STATE = 14, /*< nick=WrongSimState >*/
+    MM_CORE_ERROR_RESET_AND_RETRY = 15, /*< nick=ResetRetry    >*/
 } MMCoreError;
 
 /**

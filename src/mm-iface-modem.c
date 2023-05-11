@@ -604,6 +604,12 @@ load_unlock_required_ready (MMIfaceModem *self,
             return;
         }
 
+        /* If the error indicates that retry logic needs to be reset... reset the retry count to 0 */
+        if (g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_RESET_AND_RETRY)) {
+            ctx->retries = 0;
+            mm_obj_info (self, "restarting unlock required check");
+        }
+
         /* For the remaining ones, retry if possible */
         if (ctx->retries < ctx->max_retries) {
             ctx->retries++;

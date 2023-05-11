@@ -1585,10 +1585,13 @@ unlock_required_subscriber_ready_state_ready (MbimDevice   *device,
     g_autoptr(MbimMessage)     response = NULL;
     GError                    *error = NULL;
     MbimSubscriberReadyState   ready_state = MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED;
+    MbimSubscriberReadyState   prev_ready_state = MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED;
 
     ctx = g_task_get_task_data (task);
     self = g_task_get_source_object (task);
 
+    /* hold on to the previous ready_state value to determine if the retry logic needs to be reset. */
+    prev_ready_state = self->priv->enabled_cache.last_ready_state;
     /* reset to the default if any error happens */
     self->priv->enabled_cache.last_ready_state = MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED;
 
@@ -1671,9 +1674,21 @@ unlock_required_subscriber_ready_state_ready (MbimDevice   *device,
             else
                 g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                          "Error waiting for SIM to get initialized");
-        } else
-            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_RETRY,
+        } else {
+            /* Start the retry process from the top if the SIM state changes from
+             * MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED to
+             * MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED
+             * This will address the race condition that occurs during rapid hotswap. */
+            gboolean retry_reset_needed = FALSE;
+
+            if (prev_ready_state == MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED &&
+                ready_state == MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED)
+                retry_reset_needed = TRUE;
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     retry_reset_needed ? MM_CORE_ERROR_RESET_AND_RETRY : MM_CORE_ERROR_RETRY,
                                      "SIM not ready yet (retry)");
+        }
         g_object_unref (task);
         return;
     }
