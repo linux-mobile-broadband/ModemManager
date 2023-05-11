@@ -6745,6 +6745,73 @@ parent_signal_load_values_ready (MMIfaceModemSignal *self,
 }
 
 static void
+mbimexv2_signal_state_query_ready (MbimDevice   *device,
+                                   GAsyncResult *res,
+                                   GTask        *task)
+{
+    MMBroadbandModemMbim            *self;
+    GError                          *error = NULL;
+    SignalLoadValuesResult          *result;
+    g_autoptr(MbimMessage)           response = NULL;
+    g_autoptr(MbimRsrpSnrInfoArray)  rsrp_snr = NULL;
+    guint32                          rsrp_snr_count = 0;
+    guint32                          rssi;
+    guint32                          error_rate = 99;
+    MbimDataClass                    data_class;
+
+    self = g_task_get_source_object (task);
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response || !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!mbim_device_check_ms_mbimex_version (device, 2, 0)) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Failed MBIMEx v2.0 signal state response support check");
+        g_object_unref (task);
+        return;
+    }
+
+    if (!mbim_message_ms_basic_connect_v2_signal_state_response_parse (
+            response,
+            &rssi,
+            &error_rate,
+            NULL, /* signal_strength_interval */
+            NULL, /* rssi_threshold */
+            NULL, /* error_rate_threshold */
+            &rsrp_snr_count,
+            &rsrp_snr,
+            &error)) {
+        g_prefix_error (&error, "Failed processing MBIMEx v2.0 signal state response: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    result = g_slice_new0 (SignalLoadValuesResult);
+
+    /* Best guess of current data class */
+    data_class = self->priv->enabled_cache.highest_available_data_class;
+    if (data_class == 0)
+        data_class = self->priv->enabled_cache.available_data_classes;
+    if (!mm_signal_from_mbim_signal_state (
+            data_class, rssi, error_rate, rsrp_snr, rsrp_snr_count, self,
+            NULL, NULL, &result->gsm, &result->umts, &result->lte, &result->nr5g)) {
+        signal_load_values_result_free (result);
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "No signal details given");
+        g_object_unref (task);
+        return;
+    }
+
+    g_task_return_pointer (task, result, (GDestroyNotify) signal_load_values_result_free);
+    g_object_unref (task);
+}
+
+static void
 modem_signal_load_values (MMIfaceModemSignal  *self,
                           GCancellable        *cancellable,
                           GAsyncReadyCallback  callback,
@@ -6758,6 +6825,18 @@ modem_signal_load_values (MMIfaceModemSignal  *self,
         return;
 
     task = g_task_new (self, NULL, callback, user_data);
+
+    if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
+        message = mbim_message_signal_state_query_new (NULL);
+        mbim_device_command (device,
+                             message,
+                             5,
+                             NULL,
+                             (GAsyncReadyCallback)mbimexv2_signal_state_query_ready,
+                             task);
+        mbim_message_unref (message);
+        return;
+    }
 
     if (MM_BROADBAND_MODEM_MBIM (self)->priv->is_atds_signal_supported) {
         message = mbim_message_atds_signal_query_new (NULL);
