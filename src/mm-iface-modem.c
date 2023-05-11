@@ -528,7 +528,7 @@ mm_iface_modem_abort_invocation_if_state_not_reached (MMIfaceModem          *sel
  * are modems on which the SIM takes more than 15s to be ready, luckily,
  * they happen to be QMI modems where the SIM's iccid in load_sim_slots
  * lets us know that there is a sim */
-#define MAX_UNLOCK_REQUIRED_RETRIES_NO_SIM     6
+#define MAX_UNLOCK_REQUIRED_RETRIES_NO_SIM     7
 #define MAX_UNLOCK_REQUIRED_RETRIES_SIM_EXISTS 30
 
 /* Time between retries */
