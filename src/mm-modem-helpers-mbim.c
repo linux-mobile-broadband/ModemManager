@@ -1160,12 +1160,18 @@ mm_signal_from_mbim_signal_state (MbimDataClass          data_class,
     MMSignal **last_updated = NULL;
     guint      n_out_updated = 0;
 
-    *out_cdma = NULL;
-    *out_evdo = NULL;
-    *out_gsm = NULL;
-    *out_umts = NULL;
-    *out_lte = NULL;
-    *out_nr5g = NULL;
+    if (out_cdma)
+        *out_cdma = NULL;
+    if (out_evdo)
+        *out_evdo = NULL;
+    if (out_gsm)
+        *out_gsm = NULL;
+    if (out_umts)
+        *out_umts = NULL;
+    if (out_lte)
+        *out_lte = NULL;
+    if (out_nr5g)
+        *out_nr5g = NULL;
 
     /* When MBIMEx v2.0 is available, we get LTE+5GNR information reported
      * in the RSRP/SNR list of items. */
