@@ -4220,12 +4220,11 @@ load_sim_step_ready (MMBaseSim    *sim,
                      GAsyncResult *res,
                      GTask        *task)
 {
-    MMBroadbandModem *self;
-    SimSwapContext   *ctx;
-
-    g_autofree gchar *current = NULL;
-    GError           *error = NULL;
-    const gchar      *str;
+    MMBroadbandModem  *self;
+    SimSwapContext    *ctx;
+    g_autofree gchar  *current = NULL;
+    g_autoptr(GError)  error = NULL;
+    const gchar       *str;
 
     self = MM_BROADBAND_MODEM (g_task_get_source_object (task));
     ctx = g_task_get_task_data (task);
@@ -4251,7 +4250,6 @@ load_sim_step_ready (MMBaseSim    *sim,
             mm_obj_warn (self, "could not load SIM %s: %s (%d retries left)",
                          str, error->message, ctx->retries);
             --ctx->retries;
-            g_clear_error (&error);
             if (ctx->step == SIM_SWAP_CHECK_STEP_ICCID_CHANGED)
                 g_timeout_add_seconds (1, (GSourceFunc) load_sim_identifier, task);
             else if (ctx->step == SIM_SWAP_CHECK_STEP_IMSI_CHANGED)
