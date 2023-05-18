@@ -310,7 +310,7 @@ charset_gsm_unpacked_to_utf8 (const guint8  *gsm,
 
     for (i = 0; i < len; i++) {
         guint8 uchars[4];
-        guint8 ulen;
+        guint8 ulen = 0;
 
         /*
          * 	0x00 is NULL (when followed only by 0x00 up to the
@@ -336,9 +336,11 @@ charset_gsm_unpacked_to_utf8 (const guint8  *gsm,
 
         if (gsm[i] == GSM_ESCAPE_CHAR) {
             /* Extended alphabet, decode next char */
-            ulen = gsm_ext_char_to_utf8 (gsm[i+1], uchars);
-            if (ulen)
-                i += 1;
+            if (i + 1 < len) {
+                ulen = gsm_ext_char_to_utf8 (gsm[i + 1], uchars);
+                if (ulen)
+                    i += 1;
+            }
         } else {
             /* Default alphabet */
             ulen = gsm_def_char_to_utf8 (gsm[i], uchars);
