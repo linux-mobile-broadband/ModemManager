@@ -452,10 +452,42 @@ typedef struct {
     MMModemMode           mode;
     MMModemBand           bands_2g[4];
     MMModemBand           bands_3g[6];
-    MMModemBand           bands_4g[12];
+    MMModemBand           bands_4g[18];
 } BandConfiguration;
 
 static const BandConfiguration band_configuration[] = {
+    {
+        .model    = "LARA-R6001",
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_UNSUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS }, /* Quad-band */
+        .bands_3g = { MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UTRAN_1,
+                      MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8 }, /* 1900, 2100, 850, 900 */
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_3,
+                      MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_5, MM_MODEM_BAND_EUTRAN_7,
+                      MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_12, MM_MODEM_BAND_EUTRAN_13,
+                      MM_MODEM_BAND_EUTRAN_18, MM_MODEM_BAND_EUTRAN_19, MM_MODEM_BAND_EUTRAN_20,
+                      MM_MODEM_BAND_EUTRAN_26, MM_MODEM_BAND_EUTRAN_28, MM_MODEM_BAND_EUTRAN_38,
+                      MM_MODEM_BAND_EUTRAN_39, MM_MODEM_BAND_EUTRAN_40, MM_MODEM_BAND_EUTRAN_41 }
+    },
+    {
+        .model    = "LARA-R6001D",
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_UNSUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS }, /* Quad-band */
+        .bands_3g = { MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UTRAN_1,
+                      MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8 }, /* 1900, 2100, 850, 900 */
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_3,
+                      MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_5, MM_MODEM_BAND_EUTRAN_7,
+                      MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_12, MM_MODEM_BAND_EUTRAN_13,
+                      MM_MODEM_BAND_EUTRAN_18, MM_MODEM_BAND_EUTRAN_19, MM_MODEM_BAND_EUTRAN_20,
+                      MM_MODEM_BAND_EUTRAN_26, MM_MODEM_BAND_EUTRAN_28, MM_MODEM_BAND_EUTRAN_38,
+                      MM_MODEM_BAND_EUTRAN_39, MM_MODEM_BAND_EUTRAN_40, MM_MODEM_BAND_EUTRAN_41 }
+    },
     {
         .model    = "SARA-G300",
         .method   = SETTINGS_UPDATE_METHOD_COPS,
