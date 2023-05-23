@@ -5105,72 +5105,127 @@ update_bearer_speeds (MMBroadbandModemMbim *self,
 /*****************************************************************************/
 /* Packet service updates */
 
-static void
-basic_connect_notification_packet_service (MMBroadbandModemMbim *self,
-                                           MbimDevice           *device,
-                                           MbimMessage          *notification)
+static gboolean
+common_process_packet_service (MMBroadbandModemMbim     *self,
+                               MbimDevice               *device,
+                               MbimMessage              *message,
+                               guint32                  *out_nw_error,
+                               MbimPacketServiceState   *out_packet_service_state,
+                               GError                  **error)
 {
-    guint32                 nw_error;
-    MbimPacketServiceState  packet_service_state;
+    guint32                 nw_error = 0;
+    MbimPacketServiceState  packet_service_state = MBIM_PACKET_SERVICE_STATE_UNKNOWN;
     MbimDataClass           data_class = 0;
     MbimDataClassV3         data_class_v3 = 0;
     MbimDataSubclass        data_subclass = 0;
-    guint64                 uplink_speed;
-    guint64                 downlink_speed;
+    guint64                 uplink_speed = 0;
+    guint64                 downlink_speed = 0;
     MbimFrequencyRange      frequency_range = MBIM_FREQUENCY_RANGE_UNKNOWN;
     g_autofree gchar       *data_class_str = NULL;
     g_autofree gchar       *data_class_v3_str = NULL;
     g_autofree gchar       *data_subclass_str = NULL;
     g_autofree gchar       *frequency_range_str = NULL;
     const gchar            *nw_error_str;
-    g_autoptr(GError)       error = NULL;
+    gboolean                is_notification;
+
+    is_notification = (mbim_message_get_message_type (message) == MBIM_MESSAGE_TYPE_INDICATE_STATUS);
+    g_assert (is_notification || (mbim_message_get_message_type (message) == MBIM_MESSAGE_TYPE_COMMAND_DONE));
 
     if (mbim_device_check_ms_mbimex_version (device, 3, 0)) {
-        if (!mbim_message_ms_basic_connect_v3_packet_service_notification_parse (
-                notification,
-                &nw_error,
-                &packet_service_state,
-                &data_class_v3,
-                &uplink_speed,
-                &downlink_speed,
-                &frequency_range,
-                &data_subclass,
-                NULL, /* tai */
-                &error)) {
-            mm_obj_warn (self, "failed processing MBIMEx v3.0 packet service indication: %s", error->message);
-            return;
+        if (is_notification) {
+            if (!mbim_message_ms_basic_connect_v3_packet_service_notification_parse (
+                    message,
+                    &nw_error,
+                    &packet_service_state,
+                    &data_class_v3,
+                    &uplink_speed,
+                    &downlink_speed,
+                    &frequency_range,
+                    &data_subclass,
+                    NULL, /* tai */
+                    error)) {
+                g_prefix_error (error, "Failed processing MBIMEx v3.0 packet service indication: ");
+                return FALSE;
+            }
+            mm_obj_dbg (self, "processed MBIMEx v3.0 packet service indication");
+        } else {
+            if (!mbim_message_ms_basic_connect_v3_packet_service_response_parse (
+                    message,
+                    &nw_error,
+                    &packet_service_state,
+                    &data_class_v3,
+                    &uplink_speed,
+                    &downlink_speed,
+                    &frequency_range,
+                    &data_subclass,
+                    NULL, /* tai */
+                    error)) {
+                g_prefix_error (error, "Failed processing MBIMEx v3.0 packet service response: ");
+                return FALSE;
+            }
+            mm_obj_dbg (self, "processed MBIMEx v3.0 packet service response");
         }
-        mm_obj_dbg (self, "processed MBIMEx v3.0 packet service indication");
         data_class_v3_str = mbim_data_class_v3_build_string_from_mask (data_class_v3);
         data_subclass_str = mbim_data_subclass_build_string_from_mask (data_subclass);
     } else if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
-        if (!mbim_message_ms_basic_connect_v2_packet_service_notification_parse (
-                notification,
-                &nw_error,
-                &packet_service_state,
-                &data_class, /* current */
-                &uplink_speed,
-                &downlink_speed,
-                &frequency_range,
-                &error)) {
-            mm_obj_warn (self, "failed processing MBIMEx v2.0 packet service indication: %s", error->message);
-            return;
+        if (is_notification) {
+            if (!mbim_message_ms_basic_connect_v2_packet_service_notification_parse (
+                    message,
+                    &nw_error,
+                    &packet_service_state,
+                    &data_class, /* current */
+                    &uplink_speed,
+                    &downlink_speed,
+                    &frequency_range,
+                    error)) {
+                g_prefix_error (error, "Failed processing MBIMEx v2.0 packet service indication: ");
+                return FALSE;
+            }
+            mm_obj_dbg (self, "processed MBIMEx v2.0 packet service indication");
+        } else {
+            if (!mbim_message_ms_basic_connect_v2_packet_service_response_parse (
+                    message,
+                    &nw_error,
+                    &packet_service_state,
+                    &data_class, /* current */
+                    &uplink_speed,
+                    &downlink_speed,
+                    &frequency_range,
+                    error)) {
+                g_prefix_error (error, "Failed processing MBIMEx v2.0 packet service response: ");
+                return FALSE;
+            }
+            mm_obj_dbg (self, "processed MBIMEx v2.0 packet service response");
         }
-        mm_obj_dbg (self, "processed MBIMEx v2.0 packet service indication");
         data_class_str = mbim_data_class_build_string_from_mask (data_class);
     } else {
-        if (!mbim_message_packet_service_notification_parse (
-                notification,
-                &nw_error,
-                &packet_service_state,
-                &data_class, /* highest_available */
-                &uplink_speed,
-                &downlink_speed,
-                &error)) {
-            mm_obj_warn (self, "failed processing packet service indication: %s", error->message);
-            return;
+        if (is_notification) {
+            if (!mbim_message_packet_service_notification_parse (
+                    message,
+                    &nw_error,
+                    &packet_service_state,
+                    &data_class, /* highest available */
+                    &uplink_speed,
+                    &downlink_speed,
+                    error)) {
+                g_prefix_error (error, "Failed processing packet service indication: ");
+                return FALSE;
+            }
+            mm_obj_dbg (self, "processed packet service indication");
+        } else {
+            if (!mbim_message_packet_service_response_parse (
+                    message,
+                    &nw_error,
+                    &packet_service_state,
+                    &data_class, /* highest available */
+                    &uplink_speed,
+                    &downlink_speed,
+                    error)) {
+                g_prefix_error (error, "Failed processing packet service response: ");
+                return FALSE;
+            }
+            mm_obj_dbg (self, "processed packet service response");
         }
-        mm_obj_dbg (self, "processed packet service indication");
         data_class_str = mbim_data_class_build_string_from_mask (data_class);
     }
 
@@ -5206,6 +5261,23 @@ basic_connect_notification_packet_service (MMBroadbandModemMbim *self,
     update_packet_service_info (self, packet_service_state);
 
     update_bearer_speeds (self, uplink_speed, downlink_speed);
+
+    if (out_nw_error)
+        *out_nw_error = nw_error;
+    if (out_packet_service_state)
+        *out_packet_service_state = packet_service_state;
+    return TRUE;
+}
+
+static void
+basic_connect_notification_packet_service (MMBroadbandModemMbim *self,
+                                           MbimDevice           *device,
+                                           MbimMessage          *notification)
+{
+    g_autoptr(GError) error = NULL;
+
+    if (!common_process_packet_service (self, device, notification, NULL, NULL, &error))
+        mm_obj_warn (self, "%s", error->message);
 }
 
 static void
@@ -9394,60 +9466,36 @@ packet_service_set_ready (MbimDevice   *device,
     g_autoptr(MbimMessage)  response = NULL;
     g_autoptr(GError)       error = NULL;
     MbimPacketServiceState  requested_packet_service_state;
-    MbimPacketServiceState  packet_service_state;
-    guint32                 nw_error;
+    MbimPacketServiceState  packet_service_state = MBIM_PACKET_SERVICE_STATE_UNKNOWN;
 
     self = g_task_get_source_object (task);
 
+    /* The NwError field is valid if MBIM_SET_PACKET_SERVICE response status code
+     * equals MBIM_STATUS_FAILURE, so we parse the message both on success and on that
+     * specific failure */
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
         (mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
-         error->code == MBIM_STATUS_ERROR_FAILURE)) {
+         g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_FAILURE))) {
         g_autoptr(GError) inner_error = NULL;
+        guint32           nw_error = 0;
 
-        if (mbim_device_check_ms_mbimex_version (device, 3, 0)) {
-            mbim_message_ms_basic_connect_v3_packet_service_response_parse (
-                response,
-                &nw_error,
-                &packet_service_state,
-                NULL, /* data_class_v3 */
-                NULL, /* uplink_speed */
-                NULL, /* downlink_speed */
-                NULL, /* frequency_range */
-                NULL, /* data_subclass */
-                NULL, /* tai */
-                &inner_error);
-        } else if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
-            mbim_message_ms_basic_connect_v2_packet_service_response_parse (
-                response,
-                &nw_error,
-                &packet_service_state,
-                NULL, /* data_class */
-                NULL, /* uplink_speed */
-                NULL, /* downlink_speed */
-                NULL, /* frequency_range */
-                &inner_error);
+        if (!common_process_packet_service (self,
+                                            device,
+                                            response,
+                                            &nw_error,
+                                            &packet_service_state,
+                                            &inner_error)) {
+            mm_obj_warn (self, "%s", inner_error->message);
+            /* Prefer the error from the result to the parsing error */
+            if (!error)
+                error = g_steal_pointer (&inner_error);
         } else {
-            mbim_message_packet_service_response_parse (
-                response,
-                &nw_error,
-                &packet_service_state,
-                NULL, /* data_class */
-                NULL, /* uplink_speed */
-                NULL, /* downlink_speed */
-                &inner_error);
-        }
-
-        if (!inner_error) {
             /* Prefer the NW error if available */
             if (nw_error) {
                 g_clear_error (&error);
                 error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error, self);
             }
-        } else {
-            /* Prefer the error from the result to the parsing error */
-            if (!error)
-                error = g_steal_pointer (&inner_error);
         }
     }
 
