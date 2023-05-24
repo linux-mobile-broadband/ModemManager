@@ -2691,6 +2691,7 @@ interface_disabling_step (GTask *task)
         /* fall through */
 
     case DISABLING_STEP_REGISTRATION_STATE:
+        update_packet_service_state (self, MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN);
         update_registration_state (self, MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
         mm_iface_modem_3gpp_update_access_technologies (self, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
         mm_iface_modem_3gpp_update_location (self, 0, 0, 0);
