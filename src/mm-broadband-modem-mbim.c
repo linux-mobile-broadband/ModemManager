@@ -6369,11 +6369,37 @@ modem_3gpp_run_registration_checks_finish (MMIfaceModem3gpp  *self,
 }
 
 static void
+packet_service_query_ready (MbimDevice   *device,
+                            GAsyncResult *res,
+                            GTask        *task)
+{
+    MMBroadbandModemMbim   *self;
+    g_autoptr(MbimMessage)  response = NULL;
+    g_autoptr(GError)       error = NULL;
+
+    self = g_task_get_source_object (task);
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        (mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
+         g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_FAILURE))) {
+        g_autoptr(GError) inner_error = NULL;
+
+        if (!common_process_packet_service (self, device, response, NULL, NULL, &inner_error))
+            mm_obj_warn (self, "%s", inner_error->message);
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
 register_state_query_ready (MbimDevice   *device,
                             GAsyncResult *res,
                             GTask        *task)
 {
     g_autoptr(MbimMessage)  response = NULL;
+    g_autoptr(MbimMessage)  message = NULL;
     MMBroadbandModemMbim   *self;
     GError                 *error = NULL;
     MbimRegisterState       register_state;
@@ -6438,8 +6464,14 @@ register_state_query_ready (MbimDevice   *device,
                               provider_id,
                               provider_name);
 
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+    /* Now queue packet service state update */
+    message = mbim_message_packet_service_query_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)packet_service_query_ready,
+                         task);
 }
 
 static void
