@@ -4828,64 +4828,142 @@ update_registration_info (MMBroadbandModemMbim *self,
     }
 }
 
+static gboolean
+common_process_register_state (MMBroadbandModemMbim  *self,
+                               MbimDevice            *device,
+                               MbimMessage           *message,
+                               MbimNwError           *out_nw_error,
+                               GError               **error)
+{
+    MbimNwError        nw_error = 0;
+    MbimRegisterState  register_state = MBIM_REGISTER_STATE_UNKNOWN;
+    MbimDataClass      available_data_classes = 0;
+    g_autofree gchar  *provider_id = NULL;
+    g_autofree gchar  *provider_name = NULL;
+    MbimDataClass      preferred_data_classes = 0;
+    const gchar       *nw_error_str;
+    g_autofree gchar  *available_data_classes_str = NULL;
+    g_autofree gchar  *preferred_data_classes_str = NULL;
+    gboolean           is_notification;
+
+    is_notification = (mbim_message_get_message_type (message) == MBIM_MESSAGE_TYPE_INDICATE_STATUS);
+    g_assert (is_notification || (mbim_message_get_message_type (message) == MBIM_MESSAGE_TYPE_COMMAND_DONE));
+
+    if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
+        if (is_notification) {
+            if (!mbim_message_ms_basic_connect_v2_register_state_notification_parse (
+                    message,
+                    &nw_error,
+                    &register_state,
+                    NULL, /* register_mode */
+                    &available_data_classes,
+                    NULL, /* current_cellular_class */
+                    &provider_id,
+                    &provider_name,
+                    NULL, /* roaming_text */
+                    NULL, /* registration_flag */
+                    &preferred_data_classes,
+                    error)) {
+                g_prefix_error (error, "Failed processing MBIMEx v2.0 register state indication: ");
+                return FALSE;
+            }
+            mm_obj_dbg (self, "processed MBIMEx v2.0 register state indication");
+        } else {
+            if (!mbim_message_ms_basic_connect_v2_register_state_response_parse (
+                    message,
+                    &nw_error,
+                    &register_state,
+                    NULL, /* register_mode */
+                    &available_data_classes,
+                    NULL, /* current_cellular_class */
+                    &provider_id,
+                    &provider_name,
+                    NULL, /* roaming_text */
+                    NULL, /* registration_flag */
+                    &preferred_data_classes,
+                    error)) {
+                g_prefix_error (error, "Failed processing MBIMEx v2.0 register state response: ");
+                return FALSE;
+            }
+            mm_obj_dbg (self, "processed MBIMEx v2.0 register state indication");
+        }
+    } else {
+        if (is_notification) {
+            if (!mbim_message_register_state_notification_parse (
+                    message,
+                    &nw_error,
+                    &register_state,
+                    NULL, /* register_mode */
+                    &available_data_classes,
+                    NULL, /* current_cellular_class */
+                    &provider_id,
+                    &provider_name,
+                    NULL, /* roaming_text */
+                    NULL, /* registration_flag */
+                    error)) {
+                g_prefix_error (error, "Failed processing register state indication: ");
+                return FALSE;
+            }
+            mm_obj_dbg (self, "processed register state indication");
+        } else {
+            if (!mbim_message_register_state_response_parse (
+                    message,
+                    &nw_error,
+                    &register_state,
+                    NULL, /* register_mode */
+                    &available_data_classes,
+                    NULL, /* current_cellular_class */
+                    &provider_id,
+                    &provider_name,
+                    NULL, /* roaming_text */
+                    NULL, /* registration_flag */
+                    error)) {
+                g_prefix_error (error, "Failed processing register state response: ");
+                return FALSE;
+            }
+            mm_obj_dbg (self, "processed register state response");
+        }
+    }
+
+    nw_error_str = mbim_nw_error_get_string (nw_error);
+    available_data_classes_str = mbim_data_class_build_string_from_mask (available_data_classes);
+    preferred_data_classes_str = mbim_data_class_build_string_from_mask (preferred_data_classes);
+
+    mm_obj_dbg (self, "register state update:");
+    if (nw_error_str)
+        mm_obj_dbg (self, "              nw error: '%s'", nw_error_str);
+    else
+        mm_obj_dbg (self, "              nw error: '0x%x'", nw_error);
+    mm_obj_dbg (self, "                 state: '%s'", mbim_register_state_get_string (register_state));
+    mm_obj_dbg (self, "           provider id: '%s'", provider_id ? provider_id : "n/a");
+    mm_obj_dbg (self, "         provider name: '%s'", provider_name ? provider_name : "n/a");
+    mm_obj_dbg (self, "available data classes: '%s'", available_data_classes_str);
+    mm_obj_dbg (self, "preferred data classes: '%s'", preferred_data_classes_str);
+
+    update_registration_info (self,
+                              FALSE,
+                              register_state,
+                              available_data_classes,
+                              g_steal_pointer (&provider_id),
+                              g_steal_pointer (&provider_name));
+
+    if (preferred_data_classes)
+        complete_pending_allowed_modes_action (self, preferred_data_classes);
+
+    if (out_nw_error)
+        *out_nw_error = nw_error;
+    return TRUE;
+}
+
 static void
 basic_connect_notification_register_state (MMBroadbandModemMbim *self,
                                            MbimDevice           *device,
                                            MbimMessage          *notification)
 {
     g_autoptr(GError)  error = NULL;
-    MbimRegisterState  register_state;
-    MbimDataClass      available_data_classes;
-    gchar             *provider_id;
-    gchar             *provider_name;
-    MbimDataClass      preferred_data_classes = 0;
 
-    if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
-        if (!mbim_message_ms_basic_connect_v2_register_state_notification_parse (
-                notification,
-                NULL, /* nw_error */
-                &register_state,
-                NULL, /* register_mode */
-                &available_data_classes,
-                NULL, /* current_cellular_class */
-                &provider_id,
-                &provider_name,
-                NULL, /* roaming_text */
-                NULL, /* registration_flag */
-                &preferred_data_classes,
-                &error)) {
-            mm_obj_warn (self, "failed processing MBIMEx v2.0 register state indication: %s", error->message);
-            return;
-        }
-        mm_obj_dbg (self, "processed MBIMEx v2.0 register state indication");
-    } else {
-        if (!mbim_message_register_state_notification_parse (
-                notification,
-                NULL, /* nw_error */
-                &register_state,
-                NULL, /* register_mode */
-                &available_data_classes,
-                NULL, /* current_cellular_class */
-                &provider_id,
-                &provider_name,
-                NULL, /* roaming_text */
-                NULL, /* registration_flag */
-                &error)) {
-            mm_obj_warn (self, "failed processing register state indication: %s", error->message);
-            return;
-        }
-        mm_obj_dbg (self, "processed register state indication");
-    }
-
-    update_registration_info (self,
-                              FALSE,
-                              register_state,
-                              available_data_classes,
-                              provider_id,
-                              provider_name);
-
-    if (preferred_data_classes)
-        complete_pending_allowed_modes_action (self, preferred_data_classes);
+    if (!common_process_register_state (self, device, notification, NULL, &error))
+        mm_obj_warn (self, "%s", error->message);
 }
 
 typedef struct {
@@ -6402,10 +6480,6 @@ register_state_query_ready (MbimDevice   *device,
     g_autoptr(MbimMessage)  message = NULL;
     MMBroadbandModemMbim   *self;
     GError                 *error = NULL;
-    MbimRegisterState       register_state;
-    MbimDataClass           available_data_classes;
-    gchar                  *provider_id;
-    gchar                  *provider_name;
 
     self = g_task_get_source_object (task);
 
@@ -6416,53 +6490,11 @@ register_state_query_ready (MbimDevice   *device,
         return;
     }
 
-    if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
-        if (!mbim_message_ms_basic_connect_v2_register_state_response_parse (
-                response,
-                NULL, /* nw_error */
-                &register_state,
-                NULL, /* register_mode */
-                &available_data_classes,
-                NULL, /* current_cellular_class */
-                &provider_id,
-                &provider_name,
-                NULL, /* roaming_text */
-                NULL, /* registration_flag */
-                NULL, /* preferred_data_classes */
-                &error))
-            g_prefix_error (&error, "Failed processing MBIMEx v2.0 register state response: ");
-        else
-            mm_obj_dbg (self, "processed MBIMEx v2.0 register state response");
-    } else {
-        if (!mbim_message_register_state_response_parse (
-                response,
-                NULL, /* nw_error */
-                &register_state,
-                NULL, /* register_mode */
-                &available_data_classes,
-                NULL, /* current_cellular_class */
-                &provider_id,
-                &provider_name,
-                NULL, /* roaming_text */
-                NULL, /* registration_flag */
-                &error))
-            g_prefix_error (&error, "Failed processing register state response: ");
-        else
-            mm_obj_dbg (self, "processed register state response");
-    }
-
-    if (error) {
+    if (!common_process_register_state (self, device, response, NULL, &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
     }
-
-    update_registration_info (self,
-                              FALSE,
-                              register_state,
-                              available_data_classes,
-                              provider_id,
-                              provider_name);
 
     /* Now queue packet service state update */
     message = mbim_message_packet_service_query_new (NULL);
@@ -6517,9 +6549,9 @@ modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
 }
 
 static void
-register_state_set_ready (MbimDevice *device,
+register_state_set_ready (MbimDevice   *device,
                           GAsyncResult *res,
-                          GTask *task)
+                          GTask        *task)
 {
     MMBroadbandModemMbim   *self;
     g_autoptr(MbimMessage)  response = NULL;
@@ -6527,39 +6559,25 @@ register_state_set_ready (MbimDevice *device,
 
     self = g_task_get_source_object (task);
 
-    /* According to Mobile Broadband Interface Model specification 1.0,
-     * Errata 1, table 10.5.9.8: Status codes for MBIM_CID_REGISTER_STATE,
-     * NwError field of MBIM_REGISTRATION_STATE_INFO structure is valid
-     * if and only if MBIM_SET_REGISTRATION_STATE response status code equals
-     * MBIM_STATUS_FAILURE.
-     * Therefore it only makes sense to parse this value if MBIM_STATUS_FAILURE
-     * result is returned in response, contrary to usual "success" code.
-     * However, some modems do not set this value to 0 when registered,
-     * causing ModemManager to drop to idle state, while modem itself is
-     * registered.
-     */
+    /* The NwError field is valid if MBIM_SET_REGISTER_STATE response status code
+     * equals MBIM_STATUS_FAILURE, so we parse the message both on success and on that
+     * specific failure */
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
-        !mbim_message_response_get_result (response,
-                                           MBIM_MESSAGE_TYPE_COMMAND_DONE,
-                                           &error) &&
-        g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_FAILURE)) {
-        MbimNwError nw_error;
+        (mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
+         g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_FAILURE))) {
+        g_autoptr(GError) inner_error = NULL;
+        MbimNwError       nw_error = 0;
 
-        g_clear_error (&error);
-        if (mbim_message_register_state_response_parse (
-                response,
-                &nw_error,
-                NULL, /* &register_state */
-                NULL, /* register_mode */
-                NULL, /* available_data_classes */
-                NULL, /* current_cellular_class */
-                NULL, /* provider_id */
-                NULL, /* provider_name */
-                NULL, /* roaming_text */
-                NULL, /* registration_flag */
-                &error)) {
-            /* NwError "0" is defined in 3GPP TS 24.008 as "Unknown error",
+        if (!common_process_register_state (self, device, response, &nw_error, &inner_error)) {
+            mm_obj_warn (self, "%s", inner_error->message);
+            /* Prefer the error from the result to the parsing error */
+            if (!error)
+                error = g_steal_pointer (&inner_error);
+        } else {
+            /* Prefer the NW error if available.
+             *
+             * NwError "0" is defined in 3GPP TS 24.008 as "Unknown error",
              * not "No error", making it unsuitable as condition for registration check.
              * Still, there are certain modems (e.g. Fibocom NL668) that will
              * report Failure+NwError=0 even after the modem has already reported a
@@ -6567,10 +6585,10 @@ register_state_set_ready (MbimDevice *device,
              * that is the case, log about it and ignore the error; we are anyway
              * reloading the registration info after the set, so it should not be
              * a big issue. */
-            if (nw_error == 0)
-                mm_obj_dbg (self, "ignored failure reported in register operation");
-            else
+            if (nw_error) {
+                g_clear_error (&error);
                 error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error, self);
+            }
         }
     }
 
