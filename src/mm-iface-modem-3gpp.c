@@ -3360,6 +3360,98 @@ load_imei_ready (MMIfaceModem3gpp *self,
     interface_initialization_step (task);
 }
 
+/*****************************************************************************/
+
+typedef struct {
+    MmGdbusModem3gpp      *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModem3gpp      *self;
+    GVariant              *data;
+} HandleSetCarrierLockContext;
+
+static void
+handle_set_carrier_lock_context_free (HandleSetCarrierLockContext *ctx)
+{
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_variant_unref (ctx->data);
+    g_free (ctx);
+}
+
+static void
+handle_set_carrier_lock_ready (MMIfaceModem3gpp            *self,
+                               GAsyncResult                *res,
+                               HandleSetCarrierLockContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_carrier_lock_finish (self, res, &error))
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else
+        mm_gdbus_modem3gpp_complete_set_carrier_lock (ctx->skeleton, ctx->invocation);
+    handle_set_carrier_lock_context_free (ctx);
+}
+
+static void
+handle_set_carrier_lock_auth_ready (MMBaseModem                 *self,
+                                    GAsyncResult                *res,
+                                    HandleSetCarrierLockContext *ctx)
+{
+    GError       *error = NULL;
+    const guint8 *data;
+    gsize         data_size;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_set_carrier_lock_context_free (ctx);
+        return;
+    }
+
+    /* If carrier lock is not implemented, report an error */
+    if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_carrier_lock ||
+        !MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_carrier_lock_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot send set carrier lock request to modem: "
+                                               "operation not supported");
+        handle_set_carrier_lock_context_free (ctx);
+        return;
+    }
+    data = (const guint8 *) g_variant_get_fixed_array (ctx->data, &data_size, sizeof (guint8));
+
+    MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_carrier_lock (ctx->self,
+                                                                data,
+                                                                data_size,
+                                                                (GAsyncReadyCallback)handle_set_carrier_lock_ready,
+                                                                ctx);
+}
+
+static gboolean
+handle_set_carrier_lock (MmGdbusModem3gpp      *skeleton,
+                         GDBusMethodInvocation *invocation,
+                         GVariant              *data,
+                         MMIfaceModem3gpp      *self)
+{
+    HandleSetCarrierLockContext *ctx;
+
+    ctx = g_new0 (HandleSetCarrierLockContext, 1);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+    ctx->data = g_variant_ref (data);
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)handle_set_carrier_lock_auth_ready,
+                             ctx);
+    return TRUE;
+}
+
+/*****************************************************************************/
+
 static void
 interface_initialization_step (GTask *task)
 {
@@ -3497,6 +3589,10 @@ interface_initialization_step (GTask *task)
         g_signal_connect (ctx->skeleton,
                           "handle-disable-facility-lock",
                           G_CALLBACK (handle_disable_facility_lock),
+                          self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-set-carrier-lock",
+                          G_CALLBACK (handle_set_carrier_lock),
                           self);
 
         /* Finally, export the new interface */

@@ -273,6 +273,16 @@ struct _MMIfaceModem3gpp {
     gboolean (* set_nr5g_registration_settings_finish) (MMIfaceModem3gpp             *self,
                                                         GAsyncResult                 *res,
                                                         GError                      **error);
+
+    /* Set carrier lock */
+    void     (* set_carrier_lock)       (MMIfaceModem3gpp    *self,
+                                         const guint8        *data,
+                                         gsize                data_size,
+                                         GAsyncReadyCallback  callback,
+                                         gpointer             user_data);
+    gboolean (*set_carrier_lock_finish) (MMIfaceModem3gpp    *self,
+                                         GAsyncResult        *res,
+                                         GError             **error);
 };
 
 GType mm_iface_modem_3gpp_get_type (void);

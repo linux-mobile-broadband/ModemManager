@@ -145,6 +145,7 @@ struct _MMBroadbandModemMbimPrivate {
     gboolean is_intel_reset_supported;
     gboolean is_slot_info_status_supported;
     gboolean is_ms_sar_supported;
+    gboolean is_google_carrier_lock_supported;
 
     /* Process unsolicited notifications */
     guint notification_id;
@@ -3386,6 +3387,16 @@ query_device_services_ready (MbimDevice   *device,
                 continue;
             }
 
+            if (service == MBIM_SERVICE_GOOGLE) {
+                for (j = 0; j < device_services[i]->cids_count; j++) {
+                    if (device_services[i]->cids[j] == MBIM_CID_GOOGLE_CARRIER_LOCK) {
+                        mm_obj_dbg (self, "Google carrier lock is supported");
+                        self->priv->is_google_carrier_lock_supported = TRUE;
+                    }
+                }
+                continue;
+            }
+
             /* no optional features to check in remaining services */
         }
         mbim_device_service_element_array_free (device_services);
@@ -5118,6 +5129,14 @@ basic_connect_notification_subscriber_ready_status (MMBroadbandModemMbim *self,
          ready_state != MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED)) {
         /* SIM has been removed or reinserted, re-probe to ensure correct interfaces are exposed */
         mm_obj_dbg (self, "SIM hot swap detected");
+        active_sim_event = TRUE;
+    }
+
+    if ((self->priv->enabled_cache.last_ready_state != MBIM_SUBSCRIBER_READY_STATE_DEVICE_LOCKED &&
+         ready_state == MBIM_SUBSCRIBER_READY_STATE_DEVICE_LOCKED) ||
+        (self->priv->enabled_cache.last_ready_state == MBIM_SUBSCRIBER_READY_STATE_DEVICE_LOCKED &&
+         ready_state != MBIM_SUBSCRIBER_READY_STATE_DEVICE_LOCKED)) {
+        mm_obj_dbg (self, "Lock state change detected");
         active_sim_event = TRUE;
     }
 
@@ -9618,6 +9637,71 @@ set_packet_service_state (MMIfaceModem3gpp              *self,
                          task);
 }
 
+/*****************************************************************************/
+/* Set carrier lock */
+
+static gboolean
+modem_set_carrier_lock_finish (MMIfaceModem3gpp  *self,
+                               GAsyncResult      *res,
+                               GError           **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+set_carrier_lock_ready (MbimDevice   *device,
+                        GAsyncResult *res,
+                        GTask        *task)
+{
+    g_autoptr(MbimMessage)  response = NULL;
+    GError                 *error = NULL;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error)) {
+        g_task_return_boolean (task, TRUE);
+    } else if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_OPERATION_NOT_ALLOWED)) {
+        g_clear_error (&error);
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED, "operation not allowed");
+    } else
+        g_task_return_error (task, error);
+
+    g_object_unref (task);
+}
+
+static void
+modem_set_carrier_lock (MMIfaceModem3gpp    *_self,
+                        const guint8        *data,
+                        gsize                data_size,
+                        GAsyncReadyCallback  callback,
+                        gpointer             user_data)
+{
+    MMBroadbandModemMbim   *self = MM_BROADBAND_MODEM_MBIM (_self);
+    MbimDevice             *device;
+    g_autoptr(MbimMessage)  message = NULL;
+    GTask                  *task;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!self->priv->is_google_carrier_lock_supported) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "Google carrier lock is not supported");
+        g_object_unref (task);
+        return;
+    }
+
+    mm_obj_dbg (self, "Sending carrier lock request...");
+    message = mbim_message_google_carrier_lock_set_new (data_size, data, NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)set_carrier_lock_ready,
+                         task);
+}
 
 /*****************************************************************************/
 
@@ -9853,6 +9937,9 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->disable_facility_lock_finish = modem_3gpp_disable_facility_lock_finish;
     iface->set_packet_service_state = set_packet_service_state;
     iface->set_packet_service_state_finish = set_packet_service_state_finish;
+    /* carrier lock */
+    iface->set_carrier_lock = modem_set_carrier_lock;
+    iface->set_carrier_lock_finish = modem_set_carrier_lock_finish;
 }
 
 static void

@@ -1510,6 +1510,101 @@ mm_modem_3gpp_set_nr5g_registration_settings_sync (MMModem3gpp                 *
 
 /*****************************************************************************/
 
+/**
+ * mm_modem_3gpp_set_carrier_lock_finish:
+ * @self: A #MMModem3gpp.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_gdbus_modem3gpp_call_set_carrier_lock().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_3gpp_set_carrier_lock().
+ *
+ * Returns: (skip): %TRUE if the call succeded, %FALSE if @error is set.
+ * Since: 1.22
+ */
+gboolean
+mm_modem_3gpp_set_carrier_lock_finish (MMModem3gpp   *self,
+                                       GAsyncResult  *res,
+                                       GError       **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), FALSE);
+
+    return mm_gdbus_modem3gpp_call_set_carrier_lock_finish (MM_GDBUS_MODEM3GPP (self), res, error);
+}
+
+/**
+ * mm_modem_3gpp_set_carrier_lock:
+ * @self: A #MMModem3gpp.
+ * @data: (array length=data_size): Carrier lock information.
+ * @data_size: size of @data.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously sends the carrier lock information to the modem.
+ *
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_location_inject_assistance_data_finish() to get the result of the
+ * operation.
+ *
+ * See mm_modem_3gpp_set_carrier_lock_sync() for the synchronous,
+ * blocking version of this method.
+ *
+ * Since: 1.22
+ */
+void
+mm_modem_3gpp_set_carrier_lock (MMModem3gpp         *self,
+                                const guint8        *data,
+                                gsize                data_size,
+                                GCancellable        *cancellable,
+                                GAsyncReadyCallback  callback,
+                                gpointer             user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_3GPP (self));
+
+    mm_gdbus_modem3gpp_call_set_carrier_lock (MM_GDBUS_MODEM3GPP (self),
+                                              g_variant_new_fixed_array (G_VARIANT_TYPE_BYTE, data, data_size, sizeof (guint8)),
+                                              cancellable,
+                                              callback,
+                                              user_data);
+}
+
+/**
+ * mm_modem_3gpp_set_carrier_lock_sync:
+ * @self: A #MMModem3gpp.
+ * @data: (array length=data_size): Carrier lock information.
+ * @data_size: size of @data.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously sends the carrier lock information to the modem..
+ *
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_3gpp_set_carrier_lock() for the asynchronous version of this method.
+ *
+ * Returns: %TRUE if the carrier network info is successfully send, %FALSE if @error is set.
+ *
+ * Since: 1.22
+ */
+gboolean
+mm_modem_3gpp_set_carrier_lock_sync (MMModem3gpp   *self,
+                                     const guint8  *data,
+                                     gsize          data_size,
+                                     GCancellable  *cancellable,
+                                     GError       **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), FALSE);
+
+    return mm_gdbus_modem3gpp_call_set_carrier_lock_sync (MM_GDBUS_MODEM3GPP (self),
+                                                          g_variant_new_fixed_array (G_VARIANT_TYPE_BYTE, data, data_size, sizeof (guint8)),
+                                                          cancellable,
+                                                          error);
+}
+
+/*****************************************************************************/
+
 static void
 mm_modem_3gpp_init (MMModem3gpp *self)
 {

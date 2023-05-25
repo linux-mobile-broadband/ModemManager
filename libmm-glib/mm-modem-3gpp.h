@@ -219,6 +219,21 @@ gboolean mm_modem_3gpp_set_nr5g_registration_settings_sync   (MMModem3gpp       
                                                               GCancellable                   *cancellable,
                                                               GError                        **error);
 
+gboolean mm_modem_3gpp_set_carrier_lock_finish (MMModem3gpp          *self,
+                                                GAsyncResult         *res,
+                                                GError              **error);
+void     mm_modem_3gpp_set_carrier_lock        (MMModem3gpp          *self,
+                                                const guint8         *data,
+                                                gsize                 data_size,
+                                                GCancellable         *cancellable,
+                                                GAsyncReadyCallback   callback,
+                                                gpointer              user_data);
+gboolean mm_modem_3gpp_set_carrier_lock_sync   (MMModem3gpp          *self,
+                                                const guint8         *data,
+                                                gsize                 data_size,
+                                                GCancellable         *cancellable,
+                                                GError              **error);
+
 G_END_DECLS
 
 #endif /* _MM_MODEM_3GPP_H_ */

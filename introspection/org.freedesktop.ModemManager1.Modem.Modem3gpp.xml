@@ -230,6 +230,20 @@
     </method>
 
     <!--
+        SetCarrierLock:
+        @data: The list of carrier network information to be sent to be configured.
+
+        Command to send the list of carrier network information to the modem.
+
+        Since: 1.22
+    -->
+    <method name="SetCarrierLock">
+      <arg name="data" type="ay" direction="in">
+        <annotation name="org.gtk.GDBus.C.ForceGVariant" value="true"/>
+      </arg>
+    </method>
+
+    <!--
         SetPacketServiceState:
         @state: a <link linkend="MMModem3gppPacketServiceState">MMModem3gppPacketServiceState</link>.
 

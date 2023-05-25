@@ -54,6 +54,7 @@ static gchar    *set_initial_eps_bearer_settings_str;
 static gchar    *disable_facility_lock_str;
 static gchar    *set_packet_service_state_str;
 static gchar    *set_nr5g_registration_settings_str;
+static gchar    *set_carrier_lock_str;
 
 static GOptionEntry entries[] = {
     { "3gpp-scan", 0, 0, G_OPTION_ARG_NONE, &scan_flag,
@@ -87,6 +88,10 @@ static GOptionEntry entries[] = {
     { "3gpp-set-nr5g-registration-settings", 0, 0, G_OPTION_ARG_STRING, &set_nr5g_registration_settings_str,
       "Set 5GNR registration settings",
       "[\"key=value,...\"]"
+    },
+    { "3gpp-set-carrier-lock", 0, 0, G_OPTION_ARG_STRING, &set_carrier_lock_str,
+      "Carrier Lock",
+      "[(Data)]"
     },
     { NULL }
 };
@@ -122,7 +127,8 @@ mmcli_modem_3gpp_options_enabled (void)
                  !!set_initial_eps_bearer_settings_str +
                  !!disable_facility_lock_str +
                  !!set_packet_service_state_str +
-                 !!set_nr5g_registration_settings_str);
+                 !!set_nr5g_registration_settings_str +
+                 !!set_carrier_lock_str);
 
     if (n_actions > 1) {
         g_printerr ("error: too many 3GPP actions requested\n");
@@ -421,6 +427,32 @@ set_nr5g_registration_settings_ready (MMModem3gpp  *modem_3gpp,
 }
 
 static void
+set_carrier_lock_process_reply (gboolean     result,
+                                const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't send carrier lock information: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully sent carrier lock information to modem\n");
+}
+
+static void
+set_carrier_lock_ready (MMModem3gpp  *modem_3gpp,
+                        GAsyncResult *result)
+{
+    gboolean          operation_result;
+    g_autoptr(GError) error = NULL;
+
+    operation_result = mm_modem_3gpp_set_carrier_lock_finish (modem_3gpp, result, &error);
+    set_carrier_lock_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
 get_modem_ready (GObject      *source,
                  GAsyncResult *result)
 {
@@ -452,6 +484,28 @@ get_modem_ready (GObject      *source,
                                              ctx->cancellable,
                                              (GAsyncReadyCallback)disable_facility_lock_ready,
                                              NULL);
+        return;
+    }
+
+    /* Request to set carrier Lock */
+    if (set_carrier_lock_str) {
+        gsize              data_size  = 0;
+        g_autofree guint8 *data = NULL;
+        GError            *error = NULL;
+
+        data = mm_utils_hexstr2bin (set_carrier_lock_str, -1, &data_size, &error);
+        if (!data) {
+            g_printerr ("Failed to read data from the input: %s\n", error->message);
+            exit (EXIT_FAILURE);
+            return;
+        }
+
+        mm_modem_3gpp_set_carrier_lock (ctx->modem_3gpp,
+                                        data,
+                                        (guint32)data_size,
+                                        ctx->cancellable,
+                                        (GAsyncReadyCallback)set_carrier_lock_ready,
+                                        NULL);
         return;
     }
 
@@ -614,6 +668,28 @@ mmcli_modem_3gpp_run_synchronous (GDBusConnection *connection)
                                                            NULL,
                                                            &error);
         disable_facility_lock_process_reply (result, error);
+        return;
+    }
+
+    /* Request to set carrier Lock */
+    if (set_carrier_lock_str) {
+        gsize              data_size  = 0;
+        g_autofree guint8 *data = NULL;
+        gboolean           result;
+
+        data = mm_utils_hexstr2bin (set_carrier_lock_str, -1, &data_size, &error);
+        if (!data) {
+            g_printerr ("Failed to read data from the input: %s\n", error->message);
+            exit (EXIT_FAILURE);
+            return;
+        }
+
+        result = mm_modem_3gpp_set_carrier_lock_sync (ctx->modem_3gpp,
+                                                      data,
+                                                      (guint32)data_size,
+                                                      NULL,
+                                                      &error);
+        set_carrier_lock_process_reply (result, error);
         return;
     }
 
