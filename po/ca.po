@@ -1,0 +1,116 @@
+# Catalan translation for ModemManager.
+# Copyright (C) 2023 ModemManager's COPYRIGHT HOLDER
+# This file is distributed under the same license as the ModemManager package.
+# pocsenderi <pocsenderi@protonmail.com>, 2023.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: ModemManager main\n"
+"Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
+"ModemManager/issues\n"
+"POT-Creation-Date: 2023-05-30 15:25+0000\n"
+"PO-Revision-Date: 2023-05-30 21:43+0200\n"
+"Last-Translator: pocsenderi <pocsenderi@protonmail.com>\n"
+"Language-Team: Catalan <gnome@llistes.softcatala.org>\n"
+"Language: ca\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 2.4.2\n"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:13
+msgid "Control the Modem Manager daemon"
+msgstr "Controla el dimoni del Modem Manager"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:14
+msgid "System policy prevents controlling the Modem Manager."
+msgstr "La política del sistema impedeix controlar el Modem Manager."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:22
+msgid "Unlock and control a mobile broadband device"
+msgstr "Desbloqueja i controla un dispositiu de banda ampla mòbil"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:23
+msgid ""
+"System policy prevents unlocking or controlling the mobile broadband device."
+msgstr ""
+"La política del sistema impedeix desbloquejar o controlar el dispositiu de "
+"banda ampla mòbil."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:31
+msgid "Add, modify, and delete mobile broadband contacts"
+msgstr "Afegeix, modifica o esborra contactes de mòbil"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
+msgid ""
+"System policy prevents adding, modifying, or deleting this device's contacts."
+msgstr ""
+"La política del sistema impedeix afegir, modificar o suprimir els contactes "
+"d'aquest dispositiu."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
+msgid "Send, save, modify, and delete text messages"
+msgstr "Envia, desa, modifica i esborra missatges de text"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
+msgid ""
+"System policy prevents sending or manipulating this device's text messages."
+msgstr ""
+"La política del sistema impedeix enviar o manipular els missatges de text "
+"d'aquest dispositiu."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
+msgid "Accept incoming voice calls or start outgoing voice calls."
+msgstr "Accepta trucades de veu entrants o n'inicia de sortints."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
+msgid "System policy prevents voice calls."
+msgstr "La política del sistema impedeix les trucades de veu."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Query network time and timezone information"
+msgstr "Consulta informació del fus horari i l'hora de la xarxa"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+msgid "System policy prevents querying network time information."
+msgstr ""
+"La política del sistema impedeix consultar la informació de l'hora de la "
+"xarxa."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
+msgid "Enable and view geographic location and positioning information"
+msgstr "Activa i mostra informació de posicionament i ubicació geogràfica"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
+msgid ""
+"System policy prevents enabling or viewing geographic location information."
+msgstr ""
+"La política del sistema impedeix habilitar o visualitzar informació "
+"d'ubicació geogràfica."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
+msgid "Query and utilize network information and services"
+msgstr "Consulta i fa ús d'informació i serveis de xarxa"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
+msgid ""
+"System policy prevents querying or utilizing network information and "
+"services."
+msgstr ""
+"La política del sistema impedeix consultar o utilitzar informació i serveis "
+"de xarxa."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:85
+msgid "Query and manage firmware on a mobile broadband device"
+msgstr ""
+"Consulta i gestiona el microprogramari en un dispositiu de banda ampla mòbil"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:86
+msgid "System policy prevents querying or managing this device's firmware."
+msgstr ""
+"La política del sistema impedeix consultar o gestionar el microprogramari "
+"d'aquest dispositiu."
+
+#: src/mm-sleep-monitor-systemd.c:125
+msgid "ModemManager needs to reset devices"
+msgstr "ModemManager necessita reinicialitzar els dispositius"
