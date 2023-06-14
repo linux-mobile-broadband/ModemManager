@@ -3649,7 +3649,7 @@ uim_start_refresh_timeout (MMSharedQmi *self)
 
     mm_obj_dbg (self, "refresh start timed out; trigger SIM change check");
 
-    mm_iface_modem_check_for_sim_swap (MM_IFACE_MODEM (self), 0, NULL, NULL, NULL, NULL);
+    mm_iface_modem_check_for_sim_swap (MM_IFACE_MODEM (self), NULL, NULL, NULL, NULL);
 
     return G_SOURCE_REMOVE;
 }
@@ -3715,7 +3715,7 @@ uim_refresh_indication_cb (QmiClientUim                  *client,
                 g_source_remove (priv->uim_refresh_start_timeout_id);
                 priv->uim_refresh_start_timeout_id = 0;
             }
-            mm_iface_modem_check_for_sim_swap (MM_IFACE_MODEM (self), 0, NULL, NULL, NULL, NULL);
+            mm_iface_modem_check_for_sim_swap (MM_IFACE_MODEM (self), NULL, NULL, NULL, NULL);
         }
     }
 }

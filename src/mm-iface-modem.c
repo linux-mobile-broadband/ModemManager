@@ -157,7 +157,6 @@ explicit_check_for_sim_swap_ready (MMIfaceModem *self,
 
 void
 mm_iface_modem_check_for_sim_swap (MMIfaceModem *self,
-                                   guint slot_index,
                                    const gchar *iccid,
                                    const gchar *imsi,
                                    GAsyncReadyCallback callback,
@@ -167,36 +166,6 @@ mm_iface_modem_check_for_sim_swap (MMIfaceModem *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    /*  Slot index 0 is used when slot is not known, assumingly on a modem with just one SIM slot */
-    if (slot_index != 0) {
-        MmGdbusModem *skeleton;
-        guint primary_slot;
-
-        g_object_get (self,
-                      MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
-                      NULL);
-
-        if (!skeleton) {
-            g_task_return_new_error (task,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_FAILED,
-                                     "Couldn't get interface skeleton");
-            g_object_unref (task);
-            return;
-        }
-
-        primary_slot = mm_gdbus_modem_get_primary_sim_slot (MM_GDBUS_MODEM (skeleton));
-        g_object_unref (skeleton);
-
-        /* Check that it's really the primary slot whose iccid or imsi has changed */
-        if (primary_slot && primary_slot != slot_index) {
-            mm_obj_info (self, "checking for SIM swap ignored: status changed in slot %u, but primary is %u", slot_index, primary_slot);
-            g_task_return_boolean (task, TRUE);
-            g_object_unref (task);
-            return;
-        }
-    }
-
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap ||
         !MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap_finish) {
         mm_obj_info (self, "checking for SIM swap ignored: not implemented");
@@ -205,7 +174,7 @@ mm_iface_modem_check_for_sim_swap (MMIfaceModem *self,
         return;
     }
 
-    mm_obj_info (self, "start checking for SIM swap in slot %u", slot_index);
+    mm_obj_info (self, "started checking for SIM swap...");
     MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap (
         self,
         iccid,
@@ -4641,7 +4610,6 @@ interface_syncing_step (GTask *task)
          */
         mm_iface_modem_check_for_sim_swap (
             self,
-            0,
             NULL,
             NULL,
             (GAsyncReadyCallback)sync_detect_sim_swap_ready,

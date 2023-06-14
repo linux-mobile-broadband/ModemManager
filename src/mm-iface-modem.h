@@ -599,7 +599,6 @@ void mm_iface_modem_bind_simple_status (MMIfaceModem *self,
 
 /* Check if the SIM or eSIM profile has changed */
 void     mm_iface_modem_check_for_sim_swap        (MMIfaceModem *self,
-                                                   guint slot_index,
                                                    const gchar *iccid,
                                                    const gchar *imsi,
                                                    GAsyncReadyCallback callback,
