@@ -197,20 +197,21 @@ mm_iface_modem_check_for_sim_swap (MMIfaceModem *self,
         }
     }
 
-    if (MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap &&
-        MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap_finish) {
-        mm_obj_info (self, "start checking for SIM swap in slot %u", slot_index);
-        MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap (
-            self,
-            iccid,
-            imsi,
-            (GAsyncReadyCallback)explicit_check_for_sim_swap_ready,
-            task);
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap ||
+        !MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap_finish) {
+        mm_obj_info (self, "checking for SIM swap ignored: not implemented");
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
-    g_task_return_boolean (task, FALSE);
-    g_object_unref (task);
+    mm_obj_info (self, "start checking for SIM swap in slot %u", slot_index);
+    MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap (
+        self,
+        iccid,
+        imsi,
+        (GAsyncReadyCallback)explicit_check_for_sim_swap_ready,
+        task);
 }
 
 /*****************************************************************************/
