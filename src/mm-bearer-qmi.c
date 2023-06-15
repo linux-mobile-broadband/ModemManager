@@ -2442,8 +2442,21 @@ load_settings_from_bearer (MMBearerQmi         *self,
     GError              *inner_error = NULL;
     const gchar         *str;
     const gchar         *data_port_driver;
+    guint                current_multiplexed_bearers;
+    guint                max_multiplexed_bearers;
+    gboolean             multiplex_supported = TRUE;
 
+    if (!mm_broadband_modem_get_active_multiplexed_bearers (MM_BROADBAND_MODEM (ctx->modem),
+                                                            &current_multiplexed_bearers,
+                                                            &max_multiplexed_bearers,
+                                                            error))
+        return FALSE;
+
+    /* Check multiplex support in the kernel and the device */
     data_port_driver = mm_kernel_device_get_driver (mm_port_peek_kernel_device (ctx->data));
+    /* All drivers should support multiplexing */
+    if (!max_multiplexed_bearers)
+        multiplex_supported = FALSE;
 
     /* If no multiplex setting given by the user, assume none; unless in IPA */
     ctx->multiplex = mm_bearer_properties_get_multiplex (properties);
@@ -2456,9 +2469,31 @@ load_settings_from_bearer (MMBearerQmi         *self,
             ctx->multiplex = MM_BEARER_MULTIPLEX_SUPPORT_NONE;
     }
 
-    /* The link prefix hint given must be modem-specific */
+    /* If multiplex unsupported, either abort or default to none */
+    if (!multiplex_supported) {
+        if (ctx->multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                         "Multiplexing required but not supported");
+            return FALSE;
+        }
+        if (ctx->multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED) {
+            mm_obj_dbg (self, "Multiplexing unsupported");
+            ctx->multiplex = MM_BEARER_MULTIPLEX_SUPPORT_NONE;
+        }
+    }
+
+    /* Go on with multiplexing enabled */
     if (ctx->multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED ||
         ctx->multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED) {
+        g_assert (multiplex_supported);
+
+        if (current_multiplexed_bearers == max_multiplexed_bearers) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                         "Maximum number of multiplexed bearers reached");
+            return FALSE;
+        }
+
+        /* The link prefix hint given must be modem-specific */
         ctx->link_prefix_hint = g_strdup_printf ("qmapmux%u.", mm_base_modem_get_dbus_id (MM_BASE_MODEM (modem)));
     }
 

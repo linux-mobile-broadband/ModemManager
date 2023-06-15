@@ -29,6 +29,7 @@
 #include "mm-sms-mbim.h"
 
 #include "ModemManager.h"
+#include <ModemManager-tags.h>
 #include "mm-context.h"
 #include "mm-log-object.h"
 #include "mm-errors-types.h"
@@ -2957,8 +2958,9 @@ modem_create_bearer (MMIfaceModem        *self,
 static MMBearerList *
 modem_create_bearer_list (MMIfaceModem *self)
 {
-    guint n;
-    guint n_multiplexed;
+    MMPortMbim *port;
+    guint       n;
+    guint       n_multiplexed;
 
     /* The maximum number of available/connected modems is guessed from
      * the size of the data ports list. */
@@ -2968,6 +2970,21 @@ modem_create_bearer_list (MMIfaceModem *self)
     /* The maximum number of multiplexed links is defined by the MBIM protocol */
     n_multiplexed = (MBIM_DEVICE_SESSION_ID_MAX - MBIM_DEVICE_SESSION_ID_MIN + 1);
     mm_obj_dbg (self, "allowed up to %u active multiplexed bearers", n_multiplexed);
+
+    port = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self));
+    if (port &&
+        mm_kernel_device_has_global_property (mm_port_peek_kernel_device (MM_PORT (port)),
+                                              ID_MM_MAX_MULTIPLEXED_LINKS)) {
+        guint n_multiplexed_limited;
+
+        n_multiplexed_limited = mm_kernel_device_get_global_property_as_int (
+            mm_port_peek_kernel_device (MM_PORT (port)),
+            ID_MM_MAX_MULTIPLEXED_LINKS);
+        if (n_multiplexed_limited < n_multiplexed) {
+            n_multiplexed = n_multiplexed_limited;
+            mm_obj_dbg (self, "limited to %u active multiplexed bearers", n_multiplexed);
+        }
+    }
 
     /* by default, no multiplexing support */
     return mm_bearer_list_new (n, n_multiplexed);

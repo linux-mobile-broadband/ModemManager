@@ -270,6 +270,23 @@
  */
 #define ID_MM_REQUIRED "ID_MM_REQUIRED"
 
+/**
+ * ID_MM_MAX_MULTIPLEXED_LINKS:
+ *
+ * This is a device-specific tag that allows users to specify the maximum amount
+ * of multiplexed links the modem supports.
+ *
+ * An integer value greater or equal than 0 must be given. The value 0 in this
+ * tag completely disables the multiplexing support in the device.
+ *
+ * This setting does nothing if the modem doesn't support multiplexing, or if the
+ * value configured is greater than the one specified by the modem itself (e.g.
+ * the control protocol in use also limits this value).
+ *
+ * Since: 1.22
+ */
+#define ID_MM_MAX_MULTIPLEXED_LINKS "ID_MM_MAX_MULTIPLEXED_LINKS"
+
 /*
  * The following symbols are deprecated. We don't add them to -compat
  * because this -tags file is not really part of the installed API.

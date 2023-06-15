@@ -27,6 +27,7 @@
 #include "mm-broadband-modem-qmi.h"
 
 #include "ModemManager.h"
+#include <ModemManager-tags.h>
 #include "mm-log.h"
 #include "mm-errors-types.h"
 #include "mm-modem-helpers.h"
@@ -435,10 +436,22 @@ modem_create_bearer_list (MMIfaceModem *self)
         }
 
         if (kernel_data_modes & (MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET | MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN)) {
-            /* The maximum number of multiplexed links is retrieved from the
-             * MMPortQmi */
+            /* The maximum number of multiplexed links is retrieved from the MMPortQmi */
             n_multiplexed = mm_port_qmi_get_max_multiplexed_links (port);
             mm_obj_dbg (self, "allowed up to %u active multiplexed bearers", n_multiplexed);
+
+            if (mm_kernel_device_has_global_property (mm_port_peek_kernel_device (MM_PORT (port)),
+                                                      ID_MM_MAX_MULTIPLEXED_LINKS)) {
+                guint n_multiplexed_limited;
+
+                n_multiplexed_limited = mm_kernel_device_get_global_property_as_int (
+                    mm_port_peek_kernel_device (MM_PORT (port)),
+                    ID_MM_MAX_MULTIPLEXED_LINKS);
+                if (n_multiplexed_limited < n_multiplexed) {
+                    n_multiplexed = n_multiplexed_limited;
+                    mm_obj_dbg (self, "limited to %u active multiplexed bearers", n_multiplexed);
+                }
+            }
         }
     }
 

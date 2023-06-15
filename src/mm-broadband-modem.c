@@ -12860,6 +12860,52 @@ mm_broadband_modem_get_current_charset (MMBroadbandModem *self)
 
 /*****************************************************************************/
 
+static void
+bearer_count_multiplexed_connected (MMBaseBearer *bearer,
+                                    guint        *count)
+{
+    /* The Multiplexed property is only set if connected, so it's enough to check
+     * that one to see if we're connected and multiplexed */
+    if (mm_gdbus_bearer_get_multiplexed (MM_GDBUS_BEARER (bearer)))
+        *count += 1;
+}
+
+gboolean
+mm_broadband_modem_get_active_multiplexed_bearers (MMBroadbandModem  *self,
+                                                   guint             *out_current,
+                                                   guint             *out_max,
+                                                   GError           **error)
+{
+    g_autoptr(MMBearerList) list = NULL;
+    guint                   max;
+    guint                   count = 0;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_BEARER_LIST, &list,
+                  NULL);
+
+    if (!list) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Bearer list unavailable");
+        return FALSE;
+    }
+
+    max = mm_bearer_list_get_max_active_multiplexed (list);
+
+    mm_bearer_list_foreach (list,
+                            (MMBearerListForeachFunc)bearer_count_multiplexed_connected,
+                            &count);
+    g_assert (!(!max && count));
+
+    if (out_max)
+        *out_max = max;
+    if (out_current)
+        *out_current = count;
+
+    return TRUE;
+}
+
+/*****************************************************************************/
+
 gchar *
 mm_broadband_modem_create_device_identifier (MMBroadbandModem  *self,
                                              const gchar       *ati,
