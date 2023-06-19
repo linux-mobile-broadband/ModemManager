@@ -4464,6 +4464,7 @@ set_supl_server_context_free (SetSuplServerContext *ctx)
             g_signal_handler_disconnect (ctx->client, ctx->indication_id);
         g_object_unref (ctx->client);
     }
+    g_free (ctx->supl);
     g_slice_free (SetSuplServerContext, ctx);
 }
 
