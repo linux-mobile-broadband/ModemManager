@@ -573,7 +573,7 @@ probe_qgps_ready (MMBaseModem  *_self,
                             FEATURE_SUPPORTED : FEATURE_NOT_SUPPORTED);
 
     mm_obj_dbg (self, "GPS management with +QGPS is %ssupported",
-                priv->qgps_supported ? "" : "not ");
+                priv->qgps_supported == FEATURE_SUPPORTED ? "" : "not ");
 
     /* Recover parent sources */
     sources = GPOINTER_TO_UINT (g_task_get_task_data (task));
