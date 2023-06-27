@@ -20,9 +20,9 @@ stages:
                                gobject-introspection python-is-python3 libsystemd-dev
                                libpolkit-gobject-1-dev valac meson ninja-build
                                libdbus-1-dev bash-completion udev policykit-1 help2man
-    LIBQMI_BRANCH: 'main'
-    LIBQRTR_BRANCH: 'main'
-    LIBMBIM_BRANCH: 'main'
+    LIBQMI_BRANCH: 'qmi-1-32'
+    LIBQRTR_BRANCH: 'qrtr-1-2'
+    LIBMBIM_BRANCH: 'mbim-1-28'
 
 build container:
   extends:
