@@ -4105,12 +4105,12 @@ modem_check_time_reply (MMBaseModem   *_self,
     MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
 
     if (!error) {
-        if (strstr (response, "^NTCT"))
+        if (strstr (response, "^NWTIME"))
             self->priv->nwtime_support = FEATURE_SUPPORTED;
         else if (strstr (response, "^TIME"))
             self->priv->time_support = FEATURE_SUPPORTED;
     } else {
-        if (strstr (command, "^NTCT"))
+        if (strstr (command, "^NWTIME"))
             self->priv->nwtime_support = FEATURE_NOT_SUPPORTED;
         else if (strstr (command, "^TIME"))
             self->priv->time_support = FEATURE_NOT_SUPPORTED;
@@ -4122,7 +4122,7 @@ modem_check_time_reply (MMBaseModem   *_self,
 }
 
 static const MMBaseModemAtCommand time_cmd_sequence[] = {
-    { "^NTCT?", 3, FALSE, modem_check_time_reply }, /* 3GPP/LTE */
+    { "^NWTIME?", 3, FALSE, modem_check_time_reply }, /* 3GPP/LTE */
     { "^TIME",  3, FALSE, modem_check_time_reply }, /* CDMA */
     { NULL }
 };
