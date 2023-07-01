@@ -1244,7 +1244,7 @@ mm_huawei_parse_nwtime_response (const gchar        *response,
             /* Return ISO-8601 format date/time string */
             *iso8601p = mm_new_iso8601_time (year, month, day, hour,
                                              minute, second,
-                                             TRUE, (tz * 15) + (dt * 60),
+                                             TRUE, (tz * 15),
                                              error);
             return (*iso8601p != NULL);
         }
