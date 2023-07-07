@@ -342,9 +342,6 @@ mm_shared_quectel_firmware_load_update_settings (MMIfaceModemFirmware *self,
     MMPortSerialAt *at_port;
     MMModemFirmwareUpdateMethod update_methods;
     MMFirmwareUpdateSettings *update_settings;
-#if defined WITH_MBIM
-    MMPortMbim *mbim;
-#endif
 
     task = g_task_new (self, NULL, callback, user_data);
 
@@ -366,23 +363,29 @@ mm_shared_quectel_firmware_load_update_settings (MMIfaceModemFirmware *self,
     }
 
 #if defined WITH_MBIM
-    mbim = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self));
-    if (mbim) {
-        g_autoptr(MbimMessage) message = NULL;
+    {
+        MMPortMbim *mbim = NULL;
 
-        update_methods = quectel_get_firmware_update_methods (MM_BASE_MODEM (self), MM_PORT (mbim));
-        update_settings = mm_firmware_update_settings_new (update_methods);
+        if (MM_IS_BROADBAND_MODEM_MBIM (self))
+            mbim = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self));
 
-        /* Fetch firmware info */
-        g_task_set_task_data (task, update_settings, g_object_unref);
-        message = mbim_message_qdu_quectel_read_version_set_new (MBIM_QDU_QUECTEL_VERSION_TYPE_FW_BUILD_ID, NULL);
-        mbim_device_command (mm_port_mbim_peek_device (mbim),
-                             message,
-                             5,
-                             NULL,
-                             (GAsyncReadyCallback) quectel_mbim_port_get_firmware_version_ready,
-                             task);
-        return;
+        if (mbim) {
+            g_autoptr(MbimMessage) message = NULL;
+
+            update_methods = quectel_get_firmware_update_methods (MM_BASE_MODEM (self), MM_PORT (mbim));
+            update_settings = mm_firmware_update_settings_new (update_methods);
+
+            /* Fetch firmware info */
+            g_task_set_task_data (task, update_settings, g_object_unref);
+            message = mbim_message_qdu_quectel_read_version_set_new (MBIM_QDU_QUECTEL_VERSION_TYPE_FW_BUILD_ID, NULL);
+            mbim_device_command (mm_port_mbim_peek_device (mbim),
+                                 message,
+                                 5,
+                                 NULL,
+                                 (GAsyncReadyCallback) quectel_mbim_port_get_firmware_version_ready,
+                                 task);
+            return;
+        }
     }
 #endif
 
