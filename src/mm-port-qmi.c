@@ -2089,7 +2089,11 @@ count_links_setup (MMPortQmi *self,
             return 0;
         }
 
-        return links->len;
+        if (links)
+            return links->len;
+
+        /* No list of links returned, so there are none */
+        return 0;
     }
 
     if (self->priv->kernel_data_modes & MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN)
