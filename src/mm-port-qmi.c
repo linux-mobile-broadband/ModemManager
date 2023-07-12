@@ -712,6 +712,18 @@ get_rmnet_device_add_link_flags (MMPortQmi *self)
         }
     }
 
+    if (g_strcmp0 (self->priv->net_driver, "qmi_wwan") == 0) {
+        QmiWdaDataAggregationProtocol dap;
+
+        dap = mm_port_qmi_get_data_aggregation_protocol (self);
+        if (dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5)
+            flags |= (QMI_DEVICE_ADD_LINK_FLAGS_INGRESS_MAP_CKSUMV5 |
+                      QMI_DEVICE_ADD_LINK_FLAGS_EGRESS_MAP_CKSUMV5);
+        else if (dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV4)
+            flags |= (QMI_DEVICE_ADD_LINK_FLAGS_INGRESS_MAP_CKSUMV4 |
+                      QMI_DEVICE_ADD_LINK_FLAGS_EGRESS_MAP_CKSUMV4);
+    }
+
     flags_str = qmi_device_add_link_flags_build_string_from_mask (flags);
     mm_obj_dbg (self, "Creating RMNET link with flags: %s", flags_str);
     return flags;
