@@ -187,9 +187,10 @@ if enable_udev
 endif
 config_h.set('WITH_UDEV', enable_udev)
 
-# udev base directory
+# udev base directory (required to install rules even when udev support is disabled)
 udev_udevdir = get_option('udevdir')
 if udev_udevdir == ''
+  assert(enable_udev, 'udevdir must be explicitly given if udev support is disabled')
   udev_udevdir = dependency('udev').get_pkgconfig_variable('udevdir')
 endif
 udev_rulesdir = udev_udevdir / 'rules.d'
