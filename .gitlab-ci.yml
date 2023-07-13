@@ -20,6 +20,9 @@ stages:
                                gobject-introspection python-is-python3 libsystemd-dev
                                libpolkit-gobject-1-dev valac libdbus-1-dev
                                bash-completion udev policykit-1 help2man
+    LIBQMI_BRANCH: 'main'
+    LIBQRTR_BRANCH: 'main'
+    LIBMBIM_BRANCH: 'main'
 
 build container:
   extends:
@@ -40,7 +43,7 @@ before_script:
 .prepare_deps: &prepare_deps
     - >
       if [ "$BUILD_MBIM" == "true" ]; then
-        git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
+        git clone --depth 1 --branch ${LIBMBIM_BRANCH} https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
         pushd libmbim
         meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=false -Dbash_completion=false
         ninja -C build
@@ -49,7 +52,7 @@ before_script:
       fi
     - >
       if [ "$BUILD_QRTR" == "true" ]; then
-        git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqrtr-glib.git
+        git clone --depth 1 --branch ${LIBQRTR_BRANCH} https://gitlab.freedesktop.org/mobile-broadband/libqrtr-glib.git
         pushd libqrtr-glib
         meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=false
         ninja -C build
@@ -58,7 +61,7 @@ before_script:
       fi
     - >
       if [ "$BUILD_QMI" == "true" ]; then
-        git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
+        git clone --depth 1 --branch ${LIBQMI_BRANCH} https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
         pushd libqmi
         meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=false -Dbash_completion=false -Dmbim_qmux=$BUILD_MBIM -Dqrtr=$BUILD_QRTR -Dcollection=basic
         ninja -C build
