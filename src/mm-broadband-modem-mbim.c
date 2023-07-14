@@ -4691,14 +4691,16 @@ update_packet_service_info (MMBroadbandModemMbim    *self,
 {
     MMModem3gppPacketServiceState state;
 
-    if (packet_service_state == self->priv->enabled_cache.packet_service_state)
-        return;
-
-    self->priv->enabled_cache.packet_service_state = packet_service_state;
+    /* Report the new value to the 3GPP interface right away, don't assume it has the same
+     * cached value. */
     state = mm_modem_3gpp_packet_service_state_from_mbim_packet_service_state (packet_service_state);
     mm_iface_modem_3gpp_update_packet_service_state (MM_IFACE_MODEM_3GPP (self), state);
 
+    if (packet_service_state == self->priv->enabled_cache.packet_service_state)
+        return;
+
     /* PS reg state depends on the packet service state */
+    self->priv->enabled_cache.packet_service_state = packet_service_state;
     update_registration_info (self,
                               FALSE,
                               self->priv->enabled_cache.reg_state,
