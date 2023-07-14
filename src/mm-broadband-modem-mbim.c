@@ -5189,10 +5189,13 @@ bearer_list_report_speeds (MMBaseBearer         *bearer,
     if (!MM_IS_BEARER_MBIM (bearer))
         return;
 
-    mm_obj_dbg (self, "bearer '%s' speeds updated", mm_base_bearer_get_path (bearer));
-    mm_base_bearer_report_speeds (bearer,
-                                  self->priv->enabled_cache.packet_service_uplink_speed,
-                                  self->priv->enabled_cache.packet_service_downlink_speed);
+    /* Update speeds only if connected or connecting */
+    if (mm_base_bearer_get_status (bearer) >= MM_BEARER_STATUS_CONNECTING) {
+        mm_obj_dbg (self, "bearer '%s' speeds updated", mm_base_bearer_get_path (bearer));
+        mm_base_bearer_report_speeds (bearer,
+                                      self->priv->enabled_cache.packet_service_uplink_speed,
+                                      self->priv->enabled_cache.packet_service_downlink_speed);
+    }
 }
 
 static void
