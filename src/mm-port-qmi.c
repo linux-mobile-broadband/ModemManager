@@ -81,6 +81,8 @@ struct _MMPortQmiPrivate {
     MMPort   *preallocated_links_main;
     GArray   *preallocated_links;
     GList    *preallocated_links_setup_pending;
+    /* first multiplex setup */
+    gboolean first_multiplex_setup;
 };
 
 /*****************************************************************************/
@@ -2052,8 +2054,10 @@ internal_setup_data_format_ready (MMPortQmi    *self,
                                             NULL, /* not expected to update */
                                             &error))
         g_task_return_error (task, error);
-    else
+    else {
+        self->priv->first_multiplex_setup = FALSE;
         g_task_return_boolean (task, TRUE);
+    }
     g_object_unref (task);
 }
 
@@ -2146,9 +2150,12 @@ mm_port_qmi_setup_data_format (MMPortQmi                      *self,
         (self->priv->kernel_data_modes & (MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET | MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN)) &&
         MM_PORT_QMI_DAP_IS_SUPPORTED_QMAP (self->priv->dap)) {
         mm_obj_dbg (self, "multiplex support already available when setting up data format");
-        g_task_return_boolean (task, TRUE);
-        g_object_unref (task);
-        return;
+        /* If this is the first time that multiplex is used, perform anyway the internal reset operation, so that the links are properly managed */
+        if (!self->priv->first_multiplex_setup) {
+            g_task_return_boolean (task, TRUE);
+            g_object_unref (task);
+            return;
+        }
     }
 
     if ((action == MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_SET_DEFAULT) &&
@@ -2409,6 +2416,7 @@ port_open_step (GTask *task)
     switch (ctx->step) {
     case PORT_OPEN_STEP_FIRST:
         mm_obj_dbg (self, "Opening QMI device...");
+        self->priv->first_multiplex_setup = TRUE;
         ctx->step++;
         /* Fall through */
 
