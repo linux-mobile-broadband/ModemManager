@@ -1194,8 +1194,9 @@ load_supported_kernel_data_modes (MMPortQmi *self,
 
 /*****************************************************************************/
 
-#define DEFAULT_DOWNLINK_DATA_AGGREGATION_MAX_SIZE      32768
-#define DEFAULT_DOWNLINK_DATA_AGGREGATION_MAX_DATAGRAMS 32
+#define DEFAULT_DOWNLINK_DATA_AGGREGATION_MAX_SIZE                32768
+#define DEFAULT_DOWNLINK_DATA_AGGREGATION_MAX_SIZE_QMI_WWAN_RMNET 16384
+#define DEFAULT_DOWNLINK_DATA_AGGREGATION_MAX_DATAGRAMS           32
 
 typedef struct {
     MMPortQmiKernelDataMode       kernel_data_mode;
@@ -1510,7 +1511,11 @@ sync_wda_data_format (GTask *task)
     qmi_message_wda_set_data_format_input_set_uplink_data_aggregation_protocol (input, ctx->wda_ul_dap_requested, NULL);
     qmi_message_wda_set_data_format_input_set_downlink_data_aggregation_protocol (input, ctx->wda_dl_dap_requested, NULL);
     if (ctx->wda_dl_dap_requested != QMI_WDA_DATA_AGGREGATION_PROTOCOL_DISABLED) {
-        qmi_message_wda_set_data_format_input_set_downlink_data_aggregation_max_size (input, DEFAULT_DOWNLINK_DATA_AGGREGATION_MAX_SIZE, NULL);
+        if ((g_strcmp0 (self->priv->net_driver, "qmi_wwan") == 0) &&
+            (ctx->kernel_data_modes_supported & MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET))
+            qmi_message_wda_set_data_format_input_set_downlink_data_aggregation_max_size (input, DEFAULT_DOWNLINK_DATA_AGGREGATION_MAX_SIZE_QMI_WWAN_RMNET, NULL);
+        else
+            qmi_message_wda_set_data_format_input_set_downlink_data_aggregation_max_size (input, DEFAULT_DOWNLINK_DATA_AGGREGATION_MAX_SIZE, NULL);
         qmi_message_wda_set_data_format_input_set_downlink_data_aggregation_max_datagrams (input, DEFAULT_DOWNLINK_DATA_AGGREGATION_MAX_DATAGRAMS, NULL);
     }
     if (ctx->use_endpoint)
