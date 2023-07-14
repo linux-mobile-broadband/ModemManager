@@ -4797,6 +4797,8 @@ update_registration_info (MMBroadbandModemMbim *self,
         g_clear_pointer (&self->priv->enabled_cache.current_operator_name, g_free);
         g_free (operator_id_take);
         g_free (operator_name_take);
+        /* Explicitly reset packet service state if we're not registered */
+        update_packet_service_info (self, MBIM_PACKET_SERVICE_STATE_UNKNOWN);
     }
 
     /* If we can update domain registration states right now, do it */
