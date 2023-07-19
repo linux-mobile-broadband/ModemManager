@@ -5,3 +5,4 @@ tags
 /.vscode
 /cscope.out
 subprojects/libmbim
+subprojects/libqmi
