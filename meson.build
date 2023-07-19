@@ -259,7 +259,16 @@ config_h.set('WITH_BUILTIN_PLUGINS', enable_builtin_plugins)
 # MBIM support (enabled by default)
 enable_mbim = get_option('mbim')
 if enable_mbim
-  mbim_glib_dep = dependency('mbim-glib', version: '>= 1.32.0')
+  mbim_glib_dep = dependency('mbim-glib', version: '>= 1.32.0',
+                             required: not get_option('subproject-fallback'))
+  if not mbim_glib_dep.found() and get_option('subproject-fallback')
+    mbim_glib_proj = subproject('libmbim',
+                                default_options: ['man=false',
+                                                  'introspection=false',
+                                                  'bash_completion=false',
+						 ])
+    mbim_glib_dep = mbim_glib_proj.get_variable('libmbim_glib_dep')
+  endif
 endif
 config_h.set('WITH_MBIM', enable_mbim)
 

@@ -1,0 +1,5 @@
+[wrap-git]
+directory=libmbim
+url=https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
+revision=main
+
