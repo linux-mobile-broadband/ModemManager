@@ -717,20 +717,20 @@ port_context_new (MMPluginManager *self,
 /* Device context */
 
 /* Time to wait for ports to appear before starting to probe the first one */
-#define MIN_WAIT_TIME_MSECS 1500
+#define MIN_WAIT_TIME_MSECS 2000
 
 /* Time to wait for other ports to appear once the first port is exposed
  * (needs to be > MIN_WAIT_TIME_MSECS!!) */
-#define MIN_PROBING_TIME_MSECS 2500
+#define MIN_PROBING_TIME_MSECS 4000
 
 /* Additional time to wait for other ports to appear after the last port is
  * exposed in the system. Longer time when not using udev, as we rely on
  * mmcli --report-kernel-event events to report new port additions, e.g.
  * via openwrt hotplug scripts. */
 #if defined WITH_UDEV
-# define EXTRA_PROBING_TIME_MSECS 1500
+# define EXTRA_PROBING_TIME_MSECS 2000
 #else
-# define EXTRA_PROBING_TIME_MSECS 3000
+# define EXTRA_PROBING_TIME_MSECS 4000
 #endif
 
 /* The wait time we define must always be less than the probing time */
