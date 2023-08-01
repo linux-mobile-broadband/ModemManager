@@ -153,6 +153,9 @@ initialize_endpoint_info (MMPortQmi *self)
             self->priv->endpoint_interface_number = 1;
             break;
         case QMI_DATA_ENDPOINT_TYPE_PCIE:
+            /* Qualcomm magic number */
+            self->priv->endpoint_interface_number = 4;
+            break;
         case QMI_DATA_ENDPOINT_TYPE_UNDEFINED:
         case QMI_DATA_ENDPOINT_TYPE_HSIC:
         case QMI_DATA_ENDPOINT_TYPE_BAM_DMUX:
@@ -715,7 +718,8 @@ get_rmnet_device_add_link_flags (MMPortQmi *self)
         }
     }
 
-    if (g_strcmp0 (self->priv->net_driver, "qmi_wwan") == 0) {
+    if (g_strcmp0 (self->priv->net_driver, "qmi_wwan") == 0 ||
+        g_strcmp0 (self->priv->net_driver, "mhi_net") == 0) {
         QmiWdaDataAggregationProtocol dap;
 
         dap = mm_port_qmi_get_data_aggregation_protocol (self);
@@ -1158,6 +1162,9 @@ load_current_kernel_data_modes (MMPortQmi *self,
         }
     }
 
+    if (g_strcmp0 (self->priv->net_driver, "mhi_net") == 0)
+        return (MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP | MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET);
+
     /* For any driver, assume raw-ip only */
     return MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP;
 }
@@ -1195,6 +1202,10 @@ load_supported_kernel_data_modes (MMPortQmi *self,
 
         return supported;
     }
+
+    /* PCIe based setups support both raw ip and QMAP through rmnet */
+    if (g_strcmp0 (self->priv->net_driver, "mhi_net") == 0)
+        return (MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP | MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET);
 
     /* For any driver, assume raw-ip only */
     return MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP;
