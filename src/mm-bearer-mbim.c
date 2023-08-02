@@ -537,8 +537,6 @@ ip_configuration_query_ready (MbimDevice   *device,
             ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_IPV4V6 ||
             ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
             gboolean address_set = FALSE;
-            gboolean gateway_set = FALSE;
-            gboolean dns_set = FALSE;
 
             ipv6_config = mm_bearer_ip_config_new ();
 
@@ -554,10 +552,13 @@ ip_configuration_query_ready (MbimDevice   *device,
 
                 /* If the address is a link-local one, then SLAAC or DHCP must be used
                  * to get the real prefix and address.
-                 * FIXME: maybe the modem reported non-LL address in ipv6address[1] ?
+                 * If the address is a global one, then the modem did SLAAC already and
+                 * there is no need to run host SLAAC.
                  */
                 if (g_inet_address_get_is_link_local (addr))
-                    address_set = FALSE;
+                    mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_DHCP);
+                else
+                    mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_STATIC);
 
                 /* Netmask */
                 mm_bearer_ip_config_set_prefix (ipv6_config, ipv6address[0]->on_link_prefix_length);
@@ -570,8 +571,13 @@ ip_configuration_query_ready (MbimDevice   *device,
                     gw_addr = g_inet_address_new_from_bytes ((guint8 *)ipv6gateway, G_SOCKET_FAMILY_IPV6);
                     gw_str = g_inet_address_to_string (gw_addr);
                     mm_bearer_ip_config_set_gateway (ipv6_config, gw_str);
-                    gateway_set = TRUE;
                 }
+            } else {
+                /* If no address is given, this is likely a bug in the modem firmware, because even in the
+                 * case of needing to run host SLAAC, a link-local IPv6 address must be given. Either way,
+                 * go on requesting the need of host SLAAC, and let the network decide whether our SLAAC
+                 * Router Solicitation messages with an unexpected link-local address are accepted or not. */
+                mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_DHCP);
             }
 
             if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS) && (ipv6dnsservercount > 0)) {
@@ -589,21 +595,11 @@ ip_configuration_query_ready (MbimDevice   *device,
                         strarr[n++] = g_inet_address_to_string (addr);
                 }
                 mm_bearer_ip_config_set_dns (ipv6_config, (const gchar **)strarr);
-                dns_set = TRUE;
             }
 
             /* MTU */
             if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU)
                 mm_bearer_ip_config_set_mtu (ipv6_config, ipv6mtu);
-
-            /* Only use the static method if all basic properties are available,
-             * otherwise use DHCP to indicate the missing ones should be
-             * retrieved from SLAAC or DHCPv6.
-             */
-            if (address_set && gateway_set && dns_set)
-                mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_STATIC);
-            else
-                mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_DHCP);
 
             /* We requested IPv6, but it wasn't reported as activated. If there is no IPv6 address
              * provided by the modem, we assume the IPv6 bearer wasn't truly activated */
