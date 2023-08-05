@@ -25,8 +25,8 @@ ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a0", ENV{.MM_USBIFNUM}=="02", SUBS
 ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a0", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a0", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_IGNORE}="1"
 
-# Fibocom NL668 only supports one single multiplexed PDN connection
-ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a0", ENV{ID_MM_MAX_MULTIPLEXED_LINKS}="1"
+# Fibocom NL668 doesn't support multiplexing properly
+ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a0", ENV{ID_MM_MAX_MULTIPLEXED_LINKS}="0"
 
 # Fibocom FM150
 #  ttyUSB0 (if #0): QCDM port
