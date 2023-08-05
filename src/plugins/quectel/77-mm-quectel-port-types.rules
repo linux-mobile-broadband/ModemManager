@@ -88,6 +88,14 @@ ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0800", ENV{.MM_USBIFNUM}=="01", SUBS
 ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0800", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
 ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0800", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 
+# Quectel EM060K-GL (MBIM)
+#  ttyUSB0 (if #3): QCDM/DIAG port
+#  ttyUSB1 (if #4): GPS data port
+#  ttyUSB2 (if #5): AT port
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0128", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_QCDM}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0128", ENV{.MM_USBIFNUM}=="04", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0128", ENV{.MM_USBIFNUM}=="05", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+
 # Quectel EM05-G variants with Sahara-Firehose support:
 ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="030a", ENV{ID_MM_QUECTEL_FIREHOSE}="1"
 ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="030a", ENV{ID_MM_QUECTEL_SAHARA}="1"
