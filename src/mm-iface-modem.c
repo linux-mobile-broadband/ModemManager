@@ -141,6 +141,60 @@ mm_iface_modem_check_for_sim_swap_finish (MMIfaceModem *self,
 }
 
 static void
+check_basic_sim_details_ready (MMIfaceModem *self,
+                               GAsyncResult *res,
+                               GTask        *task)
+{
+    g_autoptr(MMBaseSim)  sim = NULL;
+    GError               *error = NULL;
+    const gchar          *old_iccid = NULL;
+    const gchar          *old_imsi = NULL;
+    g_autofree gchar     *current_iccid = NULL;
+    g_autofree gchar     *current_imsi = NULL;
+    gboolean              sim_inserted;
+
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->check_basic_sim_details_finish (
+        self, res, &sim_inserted, &current_iccid, &current_imsi, &error)) {
+        mm_obj_warn (self, "SIM details check failed: %s", error->message);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    g_object_get (self, MM_IFACE_MODEM_SIM, &sim, NULL);
+    if (sim) {
+        old_iccid = mm_gdbus_sim_get_sim_identifier (MM_GDBUS_SIM (sim));
+        old_imsi = mm_gdbus_sim_get_imsi (MM_GDBUS_SIM (sim));
+    }
+
+    if (!sim && !sim_inserted) {
+        mm_obj_info (self, "No SIM inserted before and after");
+    } else if (sim && !sim_inserted) {
+        mm_obj_info (self, "SIM removed");
+        mm_iface_modem_process_sim_event (self);
+    } else if (!sim && sim_inserted) {
+        mm_obj_info (self, "SIM inserted");
+        mm_iface_modem_process_sim_event (self);
+    } else if ((g_strcmp0 (current_iccid, old_iccid) != 0) ||
+               (g_strcmp0 (current_imsi, old_imsi) != 0)) {
+        mm_obj_info (self, "new SIM detected");
+        mm_obj_info (self, "ICCID: %s -> %s",
+                     mm_log_str_personal_info (old_iccid),
+                     mm_log_str_personal_info (current_iccid));
+        mm_obj_info (self, "IMSI: %s -> %s",
+                     mm_log_str_personal_info (old_imsi),
+                     mm_log_str_personal_info (current_imsi));
+        mm_iface_modem_process_sim_event (self);
+    } else {
+        mm_obj_info (self, "SIM not changed. ICCID: %s, IMSI: %s",
+                     mm_log_str_personal_info (current_iccid),
+                     mm_log_str_personal_info (current_imsi));
+    }
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
 explicit_check_for_sim_swap_ready (MMIfaceModem *self,
                                    GAsyncResult *res,
                                    GTask *task)
@@ -159,8 +213,6 @@ explicit_check_for_sim_swap_ready (MMIfaceModem *self,
 
 void
 mm_iface_modem_check_for_sim_swap (MMIfaceModem *self,
-                                   const gchar *iccid,
-                                   const gchar *imsi,
                                    GAsyncReadyCallback callback,
                                    gpointer user_data)
 {
@@ -168,21 +220,29 @@ mm_iface_modem_check_for_sim_swap (MMIfaceModem *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap ||
-        !MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap_finish) {
-        mm_obj_info (self, "checking for SIM swap ignored: not implemented");
-        g_task_return_boolean (task, TRUE);
-        g_object_unref (task);
+    if (MM_IFACE_MODEM_GET_INTERFACE (self)->check_basic_sim_details &&
+        MM_IFACE_MODEM_GET_INTERFACE (self)->check_basic_sim_details_finish) {
+        mm_obj_info (self, "started checking for basic SIM details...");
+        MM_IFACE_MODEM_GET_INTERFACE (self)->check_basic_sim_details (
+            self,
+            (GAsyncReadyCallback)check_basic_sim_details_ready,
+            task);
         return;
     }
 
-    mm_obj_info (self, "started checking for SIM swap...");
-    MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap (
-        self,
-        iccid,
-        imsi,
-        (GAsyncReadyCallback)explicit_check_for_sim_swap_ready,
-        task);
+    if (MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap &&
+        MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap_finish) {
+        mm_obj_info (self, "started checking for SIM swap...");
+        MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap (
+            self,
+            (GAsyncReadyCallback)explicit_check_for_sim_swap_ready,
+            task);
+        return;
+    }
+
+    mm_obj_info (self, "checking for SIM swap ignored: not implemented");
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -4421,8 +4481,6 @@ interface_enabling_step (GTask *task)
             MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap_finish) {
             MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap (
                 self,
-                NULL,
-                NULL,
                 (GAsyncReadyCallback)check_for_sim_swap_ready,
                 task);
             return;
@@ -4618,8 +4676,6 @@ interface_syncing_step (GTask *task)
          */
         mm_iface_modem_check_for_sim_swap (
             self,
-            NULL,
-            NULL,
             (GAsyncReadyCallback)sync_detect_sim_swap_ready,
             task);
         return;

@@ -291,13 +291,21 @@ struct _MMIfaceModem {
      * Useful for when the modem changes power states since we might
      * not get the relevant notifications from the modem. */
     void (*check_for_sim_swap) (MMIfaceModem *self,
-                                const gchar *iccid,
-                                const gchar *imsi,
                                 GAsyncReadyCallback callback,
                                 gpointer user_data);
     gboolean (*check_for_sim_swap_finish) (MMIfaceModem *self,
                                            GAsyncResult *res,
                                            GError **error);
+
+    void (*check_basic_sim_details) (MMIfaceModem *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data);
+    gboolean (*check_basic_sim_details_finish) (MMIfaceModem  *self,
+                                                GAsyncResult  *res,
+                                                gboolean      *sim_inserted,
+                                                gchar         **iccid,
+                                                gchar         **imsi,
+                                                GError        **error);
 
     /* Asynchronous flow control setup */
     void (*setup_flow_control) (MMIfaceModem *self,
@@ -599,8 +607,6 @@ void mm_iface_modem_bind_simple_status (MMIfaceModem *self,
 
 /* Check if the SIM or eSIM profile has changed */
 void     mm_iface_modem_check_for_sim_swap        (MMIfaceModem *self,
-                                                   const gchar *iccid,
-                                                   const gchar *imsi,
                                                    GAsyncReadyCallback callback,
                                                    gpointer user_data);
 gboolean mm_iface_modem_check_for_sim_swap_finish (MMIfaceModem *self,
@@ -612,6 +618,5 @@ void mm_iface_modem_modify_sim (MMIfaceModem *self,
                                 MMBaseSim *new_sim);
 
 void mm_iface_modem_process_sim_event (MMIfaceModem *self);
-
 
 #endif /* MM_IFACE_MODEM_H */

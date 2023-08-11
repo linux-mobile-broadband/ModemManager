@@ -6361,6 +6361,137 @@ modem_setup_sim_hot_swap (MMIfaceModem        *_self,
 }
 
 /*****************************************************************************/
+/* Check basic SIM details */
+
+typedef struct {
+    gboolean  sim_inserted;
+    gchar    *iccid;
+    gchar    *imsi;
+} SimDetails;
+
+static void sim_details_free (SimDetails *sim_info) {
+    g_free (sim_info->iccid);
+    g_free (sim_info->imsi);
+    g_slice_free (SimDetails, sim_info);
+}
+
+static gboolean
+modem_check_basic_sim_details_finish (MMIfaceModem  *self,
+                                      GAsyncResult  *res,
+                                      gboolean      *sim_inserted,
+                                      gchar        **iccid,
+                                      gchar        **imsi,
+                                      GError       **error)
+{
+    SimDetails *sim_info;
+
+    sim_info = g_task_propagate_pointer (G_TASK (res), error);
+    if (!sim_info)
+        return FALSE;
+
+    *sim_inserted = sim_info->sim_inserted;
+    if (iccid)
+        *iccid = g_steal_pointer (&sim_info->iccid);
+    if (imsi)
+        *imsi = g_steal_pointer (&sim_info->imsi);
+    sim_details_free (sim_info);
+    return TRUE;
+}
+
+static void
+basic_sim_details_subscriber_ready_state_ready (MbimDevice   *device,
+                                                GAsyncResult *res,
+                                                GTask        *task)
+{
+    MMBroadbandModemMbim     *self;
+    g_autoptr(MbimMessage)    response = NULL;
+    GError                   *error = NULL;
+    gchar                    *imsi = NULL;
+    g_autofree gchar         *raw_iccid = NULL;
+    MbimSubscriberReadyState  ready_state = MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED;
+
+    self = g_task_get_source_object (task);
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response || !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (mbim_device_check_ms_mbimex_version (device, 3, 0)) {
+        if (!mbim_message_ms_basic_connect_v3_subscriber_ready_status_response_parse (
+                response,
+                &ready_state, /* ready_state */
+                NULL, /* flags */
+                &imsi, /* subscriber id */
+                &raw_iccid, /* sim_iccid */
+                NULL, /* ready_info */
+                NULL, /* telephone_numbers_count */
+                NULL,
+                &error))
+            g_prefix_error (&error, "Failed processing MBIMEx v3.0 subscriber ready status response: ");
+        else
+            mm_obj_dbg (self, "processed MBIMEx v3.0 subscriber ready status response");
+    } else {
+        if (!mbim_message_subscriber_ready_status_response_parse (
+                response,
+                &ready_state, /* ready_state */
+                &imsi, /* subscriber id */
+                &raw_iccid, /* sim_iccid */
+                NULL, /* ready_info */
+                NULL, /* telephone_numbers_count */
+                NULL,
+                &error))
+            g_prefix_error (&error, "Failed processing subscriber ready status response: ");
+        else
+            mm_obj_dbg (self, "processed subscriber ready status response");
+    }
+
+    if (error)
+        g_task_return_error (task, error);
+    else {
+        SimDetails        *sim_details;
+        g_autoptr(GError)  inner_error = NULL;
+
+        sim_details = g_slice_new0 (SimDetails);
+        if (ready_state != MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED) {
+            sim_details->sim_inserted = TRUE;
+            sim_details->iccid = mm_3gpp_parse_iccid (raw_iccid, &inner_error);
+            if (!sim_details->iccid) {
+                mm_obj_warn (self, "can not get ICCID info: couldn't parse SIM ICCID: %s", inner_error->message);
+            }
+            sim_details->imsi = imsi;
+        }
+        g_task_return_pointer (task, sim_details, (GDestroyNotify)sim_details_free);
+    }
+    g_object_unref (task);
+}
+
+static void
+modem_check_basic_sim_details (MMIfaceModem        *self,
+                               GAsyncReadyCallback  callback,
+                               gpointer             user_data)
+{
+    MbimDevice             *device;
+    GTask                  *task;
+    g_autoptr(MbimMessage)  message = NULL;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    message = mbim_message_subscriber_ready_status_query_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)basic_sim_details_subscriber_ready_state_ready,
+                         task);
+}
+
+/*****************************************************************************/
 /* Enable/Disable unsolicited events (3GPP interface) */
 
 static gboolean
@@ -9911,6 +10042,8 @@ iface_modem_init (MMIfaceModem *iface)
     /* SIM hot swapping */
     iface->setup_sim_hot_swap = modem_setup_sim_hot_swap;
     iface->setup_sim_hot_swap_finish = modem_setup_sim_hot_swap_finish;
+    iface->check_basic_sim_details = modem_check_basic_sim_details;
+    iface->check_basic_sim_details_finish = modem_check_basic_sim_details_finish;
 
     /* Other actions */
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
