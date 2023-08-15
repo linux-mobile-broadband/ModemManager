@@ -137,7 +137,8 @@ ATTRS{vendor}=="0x1eac", ATTRS{device}=="0x1001", ENV{ID_MM_QUECTEL_FIREHOSE}="1
 ATTRS{vendor}=="0x1eac", ATTRS{device}=="0x1002", ENV{ID_MM_QUECTEL_FIREHOSE}="1"
 ATTRS{vendor}=="0x1eac", ATTRS{device}=="0x100d", ENV{ID_MM_QUECTEL_FIREHOSE}="1"
 
-# Quectel RM520 with firehose support
+# Quectel RM520 (two variants: 0x1004 and 0x1007) with firehose support
 ATTRS{vendor}=="0x1eac", ATTRS{device}=="0x1004", ENV{ID_MM_QUECTEL_FIREHOSE}="1"
+ATTRS{vendor}=="0x1eac", ATTRS{device}=="0x1007", ENV{ID_MM_QUECTEL_FIREHOSE}="1"
 
 LABEL="mm_quectel_end"
