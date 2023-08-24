@@ -47,6 +47,7 @@ ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a2", ENV{.MM_USBIFNUM}=="02", SUBS
 ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a2", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a2", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_IGNORE}="1"
 ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a2", ENV{.MM_USBIFNUM}=="05", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a2", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_FIBOCOM_FASTBOOT}="1"
 
 # Fibocom FM101-GL (ADB)
 #  ttyUSB0 (if #2): debug port (ignore)

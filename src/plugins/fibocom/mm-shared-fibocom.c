@@ -28,6 +28,7 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-shared-fibocom.h"
+#include "mm-base-modem-at.h"
 
 /*****************************************************************************/
 /* Private data context */
@@ -216,6 +217,122 @@ mm_shared_fibocom_set_initial_eps_bearer_settings (MMIfaceModem3gpp    *self,
     }
 
     parent_set_initial_eps_bearer_settings (task);
+}
+
+/*****************************************************************************/
+
+MMFirmwareUpdateSettings *
+mm_shared_fibocom_firmware_load_update_settings_finish (MMIfaceModemFirmware  *self,
+                                                        GAsyncResult          *res,
+                                                        GError               **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static gboolean
+fibocom_is_fastboot_supported (MMBaseModem *modem,
+                               MMPort      *port)
+{
+    return mm_kernel_device_get_global_property_as_boolean (mm_port_peek_kernel_device (port), "ID_MM_FIBOCOM_FASTBOOT");
+}
+
+static MMModemFirmwareUpdateMethod
+fibocom_get_firmware_update_methods (MMBaseModem *modem,
+                                     MMPort      *port)
+{
+    MMModemFirmwareUpdateMethod update_methods;
+
+    update_methods = MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE;
+
+    if (fibocom_is_fastboot_supported (modem, port))
+        update_methods |= MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT;
+
+    return update_methods;
+}
+
+static void
+fibocom_at_port_get_firmware_version_ready (MMBaseModem  *self,
+                                            GAsyncResult *res,
+                                            GTask        *task)
+{
+    MMFirmwareUpdateSettings    *update_settings;
+    MMModemFirmwareUpdateMethod  update_methods;
+    const gchar                 *version_from_at;
+    g_auto(GStrv)                version = NULL;
+    g_autoptr(GPtrArray)         ids = NULL;
+    GError                      *error = NULL;
+
+    update_settings = g_task_get_task_data (task);
+    update_methods = mm_firmware_update_settings_get_method (update_settings);
+
+    /* Set device ids */
+    ids = mm_iface_firmware_build_generic_device_ids (MM_IFACE_MODEM_FIRMWARE (self), &error);
+    if (error) {
+        mm_obj_warn (self, "failed to build generic device ids: %s", error->message);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* The version get from the AT needs to be formatted
+     *
+     * version_from_at : AT+GTPKGVER: "19500.0000.00.01.02.80_6001.0000.007.000.075_A89"
+     * version[1] : 19500.0000.00.01.02.80_6001.0000.007.000.075_A89
+     */
+    version_from_at = mm_base_modem_at_command_finish (self, res, NULL);
+    if (version_from_at) {
+        version = g_strsplit (version_from_at, "\"", -1);
+        if (version && version[0] && version[1] && g_utf8_validate (version[1], -1, NULL)) {
+            mm_firmware_update_settings_set_version (update_settings, version[1]);
+        }
+    }
+
+    mm_firmware_update_settings_set_device_ids (update_settings, (const gchar **)ids->pdata);
+
+    /* Set update methods */
+    if (update_methods & MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT) {
+        /* Fastboot AT */
+        mm_firmware_update_settings_set_fastboot_at (update_settings, "AT+SYSCMD=\"sys_reboot bootloader\"");
+    }
+
+    g_task_return_pointer (task, g_object_ref (update_settings), g_object_unref);
+    g_object_unref (task);
+}
+
+void
+mm_shared_fibocom_firmware_load_update_settings (MMIfaceModemFirmware *self,
+                                                 GAsyncReadyCallback   callback,
+                                                 gpointer              user_data)
+{
+    GTask *task;
+    MMPortSerialAt *at_port;
+    MMModemFirmwareUpdateMethod update_methods;
+    MMFirmwareUpdateSettings *update_settings;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    at_port = mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL);
+    if (at_port) {
+        update_methods = fibocom_get_firmware_update_methods (MM_BASE_MODEM (self), MM_PORT (at_port));
+        update_settings = mm_firmware_update_settings_new (update_methods);
+        g_task_set_task_data (task, update_settings, g_object_unref);
+
+        /* Get modem version by AT */
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "+GTPKGVER?",
+                                  3,
+                                  TRUE,
+                                  (GAsyncReadyCallback) fibocom_at_port_get_firmware_version_ready,
+                                  task);
+
+        return;
+    }
+
+    g_task_return_new_error (task,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "Couldn't find a port to fetch firmware info");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/

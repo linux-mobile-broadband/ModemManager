@@ -25,6 +25,7 @@
 #include "mm-broadband-modem.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-firmware.h"
 
 #define MM_TYPE_SHARED_FIBOCOM               (mm_shared_fibocom_get_type ())
 #define MM_SHARED_FIBOCOM(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SHARED_FIBOCOM, MMSharedFibocom))
@@ -46,8 +47,17 @@ void     mm_shared_fibocom_set_initial_eps_bearer_settings        (MMIfaceModem3
                                                                    MMBearerProperties  *config,
                                                                    GAsyncReadyCallback  callback,
                                                                    gpointer             user_data);
+
 gboolean mm_shared_fibocom_set_initial_eps_bearer_settings_finish (MMIfaceModem3gpp    *self,
                                                                    GAsyncResult        *res,
                                                                    GError             **error);
+
+void                      mm_shared_fibocom_firmware_load_update_settings        (MMIfaceModemFirmware  *self,
+                                                                                  GAsyncReadyCallback    callback,
+                                                                                  gpointer               user_data);
+
+MMFirmwareUpdateSettings *mm_shared_fibocom_firmware_load_update_settings_finish (MMIfaceModemFirmware  *self,
+                                                                                  GAsyncResult          *res,
+                                                                                  GError               **error);
 
 #endif /* MM_SHARED_FIBOCOM_H */

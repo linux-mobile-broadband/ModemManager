@@ -28,14 +28,16 @@
 #include "mm-broadband-modem-mbim-xmm-fibocom.h"
 #include "mm-shared-fibocom.h"
 
-static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
-static void shared_fibocom_init   (MMSharedFibocom  *iface);
+static void iface_modem_3gpp_init     (MMIfaceModem3gpp     *iface);
+static void shared_fibocom_init       (MMSharedFibocom      *iface);
+static void iface_modem_firmware_init (MMIfaceModemFirmware *iface);
 
 static MMIfaceModem3gpp *iface_modem_3gpp_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbimXmmFibocom, mm_broadband_modem_mbim_xmm_fibocom, MM_TYPE_BROADBAND_MODEM_MBIM_XMM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_FIBOCOM,  shared_fibocom_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_FIBOCOM,  shared_fibocom_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init))
 
 /******************************************************************************/
 
@@ -77,6 +79,13 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 
     iface->set_initial_eps_bearer_settings        = mm_shared_fibocom_set_initial_eps_bearer_settings;
     iface->set_initial_eps_bearer_settings_finish = mm_shared_fibocom_set_initial_eps_bearer_settings_finish;
+}
+
+static void
+iface_modem_firmware_init (MMIfaceModemFirmware *iface)
+{
+    iface->load_update_settings = mm_shared_fibocom_firmware_load_update_settings;
+    iface->load_update_settings_finish = mm_shared_fibocom_firmware_load_update_settings_finish;
 }
 
 static MMIfaceModem3gpp *
