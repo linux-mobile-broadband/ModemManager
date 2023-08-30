@@ -1065,6 +1065,15 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
             goto error;
         }
 
+        if (offset + packlen > PDU_SIZE) {
+            g_set_error (error,
+                         MM_MESSAGE_ERROR,
+                         MM_MESSAGE_ERROR_INVALID_PDU_PARAMETER,
+                         "Packed user data is too large for PDU (want %d bytes total, have %d)",
+                         offset + packlen, PDU_SIZE);
+            goto error;
+        }
+
         memcpy (&pdu[offset], packed, packlen);
         offset += packlen;
     } else if (encoding == MM_SMS_ENCODING_UCS2) {
@@ -1090,6 +1099,15 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
                     *udl_ptr,
                     mm_sms_part_get_concat_sequence (part) ? "with" : "without");
 
+        if (offset + array->len > PDU_SIZE) {
+            g_set_error (error,
+                         MM_MESSAGE_ERROR,
+                         MM_MESSAGE_ERROR_INVALID_PDU_PARAMETER,
+                         "User data is too large for PDU (want %d bytes total, have %d)",
+                         offset + array->len, PDU_SIZE);
+            goto error;
+        }
+
         memcpy (&pdu[offset], array->data, array->len);
         offset += array->len;
     } else if (mm_sms_part_get_encoding (part) == MM_SMS_ENCODING_8BIT) {
@@ -1104,6 +1122,15 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
         mm_obj_dbg (log_object, "  binary user data length is %u octets (%s UDH)",
                 *udl_ptr,
                 mm_sms_part_get_concat_sequence (part) ? "with" : "without");
+
+        if (offset + data->len > PDU_SIZE) {
+            g_set_error (error,
+                         MM_MESSAGE_ERROR,
+                         MM_MESSAGE_ERROR_INVALID_PDU_PARAMETER,
+                         "User data is too large for PDU (want %d bytes total, have %d)",
+                         offset + data->len, PDU_SIZE);
+            goto error;
+        }
 
         memcpy (&pdu[offset], data->data, data->len);
         offset += data->len;
