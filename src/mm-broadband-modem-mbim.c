@@ -5152,6 +5152,11 @@ basic_connect_notification_subscriber_ready_status (MMBroadbandModemMbim *self,
     if ((self->priv->enabled_cache.last_ready_state != MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED &&
          ready_state == MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED) ||
         (self->priv->enabled_cache.last_ready_state == MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED &&
+         ready_state != MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED) ||
+        /*SIM state becomes "not initialized" when queried shortly after being inserted. Its state
+         * transitions are: "not inserted" --> "not initialized" --> "initialized". To detect SIM
+         * hotswap event from this sequence, we need the check condition below*/
+        (self->priv->enabled_cache.last_ready_state == MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED &&
          ready_state != MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED)) {
         /* SIM has been removed or reinserted, re-probe to ensure correct interfaces are exposed */
         mm_obj_dbg (self, "SIM hot swap detected");
