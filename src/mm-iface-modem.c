@@ -377,6 +377,9 @@ mm_iface_modem_wait_for_final_state_finish (MMIfaceModem *self,
         g_propagate_error (error, inner_error);
         return MM_MODEM_STATE_UNKNOWN;
     }
+    if (value == MM_MODEM_STATE_UNKNOWN)
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Unknown modem state");
     return (MMModemState)value;
 }
 
