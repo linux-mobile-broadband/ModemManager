@@ -155,6 +155,9 @@ mm_iface_modem_3gpp_wait_for_packet_service_state_finish (MMIfaceModem3gpp  *sel
         g_propagate_error (error, inner_error);
         return MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN;
     }
+    if (value == MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN)
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Unknown packet service state");
     return (MMModem3gppPacketServiceState)value;
 }
 
