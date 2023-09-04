@@ -303,7 +303,8 @@ wait_for_packet_service_state_ready (MMIfaceModem3gpp *self,
     ctx = g_task_get_task_data (task);
     g_assert (!ctx->error);
 
-    if (!mm_iface_modem_3gpp_wait_for_packet_service_state_finish (self, res, &ctx->error))
+    mm_iface_modem_3gpp_wait_for_packet_service_state_finish (self, res, &ctx->error);
+    if (ctx->error)
         ctx->step++;
     else
         ctx->step = PACKET_SERVICE_ATTACH_IN_3GPP_NETWORK_STEP_LAST;
