@@ -244,12 +244,15 @@ packet_service_state_changed (MMIfaceModem3gpp *self,
                   MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE, &state,
                   NULL);
 
+    /* Ignore unknown state explicitly during a wait operation */
+    if (state == MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN)
+        return;
+
     ctx = g_task_get_task_data (task);
 
     /* If we want a specific final state and this is not the one we were
      * looking for, then skip */
     if ((ctx->final_state != MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN) &&
-        (state != MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN) &&
         (state != ctx->final_state))
         return;
 
