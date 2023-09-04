@@ -404,6 +404,10 @@ state_changed (MMIfaceModem *self,
                   MM_IFACE_MODEM_STATE, &state,
                   NULL);
 
+    /* Ignore unknown state explicitly during a wait operation */
+    if (state == MM_MODEM_STATE_UNKNOWN)
+        return;
+
     /* Are we in a final state already? */
     if (MODEM_STATE_IS_INTERMEDIATE (state))
         return;
@@ -413,7 +417,6 @@ state_changed (MMIfaceModem *self,
     /* If we want a specific final state and this is not the one we were
      * looking for, then skip */
     if (ctx->final_state != MM_MODEM_STATE_UNKNOWN &&
-        state != MM_MODEM_STATE_UNKNOWN &&
         state != ctx->final_state)
         return;
 
