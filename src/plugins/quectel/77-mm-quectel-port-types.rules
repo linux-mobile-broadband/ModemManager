@@ -132,9 +132,10 @@ GOTO="mm_quectel_end"
 
 LABEL="mm_quectel_pci"
 
-# Quectel EM120 and EM160 with firehose support
+# Quectel EM120 and EM160 (two variants: 0x1002 and 0x100d) with firehose support
 ATTRS{vendor}=="0x1eac", ATTRS{device}=="0x1001", ENV{ID_MM_QUECTEL_FIREHOSE}="1"
 ATTRS{vendor}=="0x1eac", ATTRS{device}=="0x1002", ENV{ID_MM_QUECTEL_FIREHOSE}="1"
+ATTRS{vendor}=="0x1eac", ATTRS{device}=="0x100d", ENV{ID_MM_QUECTEL_FIREHOSE}="1"
 
 # Quectel RM520 with firehose support
 ATTRS{vendor}=="0x1eac", ATTRS{device}=="0x1004", ENV{ID_MM_QUECTEL_FIREHOSE}="1"
