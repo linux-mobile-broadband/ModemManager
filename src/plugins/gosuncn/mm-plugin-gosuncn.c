@@ -39,6 +39,7 @@ MM_DEFINE_PLUGIN (GOSUNCN, gosuncn, Gosuncn)
 static MMBaseModem *
 create_modem (MMPlugin *self,
               const gchar *uid,
+              const gchar *physdev,
               const gchar **drivers,
               guint16 vendor,
               guint16 product,
@@ -50,6 +51,7 @@ create_modem (MMPlugin *self,
     if (mm_port_probe_list_has_qmi_port (probes)) {
         mm_obj_dbg (self, "QMI-powered Gosuncn modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_qmi_new (uid,
+                                                          physdev,
                                                           drivers,
                                                           mm_plugin_get_name (self),
                                                           vendor,
@@ -61,6 +63,7 @@ create_modem (MMPlugin *self,
     if (mm_port_probe_list_has_mbim_port (probes)) {
         mm_obj_dbg (self, "MBIM-powered Gosuncn modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_mbim_new (uid,
+                                                           physdev,
                                                            drivers,
                                                            mm_plugin_get_name (self),
                                                            vendor,
@@ -70,6 +73,7 @@ create_modem (MMPlugin *self,
 
     /* Fallback to default modem in the worst case */
     return MM_BASE_MODEM (mm_broadband_modem_new (uid,
+                                                  physdev,
                                                   drivers,
                                                   mm_plugin_get_name (self),
                                                   vendor,

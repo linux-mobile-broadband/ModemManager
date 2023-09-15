@@ -371,6 +371,7 @@ print_modem_info (void)
     mmcli_output_string           (MMC_F_HARDWARE_EQUIPMENT_ID,           mm_modem_get_equipment_identifier (ctx->modem));
 
     mmcli_output_string           (MMC_F_SYSTEM_DEVICE,                   mm_modem_get_device (ctx->modem));
+    mmcli_output_string           (MMC_F_SYSTEM_PHYSDEV,                  mm_modem_get_physdev (ctx->modem));
     mmcli_output_string_array     (MMC_F_SYSTEM_DRIVERS,                  (const gchar **) mm_modem_get_drivers (ctx->modem), FALSE);
     mmcli_output_string           (MMC_F_SYSTEM_PLUGIN,                   mm_modem_get_plugin (ctx->modem));
     mmcli_output_string           (MMC_F_SYSTEM_PRIMARY_PORT,             mm_modem_get_primary_port (ctx->modem));

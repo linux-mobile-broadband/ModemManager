@@ -43,6 +43,7 @@ struct _MMBroadbandModemHsoClass{
 GType mm_broadband_modem_hso_get_type (void);
 
 MMBroadbandModemHso *mm_broadband_modem_hso_new (const gchar *device,
+                                                 const gchar *physdev,
                                                  const gchar **drivers,
                                                  const gchar *plugin,
                                                  guint16 vendor_id,

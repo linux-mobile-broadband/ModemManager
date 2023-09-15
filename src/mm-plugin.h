@@ -105,6 +105,7 @@ struct _MMPluginClass {
      * a list of port probes (Mandatory) */
     MMBaseModem *(*create_modem) (MMPlugin *self,
                                   const gchar *uid,
+                                  const gchar *physdev,
                                   const gchar **drivers,
                                   guint16 vendor,
                                   guint16 product,

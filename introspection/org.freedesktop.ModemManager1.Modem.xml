@@ -930,6 +930,19 @@
     <property name="Device" type="s" access="read" />
 
     <!--
+        Physdev:
+
+        The physical modem device path (ie, USB, PCI, PCMCIA device), which
+        may be dependent upon the operating system.
+
+        In Linux for example, this points to a sysfs path of the usb_device
+        object.
+
+        Since: 1.22
+    -->
+    <property name="Physdev" type="s" access="read" />
+
+    <!--
         Drivers:
 
         The Operating System device drivers handling communication with the modem

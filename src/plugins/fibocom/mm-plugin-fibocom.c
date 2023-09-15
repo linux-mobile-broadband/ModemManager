@@ -44,6 +44,7 @@ MM_DEFINE_PLUGIN (FIBOCOM, fibocom, Fibocom)
 static MMBaseModem *
 create_modem (MMPlugin     *self,
               const gchar  *uid,
+              const gchar  *physdev,
               const gchar **drivers,
               guint16       vendor,
               guint16       product,
@@ -56,6 +57,7 @@ create_modem (MMPlugin     *self,
         if (mm_port_probe_list_is_xmm (probes)) {
             mm_obj_dbg (self, "MBIM-powered XMM-based Fibocom modem found...");
             return MM_BASE_MODEM (mm_broadband_modem_mbim_xmm_fibocom_new (uid,
+                                                                           physdev,
                                                                            drivers,
                                                                            mm_plugin_get_name (self),
                                                                            vendor,
@@ -63,6 +65,7 @@ create_modem (MMPlugin     *self,
         }
         mm_obj_dbg (self, "MBIM-powered Fibocom modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_mbim_fibocom_new (uid,
+                                                                   physdev,
                                                                    drivers,
                                                                    mm_plugin_get_name (self),
                                                                    vendor,
@@ -74,6 +77,7 @@ create_modem (MMPlugin     *self,
     if (mm_port_probe_list_has_qmi_port (probes)) {
         mm_obj_dbg (self, "QMI-powered Fibocom modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_qmi_new (uid,
+                                                          physdev,
                                                           drivers,
                                                           mm_plugin_get_name (self),
                                                           vendor,
@@ -84,6 +88,7 @@ create_modem (MMPlugin     *self,
     if (mm_port_probe_list_is_xmm (probes)) {
         mm_obj_dbg (self, "XMM-based Fibocom modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_xmm_new (uid,
+                                                          physdev,
                                                           drivers,
                                                           mm_plugin_get_name (self),
                                                           vendor,
@@ -92,6 +97,7 @@ create_modem (MMPlugin     *self,
 
     mm_obj_dbg (self, "Fibocom modem found...");
     return MM_BASE_MODEM (mm_broadband_modem_fibocom_new (uid,
+                                                          physdev,
                                                           drivers,
                                                           mm_plugin_get_name (self),
                                                           vendor,

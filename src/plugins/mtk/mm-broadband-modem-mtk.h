@@ -43,6 +43,7 @@ struct _MMBroadbandModemMtkClass {
 GType mm_broadband_modem_mtk_get_type (void);
 
 MMBroadbandModemMtk *mm_broadband_modem_mtk_new (const gchar *device,
+                                                 const gchar *physdev,
                                                  const gchar **drivers,
                                                  const gchar *plugin,
                                                  guint16 vendor_id,

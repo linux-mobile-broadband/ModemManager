@@ -41,6 +41,7 @@ struct _MMBroadbandModemUbloxClass{
 GType mm_broadband_modem_ublox_get_type (void);
 
 MMBroadbandModemUblox *mm_broadband_modem_ublox_new (const gchar *device,
+                                                     const gchar *physdev,
                                                      const gchar **drivers,
                                                      const gchar *plugin,
                                                      guint16 vendor_id,

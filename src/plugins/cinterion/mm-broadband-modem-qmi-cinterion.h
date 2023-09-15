@@ -40,6 +40,7 @@ struct _MMBroadbandModemQmiCinterionClass{
 GType mm_broadband_modem_qmi_cinterion_get_type (void);
 
 MMBroadbandModemQmiCinterion *mm_broadband_modem_qmi_cinterion_new (const gchar *device,
+                                                                    const gchar *physdev,
                                                                     const gchar **drivers,
                                                                     const gchar *plugin,
                                                                     guint16 vendor_id,

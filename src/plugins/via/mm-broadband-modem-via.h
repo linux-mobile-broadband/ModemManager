@@ -41,6 +41,7 @@ struct _MMBroadbandModemViaClass{
 GType mm_broadband_modem_via_get_type (void);
 
 MMBroadbandModemVia *mm_broadband_modem_via_new (const gchar *device,
+                                                 const gchar *physdev,
                                                  const gchar **drivers,
                                                  const gchar *plugin,
                                                  guint16 vendor_id,

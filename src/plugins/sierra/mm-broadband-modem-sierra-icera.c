@@ -99,6 +99,7 @@ setup_ports (MMBroadbandModem *self)
 
 MMBroadbandModemSierraIcera *
 mm_broadband_modem_sierra_icera_new (const gchar *device,
+                                     const gchar *physdev,
                                      const gchar **drivers,
                                      const gchar *plugin,
                                      guint16 vendor_id,
@@ -106,6 +107,7 @@ mm_broadband_modem_sierra_icera_new (const gchar *device,
 {
     return g_object_new (MM_TYPE_BROADBAND_MODEM_SIERRA_ICERA,
                          MM_BASE_MODEM_DEVICE, device,
+                         MM_BASE_MODEM_PHYSDEV, physdev,
                          MM_BASE_MODEM_DRIVERS, drivers,
                          MM_BASE_MODEM_PLUGIN, plugin,
                          MM_BASE_MODEM_VENDOR_ID, vendor_id,

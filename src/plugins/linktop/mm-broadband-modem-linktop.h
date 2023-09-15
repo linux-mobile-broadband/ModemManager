@@ -41,6 +41,7 @@ struct _MMBroadbandModemLinktopClass{
 GType mm_broadband_modem_linktop_get_type (void);
 
 MMBroadbandModemLinktop *mm_broadband_modem_linktop_new (const gchar *device,
+                                                         const gchar *physdev,
                                                          const gchar **drivers,
                                                          const gchar *plugin,
                                                          guint16 vendor_id,

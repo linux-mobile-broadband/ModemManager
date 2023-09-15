@@ -41,6 +41,7 @@ struct _MMBroadbandModemFibocomClass{
 GType mm_broadband_modem_fibocom_get_type (void);
 
 MMBroadbandModemFibocom *mm_broadband_modem_fibocom_new (const gchar  *device,
+                                                         const gchar  *physdev,
                                                          const gchar **drivers,
                                                          const gchar  *plugin,
                                                          guint16       vendor_id,

@@ -39,6 +39,7 @@ struct _MMBroadbandModemMbimCinterionClass{
 GType mm_broadband_modem_mbim_cinterion_get_type (void);
 
 MMBroadbandModemMbimCinterion *mm_broadband_modem_mbim_cinterion_new (const gchar  *device,
+                                                                      const gchar  *physdev,
                                                                       const gchar **drivers,
                                                                       const gchar  *plugin,
                                                                       guint16       vendor_id,

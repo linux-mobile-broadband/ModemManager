@@ -60,6 +60,7 @@ static const MMPortProbeAtCommand custom_at_probe[] = {
 static MMBaseModem *
 create_modem (MMPlugin *self,
               const gchar *uid,
+              const gchar *physdev,
               const gchar **drivers,
               guint16 vendor,
               guint16 product,
@@ -71,6 +72,7 @@ create_modem (MMPlugin *self,
     if (mm_port_probe_list_has_qmi_port (probes)) {
         mm_obj_dbg (self, "QMI-powered ZTE modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_qmi_new (uid,
+                                                          physdev,
                                                           drivers,
                                                           mm_plugin_get_name (self),
                                                           vendor,
@@ -82,6 +84,7 @@ create_modem (MMPlugin *self,
     if (mm_port_probe_list_has_mbim_port (probes)) {
         mm_obj_dbg (self, "MBIM-powered ZTE modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_mbim_new (uid,
+                                                           physdev,
                                                            drivers,
                                                            mm_plugin_get_name (self),
                                                            vendor,
@@ -91,12 +94,14 @@ create_modem (MMPlugin *self,
 
     if (mm_port_probe_list_is_icera (probes))
         return MM_BASE_MODEM (mm_broadband_modem_zte_icera_new (uid,
+                                                                physdev,
                                                                 drivers,
                                                                 mm_plugin_get_name (self),
                                                                 vendor,
                                                                 product));
 
     return MM_BASE_MODEM (mm_broadband_modem_zte_new (uid,
+                                                      physdev,
                                                       drivers,
                                                       mm_plugin_get_name (self),
                                                       vendor,

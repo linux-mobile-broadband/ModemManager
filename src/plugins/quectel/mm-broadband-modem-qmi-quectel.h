@@ -39,6 +39,7 @@ struct _MMBroadbandModemQmiQuectelClass{
 GType mm_broadband_modem_qmi_quectel_get_type (void);
 
 MMBroadbandModemQmiQuectel *mm_broadband_modem_qmi_quectel_new (const gchar  *device,
+                                                                const gchar  *physdev,
                                                                 const gchar **drivers,
                                                                 const gchar  *plugin,
                                                                 guint16       vendor_id,

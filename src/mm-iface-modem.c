@@ -5332,6 +5332,16 @@ interface_initialization_step (GTask *task)
             mm_gdbus_modem_set_device (ctx->skeleton, device);
             g_free (device);
         }
+        /* Load physdev path if not done before */
+        if (!mm_gdbus_modem_get_physdev (ctx->skeleton)) {
+            gchar *physdev;
+
+            g_object_get (self,
+                          MM_BASE_MODEM_PHYSDEV, &physdev,
+                          NULL);
+            mm_gdbus_modem_set_physdev (ctx->skeleton, physdev);
+            g_free (physdev);
+        }
         /* Load driver if not done before */
         if (!mm_gdbus_modem_get_drivers (ctx->skeleton)) {
             gchar **drivers;
@@ -6035,6 +6045,7 @@ mm_iface_modem_initialize (MMIfaceModem *self,
         mm_gdbus_modem_set_own_numbers (skeleton, NULL);
         mm_gdbus_modem_set_device_identifier (skeleton, NULL);
         mm_gdbus_modem_set_device (skeleton, NULL);
+        mm_gdbus_modem_set_physdev (skeleton, NULL);
         mm_gdbus_modem_set_drivers (skeleton, NULL);
         mm_gdbus_modem_set_plugin (skeleton, NULL);
         mm_gdbus_modem_set_equipment_identifier (skeleton, NULL);

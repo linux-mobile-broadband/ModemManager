@@ -41,6 +41,7 @@ struct _MMBroadbandModemMbimFoxconnClass{
 GType mm_broadband_modem_mbim_foxconn_get_type (void);
 
 MMBroadbandModemMbimFoxconn *mm_broadband_modem_mbim_foxconn_new (const gchar  *device,
+                                                                  const gchar  *physdev,
                                                                   const gchar **driver,
                                                                   const gchar  *plugin,
                                                                   guint16       vendor_id,

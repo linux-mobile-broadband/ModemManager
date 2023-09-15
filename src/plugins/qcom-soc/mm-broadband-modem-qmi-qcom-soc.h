@@ -41,6 +41,7 @@ struct _MMBroadbandModemQmiQcomSocClass{
 GType mm_broadband_modem_qmi_qcom_soc_get_type (void);
 
 MMBroadbandModemQmiQcomSoc *mm_broadband_modem_qmi_qcom_soc_new (const gchar  *device,
+                                                                 const gchar  *physdev,
                                                                  const gchar **drivers,
                                                                  const gchar  *plugin,
                                                                  guint16       vendor_id,

@@ -39,6 +39,7 @@ struct _MMBroadbandModemPantechClass{
 GType mm_broadband_modem_pantech_get_type (void);
 
 MMBroadbandModemPantech *mm_broadband_modem_pantech_new (const gchar *device,
+                                                         const gchar *physdev,
                                                          const gchar **drivers,
                                                          const gchar *plugin,
                                                          guint16 vendor_id,

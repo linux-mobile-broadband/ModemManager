@@ -49,6 +49,7 @@ GType mm_broadband_modem_mbim_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBroadbandModemMbim, g_object_unref)
 
 MMBroadbandModemMbim *mm_broadband_modem_mbim_new (const gchar  *device,
+                                                   const gchar  *physdev,
                                                    const gchar **drivers,
                                                    const gchar  *plugin,
                                                    guint16       vendor_id,

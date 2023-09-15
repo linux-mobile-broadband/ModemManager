@@ -776,6 +776,54 @@ mm_modem_dup_device (MMModem *self)
 /*****************************************************************************/
 
 /**
+ * mm_modem_get_physdev:
+ * @self: A #MMModem.
+ *
+ * Gets the physical modem device path (ie, USB, PCI, PCMCIA device), which
+ * may be dependent upon the operating system.
+ *
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_dup_physdev() if on another thread.</warning>
+ *
+ * Returns: (transfer none): The physdev path, or %NULL if none available. Do not
+ * free the returned value, it belongs to @self.
+ *
+ * Since: 1.22
+ */
+const gchar *
+mm_modem_get_physdev (MMModem *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), NULL);
+
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_modem_get_physdev (MM_GDBUS_MODEM (self)));
+}
+
+/**
+ * mm_modem_dup_physdev:
+ * @self: A #MMModem.
+ *
+ * Gets a copy of the physical modem device path (ie, USB, PCI, PCMCIA
+ * device), which may be dependent upon the operating system.
+ *
+ * Returns: (transfer full): The physdev path, or %NULL if none available. The
+ * returned value should be freed with g_free().
+ *
+ * Since: 1.22
+ */
+gchar *
+mm_modem_dup_physdev (MMModem *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), NULL);
+
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_modem_dup_physdev (MM_GDBUS_MODEM (self)));
+}
+
+/*****************************************************************************/
+
+/**
  * mm_modem_get_drivers:
  * @self: A #MMModem.
  *

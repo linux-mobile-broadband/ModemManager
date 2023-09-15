@@ -35,6 +35,7 @@ MM_DEFINE_PLUGIN (SIERRA_LEGACY, sierra_legacy, SierraLegacy)
 static MMBaseModem *
 create_modem (MMPlugin *self,
               const gchar *uid,
+              const gchar *physdev,
               const gchar **drivers,
               guint16 vendor,
               guint16 product,
@@ -44,12 +45,14 @@ create_modem (MMPlugin *self,
 {
     if (mm_common_sierra_port_probe_list_is_icera (probes))
         return MM_BASE_MODEM (mm_broadband_modem_sierra_icera_new (uid,
+                                                                   physdev,
                                                                    drivers,
                                                                    mm_plugin_get_name (self),
                                                                    vendor,
                                                                    product));
 
     return MM_BASE_MODEM (mm_broadband_modem_sierra_new (uid,
+                                                         physdev,
                                                          drivers,
                                                          mm_plugin_get_name (self),
                                                          vendor,

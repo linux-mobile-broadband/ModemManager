@@ -111,6 +111,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_HARDWARE_CURRENT_CAPABILITIES]            = { "modem.generic.current-capabilities",              "current",                  MMC_S_MODEM_HARDWARE,             },
     [MMC_F_HARDWARE_EQUIPMENT_ID]                    = { "modem.generic.equipment-identifier",              "equipment id",             MMC_S_MODEM_HARDWARE,             },
     [MMC_F_SYSTEM_DEVICE]                            = { "modem.generic.device",                            "device",                   MMC_S_MODEM_SYSTEM,               },
+    [MMC_F_SYSTEM_PHYSDEV]                           = { "modem.generic.physdev",                           "physdev",                  MMC_S_MODEM_SYSTEM,               },
     [MMC_F_SYSTEM_DRIVERS]                           = { "modem.generic.drivers",                           "drivers",                  MMC_S_MODEM_SYSTEM,               },
     [MMC_F_SYSTEM_PLUGIN]                            = { "modem.generic.plugin",                            "plugin",                   MMC_S_MODEM_SYSTEM,               },
     [MMC_F_SYSTEM_PRIMARY_PORT]                      = { "modem.generic.primary-port",                      "primary port",             MMC_S_MODEM_SYSTEM,               },

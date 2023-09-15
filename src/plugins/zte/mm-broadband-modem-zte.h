@@ -43,6 +43,7 @@ struct _MMBroadbandModemZteClass{
 GType mm_broadband_modem_zte_get_type (void);
 
 MMBroadbandModemZte *mm_broadband_modem_zte_new (const gchar *device,
+                                                 const gchar *physdev,
                                                  const gchar **drivers,
                                                  const gchar *plugin,
                                                  guint16 vendor_id,

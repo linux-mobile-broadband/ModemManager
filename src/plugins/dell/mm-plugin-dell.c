@@ -370,6 +370,7 @@ port_probe_list_has_manufacturer_port (GList *probes,
 static MMBaseModem *
 create_modem (MMPlugin *self,
               const gchar *uid,
+              const gchar *physdev,
               const gchar **drivers,
               guint16 vendor,
               guint16 product,
@@ -385,6 +386,7 @@ create_modem (MMPlugin *self,
     if (mm_port_probe_list_has_qmi_port (probes)) {
         mm_obj_dbg (self, "QMI-powered Dell-branded modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_qmi_new (uid,
+                                                          physdev,
                                                           drivers,
                                                           mm_plugin_get_name (self),
                                                           vendor,
@@ -398,6 +400,7 @@ create_modem (MMPlugin *self,
         if (vendor == 0x413c && (product == 0x81d7 || product == 0x81e0 || product == 0x81e4 || product == 0x81e6)) {
             mm_obj_dbg (self, "MBIM-powered DW5821e/DW5829e (T77W968) modem found...");
             return MM_BASE_MODEM (mm_broadband_modem_mbim_foxconn_new (uid,
+                                                                       physdev,
                                                                        drivers,
                                                                        mm_plugin_get_name (self),
                                                                        vendor,
@@ -407,6 +410,7 @@ create_modem (MMPlugin *self,
         if (mm_port_probe_list_is_xmm (probes)) {
             mm_obj_dbg (self, "MBIM-powered XMM-based modem found...");
             return MM_BASE_MODEM (mm_broadband_modem_mbim_xmm_new (uid,
+                                                                   physdev,
                                                                    drivers,
                                                                    mm_plugin_get_name (self),
                                                                    vendor,
@@ -415,6 +419,7 @@ create_modem (MMPlugin *self,
 
         mm_obj_dbg (self, "MBIM-powered Dell-branded modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_mbim_new (uid,
+                                                           physdev,
                                                            drivers,
                                                            mm_plugin_get_name (self),
                                                            vendor,
@@ -425,6 +430,7 @@ create_modem (MMPlugin *self,
     if (port_probe_list_has_manufacturer_port (probes, DELL_MANUFACTURER_NOVATEL)) {
         mm_obj_dbg (self, "Novatel-powered Dell-branded modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_novatel_new (uid,
+                                                              physdev,
                                                               drivers,
                                                               mm_plugin_get_name (self),
                                                               vendor,
@@ -434,6 +440,7 @@ create_modem (MMPlugin *self,
     if (port_probe_list_has_manufacturer_port (probes, DELL_MANUFACTURER_SIERRA)) {
         mm_obj_dbg (self, "Sierra-powered Dell-branded modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_sierra_new (uid,
+                                                             physdev,
                                                              drivers,
                                                              mm_plugin_get_name (self),
                                                              vendor,
@@ -443,6 +450,7 @@ create_modem (MMPlugin *self,
     if (port_probe_list_has_manufacturer_port (probes, DELL_MANUFACTURER_TELIT)) {
         mm_obj_dbg (self, "Telit-powered Dell-branded modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_telit_new (uid,
+                                                            physdev,
                                                             drivers,
                                                             mm_plugin_get_name (self),
                                                             vendor,
@@ -452,6 +460,7 @@ create_modem (MMPlugin *self,
     if (mm_port_probe_list_is_xmm (probes)) {
         mm_obj_dbg (self, "XMM-based modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_xmm_new (uid,
+                                                          physdev,
                                                           drivers,
                                                           mm_plugin_get_name (self),
                                                           vendor,
@@ -460,6 +469,7 @@ create_modem (MMPlugin *self,
 
     mm_obj_dbg (self, "Dell-branded generic modem found...");
     return MM_BASE_MODEM (mm_broadband_modem_new (uid,
+                                                  physdev,
                                                   drivers,
                                                   mm_plugin_get_name (self),
                                                   vendor,

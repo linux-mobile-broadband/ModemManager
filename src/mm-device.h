@@ -34,6 +34,7 @@ typedef struct _MMDeviceClass MMDeviceClass;
 typedef struct _MMDevicePrivate MMDevicePrivate;
 
 #define MM_DEVICE_UID            "uid"
+#define MM_DEVICE_PHYSDEV        "physdev"
 #define MM_DEVICE_PLUGIN         "plugin"
 #define MM_DEVICE_MODEM          "modem"
 #define MM_DEVICE_HOTPLUGGED     "hotplugged"
@@ -63,6 +64,7 @@ GType mm_device_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMDevice, g_object_unref)
 
 MMDevice *mm_device_new (const gchar              *uid,
+                         const gchar              *physdev,
                          gboolean                  hotplugged,
                          gboolean                  virtual,
                          GDBusObjectManagerServer *object_manager);
@@ -96,6 +98,7 @@ gboolean mm_device_uninhibit      (MMDevice                  *self,
 
 
 const gchar     *mm_device_get_uid              (MMDevice       *self);
+const gchar     *mm_device_get_physdev          (MMDevice       *self);
 const gchar    **mm_device_get_drivers          (MMDevice       *self);
 guint16          mm_device_get_vendor           (MMDevice       *self);
 guint16          mm_device_get_product          (MMDevice       *self);

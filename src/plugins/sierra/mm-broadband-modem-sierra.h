@@ -43,6 +43,7 @@ struct _MMBroadbandModemSierraClass{
 GType mm_broadband_modem_sierra_get_type (void);
 
 MMBroadbandModemSierra *mm_broadband_modem_sierra_new (const gchar *device,
+                                                       const gchar *physdev,
                                                        const gchar **drivers,
                                                        const gchar *plugin,
                                                        guint16 vendor_id,

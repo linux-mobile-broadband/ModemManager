@@ -35,6 +35,7 @@ G_DEFINE_TYPE_EXTENDED (MMDevice, mm_device, G_TYPE_OBJECT, 0,
 enum {
     PROP_0,
     PROP_UID,
+    PROP_PHYSDEV,
     PROP_OBJECT_MANAGER,
     PROP_PLUGIN,
     PROP_MODEM,
@@ -59,6 +60,9 @@ struct _MMDevicePrivate {
 
     /* Unique id */
     gchar *uid;
+
+    /* Physdev path */
+    gchar *physdev;
 
     /* The object manager */
     GDBusObjectManagerServer *object_manager;
@@ -526,6 +530,12 @@ mm_device_get_uid (MMDevice *self)
     return self->priv->uid;
 }
 
+const gchar *
+mm_device_get_physdev (MMDevice *self)
+{
+    return self->priv->physdev;
+}
+
 const gchar **
 mm_device_get_drivers (MMDevice *self)
 {
@@ -756,6 +766,7 @@ log_object_build_id (MMLogObject *_self)
 
 MMDevice *
 mm_device_new (const gchar              *uid,
+               const gchar              *physdev,
                gboolean                  hotplugged,
                gboolean                  virtual,
                GDBusObjectManagerServer *object_manager)
@@ -764,6 +775,7 @@ mm_device_new (const gchar              *uid,
 
     return MM_DEVICE (g_object_new (MM_TYPE_DEVICE,
                                     MM_DEVICE_UID,            uid,
+                                    MM_DEVICE_PHYSDEV,        physdev,
                                     MM_DEVICE_HOTPLUGGED,     hotplugged,
                                     MM_DEVICE_VIRTUAL,        virtual,
                                     MM_DEVICE_OBJECT_MANAGER, object_manager,
@@ -789,6 +801,10 @@ set_property (GObject *object,
     case PROP_UID:
         /* construct only */
         self->priv->uid = g_value_dup_string (value);
+        break;
+    case PROP_PHYSDEV:
+        /* construct only */
+        self->priv->physdev = g_value_dup_string (value);
         break;
     case PROP_OBJECT_MANAGER:
         /* construct only */
@@ -828,6 +844,9 @@ get_property (GObject *object,
     switch (prop_id) {
     case PROP_UID:
         g_value_set_string (value, self->priv->uid);
+        break;
+    case PROP_PHYSDEV:
+        g_value_set_object (value, self->priv->physdev);
         break;
     case PROP_OBJECT_MANAGER:
         g_value_set_object (value, self->priv->object_manager);
@@ -912,6 +931,14 @@ mm_device_class_init (MMDeviceClass *klass)
                              NULL,
                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
     g_object_class_install_property (object_class, PROP_UID, properties[PROP_UID]);
+
+    properties[PROP_PHYSDEV] =
+        g_param_spec_string (MM_DEVICE_PHYSDEV,
+                             "Physdev",
+                             "Physical device path",
+                             NULL,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_PHYSDEV, properties[PROP_PHYSDEV]);
 
     properties[PROP_OBJECT_MANAGER] =
         g_param_spec_object (MM_DEVICE_OBJECT_MANAGER,

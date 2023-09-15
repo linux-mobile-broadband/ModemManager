@@ -40,6 +40,7 @@ MM_DEFINE_PLUGIN (THURAYA, thuraya, Thuraya)
 static MMBaseModem *
 create_modem (MMPlugin *self,
               const gchar *uid,
+              const gchar *physdev,
               const gchar **drivers,
               guint16 vendor,
               guint16 product,
@@ -48,6 +49,7 @@ create_modem (MMPlugin *self,
               GError **error)
 {
     return MM_BASE_MODEM (mm_broadband_modem_thuraya_new (uid,
+                                                          physdev,
                                                           drivers,
                                                           mm_plugin_get_name (self),
                                                           vendor,

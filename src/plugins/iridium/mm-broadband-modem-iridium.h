@@ -41,6 +41,7 @@ struct _MMBroadbandModemIridiumClass{
 GType mm_broadband_modem_iridium_get_type (void);
 
 MMBroadbandModemIridium *mm_broadband_modem_iridium_new (const gchar *device,
+                                                         const gchar *physdev,
                                                          const gchar **drivers,
                                                          const gchar *plugin,
                                                          guint16 vendor_id,

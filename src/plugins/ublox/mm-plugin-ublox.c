@@ -32,6 +32,7 @@ MM_DEFINE_PLUGIN (UBLOX, ublox, Ublox)
 static MMBaseModem *
 create_modem (MMPlugin     *self,
               const gchar  *sysfs_path,
+              const gchar  *physdev,
               const gchar **drivers,
               guint16       vendor,
               guint16       product,
@@ -40,6 +41,7 @@ create_modem (MMPlugin     *self,
               GError      **error)
 {
     return MM_BASE_MODEM (mm_broadband_modem_ublox_new (sysfs_path,
+                                                        physdev,
                                                         drivers,
                                                         mm_plugin_get_name (self),
                                                         vendor,
