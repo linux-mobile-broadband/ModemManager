@@ -1633,6 +1633,11 @@ unlock_required_subscriber_ready_state_ready (MbimDevice   *device,
             mm_obj_dbg (self, "processed subscriber ready status response");
     }
 
+    if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_NOT_INITIALIZED)) {
+        g_clear_error (&error);
+        ready_state = MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED;
+    }
+
     if (!error) {
         /* Store last valid status loaded */
         self->priv->enabled_cache.last_ready_state = ready_state;
