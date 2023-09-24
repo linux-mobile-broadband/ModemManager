@@ -9805,6 +9805,7 @@ process_ussd_message (MMBroadbandModemQmi *self,
 
     switch (user_action) {
         case QMI_VOICE_USER_ACTION_NOT_REQUIRED:
+        case QMI_VOICE_USER_ACTION_UNKNOWN: /* Treat unknown user action as user action not required. */
             /* no response, or a response to user's request? */
             if (!utf8 || task)
                 break;
@@ -9822,7 +9823,6 @@ process_ussd_message (MMBroadbandModemQmi *self,
             mm_iface_modem_3gpp_ussd_update_network_request (MM_IFACE_MODEM_3GPP_USSD (self), utf8);
             g_clear_pointer (&utf8, g_free);
             break;
-        case QMI_VOICE_USER_ACTION_UNKNOWN:
         default:
             /* Not an indication */
             break;
