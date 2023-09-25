@@ -14,6 +14,8 @@
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc.
  */
 
+#include <config.h>
+
 #include <ModemManager.h>
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
