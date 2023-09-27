@@ -59,7 +59,7 @@ typedef struct _MMBaseModemPrivate MMBaseModemPrivate;
 #define MM_BASE_MODEM_MAX_TIMEOUTS        "base-modem-max-timeouts"
 #define MM_BASE_MODEM_VALID               "base-modem-valid"
 #define MM_BASE_MODEM_DEVICE              "base-modem-device"
-#define MM_BASE_MODEM_PHYSDEV        "base-modem-physdev-path"
+#define MM_BASE_MODEM_PHYSDEV             "base-modem-physdev-path"
 #define MM_BASE_MODEM_DRIVERS             "base-modem-drivers"
 #define MM_BASE_MODEM_PLUGIN              "base-modem-plugin"
 #define MM_BASE_MODEM_VENDOR_ID           "base-modem-vendor-id"
