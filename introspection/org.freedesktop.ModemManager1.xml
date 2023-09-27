@@ -32,7 +32,7 @@
     <!--
         SetLogging:
         @level: One of <literal>"ERR"</literal>, <literal>"WARN"</literal>,
-          <literal>"MSG"</literal>, <literal>"INFO"</literal>, <literal>"DEBUG"</literal>.
+          <literal>"MSG"</literal> (since 1.22), <literal>"INFO"</literal>, <literal>"DEBUG"</literal>.
 
         Set logging verbosity.
 
