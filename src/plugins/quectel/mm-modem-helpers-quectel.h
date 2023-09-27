@@ -29,4 +29,6 @@ gboolean mm_quectel_parse_ctzu_test_response (const gchar  *response,
                                               gboolean     *supports_enable_update_rtc,
                                               GError      **error);
 
+gboolean mm_quectel_check_standard_firmware_version_valid (const gchar *std_str);
+
 #endif  /* MM_MODEM_HELPERS_QUECTEL_H */

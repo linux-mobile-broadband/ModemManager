@@ -89,3 +89,52 @@ mm_quectel_parse_ctzu_test_response (const gchar  *response,
 
     return TRUE;
 }
+
+/*****************************************************************************/
+/* standard firmware info
+ * Format of the string is:
+ * "[main version]_[modem and app version]"
+ * e.g. EM05GFAR07A07M1G_01.016.01.016
+ */
+#define QUECTEL_STD_FIRMWARE_VERSION_SEG  2
+
+/* Format of the string is:
+ * "modem_main.modem_minor.ap_main.ap_minor"
+ * e.g. 01.016.01.016
+ */
+#define QUECTEL_STD_MODEM_AP_FIRMWARE_VER_SEG  4
+#define QUECTEL_STD_MODEM_AP_FIRMWARE_VER_LEN  13
+
+#define QUECTEL_MAIN_VERSION_INVALID_TAG   "00"
+#define QUECTEL_MINOR_VERSION_INVALID_TAG  "000"
+
+gboolean
+mm_quectel_check_standard_firmware_version_valid (const gchar *std_str)
+{
+    gboolean      valid = TRUE;
+    g_auto(GStrv) split_std_fw = NULL;
+    g_auto(GStrv) split_modem_ap_fw = NULL;
+    const gchar   *modem_ap_fw;
+
+    if (std_str) {
+        split_std_fw = g_strsplit (std_str, "_", QUECTEL_STD_FIRMWARE_VERSION_SEG);
+        /* Quectel standard format of the [main version]_[modem and app version]
+         * Sometimes we find that the [modem and app version] query is missing by [AT+QMGR]
+         * for example: we expect EM05GFAR07A07M1G_01.016.01.016,but unexpected EM05GFAR07A07M1G_01.016.00.000 was returned
+         * Quectel will check for this abnormal [modem and app version] and flag it
+         */
+        if (g_strv_length (split_std_fw) == QUECTEL_STD_FIRMWARE_VERSION_SEG) {
+            modem_ap_fw = split_std_fw[1];
+            if (strlen (modem_ap_fw) == QUECTEL_STD_MODEM_AP_FIRMWARE_VER_LEN) {
+                split_modem_ap_fw = g_strsplit (modem_ap_fw, ".", QUECTEL_STD_MODEM_AP_FIRMWARE_VER_SEG);
+
+                if (g_strv_length (split_modem_ap_fw) == QUECTEL_STD_MODEM_AP_FIRMWARE_VER_SEG &&
+                    !g_strcmp0 (split_modem_ap_fw[2], QUECTEL_MAIN_VERSION_INVALID_TAG) &&
+                    !g_strcmp0 (split_modem_ap_fw[3], QUECTEL_MINOR_VERSION_INVALID_TAG)){
+                    valid = FALSE;
+                }
+            }
+        }
+    }
+    return valid;
+}
