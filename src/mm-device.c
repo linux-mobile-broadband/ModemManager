@@ -898,6 +898,7 @@ finalize (GObject *object)
 {
     MMDevice *self = MM_DEVICE (object);
 
+    g_free (self->priv->physdev);
     g_free (self->priv->uid);
     g_strfreev (self->priv->drivers);
     g_strfreev (self->priv->virtual_ports);
