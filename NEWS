@@ -1,4 +1,159 @@
 
+ModemManager 1.22.0
+-------------------------------------------
+This is a new stable release of ModemManager.
+
+The following notes are directed to package maintainers:
+
+ * This version now requires:
+   ** libmbim >= 1.30.0 (for the optional MBIM support)
+   ** libqmi >= 1.34.0 (for the optional QMI support)
+
+ * The GNU autotools (autoconf/automake/libtool) support has been fully
+   removed, this release requires the use of the meson build system.
+
+ * Build:
+   ** Flag types are now generated in their own files (e.g. 'mm-flags-types.h').
+   ** A new 'fuzzer' option is available to build LLVM LibFuzzer based unit
+      testers.
+   ** A new 'builtin_plugins' option is available to integrate all built plugins
+      within the ModemManager daemon binary. This makes the daemon load much
+      quicker as it doesn't dynamically load the plugins on runtime.
+
+The most important features and changes in this release are the following:
+
+ * A new "MSG" (message) log verbosity level is introduced, which is also the
+   new default one if none explicitly defined. This level takes the place of the
+   old "INFO" level, as a level including the most important messages that should
+   be logged without needing to be warnings or errors. The new "INFO" level is
+   more verbose than "MSG" but less verbose than "DBG", and may be useful as
+   default in systems where active debugging of WWAN related issues is required.
+   E.g. all user operations triggered via DBus method calls are logged in "INFO"
+   level.
+
+ * Introduced the concept of "personal information" which should by default not
+   be included in log messages. Enabling personal information in logs requires
+   to run the daemon with the '--log-personal-info' option. This feature is
+   mostly implemented for QMI and MBIM specific logs, but hasn't yet been
+   included in generic daemon logs or when using the AT protocol. Changes and
+   fixes related to this feature will be cherry-picked and included in the
+   future stable branch updates.
+
+ * API:
+   ** Added new 'Modem.Physdev' property to unconditionally publish the physical
+      modem device path.
+   ** Updated the 'Modem.GetCellInfo()' method to include serving cell type and
+      bandwidth information in LTE and 5GNR cells.
+   ** New 'Modem3gpp.SetCarrierLock()' method to send the list of carrier
+      network information to the modem.
+   ** The 'SetLogging()' method allows a new "MSG" log level.
+
+ * Core:
+   ** The codebase has been updated to use GTask in all operations and there are
+      no longer any deprecated methods from GLib being used.
+   ** The port probing logic is now able to guess port type hints during
+      runtime, e.g. based on the kernel driver in use or the wwan subsystem port
+      'type' attributes.
+   ** Default probing and wait times have been increased, in order to cope with
+      slow kernel events reporting new port additions.
+
+ * Modem interface:
+   ** Updated the logic loading unlock retries to allow restarting the check
+      count based on the state reported by the device (e.g. if the SIM is
+      detected but not fully ready during the last expected check, a new set
+      of check retries is allowed).
+
+ * 3GPP interface:
+   ** Added support for packet service state updates via unsolicited
+      indications.
+   ** Added support for ignoring registration and packet service state updates
+      if the interface has already been disabled.
+   ** Updated initialization sequence to allow showing IMEI even if the device
+      is locked.
+   ** Logged available profiles in "INFO" level whenever they are listed.
+
+ * Simple interface:
+   ** Logged user provided settings during a connect attempt in "INFO" level.
+   ** Added support to abort an ongoing connect operation at any step in the
+      state machine, e.g. if the modem is going to be disabled.
+   ** Added support to explicitly request attaching to packet service during
+      the connection attempt.
+
+ * Signal interface:
+   ** Added logic to rate-limit printing the extended signal information with
+      "INFO" level, even if the actual refresh rate is higher.
+
+ * New udev tags:
+   ** The 'ID_MM_REQUIRED' port-specific udev tag allows users to specify that
+      the modem must be able to succesfully probe and use the given control
+      port.
+   ** The 'ID_MM_MAX_MULTIPLEXED_LINKS' udev tag allows user to specify the
+      maximum amount of multiplexed links the modem supports. This tag may be
+      set to 0 to fully disable multiplexing support in the device.
+
+ * mmcli:
+   ** New '--messaging-create-sms-with-text' action to create a text SMS from
+      the contents of a given file.
+   ** New '--3gpp-set-carrier-lock' action to send the carrier lock data to the
+      device.
+   ** Updated '--modem' to always allow using the modem physdev path for lookup.
+
+ * SMS:
+   ** Improved the parsing of 3GPP and CDMA SMS parts, fixing multiple different
+      errors that lead to unexpected crashes on SMS reception.
+
+ * MBIM:
+   ** Updated device model loading logic to use an AT port if available.
+   ** Added support for the carrier lock feature using the Google MBIM service.
+   ** Implemented support for reporting serving cell type and bandwidth in the
+      cell scan operation.
+   ** Limited the amount of different APN types usable when MS extensions are
+      unsupported.
+   ** Updated packet service state info loading to use the values reported by
+      the device instead of attempting to guess them.
+   ** Updated IPv6 IP addressing logic to rely on whether the provided address
+      is global or not to decide whether static or dynamic addressing is needed.
+
+ * QMI:
+   ** Implemented support for detecting and processing profile change
+      indications, e.g. during a SIM card IMSI refresh operation.
+   ** Implemented support for scanning LTE and 5GNR cells.
+   ** Fixed operating mode update logic to avoid needing to receive indications,
+      as old devices don't support them.
+   ** Implemented multiplexing support for Qualcomm PCI devices using the MHI
+      driver.
+   ** Updated logic to read IPA tx/rx offload values from sysfs, making the IPA
+      support work seamlessly in multiple different Qualcomm SoCs.
+   ** Updated logic reading the SIM card operator identifier to avoid using the
+      NAS service, as that sometimes involved actual network access. The new
+      logic exclusively uses SIM card read operations (e.g. IMSI and EFad).
+   ** Consolidated the logic processing registration state from responses and
+      indications.
+
+ * Plugins:
+   ** fibocom: disabled multiplexing in the NL668, which doesn't support it.
+   ** huawei: updated time interface to use ^NWTIME.
+   ** quectel: added port type hints for the EG12, EC21, EM060, EM061 and new
+      EM120, EM160 and RM520 variants.
+
+The following features which were backported to 1.20.x releases are also present
+in ModemManager 1.22.0:
+
+   ** build: new 'examples' option to allow disabling the installation of
+      examples.
+   ** mmcli: improved JSON output in network scan results.
+   ** mmcli: improved JSON output when creating SMS messages.
+   ** MBIM: ignored SIM related indications during a SIM slot switch operation.
+   ** MBIM: updated capabilities loading to use Microsoft Extensions if
+      available.
+   ** MBIM: updated supported modes loading to use the CustomDataClass field
+      contents.
+   ** QMI: fixed processing and exposing PCOs.
+   ** cinterion: improved management of the ^SWWAN? operation.
+   ** telit: improved support for 5G modems.
+   ** messaging: allowed Delete operation during enabling/disabling.
+
+
 ModemManager 1.20.0
 -------------------------------------------
 This is a new stable release of ModemManager.
