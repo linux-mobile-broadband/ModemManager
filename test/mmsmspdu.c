@@ -182,7 +182,7 @@ _mm_log (gpointer     obj,
          const gchar *module,
          const gchar *loc,
          const gchar *func,
-         guint32      level,
+         MMLogLevel   level,
          const gchar *fmt,
          ...)
 {
@@ -199,6 +199,9 @@ _mm_log (gpointer     obj,
         break;
     case MM_LOG_LEVEL_WARN:
         level_str = "warning";
+        break;
+    case MM_LOG_LEVEL_MSG:
+        level_str = "message";
         break;
     case MM_LOG_LEVEL_INFO:
         level_str = "info";
