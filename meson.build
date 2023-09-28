@@ -335,7 +335,7 @@ plugins_options_reqs = {
   'longcheer': {'available': true, 'shared': []},
   'mbm': {'available': true, 'shared': []},
   'motorola': {'available': true, 'shared': []},
-  'mtk': {'available': true, 'shared': []},
+  'mtk-legacy': {'available': true, 'shared': []},
   'nokia': {'available': true, 'shared': []},
   'nokia-icera': {'available': true, 'shared': ['icera']},
   'novatel': {'available': true, 'shared': ['novatel']},

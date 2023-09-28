@@ -621,19 +621,19 @@ if plugins_options['motorola']
   }}
 endif
 
-# plugin: mtk
-if plugins_options['mtk']
+# plugin: mtk-legacy
+if plugins_options['mtk-legacy']
   test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_MTK="@0@"'.format(plugins_dir / 'mtk')]
   plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
 
   sources = files(
-    'mtk/mm-broadband-modem-mtk.c',
-    'mtk/mm-plugin-mtk.c',
+    'mtk/mm-broadband-modem-mtk-legacy.c',
+    'mtk/mm-plugin-mtk-legacy.c',
   )
 
-  plugins += {'plugin-mtk': {
+  plugins += {'plugin-mtk-legacy': {
     'plugin': true,
-    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="motorola"']},
+    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="mtk-legacy"']},
   }}
 
   plugins_udev_rules += files('mtk/77-mm-mtk-port-types.rules')

@@ -136,9 +136,9 @@ test_telit (void)
 }
 #endif
 
-#if defined ENABLE_PLUGIN_MTK
+#if defined ENABLE_PLUGIN_MTK_LEGACY
 static void
-test_mtk (void)
+test_mtk_legacy (void)
 {
     common_test (TESTUDEVRULESDIR_MTK);
 }
@@ -231,9 +231,10 @@ int main (int argc, char **argv)
 #if defined ENABLE_PLUGIN_TELIT
     g_test_add_func ("/MM/test-udev-rules/telit", test_telit);
 #endif
-#if defined ENABLE_PLUGIN_MTK
-    g_test_add_func ("/MM/test-udev-rules/mtk", test_mtk);
+#if defined ENABLE_PLUGIN_MTK_LEGACY
+    g_test_add_func ("/MM/test-udev-rules/mtk", test_mtk_legacy);
 #endif
+
 #if defined ENABLE_PLUGIN_HAIER
     g_test_add_func ("/MM/test-udev-rules/haier", test_haier);
 #endif

@@ -51,7 +51,8 @@ option('plugin_linktop', type: 'feature', value: 'auto', description: 'enable li
 option('plugin_longcheer', type: 'feature', value: 'auto', description: 'enable longcheer plugin support')
 option('plugin_mbm', type: 'feature', value: 'auto', description: 'enable mbm plugin support')
 option('plugin_motorola', type: 'feature', value: 'auto', description: 'enable motorola plugin support')
-option('plugin_mtk', type: 'feature', value: 'auto', description: 'enable mtk plugin support')
+option('plugin_mtk_legacy', type: 'feature', value: 'auto', description: 'enable mtk
+legacy plugin support')
 option('plugin_nokia', type: 'feature', value: 'auto', description: 'enable nokia plugin support')
 
 # shared_icera

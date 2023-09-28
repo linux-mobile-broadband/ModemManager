@@ -30,7 +30,7 @@
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
-#include "mm-broadband-modem-mtk.h"
+#include "mm-broadband-modem-mtk-legacy.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
@@ -38,11 +38,11 @@ static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 static MMIfaceModem *iface_modem_parent;
 static MMIfaceModem3gpp *iface_modem_3gpp_parent;
 
-G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMtk, mm_broadband_modem_mtk, MM_TYPE_BROADBAND_MODEM, 0,
+G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMtkLegacy, mm_broadband_modem_mtk_legacy, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
 
-struct _MMBroadbandModemMtkPrivate {
+struct _MMBroadbandModemMtkLegacyPrivate {
     /* Signal quality regex */
     GRegex *ecsqg_regex;
     GRegex *ecsqu_regex;
@@ -405,7 +405,7 @@ set_current_modes_finish (MMIfaceModem *self,
 }
 
 static void
-allowed_mode_update_ready (MMBroadbandModemMtk *self,
+allowed_mode_update_ready (MMBroadbandModemMtkLegacy *self,
                            GAsyncResult *res,
                            GTask *task)
 {
@@ -502,7 +502,7 @@ set_current_modes (MMIfaceModem *self,
 static void
 mtk_80_signal_changed (MMPortSerialAt *port,
                        GMatchInfo *match_info,
-                       MMBroadbandModemMtk *self)
+                       MMBroadbandModemMtkLegacy *self)
 {
     guint quality = 0;
 
@@ -521,7 +521,7 @@ mtk_80_signal_changed (MMPortSerialAt *port,
 static void
 mtk_90_2g_signal_changed (MMPortSerialAt *port,
                           GMatchInfo *match_info,
-                          MMBroadbandModemMtk *self)
+                          MMBroadbandModemMtkLegacy *self)
 {
     guint quality = 0;
 
@@ -540,7 +540,7 @@ mtk_90_2g_signal_changed (MMPortSerialAt *port,
 static void
 mtk_90_3g_signal_changed (MMPortSerialAt *port,
                           GMatchInfo *match_info,
-                          MMBroadbandModemMtk *self)
+                          MMBroadbandModemMtkLegacy *self)
 {
     guint quality = 0;
 
@@ -556,7 +556,7 @@ mtk_90_3g_signal_changed (MMPortSerialAt *port,
 static void
 mtk_90_4g_signal_changed (MMPortSerialAt *port,
                           GMatchInfo *match_info,
-                          MMBroadbandModemMtk *self)
+                          MMBroadbandModemMtkLegacy *self)
 {
     guint quality = 0;
 
@@ -570,7 +570,7 @@ mtk_90_4g_signal_changed (MMPortSerialAt *port,
 }
 
 static void
-set_unsolicited_events_handlers (MMBroadbandModemMtk *self,
+set_unsolicited_events_handlers (MMBroadbandModemMtkLegacy *self,
                                  gboolean enable)
 {
     MMPortSerialAt *ports[2];
@@ -640,7 +640,7 @@ parent_setup_unsolicited_events_ready (MMIfaceModem3gpp *self,
         g_task_return_error (task, error);
     else {
         /* Our own setup now */
-        set_unsolicited_events_handlers (MM_BROADBAND_MODEM_MTK (self),
+        set_unsolicited_events_handlers (MM_BROADBAND_MODEM_MTK_LEGACY (self),
                                          TRUE);
         g_task_return_boolean (task, TRUE);
     }
@@ -680,7 +680,7 @@ modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *self,
                                        gpointer user_data)
 {
     /* Our own cleanup first */
-    set_unsolicited_events_handlers (MM_BROADBAND_MODEM_MTK (self), FALSE);
+    set_unsolicited_events_handlers (MM_BROADBAND_MODEM_MTK_LEGACY (self), FALSE);
 
     /* And now chain up parent's cleanup */
     iface_modem_3gpp_parent->cleanup_unsolicited_events (
@@ -825,24 +825,22 @@ static void
 setup_ports (MMBroadbandModem *self)
 {
     /* Call parent's setup ports first always */
-    MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_mtk_parent_class)->setup_ports (self);
+    MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_mtk_legacy_parent_class)->setup_ports (self);
 
     /* Now reset the unsolicited messages we'll handle when enabled */
-    set_unsolicited_events_handlers (MM_BROADBAND_MODEM_MTK (self), FALSE);
+    set_unsolicited_events_handlers (MM_BROADBAND_MODEM_MTK_LEGACY (self), FALSE);
 }
 
 /*****************************************************************************/
-MMBroadbandModemMtk *
-mm_broadband_modem_mtk_new (const gchar *device,
-                            const gchar *physdev,
+MMBroadbandModemMtkLegacy *
+mm_broadband_modem_mtk_legacy_new (const gchar *device,
                             const gchar **drivers,
                             const gchar *plugin,
                             guint16 vendor_id,
                             guint16 product_id)
 {
-    return g_object_new (MM_TYPE_BROADBAND_MODEM_MTK,
+    return g_object_new (MM_TYPE_BROADBAND_MODEM_MTK_LEGACY,
                          MM_BASE_MODEM_DEVICE, device,
-                         MM_BASE_MODEM_PHYSDEV, physdev,
                          MM_BASE_MODEM_DRIVERS, drivers,
                          MM_BASE_MODEM_PLUGIN, plugin,
                          MM_BASE_MODEM_VENDOR_ID, vendor_id,
@@ -854,12 +852,12 @@ mm_broadband_modem_mtk_new (const gchar *device,
 }
 
 static void
-mm_broadband_modem_mtk_init (MMBroadbandModemMtk *self)
+mm_broadband_modem_mtk_legacy_init (MMBroadbandModemMtkLegacy *self)
 {
     /* Initialize private data */
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
-                                              MM_TYPE_BROADBAND_MODEM_MTK,
-                                              MMBroadbandModemMtkPrivate);
+                                              MM_TYPE_BROADBAND_MODEM_MTK_LEGACY,
+                                              MMBroadbandModemMtkLegacyPrivate);
     self->priv->ecsqg_regex = g_regex_new (
         "\\r\\n\\+ECSQ:\\s*([0-9]*),\\s*[0-9]*,\\s*-[0-9]*\\r\\n",
         G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
@@ -880,7 +878,7 @@ mm_broadband_modem_mtk_init (MMBroadbandModemMtk *self)
 static void
 finalize (GObject *object)
 {
-    MMBroadbandModemMtk *self = MM_BROADBAND_MODEM_MTK (object);
+    MMBroadbandModemMtkLegacy *self = MM_BROADBAND_MODEM_MTK_LEGACY (object);
 
     g_regex_unref (self->priv->ecsqg_regex);
     g_regex_unref (self->priv->ecsqu_regex);
@@ -888,7 +886,7 @@ finalize (GObject *object)
     g_regex_unref (self->priv->ecsqeu_regex);
     g_regex_unref (self->priv->ecsqel_regex);
 
-    G_OBJECT_CLASS (mm_broadband_modem_mtk_parent_class)->finalize (object);
+    G_OBJECT_CLASS (mm_broadband_modem_mtk_legacy_parent_class)->finalize (object);
 }
 
 static void
@@ -924,12 +922,12 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 }
 
 static void
-mm_broadband_modem_mtk_class_init (MMBroadbandModemMtkClass *klass)
+mm_broadband_modem_mtk_legacy_class_init (MMBroadbandModemMtkLegacyClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
     MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
 
-    g_type_class_add_private (object_class, sizeof (MMBroadbandModemMtkPrivate));
+    g_type_class_add_private (object_class, sizeof (MMBroadbandModemMtkLegacyPrivate));
 
     object_class->finalize = finalize;
     broadband_modem_class->setup_ports = setup_ports;

@@ -22,10 +22,10 @@
 #include <libmm-glib.h>
 
 #include "mm-plugin-common.h"
-#include "mm-broadband-modem-mtk.h"
+#include "mm-broadband-modem-mtk-legacy.h"
 
-#define MM_TYPE_PLUGIN_MTK mm_plugin_mtk_get_type ()
-MM_DEFINE_PLUGIN (MTK, mtk, Mtk)
+#define MM_TYPE_PLUGIN_MTK_LEGACY mm_plugin_mtk_legacy_get_type ()
+MM_DEFINE_PLUGIN (MTK_LEGACY, mtk_legacy, MtkLegacy)
 
 /*****************************************************************************/
 
@@ -41,18 +41,17 @@ create_modem (MMPlugin *self,
               GList *probes,
               GError **error)
 {
-    return MM_BASE_MODEM (mm_broadband_modem_mtk_new (uid,
-                                                      physdev,
-                                                      drivers,
-                                                      mm_plugin_get_name (self),
-                                                      vendor,
-                                                      product));
+    return MM_BASE_MODEM (mm_broadband_modem_mtk_legacy_new (uid,
+                                                             drivers,
+                                                             mm_plugin_get_name (self),
+                                                             vendor,
+                                                             product));
 }
 
 /*****************************************************************************/
 
 MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
-mm_plugin_create_mtk (void)
+mm_plugin_create_mtk_legacy (void)
 {
     static const gchar *subsystems[] = { "tty", NULL };
     static const gchar *udev_tags[]={
@@ -60,7 +59,7 @@ mm_plugin_create_mtk (void)
         NULL};
 
     return MM_PLUGIN (
-        g_object_new (MM_TYPE_PLUGIN_MTK,
+        g_object_new (MM_TYPE_PLUGIN_MTK_LEGACY,
                       MM_PLUGIN_NAME,               MM_MODULE_NAME,
                       MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
                       MM_PLUGIN_ALLOWED_UDEV_TAGS,  udev_tags,
@@ -69,12 +68,12 @@ mm_plugin_create_mtk (void)
 }
 
 static void
-mm_plugin_mtk_init (MMPluginMtk *self)
+mm_plugin_mtk_legacy_init (MMPluginMtkLegacy *self)
 {
 }
 
 static void
-mm_plugin_mtk_class_init (MMPluginMtkClass *klass)
+mm_plugin_mtk_legacy_class_init (MMPluginMtkLegacyClass *klass)
 {
     MMPluginClass *plugin_class = MM_PLUGIN_CLASS (klass);
 
