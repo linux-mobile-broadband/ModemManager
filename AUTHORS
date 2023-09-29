@@ -11,24 +11,26 @@ Other contributors:
   Daniele Palmas
   Carlo Lobrano
   Nathan Williams
+  Lubomir Rintel
   Dylan Van Assche
   Andrew Lassalle
   Sven Schwermer
-  Iñigo Martínez
-  Lubomir Rintel
-  Teijo Kinnunen
-  Eric Caruso
   Michal Mazur
+  Iñigo Martínez
+  Eric Caruso
+  Teijo Kinnunen
   Giacinto Cifelli
   Torgny Johansson
+  Akash Aggarwal
   Prakash Pabba
   Marco Bascetta
+  Pavan Holla
   Riccardo Vangelisti
   Alexander Sack
+  Frederic Martinsons
   Guido Günther
   Joel Selvaraj
   Loic Poulain
-  Pavan Holla
   Stephan Gerhold
   Yegor Yefremov
   Eric Shienbrood
@@ -36,32 +38,34 @@ Other contributors:
   Som_SP
   Bjørn Mork
   Elly Jones
-  Akash Aggarwal
+  som
   Bob Ham
-  Frederic Martinsons
-  David McCullough
+  Ivan Mikhanchuk
   Maxim Anisimov
+  David McCullough
+  Nagi Marupaka
   Prathmesh Prabhu
   Thieu Le
   Thomas Tuttle
-  som
-  Ivan Mikhanchuk
-  Torsten Hilbrich
   Jack Song
+  Torsten Hilbrich
   Marius B. Kotsbak
   Michael Biebl
   Paul Bartell
   Alexey Orishko
   Alfonso Sánchez-Beato
   Amol Lad
+  Andrey Skvortsov
   Christian Persch
+  Louis-Alexis Eyraud
+  QuectelDuke
   Thomas Sailer
+  okaestne
   Colin Walters
   Franko Fang
   Jakub Sitnicki
   Jason Glasgow
   Jeroen Elebaut
-  Louis-Alexis Eyraud
   Matthew Starr
   Pablo Barciela
   Reinhard Speyerer
@@ -69,7 +73,8 @@ Other contributors:
   ZhangMingjie
   lvmaorui
   ori inbar
-  Andrey Skvortsov
+  Christian Taedcke
+  Clayton Craft
   David Rochberg
   Fanice.luo
   Jiří Klimeš
@@ -78,18 +83,22 @@ Other contributors:
   Martyn Russell
   Thomas Haller
   Tomas Jura
+  Ulrich Mohr
   Alexander Dahl
   Alexander Yashin
+  Alyssa Ross
+  Arnaud Ferraris
   Benoît Monin
-  Christian Taedcke
-  Clayton Craft
   Colin Helliwell
   David Leonard
+  Evangelos Ribeiro Tzaras
   Fanice Luo
   Graham Inggs
+  Heiko Thiery
   Javier Viguera
   Jessy Diamond Exum
   Justin Standring
+  Konrad Zapałowicz
   Lionel Landwerlin
   Maksim Salau
   Martin Pitt
@@ -97,16 +106,16 @@ Other contributors:
   Milo Casagrande
   Nick Stevens
   Norbert Frese
+  NorwayFun
   Piotr Drąg
   Teemu Ikonen
   Thomas Bechtold
-  Ulrich Mohr
   Vincent Palatin
   Yuri Chornoivan
+  diekleinekuh
   Adrian Bunk
   Adrien Plazas
   Alexander Couzens
-  Alyssa Ross
   Amit Mendapara
   Anders Jonsson
   Andika Triwidada
@@ -114,7 +123,6 @@ Other contributors:
   Angus Ainslie
   Anton Blanchard
   ArenM
-  Arnaud Ferraris
   Arnd Hannemann
   Arto Jantunen
   Arun Raghavan
@@ -142,10 +150,12 @@ Other contributors:
   Eugene Crosser
   Evan Nemerson
   Fabrice Bellet
+  Fabrice Fontaine
   Fangxiaozhi (Franko)
   Felipe Borges
   Felix Janda
   Florence Chan
+  Florian Eckert
   Fran Dieguez
   Gerald Richter
   Greg Suarez
@@ -155,18 +165,22 @@ Other contributors:
   Jason Simmons
   Jens Seidel
   Johny Mattsson
+  Jordi Mas
   Julian Oes
   Jun Woo Lee
   Jürgen Benvenuti
   Khem Raj
-  Konrad Zapałowicz
+  Kirill Buksha
+  Kristian Sloth Lauszus
   Krzysztof Kotlenga
   Lech Perczak
   LiuQiFeng
   Luis A. Lozano
   Lukas Senger
+  Lukas Voegl
   M. I. Spozta
   Marc Murphy
+  Marcus Folkesson
   Mario Blättermann
   Mario Limonciello
   Mark-Jablonsky
@@ -177,21 +191,23 @@ Other contributors:
   Mohammed Sadiq
   Moo
   Murithi Borona
-  Nagi Marupaka
   Nathan Follens
   Nathan J. Williams
   Nicholas Smith
   Noel J. Bergman
-  NorwayFun
+  Oliver Kästner
   Oskar Enoksson
   Piotr Figiel
   Quentin.Li
   Rafael Fontenelle
   Roshan Pius
   Rukun Mao
+  Sabri Unal
   Sam Spilsbury
+  Sebastian Krzyszkowiak
   Shawn Guo
   Simon Deziel
+  SunXinzhao
   Sławomir Bocheński
   Tabor Kelly
   Theodore A. Roth
@@ -203,8 +219,10 @@ Other contributors:
   Ting-Yuan Huang
   Tom Bechtold
   Tom Goetz
+  Tom Wimmenhove
   Tore Anderson
   Tyler
+  Ujjwal Pande
   Ulrich Ölmann
   Undef
   Valentin Blot
@@ -218,6 +236,7 @@ Other contributors:
   Zrshuo Zhang
   amol.lad
   carlyin
+  dchard
   emintufan
   goapunk
   guihkx
