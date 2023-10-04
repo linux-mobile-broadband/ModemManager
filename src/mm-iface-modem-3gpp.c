@@ -1300,6 +1300,7 @@ set_initial_eps_bearer_settings_auth_ready (MMBaseModem                         
                                             GAsyncResult                             *res,
                                             HandleSetInitialEpsBearerSettingsContext *ctx)
 {
+    gboolean                       force = FALSE;
     GError                        *error = NULL;
     GVariant                      *old_dictionary;
     g_autoptr(MMBearerProperties)  old_config = NULL;
@@ -1326,14 +1327,16 @@ set_initial_eps_bearer_settings_auth_ready (MMBaseModem                         
         return;
     }
 
-    mm_obj_info (self, "processing user request to set initial EPS bearer settings...");
+    force = mm_bearer_properties_get_force (ctx->config);
+    mm_obj_info (self, "processing user request to set initial EPS bearer settings%s...", force ? " (forced)" : "");
+
     mm_log_bearer_properties (self, MM_LOG_LEVEL_INFO, "  ", ctx->config);
 
     old_dictionary = mm_gdbus_modem3gpp_get_initial_eps_bearer_settings (ctx->skeleton);
     if (old_dictionary)
         old_config = mm_bearer_properties_new_from_dictionary (old_dictionary, NULL);
 
-    if (old_config && mm_bearer_properties_cmp (ctx->config, old_config, MM_BEARER_PROPERTIES_CMP_FLAGS_EPS)) {
+    if (!force && old_config && mm_bearer_properties_cmp (ctx->config, old_config, MM_BEARER_PROPERTIES_CMP_FLAGS_EPS)) {
         mm_obj_info (self, "skipped setting initial EPS bearer settings: same configuration provided");
         mm_gdbus_modem3gpp_complete_set_initial_eps_bearer_settings (ctx->skeleton, ctx->invocation);
         handle_set_initial_eps_bearer_settings_context_free (ctx);

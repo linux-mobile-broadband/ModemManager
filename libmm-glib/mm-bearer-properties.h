@@ -93,6 +93,9 @@ void mm_bearer_properties_set_access_type_preference (MMBearerProperties        
                                                       MMBearerAccessTypePreference  access_type_preference);
 void mm_bearer_properties_set_roaming_allowance      (MMBearerProperties           *self,
                                                       MMBearerRoamingAllowance      roaming_allowance);
+void mm_bearer_properties_set_force                  (MMBearerProperties           *self,
+                                                      gboolean                      force);
+
 
 const gchar                 *mm_bearer_properties_get_apn                    (MMBearerProperties *self);
 MMBearerAllowedAuth          mm_bearer_properties_get_allowed_auth           (MMBearerProperties *self);
@@ -107,6 +110,7 @@ MMModemCdmaRmProtocol        mm_bearer_properties_get_rm_protocol            (MM
 MMBearerMultiplexSupport     mm_bearer_properties_get_multiplex              (MMBearerProperties *self);
 MMBearerAccessTypePreference mm_bearer_properties_get_access_type_preference (MMBearerProperties *self);
 MMBearerRoamingAllowance     mm_bearer_properties_get_roaming_allowance      (MMBearerProperties *self);
+gboolean                     mm_bearer_properties_get_force                  (MMBearerProperties *self);
 
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */

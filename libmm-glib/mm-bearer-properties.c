@@ -46,6 +46,12 @@ G_DEFINE_TYPE (MMBearerProperties, mm_bearer_properties, G_TYPE_OBJECT)
 #define PROPERTY_ALLOW_ROAMING "allow-roaming"
 #define PROPERTY_RM_PROTOCOL   "rm-protocol"
 #define PROPERTY_MULTIPLEX     "multiplex"
+/* special property to force send initial EPS bearer settings to the modem,
+ * even if new bearer properties match the existing ones.
+ * It is only applicable while setting the initial bearer settings and does
+ * not apply to any other bearer setting operations like simple connect etc.
+ * This property is not sent to the modem*/
+#define PROPERTY_FORCE     "force"
 
 /* no longer used properties */
 #define DEPRECATED_PROPERTY_NUMBER "number"
@@ -57,6 +63,9 @@ struct _MMBearerPropertiesPrivate {
     /* Roaming allowance */
     gboolean allow_roaming_set;
     gboolean allow_roaming;
+    /* Force send to modem */
+    gboolean force_set;
+    gboolean force;
     /* Protocol of the Rm interface */
     MMModemCdmaRmProtocol rm_protocol;
     /* Multiplex support */
@@ -492,6 +501,50 @@ mm_bearer_properties_get_allow_roaming (MMBearerProperties *self)
 /*****************************************************************************/
 
 /**
+ * mm_bearer_properties_set_force:
+ * @self: a #MMBearerProperties.
+ * @force: boolean value.
+ *
+ * Sets the flag to indicate whether initial EPS bearer settings should be
+ * forced sent to the modem even if they match existing properties.
+ * This method does not apply when the bearer properties are used for other
+ * operations.
+ *
+ * Since: 1.24
+ */
+void
+mm_bearer_properties_set_force (MMBearerProperties *self,
+                                gboolean force)
+{
+    g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
+
+    self->priv->force = force;
+    self->priv->force_set = TRUE;
+}
+
+/**
+ * mm_bearer_properties_get_force:
+ * @self: a #MMBearerProperties.
+ *
+ * Checks whether initial EPS bearer settings should be forced sent
+ * to the modem.This method does not apply when the bearer properties are
+ * used for other operations.
+ *
+ * Returns: %TRUE if force send is required, %FALSE otherwise.
+ *
+ * Since: 1.24
+ */
+gboolean
+mm_bearer_properties_get_force (MMBearerProperties *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), FALSE);
+
+    return self->priv->force;
+}
+
+/*****************************************************************************/
+
+/**
  * mm_bearer_properties_set_rm_protocol:
  * @self: a #MMBearerProperties.
  * @protocol: a #MMModemCdmaRmProtocol.
@@ -616,6 +669,13 @@ mm_bearer_properties_get_dictionary (MMBearerProperties *self)
                                PROPERTY_MULTIPLEX,
                                g_variant_new_uint32 (self->priv->multiplex));
 
+    if (self->priv->force_set)
+        g_variant_builder_add (&builder,
+                               "{sv}",
+                               PROPERTY_FORCE,
+                               g_variant_new_boolean (self->priv->force));
+
+
     /* Merge dictionaries */
     profile_dictionary = mm_3gpp_profile_get_dictionary (self->priv->profile);
     g_variant_iter_init (&iter, profile_dictionary);
@@ -678,6 +738,12 @@ mm_bearer_properties_consume_string (MMBearerProperties  *self,
             mm_bearer_properties_set_multiplex (self, multiplex);
     } else if (g_str_equal (key, DEPRECATED_PROPERTY_NUMBER)) {
         /* NO-OP */
+    } else if (g_str_equal (key, PROPERTY_FORCE)) {
+      gboolean force;
+
+        force = mm_common_get_boolean_from_string (value, &inner_error);
+        if (!inner_error)
+            mm_bearer_properties_set_force (self, force);
     } else {
         inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                    "Invalid properties string, unsupported key '%s'", key);
@@ -758,7 +824,9 @@ mm_bearer_properties_consume_variant (MMBearerProperties  *self,
         mm_bearer_properties_set_multiplex (self, g_variant_get_uint32 (value));
     else if (g_str_equal (key, DEPRECATED_PROPERTY_NUMBER)) {
         /* NO-OP */
-    } else {
+    } else if (g_str_equal (key, PROPERTY_FORCE))
+        mm_bearer_properties_set_force (self, g_variant_get_boolean (value));
+    else {
         /* Set error */
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
                      "Invalid properties dictionary, unexpected key '%s'", key);
@@ -961,6 +1029,10 @@ mm_bearer_properties_print (MMBearerProperties *self,
         aux = mm_modem_cdma_rm_protocol_get_string (self->priv->rm_protocol);
         g_ptr_array_add (array, g_strdup_printf (PROPERTY_RM_PROTOCOL ": %s", aux));
     }
+    if (self->priv->force_set) {
+        aux = mm_common_str_boolean (self->priv->force);
+        g_ptr_array_add (array, g_strdup_printf (PROPERTY_FORCE ": %s", aux));
+    }
     return array;
 }
 
@@ -1012,6 +1084,7 @@ mm_bearer_properties_init (MMBearerProperties *self)
     self->priv->allow_roaming = TRUE;
     self->priv->rm_protocol = MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN;
     self->priv->multiplex = MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN;
+    self->priv->force = FALSE;
 }
 
 static void
