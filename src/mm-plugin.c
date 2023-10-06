@@ -995,9 +995,9 @@ mm_plugin_create_modem (MMPlugin  *self,
                 goto next;
             }
 
-            /* Ports that are explicitly blacklisted will be grabbed as ignored */
+            /* Ports that are explicitly ignored will be grabbed as ignored */
             if (mm_port_probe_is_ignored (probe)) {
-                mm_obj_dbg (self, "port %s is blacklisted", name);
+                mm_obj_dbg (self, "port %s is explicitly ignored", name);
                 force_ignored = TRUE;
                 goto grab_port;
             }

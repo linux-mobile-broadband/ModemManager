@@ -150,7 +150,7 @@ mm_filter_port (MMFilter        *self,
         return TRUE;
     }
 
-    /* If the device is explicitly blacklisted, we ignore every port. */
+    /* If the device is explicitly ignored, we ignore every port. */
     if ((self->priv->enabled_rules & MM_FILTER_RULE_EXPLICIT_BLOCKLIST) &&
         (mm_kernel_device_get_global_property_as_boolean (port, ID_MM_DEVICE_IGNORE))) {
         mm_obj_dbg (self, "(%s/%s): port filtered: device is blocklisted", subsystem, name);

@@ -1479,7 +1479,7 @@ mm_port_probe_run (MMPortProbe                *self,
 
     /* If we're told to completely ignore the port, don't do any probing */
     if (self->priv->is_ignored) {
-        mm_obj_dbg (self, "port probing finished: skipping for blacklisted port");
+        mm_obj_dbg (self, "port probing finished: skipping for ignored port");
         port_probe_task_return_boolean (self, TRUE);
         return;
     }
