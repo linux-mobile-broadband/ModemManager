@@ -13,11 +13,16 @@ ACTION!="add|change|move|bind", GOTO="mm_candidate_end"
 # connection. Don't do that.
 KERNEL=="rfcomm*", DEVPATH=="*/virtual/*", GOTO="mm_candidate_end"
 
+# All Qualcomm-based USB devices may switch to a recovery layout with a single
+# serial port in QDL mode if they fail to boot correctly too many times.
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="05c6", ATTRS{idProduct}=="9008", ENV{ID_MM_DEVICE_IGNORE}="1"
+
+# Generic candidate rules for tty/usbmisc/net subsystems
 SUBSYSTEM=="tty", ENV{ID_MM_CANDIDATE}="1"
 SUBSYSTEM=="net", ENV{ID_MM_CANDIDATE}="1"
 KERNEL=="cdc-wdm*", SUBSYSTEM=="usbmisc", ENV{ID_MM_CANDIDATE}="1"
 
-# WWAN subsystem port handling
+# WWAN subsystem candidate rules
 #  - All USB devices ignored for now, only PCI devices expected
 #  - Only "wwan_port" device types processed (single ports); we fully ignore
 #    the "wwan_dev" device type (full device, not just one port)
