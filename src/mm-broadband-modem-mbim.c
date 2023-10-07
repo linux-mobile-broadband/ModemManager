@@ -5974,11 +5974,14 @@ cleanup_unsolicited_events_3gpp (MMIfaceModem3gpp *_self,
 {
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
 
-    /* NOTE: FLAG_SUBSCRIBER_INFO is managed both via 3GPP unsolicited
-     * events and via SIM hot swap setup. We only really cleanup the
-     * indication if SIM hot swap context is not using it. */
-    if (!self->priv->sim_hot_swap_configured)
+    /* NOTE: FLAG_SUBSCRIBER_INFO and FLAG_SLOT_INFO_STATUS are managed both
+     * via 3GPP unsolicited events and via SIM hot swap setup. We only really
+     * cleanup the indication if SIM hot swap context is not using it. */
+    if (!self->priv->sim_hot_swap_configured) {
         self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
+        if (self->priv->is_slot_info_status_supported)
+            self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS;
+    }
 
     self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_CONNECT;
@@ -5987,8 +5990,6 @@ cleanup_unsolicited_events_3gpp (MMIfaceModem3gpp *_self,
         self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_PCO;
     if (self->priv->is_lte_attach_info_supported)
         self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO;
-    if (self->priv->is_slot_info_status_supported)
-        self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS;
     common_setup_cleanup_unsolicited_events (self, FALSE, callback, user_data);
 
     /* Runtime cached state while enabled, to be cleaned up once disabled */
@@ -6311,9 +6312,13 @@ enable_subscriber_info_unsolicited_events_ready (MMBroadbandModemMbim *self,
         mm_obj_dbg (self, "failed to enable subscriber info events: %s", ctx->subscriber_info_error->message);
         /* reset setup flags if enabling failed */
         self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
+        if (self->priv->is_slot_info_status_supported)
+            self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS;
         common_setup_cleanup_unsolicited_events_sync (self, ctx->port, FALSE);
         /* and also reset enable flags */
         self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
+        if (self->priv->is_slot_info_status_supported)
+            self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS;
     }
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
@@ -6351,10 +6356,14 @@ modem_setup_sim_hot_swap (MMIfaceModem        *_self,
 
     /* Setup flags synchronously, which never fails */
     self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
+    if (self->priv->is_slot_info_status_supported)
+        self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS;
     common_setup_cleanup_unsolicited_events_sync (self, ctx->port, TRUE);
 
     /* Enable flags asynchronously, which may fail */
     self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
+    if (self->priv->is_slot_info_status_supported)
+        self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS;
     common_enable_disable_unsolicited_events (self,
                                               (GAsyncReadyCallback)enable_subscriber_info_unsolicited_events_ready,
                                               task);
@@ -6509,11 +6518,14 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *_self,
 {
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
 
-    /* NOTE: FLAG_SUBSCRIBER_INFO is managed both via 3GPP unsolicited
-     * events and via SIM hot swap setup. We only really disable the
-     * indication if SIM hot swap context is not using it. */
-    if (!self->priv->sim_hot_swap_configured)
+    /* NOTE: FLAG_SUBSCRIBER_INFO and FLAG_SLOT_INFO_STATUS are managed both
+     * via 3GPP unsolicited events and via SIM hot swap setup. We only really
+     * cleanup the indication if SIM hot swap context is not using it. */
+    if (!self->priv->sim_hot_swap_configured) {
         self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
+        if (self->priv->is_slot_info_status_supported)
+            self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS;
+    }
 
     self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_CONNECT;
@@ -6522,8 +6534,6 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *_self,
         self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_PCO;
     if (self->priv->is_lte_attach_info_supported)
         self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO;
-    if (self->priv->is_slot_info_status_supported)
-        self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS;
     common_enable_disable_unsolicited_events (self, callback, user_data);
 }
 
