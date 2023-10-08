@@ -3186,8 +3186,8 @@ after_set_load_current_modes_ready (MMIfaceModem *self,
         error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                              "reloaded modes (allowed '%s' and preferred '%s') different "
                              "to the requested ones (allowed '%s' and preferred '%s')",
-                             requested_allowed_str, requested_preferred_str,
-                             current_allowed_str, current_preferred_str);
+                             current_allowed_str, current_preferred_str,
+                             requested_allowed_str, requested_preferred_str);
 
         g_free (requested_allowed_str);
         g_free (requested_preferred_str);
