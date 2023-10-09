@@ -1061,6 +1061,30 @@ load_current_modes (MMIfaceModem        *self,
 }
 
 /*****************************************************************************/
+/* Reset (Modem interface) */
+
+static gboolean
+reset_finish (MMIfaceModem *self,
+              GAsyncResult *res,
+              GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+reset (MMIfaceModem *self,
+       GAsyncReadyCallback callback,
+       gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CRESET",
+                              9,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Set allowed modes (Modem interface) */
 
 typedef struct {
@@ -1267,6 +1291,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_current_modes_finish = load_current_modes_finish;
     iface->set_current_modes = set_current_modes;
     iface->set_current_modes_finish = set_current_modes_finish;
+    iface->reset = reset;
+    iface->reset_finish = reset_finish;
 }
 
 static void
