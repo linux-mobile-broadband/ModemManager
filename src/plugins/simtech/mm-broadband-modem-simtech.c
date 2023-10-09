@@ -66,6 +66,8 @@ struct _MMBroadbandModemSimtechPrivate {
     FeatureSupport  autocsq_support;
     GRegex         *cnsmod_regex;
     GRegex         *csq_regex;
+    GRegex         *ri_done_regex;
+    GRegex         *nitz_regex;
 };
 
 /*****************************************************************************/
@@ -1217,11 +1219,39 @@ set_current_modes (MMIfaceModem        *self,
 static void
 setup_ports (MMBroadbandModem *self)
 {
+    MMBroadbandModemSimtech *modem = (MM_BROADBAND_MODEM_SIMTECH (self));
+    MMPortSerialAt          *ports[2];
+    guint                    i;
+
     /* Call parent's setup ports first always */
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_simtech_parent_class)->setup_ports (self);
 
     /* Now reset the unsolicited messages we'll handle when enabled */
     set_unsolicited_events_handlers (MM_BROADBAND_MODEM_SIMTECH (self), FALSE);
+
+    ports[0] = mm_base_modem_peek_port_primary   (MM_BASE_MODEM (modem));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (modem));
+
+    for (i = 0; i < G_N_ELEMENTS (ports); i++) {
+        if (!ports[i])
+            continue;
+
+        /* Ignore PB DONE and SMS DONE */
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            ports[i],
+            modem->priv->ri_done_regex,
+            NULL,
+            NULL,
+            NULL);
+
+        /* Ignore +NITZ: */
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            ports[i],
+            modem->priv->nitz_regex,
+            NULL,
+            NULL,
+            NULL);
+    }
 }
 
 /*****************************************************************************/
@@ -1259,10 +1289,14 @@ mm_broadband_modem_simtech_init (MMBroadbandModemSimtech *self)
     self->priv->cnsmod_support = FEATURE_SUPPORT_UNKNOWN;
     self->priv->autocsq_support = FEATURE_SUPPORT_UNKNOWN;
 
-    self->priv->cnsmod_regex = g_regex_new ("\\r\\n\\+CNSMOD:\\s*(\\d+)\\r\\n",
-                                            G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    self->priv->csq_regex    = g_regex_new ("\\r\\n\\+CSQ:\\s*(\\d+),(\\d+)\\r\\n",
-                                            G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->cnsmod_regex  = g_regex_new ("\\r\\n\\+CNSMOD:\\s*(\\d+)\\r\\n",
+                                             G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->csq_regex     = g_regex_new ("\\r\\n\\+CSQ:\\s*(\\d+),(\\d+)\\r\\n",
+                                             G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->ri_done_regex = g_regex_new ("\\r\\n(PB DONE)|(SMS DONE)\\r\\n",
+                                             G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->nitz_regex    = g_regex_new ("\\r\\n\\+NITZ:(.*)\\r\\n",
+                                             G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 }
 
 static void
@@ -1272,6 +1306,8 @@ finalize (GObject *object)
 
     g_regex_unref (self->priv->cnsmod_regex);
     g_regex_unref (self->priv->csq_regex);
+    g_regex_unref (self->priv->ri_done_regex);
+    g_regex_unref (self->priv->nitz_regex);
 
     G_OBJECT_CLASS (mm_broadband_modem_simtech_parent_class)->finalize (object);
 }
