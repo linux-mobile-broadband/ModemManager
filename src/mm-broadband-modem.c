@@ -7684,7 +7684,7 @@ list_parts_lock_storages_ready (MMBroadbandModem *self,
                               (MM_BROADBAND_MODEM (self)->priv->modem_messaging_sms_pdu_mode ?
                                "+CMGL=4" :
                                "+CMGL=\"ALL\""),
-                              20,
+                              120,
                               FALSE,
                               (GAsyncReadyCallback) (MM_BROADBAND_MODEM (self)->priv->modem_messaging_sms_pdu_mode ?
                                                      sms_pdu_part_list_ready :
