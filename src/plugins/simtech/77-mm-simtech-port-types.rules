@@ -56,4 +56,9 @@ ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9206", ENV{.MM_USBIFNUM}=="05", SUBS
 # Disable CPOL based features
 ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9206", ENV{ID_MM_PREFERRED_NETWORKS_CPOL_DISABLED}="1"
 
+# SIM A7600E-H, A7602E-H
+ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9011", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9011", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9011", ENV{.MM_USBIFNUM}=="05", ENV{ID_MM_PORT_TYPE_AT_PPP}="1"
+
 LABEL="mm_simtech_port_types_end"
