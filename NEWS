@@ -131,6 +131,7 @@ The most important features and changes in this release are the following:
       indications.
 
  * Plugins:
+   ** cinterion: implemented multiple-SIM support.
    ** fibocom: disabled multiplexing in the NL668, which doesn't support it.
    ** huawei: updated time interface to use ^NWTIME.
    ** quectel: added port type hints for the EG12, EC21, EM060, EM061 and new
