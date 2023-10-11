@@ -3,7 +3,7 @@
 
 project(
   'ModemManager', 'c',
-  version: '1.21.900',
+  version: '1.22.0',
   license: 'GPL2',
   default_options: [
     'buildtype=debugoptimized',
@@ -40,9 +40,9 @@ mm_glib_pkgincludedir = mm_includedir / mm_glib_name
 # - Otherwise, increment c and zero r.
 #   - If the interface has grown (that is, the new library is compatible with old code), increment a.
 #   - If the interface has changed in an incompatible way (that is, functions have changed or been removed), then zero a.
-current = 9
+current = 10
 revision = 0
-age = 9
+age = 10
 mm_glib_version = '@0@.@1@.@2@'.format(current - age, age, revision)
 
 mm_gir_version = '1.0'
@@ -253,14 +253,14 @@ config_h.set('WITH_BUILTIN_PLUGINS', enable_builtin_plugins)
 # MBIM support (enabled by default)
 enable_mbim = get_option('mbim')
 if enable_mbim
-  mbim_glib_dep = dependency('mbim-glib', version: '>= 1.29.900')
+  mbim_glib_dep = dependency('mbim-glib', version: '>= 1.30.0')
 endif
 config_h.set('WITH_MBIM', enable_mbim)
 
 # QMI support (enabled by default)
 enable_qmi = get_option('qmi')
 if enable_qmi
-  qmi_glib_dep = dependency('qmi-glib', version: '>= 1.33.900')
+  qmi_glib_dep = dependency('qmi-glib', version: '>= 1.34.0')
 endif
 config_h.set('WITH_QMI', enable_qmi)
 
