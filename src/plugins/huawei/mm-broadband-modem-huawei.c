@@ -1766,6 +1766,104 @@ set_current_modes (MMIfaceModem *_self,
 }
 
 /*****************************************************************************/
+/* Supported IP families (Modem interface) */
+static MMBearerIpFamily
+load_supported_ip_families_finish (MMIfaceModem *self,
+                                   GAsyncResult *res,
+                                   GError      **error)
+{
+    GError *inner_error = NULL;
+    gssize  value;
+
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_BEARER_IP_FAMILY_NONE;
+    }
+    return (MMBearerIpFamily)value;
+}
+
+static void
+parent_load_supported_ip_families_ready (MMIfaceModem *self,
+                                         GAsyncResult *res,
+                                         GTask *task)
+{
+    GError *error = NULL;
+    MMBearerIpFamily families = MM_BEARER_IP_FAMILY_NONE;
+
+    families = iface_modem_parent->load_supported_ip_families_finish (self, res, &error);
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_int (task, families);
+    g_object_unref (task);
+}
+
+static void
+load_supported_ip_families_ready (MMIfaceModem *self,
+                                  GAsyncResult *res,
+                                  GTask        *task)
+{
+    const gchar     *response;
+    MMBearerIpFamily families = MM_BEARER_IP_FAMILY_NONE;
+    gboolean         ipv4_available;
+    gboolean         ipv4_connected;
+    gboolean         ipv6_available;
+    gboolean         ipv6_connected;
+    GError          *error = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!response) {
+        mm_obj_dbg (self, "failed to fetch supported IP families using ^NDISSTATQRY: %s", error->message);
+        /* fallback to generic detection with AT+CGDCONT=? */
+        iface_modem_parent->load_supported_ip_families (
+            self,
+            (GAsyncReadyCallback)parent_load_supported_ip_families_ready,
+            task);
+        g_error_free (error);
+        return;
+    }
+
+    if (mm_huawei_parse_ndisstatqry_response (response,
+                                              &ipv4_available,
+                                              &ipv4_connected,
+                                              &ipv6_available,
+                                              &ipv6_connected,
+                                              &error)) {
+        families |= ipv4_available ? MM_BEARER_IP_FAMILY_IPV4 : 0;
+        families |= ipv6_available ? MM_BEARER_IP_FAMILY_IPV6 : 0;
+        families |= (ipv4_available && ipv6_available) ? MM_BEARER_IP_FAMILY_IPV4V6 : 0;
+    }
+
+    if (error) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "failed to load supported IP families via ^NDISSTATQRY: %s", error->message);
+        g_error_free (error);
+    } else {
+        g_task_return_int (task, (gssize)families);
+    }
+
+    g_object_unref (task);
+}
+
+static void
+load_supported_ip_families (MMIfaceModem       *self,
+                            GAsyncReadyCallback callback,
+                            gpointer            user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^NDISSTATQRY?",
+                              3,
+                              TRUE,
+                              (GAsyncReadyCallback)load_supported_ip_families_ready,
+                              task);
+}
+
+/*****************************************************************************/
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
 static void
@@ -4905,6 +5003,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_current_modes_finish = load_current_modes_finish;
     iface->set_current_modes = set_current_modes;
     iface->set_current_modes_finish = set_current_modes_finish;
+    iface->load_supported_ip_families = load_supported_ip_families;
+    iface->load_supported_ip_families_finish = load_supported_ip_families_finish;
     iface->load_signal_quality = modem_load_signal_quality;
     iface->load_signal_quality_finish = modem_load_signal_quality_finish;
     iface->create_bearer = huawei_modem_create_bearer;
