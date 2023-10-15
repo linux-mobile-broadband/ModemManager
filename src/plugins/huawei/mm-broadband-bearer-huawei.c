@@ -76,7 +76,9 @@ typedef struct {
     Connect3gppContextStep step;
     guint check_count;
     guint failed_ndisstatqry_count;
+    MMBearerIpFamily ip_family;
     MMBearerIpConfig *ipv4_config;
+    MMBearerIpConfig *ipv6_config;
 } Connect3gppContext;
 
 static void
@@ -85,6 +87,7 @@ connect_3gpp_context_free (Connect3gppContext *ctx)
     g_object_unref (ctx->modem);
 
     g_clear_object (&ctx->ipv4_config);
+    g_clear_object (&ctx->ipv6_config);
     g_clear_object (&ctx->data);
     g_clear_object (&ctx->primary);
 
@@ -236,8 +239,8 @@ connect_ndisstatqry_check_ready (MMBaseModem *modem,
         g_error_free (error);
     }
 
-    /* Connected in IPv4? */
-    if (ipv4_available && ipv4_connected) {
+    /* Connected? */
+    if ((ipv4_available && ipv4_connected) || (ipv6_available && ipv6_connected)) {
         /* Success! */
         ctx->step++;
         connect_3gpp_context_step (task);
@@ -342,19 +345,6 @@ connect_3gpp_context_step (GTask *task)
 
     switch (ctx->step) {
     case CONNECT_3GPP_CONTEXT_STEP_FIRST: {
-        MMBearerIpFamily ip_family;
-
-        ip_family = mm_bearer_properties_get_ip_type (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
-        mm_3gpp_normalize_ip_family (&ip_family, TRUE);
-        if (ip_family != MM_BEARER_IP_FAMILY_IPV4) {
-            g_task_return_new_error (task,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_UNSUPPORTED,
-                                     "Only IPv4 is supported by this modem");
-            g_object_unref (task);
-            return;
-        }
-
         /* Store the task */
         self->priv->connect_pending = task;
 
@@ -467,7 +457,7 @@ connect_3gpp_context_step (GTask *task)
         /* Setup result */
         g_task_return_pointer (
             task,
-            mm_bearer_connect_result_new (ctx->data, ctx->ipv4_config, NULL),
+            mm_bearer_connect_result_new (ctx->data, ctx->ipv4_config, ctx->ipv6_config),
             (GDestroyNotify)mm_bearer_connect_result_unref);
 
         g_object_unref (task);
@@ -512,6 +502,8 @@ connect_3gpp (MMBroadbandBearer *_self,
     ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
     ctx->data = g_object_ref (data);
     ctx->step = CONNECT_3GPP_CONTEXT_STEP_FIRST;
+    ctx->ip_family = mm_bearer_properties_get_ip_type (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
+    mm_3gpp_normalize_ip_family (&ctx->ip_family, TRUE);
 
     g_assert (self->priv->connect_pending == NULL);
     g_assert (self->priv->disconnect_pending == NULL);
@@ -521,8 +513,15 @@ connect_3gpp (MMBroadbandBearer *_self,
 
 
     /* Default to automatic/DHCP addressing */
-    ctx->ipv4_config = mm_bearer_ip_config_new ();
-    mm_bearer_ip_config_set_method (ctx->ipv4_config, MM_BEARER_IP_METHOD_DHCP);
+    if (ctx->ip_family & (MM_BEARER_IP_FAMILY_IPV4 | MM_BEARER_IP_FAMILY_IPV4V6)) {
+        ctx->ipv4_config = mm_bearer_ip_config_new ();
+        mm_bearer_ip_config_set_method (ctx->ipv4_config, MM_BEARER_IP_METHOD_DHCP);
+    }
+    
+    if (ctx->ip_family & (MM_BEARER_IP_FAMILY_IPV6 | MM_BEARER_IP_FAMILY_IPV4V6)) {
+        ctx->ipv6_config = mm_bearer_ip_config_new ();
+        mm_bearer_ip_config_set_method (ctx->ipv6_config, MM_BEARER_IP_METHOD_DHCP);
+    }
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)connect_3gpp_context_free);
@@ -621,8 +620,8 @@ disconnect_ndisstatqry_check_ready (MMBaseModem *modem,
         g_error_free (error);
     }
 
-    /* Disconnected IPv4? */
-    if (ipv4_available && !ipv4_connected) {
+    /* Disconnected? */
+    if (!((ipv4_available && ipv4_connected) || (ipv6_available && ipv6_connected))) {
         /* Success! */
         ctx->step++;
         disconnect_3gpp_context_step (task);
