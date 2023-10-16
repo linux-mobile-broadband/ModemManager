@@ -2001,14 +2001,18 @@ static void
 bearer_report_connection_status (MMBaseBearer *bearer,
                                  NdisstatResult *ndisstat_result)
 {
-    if (ndisstat_result->ipv4_available) {
-        /* TODO: MMBroadbandBearerHuawei does not currently support IPv6.
-         * When it does, we should check the IP family associated with each bearer. */
-        mm_base_bearer_report_connection_status (bearer,
-                                                 ndisstat_result->ipv4_connected ?
-                                                 MM_BEARER_CONNECTION_STATUS_CONNECTED :
-                                                 MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
-    }
+    MMBearerConnectionStatus status;
+
+    /* Note: unsolicited ^NDISSTAT messages can contain:
+     *   a) only IPv4, b) both IPv4 and IPv6, c) only IPv6 connection status
+     * A disconnect (^NDISDUP=1,0) seems to trigger two separate messages though
+     */
+    status = (ndisstat_result->ipv4_available && ndisstat_result->ipv4_connected) ||
+             (ndisstat_result->ipv6_available && ndisstat_result->ipv6_connected) ?
+             MM_BEARER_CONNECTION_STATUS_CONNECTED :
+             MM_BEARER_CONNECTION_STATUS_DISCONNECTED;
+
+    mm_base_bearer_report_connection_status (bearer, status);
 }
 
 static void
