@@ -35,6 +35,42 @@ static GQuark support_checked_quark;
 static GQuark supported_quark;
 
 /*****************************************************************************/
+/* Private data context */
+
+#define PRIVATE_TAG "3gpp-profile-manager-private-tag"
+static GQuark private_quark;
+
+typedef struct {
+    /* throttle updated signal */
+    guint updated_timeout_source;
+} Private;
+
+static void
+private_free (Private *priv)
+{
+    if (priv->updated_timeout_source)
+        g_source_remove (priv->updated_timeout_source);
+    g_slice_free (Private, priv);
+}
+
+static Private *
+get_private (MMIfaceModem3gppProfileManager *self)
+{
+    Private *priv;
+
+    if (G_UNLIKELY (!private_quark))
+        private_quark = g_quark_from_static_string (PRIVATE_TAG);
+
+    priv = g_object_get_qdata (G_OBJECT (self), private_quark);
+    if (!priv) {
+        priv = g_slice_new0 (Private);
+        g_object_set_qdata_full (G_OBJECT (self), private_quark, priv, (GDestroyNotify)private_free);
+    }
+
+    return priv;
+}
+
+/*****************************************************************************/
 
 void
 mm_iface_modem_3gpp_profile_manager_bind_simple_status (MMIfaceModem3gppProfileManager *self,
@@ -45,17 +81,47 @@ mm_iface_modem_3gpp_profile_manager_bind_simple_status (MMIfaceModem3gppProfileM
 
 /*****************************************************************************/
 
-void
-mm_iface_modem_3gpp_profile_manager_updated (MMIfaceModem3gppProfileManager *self)
+/* Throttle the amount of "Updated" signals we emit, e.g. so that if we receive
+ * multiple modem indications in a very short time span, we don't emit one signal
+ * for each of them. */
+#define UPDATED_TIMEOUT_SECS 2
+
+static gboolean
+profile_manager_updated_emit (MMIfaceModem3gppProfileManager *self)
 {
     g_autoptr(MmGdbusModem3gppProfileManagerSkeleton) skeleton = NULL;
+    Private *priv;
+
+    priv = get_private (self);
 
     g_object_get (self,
                   MM_IFACE_MODEM_3GPP_PROFILE_MANAGER_DBUS_SKELETON, &skeleton,
                   NULL);
 
-    if (skeleton)
+    if (skeleton) {
+        mm_obj_info (self, "emitting profile manager updated...");
         mm_gdbus_modem3gpp_profile_manager_emit_updated (MM_GDBUS_MODEM3GPP_PROFILE_MANAGER (skeleton));
+    } else {
+        mm_obj_warn (self, "skipping profile manager updated signal: interface disabled");
+    }
+
+    priv->updated_timeout_source = 0;
+    return G_SOURCE_REMOVE;
+}
+
+void
+mm_iface_modem_3gpp_profile_manager_updated (MMIfaceModem3gppProfileManager *self)
+{
+    Private *priv;
+
+    priv = get_private (self);
+    if (priv->updated_timeout_source) {
+        mm_obj_info (self, "skipping profile manager updated signal: one already scheduled");
+        return;
+    }
+
+    mm_obj_info (self, "profile manager updated signal scheduled");
+    priv->updated_timeout_source = g_timeout_add_seconds (UPDATED_TIMEOUT_SECS, (GSourceFunc) profile_manager_updated_emit, self);
 }
 
 static gboolean
