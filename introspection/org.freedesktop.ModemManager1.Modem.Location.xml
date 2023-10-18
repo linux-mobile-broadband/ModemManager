@@ -40,18 +40,14 @@
         no GPS sources are requested by the user, the GNSS engine will need
         to be stopped explicitly).
 
-        This method may require the client to authenticate itself.
-
         When location signaling is enabled by the user, any client application (including
         malicious ones!) would be able to use the #org.freedesktop.ModemManager1.Modem.Location:Location
         property to receive location updates. If further security is desired, the
         @signal_location argument can be set to %FALSE to disable location
         updates via D-Bus signals and require applications to call
         authenticated APIs (like <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Location.GetLocation">GetLocation()</link>)
-        to get the location information.
-
-        By default location signaling is disabled, and therefore the
-        #org.freedesktop.ModemManager1.Modem.Location:Location property will not
+        to get the location information. By default location signaling is disabled,
+        and therefore the #org.freedesktop.ModemManager1.Modem.Location:Location property will not
         be usable until explicitly enabled by the user.
 
         The optional
@@ -62,12 +58,12 @@
         <link linkend="MM-MODEM-LOCATION-SOURCE-GPS-RAW:CAPS">MM_MODEM_LOCATION_SOURCE_GPS_RAW</link>
         or
         <link linkend="MM-MODEM-LOCATION-SOURCE-GPS-NMEA:CAPS">MM_MODEM_LOCATION_SOURCE_GPS_NMEA</link>.
+        Both A-GPS operation modes rely on having a valid data connection to connect to an online
+        server, and therefore require the modem to have a valid SIM card and be enabled. If no A-GPS mode
+        is specified, standalone GPS is assumed.
 
-        Both
-        <link linkend="MM-MODEM-LOCATION-SOURCE-AGPS-MSA:CAPS">MM_MODEM_LOCATION_SOURCE_AGPS_MSA</link>
-        and
-        <link linkend="MM-MODEM-LOCATION-SOURCE-AGPS-MSB:CAPS">MM_MODEM_LOCATION_SOURCE_AGPS_MSB</link>
-        cannot be given at the same time, and if none given, standalone GPS is assumed.
+        Since 1.24, standalone GPS sources may be enabled even with the modem in failed state, e.g.
+        when there is no SIM card inserted.
 
         Since: 1.0
     -->
@@ -119,9 +115,10 @@
         There is no maximum @data size limit specified, default DBus system bus limits apply.
 
         This method may be used when the device does not have a mobile network connection by
-        itself, and therefore it cannot use any A-GPS server to improve the accuracy of the
-        position. In this case, the user can instead download the assistance data files using
-        a WiFi or LAN network, and inject them to the GNSS engine manually.
+        itself (e.g. when not even a SIM is inserted), and therefore it cannot use any A-GPS
+        server to improve the accuracy of the position. In this case, the user can instead
+        download the assistance data files using a WiFi or LAN network, and inject them to
+        the GNSS engine manually.
 
         Since: 1.10
     -->

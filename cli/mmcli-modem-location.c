@@ -254,11 +254,6 @@ context_free (void)
 static void
 ensure_modem_location (void)
 {
-    if (mm_modem_get_state (mm_object_peek_modem (ctx->object)) < MM_MODEM_STATE_ENABLED) {
-        g_printerr ("error: modem not enabled yet\n");
-        exit (EXIT_FAILURE);
-    }
-
     if (!ctx->modem_location) {
         g_printerr ("error: modem has no location capabilities\n");
         exit (EXIT_FAILURE);

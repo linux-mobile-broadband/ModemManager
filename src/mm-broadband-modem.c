@@ -12339,13 +12339,13 @@ typedef enum {
     INITIALIZE_STEP_IFACE_3GPP_PROFILE_MANAGER,
     INITIALIZE_STEP_IFACE_3GPP_USSD,
     INITIALIZE_STEP_IFACE_CDMA,
-    INITIALIZE_STEP_IFACE_LOCATION,
     INITIALIZE_STEP_IFACE_MESSAGING,
     INITIALIZE_STEP_IFACE_TIME,
     INITIALIZE_STEP_IFACE_SIGNAL,
     INITIALIZE_STEP_IFACE_OMA,
     INITIALIZE_STEP_IFACE_SAR,
     INITIALIZE_STEP_FALLBACK_LIMITED,
+    INITIALIZE_STEP_IFACE_LOCATION,
     INITIALIZE_STEP_IFACE_VOICE,
     INITIALIZE_STEP_IFACE_FIRMWARE,
     INITIALIZE_STEP_IFACE_SIMPLE,
@@ -12637,14 +12637,6 @@ initialize_step (GTask *task)
         ctx->step++;
        /* fall through */
 
-    case INITIALIZE_STEP_IFACE_LOCATION:
-        /* Initialize the Location interface */
-        mm_iface_modem_location_initialize (MM_IFACE_MODEM_LOCATION (ctx->self),
-                                            g_task_get_cancellable (task),
-                                            (GAsyncReadyCallback)iface_modem_location_initialize_ready,
-                                            task);
-        return;
-
     case INITIALIZE_STEP_IFACE_MESSAGING:
         /* Initialize the Messaging interface */
         mm_iface_modem_messaging_initialize (MM_IFACE_MODEM_MESSAGING (ctx->self),
@@ -12691,6 +12683,14 @@ initialize_step (GTask *task)
         ctx->step++;
        /* fall through */
 
+    case INITIALIZE_STEP_IFACE_LOCATION:
+        /* Initialize the Location interface */
+        mm_iface_modem_location_initialize (MM_IFACE_MODEM_LOCATION (ctx->self),
+                                            g_task_get_cancellable (task),
+                                            (GAsyncReadyCallback)iface_modem_location_initialize_ready,
+                                            task);
+        return;
+
     case INITIALIZE_STEP_IFACE_VOICE:
         /* Initialize the Voice interface */
         mm_iface_modem_voice_initialize (MM_IFACE_MODEM_VOICE (ctx->self),
@@ -12731,16 +12731,16 @@ initialize_step (GTask *task)
                                      "Modem in failed state: %s",
                                      mm_modem_state_failed_reason_get_string (reason));
 
-                /* Ensure we only leave the Modem, Voice and Firmware interfaces
+                /* Ensure we only leave the Modem, Voice, Location and Firmware interfaces
                  * around. A failure could be caused by firmware issues, which
                  * a firmware update, switch, or provisioning could fix. We also
                  * leave the Voice interface around so that we can attempt
-                 * emergency voice calls.
+                 * emergency voice calls, and the Location interface so that we can use
+                 * GNSS without a SIM card
                  */
                 mm_iface_modem_3gpp_profile_manager_shutdown (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (ctx->self));
                 mm_iface_modem_3gpp_ussd_shutdown (MM_IFACE_MODEM_3GPP_USSD (ctx->self));
                 mm_iface_modem_cdma_shutdown (MM_IFACE_MODEM_CDMA (ctx->self));
-                mm_iface_modem_location_shutdown (MM_IFACE_MODEM_LOCATION (ctx->self));
                 mm_iface_modem_signal_shutdown (MM_IFACE_MODEM_SIGNAL (ctx->self));
                 mm_iface_modem_messaging_shutdown (MM_IFACE_MODEM_MESSAGING (ctx->self));
                 mm_iface_modem_time_shutdown (MM_IFACE_MODEM_TIME (ctx->self));
