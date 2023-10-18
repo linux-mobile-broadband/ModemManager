@@ -59,11 +59,6 @@ typedef struct {
     GRegex                *rdy_regex;
 } Private;
 
-typedef struct {
-    MMFirmwareUpdateSettings *update_settings;
-    gint get_firmware_maximum_retry_int;
-} LoadUpdateSettingsContext;
-
 static void
 private_free (Private *priv)
 {
@@ -177,6 +172,19 @@ mm_shared_quectel_setup_ports (MMBroadbandModem *self)
 /*****************************************************************************/
 /* Firmware update settings loading (Firmware interface) */
 
+typedef struct {
+    MMFirmwareUpdateSettings *update_settings;
+    gint get_firmware_maximum_retry_int;
+} LoadUpdateSettingsContext;
+
+static void
+load_update_settings_context_free (LoadUpdateSettingsContext *ctx)
+{
+    if (ctx->update_settings)
+        g_object_unref (ctx->update_settings);
+    g_free (ctx);
+}
+
 MMFirmwareUpdateSettings *
 mm_shared_quectel_firmware_load_update_settings_finish (MMIfaceModemFirmware  *self,
                                                         GAsyncResult          *res,
@@ -238,22 +246,24 @@ quectel_at_port_get_firmware_version_retry_ready (MMBaseModem  *modem,
 
     if (version) {
         if (mm_quectel_check_standard_firmware_version_valid (version)) {
-            mm_obj_dbg (modem, "Valid firmware version:%s, re-update", version);
+            mm_obj_dbg (modem, "Valid firmware version: %s, re-update", version);
             mm_firmware_update_settings_set_version (ctx->update_settings, version);
             g_task_return_pointer (task, g_object_ref (ctx->update_settings), g_object_unref);
             g_object_unref (task);
             return;
         }
     }
+
     /* When the maximum repeat fetch count is greater than or equal to 0,
      * attempt to retrieve version information again. */
-    if (ctx->get_firmware_maximum_retry_int >= 0)
+    if (ctx->get_firmware_maximum_retry_int >= 0) {
         g_timeout_add_seconds (1, (GSourceFunc) quectel_at_port_get_firmware_version_retry, task);
-    else {
-        mm_obj_dbg (modem, "Maximum retries to query firmware version reached: invalid firmware version received");
-        g_task_return_pointer (task, g_object_ref (ctx->update_settings), g_object_unref);
-        g_object_unref (task);
+        return;
     }
+
+    mm_obj_dbg (modem, "Maximum retries to query firmware version reached: invalid firmware version received");
+    g_task_return_pointer (task, g_object_ref (ctx->update_settings), g_object_unref);
+    g_object_unref (task);
 }
 
 static gboolean
@@ -281,7 +291,7 @@ quectel_at_port_get_firmware_version_ready (MMBaseModem  *modem,
 {
     LoadUpdateSettingsContext *ctx;
     const gchar               *version;
-    gboolean ap_firmware_version_valid = TRUE;
+    gboolean                   ap_firmware_version_valid = TRUE;
 
     ctx = g_task_get_task_data (task);
 
@@ -293,11 +303,12 @@ quectel_at_port_get_firmware_version_ready (MMBaseModem  *modem,
         mm_firmware_update_settings_set_version (ctx->update_settings, version);
         g_task_return_pointer (task, g_object_ref (ctx->update_settings), g_object_unref);
         g_object_unref (task);
-    } else {
-        if (version)
-            mm_obj_dbg (modem, "Invalid firmware version %s return, retrying", version);
-        g_timeout_add_seconds (1, (GSourceFunc) quectel_at_port_get_firmware_version_retry, task);
+        return;
     }
+
+    if (version)
+        mm_obj_dbg (modem, "Invalid firmware version %s return, retrying", version);
+    g_timeout_add_seconds (1, (GSourceFunc) quectel_at_port_get_firmware_version_retry, task);
 }
 
 #if defined WITH_MBIM
@@ -405,15 +416,6 @@ quectel_at_port_get_firmware_revision_ready (MMBaseModem  *self,
     }
 }
 
-static void
-load_update_settings_context_free (LoadUpdateSettingsContext *ctx)
-{
-    if (ctx->update_settings)
-        g_object_unref (ctx->update_settings);
-
-    g_free (ctx);
-}
-
 void
 mm_shared_quectel_firmware_load_update_settings (MMIfaceModemFirmware *self,
                                                  GAsyncReadyCallback   callback,
@@ -426,13 +428,13 @@ mm_shared_quectel_firmware_load_update_settings (MMIfaceModemFirmware *self,
 
     task = g_task_new (self, NULL, callback, user_data);
     ctx = g_new0 (LoadUpdateSettingsContext, 1);
-    
+    g_task_set_task_data (task, ctx, (GDestroyNotify)load_update_settings_context_free);
+
     at_port = mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL);
     if (at_port) {
     	update_methods = quectel_get_firmware_update_methods (MM_BASE_MODEM (self), MM_PORT (at_port));
         ctx->update_settings = mm_firmware_update_settings_new (update_methods);
         ctx->get_firmware_maximum_retry_int = QUECTEL_STD_AP_FIRMWARE_INVALID_MAXIMUM_RETRY;
-        g_task_set_task_data (task, ctx, (GDestroyNotify)load_update_settings_context_free);
 
         /* Fetch modem name */
         mm_base_modem_at_command (MM_BASE_MODEM (self),
@@ -460,7 +462,6 @@ mm_shared_quectel_firmware_load_update_settings (MMIfaceModemFirmware *self,
             ctx->get_firmware_maximum_retry_int = QUECTEL_STD_AP_FIRMWARE_INVALID_MAXIMUM_RETRY;
 
             /* Fetch firmware info */
-            g_task_set_task_data (task, ctx, (GDestroyNotify)load_update_settings_context_free);
             message = mbim_message_qdu_quectel_read_version_set_new (MBIM_QDU_QUECTEL_VERSION_TYPE_FW_BUILD_ID, NULL);
             mbim_device_command (mm_port_mbim_peek_device (mbim),
                                  message,
