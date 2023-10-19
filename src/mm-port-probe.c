@@ -595,7 +595,7 @@ wdm_probe_mbim (MMPortProbe *self)
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
                        FALSE, /* Don't check QMI over MBIM support at this stage */
 #endif
-                       NULL,
+                       g_task_get_cancellable (self->priv->task),
                        (GAsyncReadyCallback) mbim_port_open_ready,
                        self);
 #else
