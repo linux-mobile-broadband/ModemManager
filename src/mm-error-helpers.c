@@ -15,10 +15,21 @@
  * Copyright (C) 2011 - 2012 Google, Inc.
  */
 
+#include <config.h>
+
 #include "mm-error-helpers.h"
+#include "mm-errors-types.h"
 #include "mm-log.h"
 
 #include <ctype.h>
+
+#if defined WITH_QMI
+# include <libqmi-glib.h>
+#endif
+
+#if defined WITH_MBIM
+# include <libmbim-glib.h>
+#endif
 
 /******************************************************************************/
 
@@ -41,6 +52,38 @@ normalize_error_string (const gchar *str)
 }
 
 /******************************************************************************/
+/* Core errors */
+
+/* Human friendly messages for each error type */
+static const gchar *core_error_messages[] = {
+    [MM_CORE_ERROR_FAILED]          = "Failed",
+    [MM_CORE_ERROR_CANCELLED]       = "Cancelled",
+    [MM_CORE_ERROR_ABORTED]         = "Aborted",
+    [MM_CORE_ERROR_UNSUPPORTED]     = "Unsupported",
+    [MM_CORE_ERROR_NO_PLUGINS]      = "No plugins",
+    [MM_CORE_ERROR_UNAUTHORIZED]    = "Unauthorized",
+    [MM_CORE_ERROR_INVALID_ARGS]    = "Invalid arguments",
+    [MM_CORE_ERROR_IN_PROGRESS]     = "In progress",
+    [MM_CORE_ERROR_WRONG_STATE]     = "Wrong state",
+    [MM_CORE_ERROR_CONNECTED]       = "Connected",
+    [MM_CORE_ERROR_TOO_MANY]        = "Too many",
+    [MM_CORE_ERROR_NOT_FOUND]       = "Not found",
+    [MM_CORE_ERROR_RETRY]           = "Retry",
+    [MM_CORE_ERROR_EXISTS]          = "Exists",
+    [MM_CORE_ERROR_WRONG_SIM_STATE] = "Wrong SIM state",
+    [MM_CORE_ERROR_RESET_AND_RETRY] = "Reset and retry",
+    [MM_CORE_ERROR_TIMEOUT]         = "Timed out",
+    [MM_CORE_ERROR_PROTOCOL]        = "Protocol failure",
+    [MM_CORE_ERROR_THROTTLED]       = "Throttled",
+};
+
+static const gchar *
+core_error_get_string (MMCoreError code)
+{
+    return (code < G_N_ELEMENTS (core_error_messages)) ? core_error_messages[code] : NULL;
+}
+
+/******************************************************************************/
 /* Connection errors */
 
 /* Human friendly messages for each error type */
@@ -52,17 +95,21 @@ static const gchar *connection_error_messages[] = {
     [MM_CONNECTION_ERROR_NO_ANSWER]   = "No answer",
 };
 
+static const gchar *
+connection_error_get_string (MMConnectionError code)
+{
+    return (code < G_N_ELEMENTS (connection_error_messages)) ? connection_error_messages[code] : NULL;
+}
+
 GError *
 mm_connection_error_for_code (MMConnectionError code,
                               gpointer          log_object)
 {
-    if (code < G_N_ELEMENTS (connection_error_messages)) {
-        const gchar *error_message;
+    const gchar *description;
 
-        error_message = connection_error_messages[code];
-        if (error_message)
-            return g_error_new_literal (MM_CONNECTION_ERROR, code, error_message);
-    }
+    description = connection_error_get_string (code);
+    if (description)
+        return g_error_new_literal (MM_CONNECTION_ERROR, code, description);
 
     /* Not found? Then, default to 'no carrier' */
     mm_obj_dbg (log_object, "unknown connection error: %u", code);
@@ -244,23 +291,48 @@ static const gchar *me_error_messages[] = {
 /* All generic ME errors should be < 255, as those are the only reserved ones in the 3GPP spec */
 G_STATIC_ASSERT (G_N_ELEMENTS (me_error_messages) <= 256);
 
+static const gchar *
+me_error_get_string (MMMobileEquipmentError code)
+{
+    return (code < G_N_ELEMENTS (me_error_messages)) ? me_error_messages[code] : NULL;
+}
+
 GError *
 mm_mobile_equipment_error_for_code (MMMobileEquipmentError code,
                                     gpointer               log_object)
 {
-    if (code < G_N_ELEMENTS (me_error_messages)) {
-        const gchar *error_message;
+    const gchar *description;
 
-        error_message = me_error_messages[code];
-        if (error_message)
-            return g_error_new_literal (MM_MOBILE_EQUIPMENT_ERROR, code, error_message);
-    }
+    description = me_error_get_string (code);
+    if (description)
+        return g_error_new_literal (MM_MOBILE_EQUIPMENT_ERROR, code, description);
 
     /* Not found? Then, default */
     mm_obj_dbg (log_object, "unknown mobile equipment error: %u", code);
     return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
                         MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN,
                         "Unknown mobile equipment error: %u", code);
+}
+
+/******************************************************************************/
+/* Serial errors */
+
+static const gchar *serial_error_messages[] = {
+    [MM_SERIAL_ERROR_UNKNOWN]               = "Unknown",
+    [MM_SERIAL_ERROR_OPEN_FAILED]           = "Open failed",
+    [MM_SERIAL_ERROR_SEND_FAILED]           = "Send failed",
+    [MM_SERIAL_ERROR_RESPONSE_TIMEOUT]      = "Response timeout",
+    [MM_SERIAL_ERROR_OPEN_FAILED_NO_DEVICE] = "Open failed, no device",
+    [MM_SERIAL_ERROR_FLASH_FAILED]          = "Flash failed",
+    [MM_SERIAL_ERROR_NOT_OPEN]              = "Not open",
+    [MM_SERIAL_ERROR_PARSE_FAILED]          = "Parse failed",
+    [MM_SERIAL_ERROR_FRAME_NOT_FOUND]       = "Frame not found",
+};
+
+static const gchar *
+serial_error_get_string (MMSerialError code)
+{
+    return (code < G_N_ELEMENTS (serial_error_messages)) ? serial_error_messages[code] : NULL;
 }
 
 /******************************************************************************/
@@ -302,23 +374,26 @@ static const gchar *msg_error_messages[] = {
 /* All generic message errors should be <= 500 (500-common=200), as those are the only reserved ones in the 3GPP spec */
 G_STATIC_ASSERT (G_N_ELEMENTS (msg_error_messages) <= 201);
 
+static const gchar *
+message_error_get_string (MMMessageError code)
+{
+    return ((code >= MM_MESSAGE_ERROR_COMMON_OFFSET) && ((code - MM_MESSAGE_ERROR_COMMON_OFFSET) < G_N_ELEMENTS (msg_error_messages))) ?
+            msg_error_messages[code - MM_MESSAGE_ERROR_COMMON_OFFSET] : NULL;
+}
+
 GError *
 mm_message_error_for_code (MMMessageError code,
                            gpointer       log_object)
 {
-    if ((code >= MM_MESSAGE_ERROR_COMMON_OFFSET) && ((code - MM_MESSAGE_ERROR_COMMON_OFFSET) < G_N_ELEMENTS (msg_error_messages))) {
-        const gchar *error_message;
+    const gchar *description;
 
-        error_message = msg_error_messages[code - MM_MESSAGE_ERROR_COMMON_OFFSET];
-        if (error_message)
-            return g_error_new_literal (MM_MESSAGE_ERROR, code, error_message);
-    }
+    description = message_error_get_string (code);
+    if (description)
+        return g_error_new_literal (MM_MESSAGE_ERROR, code, description);
 
     /* Not found? Then, default */
     mm_obj_dbg (log_object, "unknown message error: %u", code);
-    return g_error_new (MM_MESSAGE_ERROR,
-                        MM_MESSAGE_ERROR_UNKNOWN,
-                        "Unknown message error: %u", code);
+    return g_error_new (MM_MESSAGE_ERROR, MM_MESSAGE_ERROR_UNKNOWN, "Unknown message error: %u", code);
 }
 
 /******************************************************************************/
@@ -419,4 +494,82 @@ mm_message_error_for_string (const gchar *str,
     return g_error_new (MM_MESSAGE_ERROR,
                         MM_MESSAGE_ERROR_UNKNOWN,
                         "Unknown message error string: %s", str);
+}
+
+/******************************************************************************/
+/* CDMA activation errors */
+
+static const gchar *cdma_activation_error_messages[] = {
+    [MM_CDMA_ACTIVATION_ERROR_NONE]                           = "None",
+    [MM_CDMA_ACTIVATION_ERROR_UNKNOWN]                        = "Unknown",
+    [MM_CDMA_ACTIVATION_ERROR_ROAMING]                        = "Roaming",
+    [MM_CDMA_ACTIVATION_ERROR_WRONG_RADIO_INTERFACE]          = "Wrong radio interface",
+    [MM_CDMA_ACTIVATION_ERROR_COULD_NOT_CONNECT]              = "Could not connect",
+    [MM_CDMA_ACTIVATION_ERROR_SECURITY_AUTHENTICATION_FAILED] = "Security authentication failed",
+    [MM_CDMA_ACTIVATION_ERROR_PROVISIONING_FAILED]            = "Provisioning failed",
+    [MM_CDMA_ACTIVATION_ERROR_NO_SIGNAL]                      = "No signal",
+    [MM_CDMA_ACTIVATION_ERROR_TIMED_OUT]                      = "Timed out",
+    [MM_CDMA_ACTIVATION_ERROR_START_FAILED]                   = "Start failed",
+};
+
+static const gchar *
+cdma_activation_error_get_string (MMCdmaActivationError code)
+{
+    return (code < G_N_ELEMENTS (cdma_activation_error_messages)) ? cdma_activation_error_messages[code] : NULL;
+}
+
+/******************************************************************************/
+/* Takes a GError of any kind and ensures that the returned GError is a
+ * MM-defined one. */
+
+static GError *
+normalize_mm_error (const GError *error,
+                    const gchar  *error_description,
+                    const gchar  *error_type)
+{
+    if (error_description) {
+        GError *copy;
+
+        copy = g_error_copy (error);
+        /* Add error type name only if it isn't already the same string */
+        if (g_strcmp0 (copy->message, error_description) != 0)
+            g_prefix_error (&copy, "%s: ", error_description);
+        return copy;
+    }
+
+    return g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                        "Unhandled %s error (%u): %s",
+                        error_type, error->code, error->message);
+}
+
+GError *
+mm_normalize_error (const GError *error)
+{
+    g_assert (error);
+
+    if (error->domain == G_IO_ERROR) {
+        /* G_IO_ERROR_CANCELLED is an exception, because we map it to
+         * MM_CORE_ERROR_CANCELLED implicitly when building the DBus error name. */
+        if (error->code == G_IO_ERROR_CANCELLED)
+            return g_error_copy (error);
+
+        return g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Unhandled GIO error (%u): %s", error->code, error->message);
+    }
+
+    /* Ensure all errors reported in the MM domains are known errors */
+    if (error->domain == MM_CORE_ERROR)
+        return normalize_mm_error (error, core_error_get_string (error->code), "core");
+    if (error->domain == MM_MOBILE_EQUIPMENT_ERROR)
+        return normalize_mm_error (error, me_error_get_string (error->code), "mobile equipment");
+    if (error->domain == MM_CONNECTION_ERROR)
+        return normalize_mm_error (error, connection_error_get_string (error->code), "connection");
+    if (error->domain == MM_SERIAL_ERROR)
+        return normalize_mm_error (error, serial_error_get_string (error->code), "serial");
+    if (error->domain == MM_MESSAGE_ERROR)
+        return normalize_mm_error (error, message_error_get_string (error->code), "message");
+    if (error->domain == MM_CDMA_ACTIVATION_ERROR)
+        return normalize_mm_error (error, cdma_activation_error_get_string (error->code), "CDMA activation");
+
+    /* Generic fallback */
+    return g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "%s", error->message);
 }
