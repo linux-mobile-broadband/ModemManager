@@ -104,6 +104,7 @@
  * @MM_CORE_ERROR_WRONG_SIM_STATE: Operation cannot be executed in the current SIM state. Since 1.20.
  * @MM_CORE_ERROR_RESET_AND_RETRY: Operation cannot yet be performed, reset the retry count and retry later. Since 1.22.
  * @MM_CORE_ERROR_TIMEOUT: Operation timed out. Since 1.24.
+ * @MM_CORE_ERROR_PROTOCOL: Operation failed due to an underlying control protocol error. Since 1.24.
  *
  * Common errors that may be reported by ModemManager.
  *
@@ -127,6 +128,7 @@ typedef enum { /*< underscore_name=mm_core_error >*/
     MM_CORE_ERROR_WRONG_SIM_STATE = 14, /*< nick=WrongSimState >*/
     MM_CORE_ERROR_RESET_AND_RETRY = 15, /*< nick=ResetRetry    >*/
     MM_CORE_ERROR_TIMEOUT         = 16, /*< nick=Timeout       >*/
+    MM_CORE_ERROR_PROTOCOL        = 17, /*< nick=Protocol      >*/
 } MMCoreError;
 
 /**
