@@ -348,7 +348,7 @@ The following notes are directed to package maintainers:
  * The LEGACY and PARANOID filter types that were allowed options in the
    '--filter-policy' option in the ModemManager daemon were deprecated in
    version 1.16.0 and have now been completely removed, along with the vid:pid
-   blacklist of devices and the vid:pid greylist of RS232<->USB adapters.
+   blocklist of devices and the vid:pid greylist of RS232<->USB adapters.
 
  * Building from git no longer requires autoconf-archive, the needed AX_ macros
    are now shipped inside m4/.
@@ -735,7 +735,7 @@ The most important features and changes in this release are the following:
 
  * The daemon switched to 'STRICT' filter mode by default. The old 'DEFAULT'
    mode is renamed to 'LEGACY' and is considered now deprecated. Under the
-   'STRICT' filter mode, the TTY blacklist and greylist are ignored, and the
+   'STRICT' filter mode, the TTY blocklist and greylist are ignored, and the
    port probing mechanism uses its own heuristics to guess whether a given TTY
    is owned by a modem or not.
 
@@ -818,7 +818,7 @@ The most important features and changes in this release are the following:
    ** fibocom: added support for QMI based devices like the FM150.
    ** ublox: ignore error when disconnecting last LTE bearer.
    ** ublox: implement support to enable and detect +UUDTMF URCs.
-   ** ublox: added blacklist rules for GPS modules in the plugin itself.
+   ** ublox: added blocklist rules for GPS modules in the plugin itself.
    ** sierra: implement manual and automatic CDMA activation.
    ** novatel: implement manual and automatic CDMA activation.
 
@@ -1091,17 +1091,17 @@ The most important features and changes in this release are the following:
    ** WHITELIST-ONLY: Only devices or ports explicitly whitelisted with the new
       'ID_MM_DEVICE_PROCESS' udev tag are probed.
    ** DEFAULT: All ports are allowed to be probed except for the ones explicitly
-      greylisted as RS232 adapters or completely blacklisted. This is the
+      greylisted as RS232 adapters or completely blocklisted. This is the
       default approach that was used until now, and the default as well in this
       release if a different one isn't requested.
    ** STRICT: The daemon defines a set of heuristics to try to detect modems and
       ports to probe. Only the TTY ports that are very very likely to be modem
       ports are probed, therefore completely avoiding the need of having a
-      separate blacklist or RS232 adapter greylist. But note that this policy
+      separate blocklist or RS232 adapter greylist. But note that this policy
       may end up ignoring some devices, like TTY controlled modems without an
       associated network port.
    ** PARANOID: This is equivalent to running the STRICT mode but also applying
-      the blacklist and RS232 greylist filters explicitly.
+      the blocklist and RS232 greylist filters explicitly.
 
  * Device 'naming'. This release includes logic to allow 'naming' devices with
    the ID_MM_PHYSDEV_UID udev tag, so that the names can then be used in e.g.
