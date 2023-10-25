@@ -520,7 +520,7 @@ wdm_probe_qmi (MMPortProbe *self)
 
     mm_port_qmi_open (ctx->port_qmi,
                       FALSE,
-                      NULL,
+                      g_task_get_cancellable (self->priv->task),
                       (GAsyncReadyCallback) port_qmi_open_ready,
                       self);
 #else
