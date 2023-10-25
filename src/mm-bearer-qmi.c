@@ -1238,7 +1238,7 @@ mobile_equipment_error_from_start_network_output (MMBearerQmi                   
         /* If we have a 3GPP verbose call end reason, we try to build an error
          * with the exact error code and message */
         if (verbose_cer_type == QMI_WDS_VERBOSE_CALL_END_REASON_TYPE_3GPP)
-            return qmi_mobile_equipment_error_from_verbose_call_end_reason_3gpp ((QmiWdsVerboseCallEndReason3gpp)verbose_cer_reason, self);
+            return mm_error_from_wds_verbose_call_end_reason_3gpp ((QmiWdsVerboseCallEndReason3gpp)verbose_cer_reason, self);
 
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN,
                             "Call failed: %s error: %s", verbose_cer_type_str, verbose_cer_reason_str);
@@ -1405,7 +1405,7 @@ packet_service_status_indication_cb (QmiClientWds *client,
             /* If we have a 3GPP verbose call end reason, we try to build an error
              * with the exact error code and message */
             if (verbose_cer_type == QMI_WDS_VERBOSE_CALL_END_REASON_TYPE_3GPP)
-                connection_error = qmi_mobile_equipment_error_from_verbose_call_end_reason_3gpp ((QmiWdsVerboseCallEndReason3gpp)verbose_cer_reason, self);
+                connection_error = mm_error_from_wds_verbose_call_end_reason_3gpp ((QmiWdsVerboseCallEndReason3gpp)verbose_cer_reason, self);
             else
                 connection_error = g_error_new (MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN,
                                                 "Call failed: %s error: %s", verbose_cer_type_str, verbose_cer_reason_str);

@@ -2390,8 +2390,8 @@ static const MMMobileEquipmentError qmi_vcer_3gpp_errors[] = {
 };
 
 GError *
-qmi_mobile_equipment_error_from_verbose_call_end_reason_3gpp (QmiWdsVerboseCallEndReason3gpp vcer_3gpp,
-                                                              gpointer                       log_object)
+mm_error_from_wds_verbose_call_end_reason_3gpp (QmiWdsVerboseCallEndReason3gpp vcer_3gpp,
+                                                gpointer                       log_object)
 {
     MMMobileEquipmentError  error_code;
     const gchar            *msg;
