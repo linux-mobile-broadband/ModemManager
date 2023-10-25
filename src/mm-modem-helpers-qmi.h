@@ -150,9 +150,6 @@ QmiWdsApnTypeMask    mm_bearer_apn_type_to_qmi_apn_type             (MMBearerApn
                                                                      gpointer        log_object);
 MMBearerApnType      mm_bearer_apn_type_from_qmi_apn_type           (QmiWdsApnTypeMask apn_type);
 
-GError *mm_error_from_wds_verbose_call_end_reason_3gpp (QmiWdsVerboseCallEndReason3gpp vcer_3gpp,
-                                                        gpointer                       log_object);
-
 /*****************************************************************************/
 /* QMI/WDA to MM translations */
 
@@ -167,12 +164,6 @@ QmiOmaSessionType mm_oma_session_type_to_qmi_oma_session_type (MMOmaSessionType 
 MMOmaSessionState mm_oma_session_state_from_qmi_oma_session_state (QmiOmaSessionState qmi_session_state);
 
 MMOmaSessionStateFailedReason mm_oma_session_state_failed_reason_from_qmi_oma_session_failed_reason (QmiOmaSessionFailedReason qmi_session_failed_reason);
-
-/*****************************************************************************/
-/* QMI/LOC to MM translations */
-
-gboolean mm_error_from_qmi_loc_indication_status (QmiLocIndicationStatus   status,
-                                                  GError                 **error);
 
 /*****************************************************************************/
 /* Utility to gather current capabilities from various sources */
@@ -260,5 +251,13 @@ gboolean mm_qmi_uim_get_configuration_output_parse (gpointer                    
 
 gboolean qmi_personalization_feature_from_mm_modem_3gpp_facility (MMModem3gppFacility                          facility,
                                                                   QmiUimCardApplicationPersonalizationFeature *o_feature);
+
+/*****************************************************************************/
+/* MM error translations */
+
+GError   *mm_error_from_wds_verbose_call_end_reason_3gpp (QmiWdsVerboseCallEndReason3gpp   vcer_3gpp,
+                                                          gpointer                         log_object);
+gboolean  mm_error_from_qmi_loc_indication_status        (QmiLocIndicationStatus           status,
+                                                          GError                         **error);
 
 #endif  /* MM_MODEM_HELPERS_QMI_H */
