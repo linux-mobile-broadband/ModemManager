@@ -29,5 +29,9 @@ GError *mm_mobile_equipment_error_for_string (const gchar            *str,   gpo
 GError *mm_message_error_for_code            (MMMessageError          code,  gpointer log_object);
 GError *mm_message_error_for_string          (const gchar            *str,   gpointer log_object);
 GError *mm_normalize_error                   (const GError           *error);
+void    mm_register_error_mapping            (GQuark                  input_error_domain,
+                                              gint                    input_error_code,
+                                              GQuark                  output_error_domain,
+                                              gint                    output_error_code);
 
 #endif /* MM_ERROR_HELPERS_H */

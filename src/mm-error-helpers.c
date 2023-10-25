@@ -519,6 +519,113 @@ cdma_activation_error_get_string (MMCdmaActivationError code)
 }
 
 /******************************************************************************/
+/* Registered error mappings */
+
+typedef struct {
+    GQuark error_domain;
+    gint   error_code;
+} DomainCodePair;
+
+static guint
+domain_code_pair_hash_func (const DomainCodePair *pair)
+{
+    gint64 val;
+
+    /* The value of the GQuark error domain is selected during runtime based on the amount of
+     * error types that are registered in the type system. */
+    val = ((gint64)pair->error_domain << 31) | pair->error_code;
+    return g_int64_hash (&val);
+}
+
+static gboolean
+domain_code_pair_equal_func (const DomainCodePair *a,
+                             const DomainCodePair *b)
+{
+    return (a->error_domain == b->error_domain) && (a->error_code == b->error_code);
+}
+
+static void
+domain_code_pair_free (DomainCodePair *pair)
+{
+    g_slice_free (DomainCodePair, pair);
+}
+
+/* Map of a input domain/code error to an output domain/code error. This HT exists
+ * for as long as the process is running, it is not explicitly freed on exit. */
+static GHashTable *error_mappings;
+
+void
+mm_register_error_mapping (GQuark input_error_domain,
+                           gint   input_error_code,
+                           GQuark output_error_domain,
+                           gint   output_error_code)
+{
+    DomainCodePair *input;
+    DomainCodePair *output;
+
+    if (G_UNLIKELY (!error_mappings))
+        error_mappings = g_hash_table_new_full ((GHashFunc)domain_code_pair_hash_func,
+                                                (GEqualFunc)domain_code_pair_equal_func,
+                                                (GDestroyNotify)domain_code_pair_free,
+                                                (GDestroyNotify)domain_code_pair_free);
+
+    input = g_slice_new0 (DomainCodePair);
+    input->error_domain = input_error_domain;
+    input->error_code   = input_error_code;
+
+    /* ensure no other error is registered with the same hash, we don't want or
+     * expect dupicates*/
+    g_assert (!g_hash_table_lookup (error_mappings, input));
+
+    output = g_slice_new0 (DomainCodePair);
+    output->error_domain = output_error_domain;
+    output->error_code = output_error_code;
+
+    g_hash_table_insert (error_mappings, input, output);
+}
+
+static GError *
+normalize_mapped_error (const GError *error)
+{
+    DomainCodePair *output = NULL;
+    const gchar    *input_error_type;
+
+#if defined WITH_QMI
+    if (error->domain == QMI_CORE_ERROR)
+        input_error_type = "QMI core";
+    else if (error->domain == QMI_PROTOCOL_ERROR)
+        input_error_type = "QMI protocol";
+    else
+#endif
+#if defined WITH_MBIM
+    if (error->domain == MBIM_CORE_ERROR)
+        input_error_type = "MBIM core";
+    else if (error->domain == MBIM_PROTOCOL_ERROR)
+        input_error_type = "MBIM protocol";
+    else if (error->domain == MBIM_STATUS_ERROR)
+        input_error_type = "MBIM status";
+    else
+#endif
+        input_error_type = "unknown domain";
+
+    if (error_mappings) {
+        DomainCodePair input;
+
+        input.error_domain = error->domain;
+        input.error_code   = error->code;
+        output = g_hash_table_lookup (error_mappings, &input);
+    }
+
+    if (!output)
+        return g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                            "Unhandled %s error (%u): %s",
+                            input_error_type, error->code, error->message);
+
+    return g_error_new (output->error_domain, output->error_code,
+                        "%s error: %s", input_error_type, error->message);
+}
+
+/******************************************************************************/
 /* Takes a GError of any kind and ensures that the returned GError is a
  * MM-defined one. */
 
@@ -570,6 +677,6 @@ mm_normalize_error (const GError *error)
     if (error->domain == MM_CDMA_ACTIVATION_ERROR)
         return normalize_mm_error (error, cdma_activation_error_get_string (error->code), "CDMA activation");
 
-    /* Generic fallback */
-    return g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "%s", error->message);
+    /* Normalize mapped errors */
+    return normalize_mapped_error (error);
 }
