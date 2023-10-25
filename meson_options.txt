@@ -53,6 +53,7 @@ option('plugin_mbm', type: 'feature', value: 'auto', description: 'enable mbm pl
 option('plugin_motorola', type: 'feature', value: 'auto', description: 'enable motorola plugin support')
 option('plugin_mtk_legacy', type: 'feature', value: 'auto', description: 'enable mtk
 legacy plugin support')
+option('plugin_mtk', type: 'feature', value: 'auto', description: 'enable mtk plugin support')
 option('plugin_nokia', type: 'feature', value: 'auto', description: 'enable nokia plugin support')
 
 # shared_icera
