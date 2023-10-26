@@ -192,11 +192,11 @@ test_error_helpers_normalize (void)
     normalize_and_assert_mm_error (TRUE,  MM_CDMA_ACTIVATION_ERROR, 123456,                           "Unknown CDMA activation error");
 
 #if defined WITH_QMI
-    normalize_and_assert_mm_error (TRUE, QMI_CORE_ERROR, QMI_CORE_ERROR_TIMEOUT, "Known QMI core error");
-    normalize_and_assert_mm_error (TRUE, QMI_CORE_ERROR, 123456,                 "Unknown QMI core error");
+    normalize_and_assert_mm_error (FALSE, QMI_CORE_ERROR, QMI_CORE_ERROR_TIMEOUT, "Known QMI core error");
+    normalize_and_assert_mm_error (TRUE,  QMI_CORE_ERROR, 123456,                 "Unknown QMI core error");
 
-    normalize_and_assert_mm_error (TRUE, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_ABORTED, "Known QMI protocol error");
-    normalize_and_assert_mm_error (TRUE, QMI_PROTOCOL_ERROR, 123456,                     "Unknown QMI protocol error");
+    normalize_and_assert_mm_error (FALSE, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_ABORTED, "Known QMI protocol error");
+    normalize_and_assert_mm_error (TRUE,  QMI_PROTOCOL_ERROR, 123456,                     "Unknown QMI protocol error");
 #endif
 
 #if defined WITH_MBIM

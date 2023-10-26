@@ -255,6 +255,7 @@ gboolean qmi_personalization_feature_from_mm_modem_3gpp_facility (MMModem3gppFac
 /*****************************************************************************/
 /* MM error translations */
 
+void      mm_register_qmi_errors                         (void);
 GError   *mm_error_from_wds_verbose_call_end_reason_3gpp (QmiWdsVerboseCallEndReason3gpp   vcer_3gpp,
                                                           gpointer                         log_object);
 gboolean  mm_error_from_qmi_loc_indication_status        (QmiLocIndicationStatus           status,

@@ -25,6 +25,7 @@
 
 #if defined WITH_QMI
 # include <libqmi-glib.h>
+# include "mm-modem-helpers-qmi.h"
 #endif
 
 #if defined WITH_MBIM
@@ -593,6 +594,9 @@ normalize_mapped_error (const GError *error)
 
 #if defined WITH_MBIM
     mm_register_mbim_errors ();
+#endif
+#if defined WITH_QMI
+    mm_register_qmi_errors ();
 #endif
 
 #if defined WITH_QMI
