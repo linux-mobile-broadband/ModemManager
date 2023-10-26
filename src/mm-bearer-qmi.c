@@ -1212,8 +1212,8 @@ register_for_wds_indication (ConnectContext *ctx,
 }
 
 static GError *
-mobile_equipment_error_from_start_network_output (MMBearerQmi                     *self,
-                                                  QmiMessageWdsStartNetworkOutput *output)
+error_from_start_network_output (MMBearerQmi                     *self,
+                                 QmiMessageWdsStartNetworkOutput *output)
 {
     QmiWdsCallEndReason            cer;
     QmiWdsVerboseCallEndReasonType verbose_cer_type;
@@ -1224,24 +1224,7 @@ mobile_equipment_error_from_start_network_output (MMBearerQmi                   
             &verbose_cer_type,
             &verbose_cer_reason,
             NULL)) {
-        const gchar *verbose_cer_type_str;
-        const gchar *verbose_cer_reason_str;
-
-        verbose_cer_type_str = qmi_wds_verbose_call_end_reason_type_get_string (verbose_cer_type);
-        verbose_cer_reason_str = qmi_wds_verbose_call_end_reason_get_string (verbose_cer_type, verbose_cer_reason);
-        mm_obj_msg (self, "  verbose call end reason (%u,%d): [%s] %s",
-                    verbose_cer_type,
-                    verbose_cer_reason,
-                    verbose_cer_type_str,
-                    verbose_cer_reason_str);
-
-        /* If we have a 3GPP verbose call end reason, we try to build an error
-         * with the exact error code and message */
-        if (verbose_cer_type == QMI_WDS_VERBOSE_CALL_END_REASON_TYPE_3GPP)
-            return mm_error_from_wds_verbose_call_end_reason_3gpp ((QmiWdsVerboseCallEndReason3gpp)verbose_cer_reason, self);
-
-        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN,
-                            "Call failed: %s error: %s", verbose_cer_type_str, verbose_cer_reason_str);
+        return mm_error_from_wds_verbose_call_end_reason (verbose_cer_type, verbose_cer_reason, self);
     }
 
     if (qmi_message_wds_start_network_output_get_call_end_reason (
@@ -1294,7 +1277,7 @@ start_network_ready (QmiClientWds *client,
             mm_obj_msg (self, "couldn't start %s network: %s", ctx->running_ipv4 ? "IPv4" : "IPv6", error->message);
             if (g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_CALL_FAILED)) {
                 g_clear_error (&error);
-                error = mobile_equipment_error_from_start_network_output (self, output);
+                error = error_from_start_network_output (self, output);
             }
         }
     }
@@ -1391,28 +1374,12 @@ packet_service_status_indication_cb (QmiClientWds *client,
                 &verbose_cer_type,
                 &verbose_cer_reason,
                 NULL)) {
-            const gchar *verbose_cer_type_str;
-            const gchar *verbose_cer_reason_str;
-
-            verbose_cer_type_str = qmi_wds_verbose_call_end_reason_type_get_string (verbose_cer_type);
-            verbose_cer_reason_str = qmi_wds_verbose_call_end_reason_get_string (verbose_cer_type, verbose_cer_reason);
-            mm_obj_msg (self, "verbose call end reason (%u,%d): [%s] %s",
-                        verbose_cer_type,
-                        verbose_cer_reason,
-                        verbose_cer_type_str,
-                        verbose_cer_reason_str);
-
-            /* If we have a 3GPP verbose call end reason, we try to build an error
-             * with the exact error code and message */
-            if (verbose_cer_type == QMI_WDS_VERBOSE_CALL_END_REASON_TYPE_3GPP)
-                connection_error = mm_error_from_wds_verbose_call_end_reason_3gpp ((QmiWdsVerboseCallEndReason3gpp)verbose_cer_reason, self);
-            else
-                connection_error = g_error_new (MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN,
-                                                "Call failed: %s error: %s", verbose_cer_type_str, verbose_cer_reason_str);
-        } else if  (qmi_indication_wds_packet_service_status_output_get_call_end_reason (
-                        output,
-                        &cer,
-                        NULL)) {
+            /* Create MM error based on the verbose call end reason details */
+            connection_error = mm_error_from_wds_verbose_call_end_reason (verbose_cer_type, verbose_cer_reason, self);
+        } else if (qmi_indication_wds_packet_service_status_output_get_call_end_reason (
+                       output,
+                       &cer,
+                       NULL)) {
             const gchar *cer_str;
 
             cer_str = qmi_wds_call_end_reason_get_string (cer);

@@ -3189,6 +3189,91 @@ qmi_personalization_feature_from_mm_modem_3gpp_facility (MMModem3gppFacility    
 
 /*****************************************************************************/
 
+typedef struct {
+    QmiWdsVerboseCallEndReasonInternal vcer;
+    gboolean                           is_core_error; /* TRUE if MM_CORE_ERROR, FALSE if MM_MOBILE_EQUIPMENT_ERROR */
+    guint                              error_code;
+} InternalErrorMap;
+
+static const InternalErrorMap internal_error_map[] = {
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_ERROR */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_CALL_ENDED */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_UNKNOWN_INTERNAL_CAUSE */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_UNKNOWN_CAUSE */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_CLOSE_IN_PROGRESS */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_NETWORK_INITIATED_TERMINATION */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_APP_PREEMPTED */
+    { QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_PDN_IPV4_CALL_DISALLOWED, FALSE, MM_MOBILE_EQUIPMENT_ERROR_IPV6_ONLY_ALLOWED },
+    { QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_PDN_IPV4_CALL_THROTTLED, TRUE, MM_CORE_ERROR_THROTTLED },
+    { QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_PDN_IPV6_CALL_DISALLOWED, FALSE, MM_MOBILE_EQUIPMENT_ERROR_IPV4_ONLY_ALLOWED },
+    { QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_PDN_IPV6_CALL_THROTTLED, TRUE, MM_CORE_ERROR_THROTTLED },
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_MODEM_RESTART */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_PDP_PPP_NOT_SUPPORTED */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_UNPREFERRED_RAT */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_PHYSICAL_LINK_CLOSE_IN_PROGRESS */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_APN_PENDING_HANDOVER */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_PROFILE_BEARER_INCOMPATIBLE */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_MMGDSI_CARD_EVENT */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_LPM_OR_POWER_DOWN */
+    { QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_APN_DISABLED, FALSE, MM_MOBILE_EQUIPMENT_ERROR_MISSING_OR_UNKNOWN_APN },
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_MPIT_EXPIRED */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_IPV6_ADDRESS_TRANSFER_FAILED */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_TRAT_SWAP_FAILED */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_EHRPD_TO_HRPD_FALLBACK */
+    { QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_MANDATORY_APN_DISABLED, FALSE, MM_MOBILE_EQUIPMENT_ERROR_MISSING_OR_UNKNOWN_APN },
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_MIP_CONFIG_FAILURE */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_PDN_INACTIVITY_TIMER_EXPIRED */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_MAX_V4_CONNECTIONS */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_MAX_V6_CONNECTIONS */
+    { QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_APN_MISMATCH, FALSE, MM_MOBILE_EQUIPMENT_ERROR_MISSING_OR_UNKNOWN_APN },
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_IP_VERSION_MISMATCH */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_DUN_CALL_DISALLOWED */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_INVALID_PROFILE */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_EPC_NONEPC_TRANSITION */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_INVALID_PROFILE_ID */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_CALL_ALREADY_PRESENT */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_INTERFACE_IN_USE */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_IP_PDP_MISMATCH */
+    { QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_APN_DISALLOWED_ON_ROAMING, FALSE, MM_MOBILE_EQUIPMENT_ERROR_MISSING_OR_UNKNOWN_APN },
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_APN_PARAMETER_CHANGE */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_INTERFACE_IN_USE_CONFIG_MATCH */
+    { QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_NULL_APN_DISALLOWED, FALSE, MM_MOBILE_EQUIPMENT_ERROR_MISSING_OR_UNKNOWN_APN },
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_THERMAL_MITIGATION */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_SUBS_ID_MISMATCH */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_DATA_SETTINGS_DISABLED */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_DATA_ROAMING_SETTINGS_DISABLED */
+    { QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_APN_FORMAT_INVALID, FALSE, MM_MOBILE_EQUIPMENT_ERROR_MISSING_OR_UNKNOWN_APN },
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_DDS_CALL_ABORT */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_VALIDATION_FAILURE */
+};
+
+static GError *
+error_from_wds_verbose_call_end_reason_internal (QmiWdsVerboseCallEndReasonInternal  vcer_reason,
+                                                 const gchar                        *vcer_reason_str,
+                                                 gpointer                            log_object)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (internal_error_map); i++) {
+        if (internal_error_map[i].vcer == vcer_reason) {
+            GError *error;
+
+            g_assert (vcer_reason_str);
+            if (internal_error_map[i].is_core_error)
+                error = g_error_new_literal (MM_CORE_ERROR, internal_error_map[i].error_code, vcer_reason_str);
+            else {
+                error = mm_mobile_equipment_error_for_code (internal_error_map[i].error_code, log_object);
+                g_prefix_error (&error, "%s: ", vcer_reason_str);
+            }
+            return error;
+        }
+    }
+
+    return NULL;
+}
+
+/*****************************************************************************/
+
 static const MMMobileEquipmentError qmi_vcer_3gpp_errors[] = {
     [QMI_WDS_VERBOSE_CALL_END_REASON_3GPP_OPERATOR_DETERMINED_BARRING] = MM_MOBILE_EQUIPMENT_ERROR_OPERATOR_DETERMINED_BARRING,
     [QMI_WDS_VERBOSE_CALL_END_REASON_3GPP_INSUFFICIENT_RESOURCES] = MM_MOBILE_EQUIPMENT_ERROR_INSUFFICIENT_RESOURCES,
@@ -3233,30 +3318,61 @@ static const MMMobileEquipmentError qmi_vcer_3gpp_errors[] = {
     /* QMI_WDS_VERBOSE_CALL_END_REASON_3GPP_INVALID_PROXY_CALL_SESSION_CONTROL_FUNCTION_ADDRESS */
 };
 
-GError *
-mm_error_from_wds_verbose_call_end_reason_3gpp (QmiWdsVerboseCallEndReason3gpp vcer_3gpp,
-                                                gpointer                       log_object)
+static GError *
+error_from_wds_verbose_call_end_reason_3gpp (QmiWdsVerboseCallEndReason3gpp  vcer_reason,
+                                             const gchar                    *vcer_reason_str,
+                                             gpointer                        log_object)
 {
     MMMobileEquipmentError  error_code;
-    const gchar            *msg;
+    GError                 *error;
 
-    /* convert to mobile equipment error */
-    error_code = qmi_vcer_3gpp_errors[vcer_3gpp];
-    if (error_code)
-        return mm_mobile_equipment_error_for_code (error_code, log_object);
+    error_code = (vcer_reason < G_N_ELEMENTS (qmi_vcer_3gpp_errors)) ? qmi_vcer_3gpp_errors[vcer_reason] : 0;
+    if (!error_code)
+        return NULL;
 
-    /* provide a nicer error message on unmapped errors */
-    msg = qmi_wds_verbose_call_end_reason_3gpp_get_string (vcer_3gpp);
-    if (msg)
-        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN,
-                            "Unsupported error (%u): %s",
-                            vcer_3gpp, msg);
+    g_assert (vcer_reason_str);
+    error = mm_mobile_equipment_error_for_code (error_code, log_object);
+    g_prefix_error (&error, "%s: ", vcer_reason_str);
+    return error;
+}
 
-    /* fallback */
-    return g_error_new_literal (MM_MOBILE_EQUIPMENT_ERROR,
-                                MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN,
-                                "Unknown error");
+GError *
+mm_error_from_wds_verbose_call_end_reason (QmiWdsVerboseCallEndReasonType vcer_type,
+                                           guint                          vcer_reason,
+                                           gpointer                       log_object)
+{
+    GError      *error = NULL;
+    const gchar *vcer_type_str;
+    const gchar *vcer_reason_str;
+
+    vcer_type_str = qmi_wds_verbose_call_end_reason_type_get_string (vcer_type);
+    vcer_reason_str = qmi_wds_verbose_call_end_reason_get_string (vcer_type, vcer_reason);
+    mm_obj_msg (log_object, "verbose call end reason (%u,%d): [%s] %s",
+                vcer_type, vcer_reason, vcer_type_str, vcer_reason_str);
+
+    switch (vcer_type) {
+        case QMI_WDS_VERBOSE_CALL_END_REASON_TYPE_INTERNAL:
+            error = error_from_wds_verbose_call_end_reason_internal (vcer_reason, vcer_reason_str, log_object);
+            break;
+        case QMI_WDS_VERBOSE_CALL_END_REASON_TYPE_3GPP:
+            error = error_from_wds_verbose_call_end_reason_3gpp (vcer_reason, vcer_reason_str, log_object);
+            break;
+        case QMI_WDS_VERBOSE_CALL_END_REASON_TYPE_MIP:
+        case QMI_WDS_VERBOSE_CALL_END_REASON_TYPE_CM:
+        case QMI_WDS_VERBOSE_CALL_END_REASON_TYPE_PPP:
+        case QMI_WDS_VERBOSE_CALL_END_REASON_TYPE_EHRPD:
+        case QMI_WDS_VERBOSE_CALL_END_REASON_TYPE_IPV6:
+        default:
+            break;
+    }
+
+    if (error)
+        return error;
+
+    return g_error_new (MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN,
+                        "Call failed: %s error: %s",
+                        vcer_type_str ? vcer_type_str : "unknown",
+                        vcer_reason_str ? vcer_reason_str : "unknown");
 }
 
 /*****************************************************************************/
