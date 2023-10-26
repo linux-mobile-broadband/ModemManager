@@ -825,7 +825,7 @@ handle_register_ready (MMIfaceModem3gpp      *self,
             mm_obj_warn (self, "failed registering modem in '%s': %s", ctx->operator_id, error->message);
         else
             mm_obj_warn (self, "failed registering modem: %s", error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
         if (ctx->operator_id && ctx->operator_id[0])
             mm_obj_info (self, "modem registered in '%s'", ctx->operator_id);
@@ -846,7 +846,7 @@ handle_register_auth_ready (MMBaseModem           *self,
     GError       *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_register_context_free (ctx);
         return;
     }
@@ -866,8 +866,8 @@ handle_register_auth_ready (MMBaseModem           *self,
     case MM_MODEM_STATE_DISABLED:
     case MM_MODEM_STATE_DISABLING:
     case MM_MODEM_STATE_ENABLING:
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
-                                               "Device not yet enabled");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Device not yet enabled");
         handle_register_context_free (ctx);
         return;
 
@@ -889,8 +889,8 @@ handle_register_auth_ready (MMBaseModem           *self,
     case MM_MODEM_STATE_DISCONNECTING:
     case MM_MODEM_STATE_CONNECTING:
     case MM_MODEM_STATE_CONNECTED:
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
-                                               "Operation not allowed while modem is connected");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Operation not allowed while modem is connected");
         handle_register_context_free (ctx);
         return;
 
@@ -992,7 +992,7 @@ handle_scan_ready (MMIfaceModem3gpp  *self,
     info_list = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->scan_networks_finish (self, res, &error);
     if (error) {
         mm_obj_warn (self, "failed scanning networks: %s", error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_scan_context_free (ctx);
         return;
     }
@@ -1012,7 +1012,7 @@ handle_scan_auth_ready (MMBaseModem       *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_scan_context_free (ctx);
         return;
     }
@@ -1020,10 +1020,8 @@ handle_scan_auth_ready (MMBaseModem       *self,
     /* If scanning is not implemented, report an error */
     if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->scan_networks ||
         !MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->scan_networks_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot scan networks: operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot scan networks: operation not supported");
         handle_scan_context_free (ctx);
         return;
     }
@@ -1092,7 +1090,7 @@ after_set_load_eps_ue_mode_operation_ready (MMIfaceModem3gpp                   *
         mm_obj_warn (self, "failed reloading EPS UE mode of operation after update to '%s': %s",
                      mm_modem_3gpp_eps_ue_mode_operation_get_string (ctx->mode),
                      error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_eps_ue_mode_operation_context_free (ctx);
         return;
     }
@@ -1101,11 +1099,8 @@ after_set_load_eps_ue_mode_operation_ready (MMIfaceModem3gpp                   *
         mm_obj_info (self, "requested (%s) and reloaded (%s) EPS UE mode of operation don't match",
                      mm_modem_3gpp_eps_ue_mode_operation_get_string (ctx->mode),
                      mm_modem_3gpp_eps_ue_mode_operation_get_string (uemode));
-        g_dbus_method_invocation_return_error_literal (ctx->invocation,
-                                                       MM_CORE_ERROR,
-                                                       MM_CORE_ERROR_FAILED,
-
-                                                       "EPS UE mode of operation wasn't updated");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                                        "EPS UE mode of operation wasn't updated");
         handle_set_eps_ue_mode_operation_context_free (ctx);
         return;
     }
@@ -1126,7 +1121,7 @@ handle_set_eps_ue_mode_operation_ready (MMIfaceModem3gpp                   *self
         mm_obj_warn (self, "failed setting EPS UE mode of operation to '%s': %s",
                      mm_modem_3gpp_eps_ue_mode_operation_get_string (ctx->mode),
                      error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_eps_ue_mode_operation_context_free (ctx);
         return;
     }
@@ -1155,7 +1150,7 @@ handle_set_eps_ue_mode_operation_auth_ready (MMBaseModem                        
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_eps_ue_mode_operation_context_free (ctx);
         return;
     }
@@ -1171,10 +1166,8 @@ handle_set_eps_ue_mode_operation_auth_ready (MMBaseModem                        
     /* If UE mode update is not implemented, report an error */
     if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_eps_ue_mode_operation ||
         !MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_eps_ue_mode_operation_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot set UE mode of operation for EPS: operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot set UE mode of operation for EPS: operation not supported");
         handle_set_eps_ue_mode_operation_context_free (ctx);
         return;
     }
@@ -1244,7 +1237,7 @@ after_set_load_initial_eps_bearer_settings_ready (MMIfaceModem3gpp              
     new_config = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_settings_finish (self, res, &error);
     if (error) {
         mm_obj_warn (self, "failed reloading initial EPS bearer settings after update: %s", error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_initial_eps_bearer_settings_context_free (ctx);
         return;
     }
@@ -1253,7 +1246,7 @@ after_set_load_initial_eps_bearer_settings_ready (MMIfaceModem3gpp              
         mm_obj_warn (self, "requested and reloaded initial EPS bearer settings don't match");
         mm_obj_info (self, "reloaded initial EPS bearer settings:");
         mm_log_bearer_properties (self, MM_LOG_LEVEL_INFO, "  ", new_config);
-        g_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                                        "Initial EPS bearer settings were not updated");
         handle_set_initial_eps_bearer_settings_context_free (ctx);
         return;
@@ -1274,7 +1267,7 @@ set_initial_eps_bearer_settings_ready (MMIfaceModem3gpp                         
 
     if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_initial_eps_bearer_settings_finish (self, res, &error)) {
         mm_obj_warn (self, "failed setting initial EPS bearer settings: %s", error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_initial_eps_bearer_settings_context_free (ctx);
         return;
     }
@@ -1306,7 +1299,7 @@ set_initial_eps_bearer_settings_auth_ready (MMBaseModem                         
     g_autoptr(MMBearerProperties)  old_config = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_initial_eps_bearer_settings_context_free (ctx);
         return;
     }
@@ -1314,15 +1307,15 @@ set_initial_eps_bearer_settings_auth_ready (MMBaseModem                         
     /* If UE mode update is not implemented, report an error */
     if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_initial_eps_bearer_settings ||
         !MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_initial_eps_bearer_settings_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                               "Operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Operation not supported");
         handle_set_initial_eps_bearer_settings_context_free (ctx);
         return;
     }
 
     ctx->config = mm_bearer_properties_new_from_dictionary (ctx->dictionary, &error);
     if (!ctx->config) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_initial_eps_bearer_settings_context_free (ctx);
         return;
     }
@@ -1406,7 +1399,7 @@ update_lock_info_ready (MMIfaceModem                     *modem,
 
     mm_iface_modem_update_lock_info_finish (modem, res, &error);
     if (error) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_disable_facility_lock_context_free (ctx);
         return;
     }
@@ -1426,7 +1419,7 @@ handle_disable_facility_lock_ready (MMIfaceModem3gpp                 *self,
     if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->disable_facility_lock_finish (self, res, &error)) {
         mm_obj_warn (self, "failed disabling facility lock '%s': %s",
                      ctx->facility_str, error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_disable_facility_lock_context_free (ctx);
         return;
     }
@@ -1453,7 +1446,7 @@ disable_facility_lock_auth_ready (MMBaseModem                      *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_disable_facility_lock_context_free (ctx);
         return;
     }
@@ -1461,16 +1454,16 @@ disable_facility_lock_auth_ready (MMBaseModem                      *self,
     /* If disable facility locks is not implemented, report an error */
     if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->disable_facility_lock ||
         !MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->disable_facility_lock_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                               "Operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Operation not supported");
         handle_disable_facility_lock_context_free (ctx);
         return;
     }
 
     /* Parse properties dictionary */
     if (!g_variant_is_of_type (ctx->dictionary, G_VARIANT_TYPE ("(us)"))) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
-                                               "Invalid parameters");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                        "Invalid parameters");
         handle_disable_facility_lock_context_free (ctx);
         return;
     }
@@ -1490,8 +1483,8 @@ disable_facility_lock_auth_ready (MMBaseModem                      *self,
                                            MM_MODEM_3GPP_FACILITY_NET_SUB_PERS |
                                            MM_MODEM_3GPP_FACILITY_PROVIDER_PERS |
                                            MM_MODEM_3GPP_FACILITY_CORP_PERS))) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
-                                               "Invalid type of facility lock to disable or empty key");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                        "Invalid type of facility lock to disable or empty key");
         handle_disable_facility_lock_context_free (ctx);
         return;
     }
@@ -1613,7 +1606,7 @@ internal_set_packet_service_state_ready (MMIfaceModem3gpp                *self,
         mm_obj_warn (self, "failed setting packet service state to '%s': %s",
                      mm_modem_3gpp_packet_service_state_get_string (ctx->packet_service_state),
                      error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
         mm_obj_info (self, "packet service state set to '%s'",
                      mm_modem_3gpp_packet_service_state_get_string (ctx->packet_service_state));
@@ -1630,7 +1623,7 @@ set_packet_service_state_auth_ready (MMBaseModem                     *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_packet_service_state_context_free (ctx);
         return;
     }
@@ -1644,8 +1637,8 @@ set_packet_service_state_auth_ready (MMBaseModem                     *self,
 
     if ((ctx->packet_service_state != MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED) &&
         (ctx->packet_service_state != MM_MODEM_3GPP_PACKET_SERVICE_STATE_DETACHED)) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
-                                               "Invalid packet service state requested");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                        "Invalid packet service state requested");
         handle_set_packet_service_state_context_free (ctx);
         return;
     }
@@ -1712,7 +1705,7 @@ after_set_load_nr5g_registration_settings_ready (MMIfaceModem3gpp               
 
     new_settings = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_nr5g_registration_settings_finish (self, res, &error);
     if (error) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_nr5g_registration_settings_context_free (ctx);
         return;
     }
@@ -1721,8 +1714,8 @@ after_set_load_nr5g_registration_settings_ready (MMIfaceModem3gpp               
 
     if (!mm_nr5g_registration_settings_cmp (new_settings, ctx->settings)) {
         mm_obj_info (self, "requested and reloaded 5GNR registration settings don't match");
-        g_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                                       "5GNR registration settings were not updated");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                                        "5GNR registration settings were not updated");
         handle_set_nr5g_registration_settings_context_free (ctx);
         return;
     }
@@ -1742,7 +1735,7 @@ set_nr5g_registration_settings_ready (MMIfaceModem3gpp                         *
 
     if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_nr5g_registration_settings_finish (self, res, &error)) {
         mm_obj_warn (self, "failed setting 5GNR registration settings: %s", error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_nr5g_registration_settings_context_free (ctx);
         return;
     }
@@ -1774,7 +1767,7 @@ set_nr5g_registration_settings_auth_ready (MMBaseModem                          
     MMModem3gppMicoMode                    new_mico_mode;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_nr5g_registration_settings_context_free (ctx);
         return;
     }
@@ -1782,15 +1775,15 @@ set_nr5g_registration_settings_auth_ready (MMBaseModem                          
     /* If 5GNR registration settings update is not implemented, report an error */
     if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_nr5g_registration_settings ||
         !MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_nr5g_registration_settings_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                               "Operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Operation not supported");
         handle_set_nr5g_registration_settings_context_free (ctx);
         return;
     }
 
     ctx->settings = mm_nr5g_registration_settings_new_from_dictionary (ctx->dictionary, &error);
     if (!ctx->settings) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_nr5g_registration_settings_context_free (ctx);
         return;
     }
@@ -1799,7 +1792,7 @@ set_nr5g_registration_settings_auth_ready (MMBaseModem                          
     if (new_drx_cycle == MM_MODEM_3GPP_DRX_CYCLE_UNSUPPORTED) {
         g_set_error (&error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS, "Invalid value for DRX cycle: %s",
                      mm_modem_3gpp_drx_cycle_get_string (new_drx_cycle));
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_nr5g_registration_settings_context_free (ctx);
         return;
     }
@@ -1808,7 +1801,7 @@ set_nr5g_registration_settings_auth_ready (MMBaseModem                          
     if (new_mico_mode == MM_MODEM_3GPP_MICO_MODE_UNSUPPORTED) {
         g_set_error (&error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS, "Invalid value for MICO mode: %s",
                      mm_modem_3gpp_mico_mode_get_string (new_mico_mode));
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_nr5g_registration_settings_context_free (ctx);
         return;
     }
@@ -3396,7 +3389,7 @@ handle_set_carrier_lock_ready (MMIfaceModem3gpp            *self,
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_carrier_lock_finish (self, res, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem3gpp_complete_set_carrier_lock (ctx->skeleton, ctx->invocation);
     handle_set_carrier_lock_context_free (ctx);
@@ -3412,7 +3405,7 @@ handle_set_carrier_lock_auth_ready (MMBaseModem                 *self,
     gsize         data_size;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_carrier_lock_context_free (ctx);
         return;
     }
@@ -3420,11 +3413,9 @@ handle_set_carrier_lock_auth_ready (MMBaseModem                 *self,
     /* If carrier lock is not implemented, report an error */
     if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_carrier_lock ||
         !MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_carrier_lock_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot send set carrier lock request to modem: "
-                                               "operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot send set carrier lock request to modem: "
+                                                        "operation not supported");
         handle_set_carrier_lock_context_free (ctx);
         return;
     }

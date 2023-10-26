@@ -19,6 +19,7 @@
 
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-firmware.h"
+#include "mm-error-helpers.h"
 #include "mm-log-object.h"
 
 #if defined WITH_QMI
@@ -73,7 +74,7 @@ load_current_ready (MMIfaceModemFirmware *self,
     if (!ctx->current) {
         /* Not found isn't fatal */
         if (!g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND)) {
-            g_dbus_method_invocation_take_error (ctx->invocation, error);
+            mm_dbus_method_invocation_take_error (ctx->invocation, error);
             handle_list_context_free (ctx);
             return;
         }
@@ -110,7 +111,7 @@ load_list_ready (MMIfaceModemFirmware *self,
     if (!ctx->list) {
         /* Not found isn't fatal */
         if (!g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND)) {
-            g_dbus_method_invocation_take_error (ctx->invocation, error);
+            mm_dbus_method_invocation_take_error (ctx->invocation, error);
             handle_list_context_free (ctx);
             return;
         }
@@ -131,7 +132,7 @@ list_auth_ready (MMBaseModem *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_list_context_free (ctx);
         return;
     }
@@ -140,10 +141,8 @@ list_auth_ready (MMBaseModem *self,
         !MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->load_list_finish ||
         !MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->load_current ||
         !MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->load_current_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot list firmware: operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot list firmware: operation not supported");
         handle_list_context_free (ctx);
         return;
     }
@@ -202,7 +201,7 @@ change_current_ready (MMIfaceModemFirmware *self,
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->change_current_finish (self, res, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem_firmware_complete_select (ctx->skeleton, ctx->invocation);
     handle_select_context_free (ctx);
@@ -216,7 +215,7 @@ select_auth_ready (MMBaseModem *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_select_context_free (ctx);
         return;
     }
@@ -224,10 +223,8 @@ select_auth_ready (MMBaseModem *self,
 
     if (!MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->change_current ||
         !MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->change_current_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot select firmware: operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot select firmware: operation not supported");
         handle_select_context_free (ctx);
         return;
     }

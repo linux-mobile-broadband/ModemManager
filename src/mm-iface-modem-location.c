@@ -22,6 +22,7 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-location.h"
 #include "mm-log-object.h"
+#include "mm-error-helpers.h"
 #include "mm-modem-helpers.h"
 
 #define MM_LOCATION_GPS_REFRESH_TIME_SECS 30
@@ -913,7 +914,7 @@ setup_gathering_ready (MMIfaceModemLocation *self,
     GError *error = NULL;
 
     if (!setup_gathering_finish (self, res, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem_location_complete_setup (ctx->skeleton, ctx->invocation);
 
@@ -932,7 +933,7 @@ handle_setup_auth_ready (MMBaseModem *self,
     gchar *str;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_setup_context_free (ctx);
         return;
     }
@@ -942,11 +943,8 @@ handle_setup_auth_ready (MMBaseModem *self,
                   MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
     if (modem_state < MM_MODEM_STATE_ENABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot setup location: "
-                                               "device not yet enabled");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot setup location: device not yet enabled");
         handle_setup_context_free (ctx);
         return;
     }
@@ -955,11 +953,8 @@ handle_setup_auth_ready (MMBaseModem *self,
     not_supported = ((mm_gdbus_modem_location_get_capabilities (ctx->skeleton) ^ ctx->sources) & ctx->sources);
     if (not_supported != MM_MODEM_LOCATION_SOURCE_NONE) {
         str = mm_modem_location_source_build_string_from_mask (not_supported);
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot enable unsupported location sources: '%s'",
-                                               str);
+        mm_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot enable unsupported location sources: '%s'", str);
         handle_setup_context_free (ctx);
         g_free (str);
         return;
@@ -1048,7 +1043,7 @@ set_supl_server_ready (MMIfaceModemLocation *self,
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->set_supl_server_finish (self, res, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         mm_gdbus_modem_location_set_supl_server (ctx->skeleton, ctx->supl);
         mm_gdbus_modem_location_complete_set_supl_server (ctx->skeleton, ctx->invocation);
@@ -1066,7 +1061,7 @@ handle_set_supl_server_auth_ready (MMBaseModem *self,
     MMModemState modem_state;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_supl_server_context_free (ctx);
         return;
     }
@@ -1076,28 +1071,23 @@ handle_set_supl_server_auth_ready (MMBaseModem *self,
                   MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
     if (modem_state < MM_MODEM_STATE_ENABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot set SUPL server: "
-                                               "device not yet enabled");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot set SUPL server: device not yet enabled");
         handle_set_supl_server_context_free (ctx);
         return;
     }
 
     /* If A-GPS is NOT supported, set error */
     if (!(mm_gdbus_modem_location_get_capabilities (ctx->skeleton) & (MM_MODEM_LOCATION_SOURCE_AGPS_MSA | MM_MODEM_LOCATION_SOURCE_AGPS_MSB))) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot set SUPL server: A-GPS not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot set SUPL server: A-GPS not supported");
         handle_set_supl_server_context_free (ctx);
         return;
     }
 
     /* Validate SUPL address string: either FQDN:PORT or IP:PORT */
     if (!mm_parse_supl_address (ctx->supl, NULL, NULL, NULL, &error)) {
-        g_dbus_method_invocation_return_gerror (ctx->invocation, error);
+        mm_dbus_method_invocation_return_gerror (ctx->invocation, error);
         handle_set_supl_server_context_free (ctx);
         return;
     }
@@ -1105,10 +1095,8 @@ handle_set_supl_server_auth_ready (MMBaseModem *self,
     /* Check if plugin implements it */
     if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->set_supl_server ||
         !MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->set_supl_server_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot set SUPL server: not implemented");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot set SUPL server: not implemented");
         handle_set_supl_server_context_free (ctx);
         return;
     }
@@ -1169,7 +1157,7 @@ inject_assistance_data_ready (MMIfaceModemLocation              *self,
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->inject_assistance_data_finish (self, res, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem_location_complete_inject_assistance_data (ctx->skeleton, ctx->invocation);
 
@@ -1186,17 +1174,15 @@ handle_inject_assistance_data_auth_ready (MMBaseModem                       *sel
     gsize         data_size;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_inject_assistance_data_context_free (ctx);
         return;
     }
 
     /* If the type is NOT supported, set error */
     if (mm_gdbus_modem_location_get_supported_assistance_data (ctx->skeleton) == MM_MODEM_LOCATION_ASSISTANCE_DATA_TYPE_NONE) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot inject assistance data: ununsupported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot inject assistance data: ununsupported");
         handle_inject_assistance_data_context_free (ctx);
         return;
     }
@@ -1204,10 +1190,8 @@ handle_inject_assistance_data_auth_ready (MMBaseModem                       *sel
     /* Check if plugin implements it */
     if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->inject_assistance_data ||
         !MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->inject_assistance_data_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot inject assistance data: not implemented");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot inject assistance data: not implemented");
         handle_inject_assistance_data_context_free (ctx);
         return;
     }
@@ -1271,7 +1255,7 @@ handle_set_gps_refresh_rate_auth_ready (MMBaseModem *self,
     MMModemState modem_state;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_gps_refresh_rate_context_free (ctx);
         return;
     }
@@ -1281,11 +1265,8 @@ handle_set_gps_refresh_rate_auth_ready (MMBaseModem *self,
                   MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
     if (modem_state < MM_MODEM_STATE_ENABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot set SUPL server: "
-                                               "device not yet enabled");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot set SUPL server: device not yet enabled");
         handle_set_gps_refresh_rate_context_free (ctx);
         return;
     }
@@ -1293,10 +1274,8 @@ handle_set_gps_refresh_rate_auth_ready (MMBaseModem *self,
     /* If GPS is NOT supported, set error */
     if (!(mm_gdbus_modem_location_get_capabilities (ctx->skeleton) & ((MM_MODEM_LOCATION_SOURCE_GPS_RAW |
                                                                        MM_MODEM_LOCATION_SOURCE_GPS_NMEA)))) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot set GPS refresh rate: GPS not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot set GPS refresh rate: GPS not supported");
         handle_set_gps_refresh_rate_context_free (ctx);
         return;
     }
@@ -1356,7 +1335,7 @@ handle_get_location_auth_ready (MMBaseModem *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_get_location_context_free (ctx);
         return;
     }
@@ -1366,11 +1345,8 @@ handle_get_location_auth_ready (MMBaseModem *self,
                   MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
     if (modem_state < MM_MODEM_STATE_ENABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot get location: "
-                                               "device not yet enabled");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot get location: device not yet enabled");
         handle_get_location_context_free (ctx);
         return;
     }

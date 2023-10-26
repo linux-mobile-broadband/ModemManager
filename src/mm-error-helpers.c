@@ -712,3 +712,49 @@ mm_normalize_error (const GError *error)
     /* Normalize mapped errors */
     return normalize_mapped_error (error);
 }
+
+/******************************************************************************/
+
+void
+mm_dbus_method_invocation_take_error (GDBusMethodInvocation *invocation,
+                                      GError                *error)
+{
+    g_autoptr(GError) taken = error;
+
+    mm_dbus_method_invocation_return_gerror (invocation, taken);
+}
+
+void
+mm_dbus_method_invocation_return_error_literal (GDBusMethodInvocation *invocation,
+                                                GQuark                 domain,
+                                                gint                   code,
+                                                const gchar           *message)
+{
+    g_autoptr(GError) error = NULL;
+
+    error = g_error_new_literal (domain, code, message);
+    mm_dbus_method_invocation_return_gerror (invocation, error);
+}
+
+void
+mm_dbus_method_invocation_return_error (GDBusMethodInvocation *invocation,
+                                        GQuark                 domain,
+                                        gint                   code,
+                                        const gchar           *format,
+                                        ...)
+{
+    va_list           var_args;
+    g_autoptr(GError) error = NULL;
+
+    va_start (var_args, format);
+    error = g_error_new_valist (domain, code, format, var_args);
+    mm_dbus_method_invocation_return_gerror (invocation, error);
+    va_end (var_args);
+}
+
+void
+mm_dbus_method_invocation_return_gerror (GDBusMethodInvocation *invocation,
+                                         const GError          *error)
+{
+    g_dbus_method_invocation_take_error (invocation, mm_normalize_error (error));
+}

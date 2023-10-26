@@ -34,4 +34,20 @@ void    mm_register_error_mapping            (GQuark                  input_erro
                                               GQuark                  output_error_domain,
                                               gint                    output_error_code);
 
+/* Replacements for the dbus method invocation completions but with our error normalization
+ * procedure in place, so that we only report back MM-specific errors. */
+void mm_dbus_method_invocation_take_error           (GDBusMethodInvocation *invocation,
+                                                     GError                *error);
+void mm_dbus_method_invocation_return_error_literal (GDBusMethodInvocation *invocation,
+                                                     GQuark                 domain,
+                                                     gint                   code,
+                                                     const gchar           *message);
+void mm_dbus_method_invocation_return_error         (GDBusMethodInvocation *invocation,
+                                                     GQuark                 domain,
+                                                     gint                   code,
+                                                     const gchar           *format,
+                                                     ...) G_GNUC_PRINTF(4, 5);;
+void mm_dbus_method_invocation_return_gerror        (GDBusMethodInvocation *invocation,
+                                                     const GError          *error);
+
 #endif /* MM_ERROR_HELPERS_H */

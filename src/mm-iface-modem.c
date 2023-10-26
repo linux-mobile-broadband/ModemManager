@@ -29,6 +29,7 @@
 #include "mm-base-sim.h"
 #include "mm-bearer-list.h"
 #include "mm-private-boxed-types.h"
+#include "mm-error-helpers.h"
 #include "mm-log-object.h"
 #include "mm-log-helpers.h"
 #include "mm-context.h"
@@ -550,11 +551,8 @@ mm_iface_modem_abort_invocation_if_state_not_reached (MMIfaceModem          *sel
     if (state >= minimum_required)
         return FALSE;
 
-    g_dbus_method_invocation_return_error (invocation,
-                                           MM_CORE_ERROR,
-                                           MM_CORE_ERROR_WRONG_STATE,
-                                           "modem in %s state",
-                                           mm_modem_state_get_string (state));
+    mm_dbus_method_invocation_return_error (invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                            "modem in %s state", mm_modem_state_get_string (state));
     return TRUE;
 }
 
@@ -957,7 +955,7 @@ handle_create_bearer_ready (MMIfaceModem              *self,
     bearer = mm_iface_modem_create_bearer_finish (self, res, &error);
     if (!bearer) {
         mm_obj_warn (self, "failed creating bearer: %s", error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
         mm_obj_info (self, "created bearer: %s", mm_base_bearer_get_path (bearer));
         mm_gdbus_modem_complete_create_bearer (ctx->skeleton, ctx->invocation, mm_base_bearer_get_path (bearer));
@@ -975,7 +973,7 @@ handle_create_bearer_auth_ready (MMBaseModem               *self,
     GError                        *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_create_bearer_context_free (ctx);
         return;
     }
@@ -987,7 +985,7 @@ handle_create_bearer_auth_ready (MMBaseModem               *self,
 
     properties = mm_bearer_properties_new_from_dictionary (ctx->dictionary, &error);
     if (!properties) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_create_bearer_context_free (ctx);
         return;
     }
@@ -1055,7 +1053,7 @@ command_ready (MMIfaceModem         *self,
     result = MM_IFACE_MODEM_GET_INTERFACE (self)->command_finish (self, res, &error);
     if (error) {
         mm_obj_dbg (self, "failed running AT command '%s': %s", ctx->cmd, error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
         mm_obj_dbg (self, "AT command '%s' run: %s", ctx->cmd, result);
         mm_gdbus_modem_complete_command (ctx->skeleton, ctx->invocation, result);
@@ -1072,7 +1070,7 @@ handle_command_auth_ready (MMBaseModem          *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_command_context_free (ctx);
         return;
     }
@@ -1080,8 +1078,8 @@ handle_command_auth_ready (MMBaseModem          *self,
 #if ! defined WITH_AT_COMMAND_VIA_DBUS
     /* If we are not in Debug mode, report an error */
     if (!mm_context_get_debug ()) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNAUTHORIZED,
-                                               "Operation only allowed in debug mode");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNAUTHORIZED,
+                                                        "Operation only allowed in debug mode");
         handle_command_context_free (ctx);
         return;
     }
@@ -1089,8 +1087,8 @@ handle_command_auth_ready (MMBaseModem          *self,
 
     /* If command is not implemented, report an error */
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->command || !MM_IFACE_MODEM_GET_INTERFACE (self)->command_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                               "Operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Operation not supported");
         handle_command_context_free (ctx);
         return;
     }
@@ -1159,14 +1157,14 @@ delete_bearer_disconnect_ready (MMBaseBearer              *bearer,
 
     if (!mm_base_bearer_disconnect_finish (bearer, res, &error)) {
         mm_obj_warn (ctx->self, "failed disconnecting bearer '%s' before deleting: %s", ctx->bearer_path, error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_delete_bearer_context_free (ctx);
         return;
     }
 
     if (!mm_bearer_list_delete_bearer (ctx->list, ctx->bearer_path, &error)) {
         mm_obj_warn (ctx->self, "failed deleting bearer '%s': %s", ctx->bearer_path, error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
         mm_obj_info (ctx->self, "deleted bearer '%s'", ctx->bearer_path);
         mm_gdbus_modem_complete_delete_bearer (ctx->skeleton, ctx->invocation);
@@ -1182,7 +1180,7 @@ handle_delete_bearer_auth_ready (MMBaseModem               *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_delete_bearer_context_free (ctx);
         return;
     }
@@ -1193,16 +1191,16 @@ handle_delete_bearer_auth_ready (MMBaseModem               *self,
     }
 
     if (!g_str_has_prefix (ctx->bearer_path, MM_DBUS_BEARER_PREFIX)) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
-                                               "Invalid path '%s'", ctx->bearer_path);
+        mm_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                "Invalid path '%s'", ctx->bearer_path);
         handle_delete_bearer_context_free (ctx);
         return;
     }
 
     ctx->bearer = mm_bearer_list_find_by_path (ctx->list, ctx->bearer_path);
     if (!ctx->bearer) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
-                                               "No bearer found with path '%s'", ctx->bearer_path);
+        mm_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                "No bearer found with path '%s'", ctx->bearer_path);
         handle_delete_bearer_context_free (ctx);
         return;
     }
@@ -1255,8 +1253,8 @@ handle_list_bearers (MmGdbusModem          *skeleton,
                   MM_IFACE_MODEM_BEARER_LIST, &list,
                   NULL);
     if (!list) {
-        g_dbus_method_invocation_return_error (invocation, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                               "Bearer list not found");
+        mm_dbus_method_invocation_return_error_literal (invocation, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                                        "Bearer list not found");
         return TRUE;
     }
 
@@ -1295,7 +1293,7 @@ set_primary_sim_slot_ready (MMIfaceModem                   *self,
          * so we can safely return a success on the operation and skip the reprobing */
         if (!g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_EXISTS)) {
             mm_obj_warn (self, "failed setting primary SIM slot '%u': %s", ctx->requested_sim_slot, error->message);
-            g_dbus_method_invocation_take_error (ctx->invocation, g_steal_pointer (&error));
+            mm_dbus_method_invocation_take_error (ctx->invocation, g_steal_pointer (&error));
             handle_set_primary_sim_slot_context_free (ctx);
             return;
         }
@@ -1321,7 +1319,7 @@ handle_set_primary_sim_slot_auth_ready (MMBaseModem                    *self,
     const gchar *const *sim_slot_paths;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_primary_sim_slot_context_free (ctx);
         return;
     }
@@ -1329,8 +1327,8 @@ handle_set_primary_sim_slot_auth_ready (MMBaseModem                    *self,
     /* If SIM switching is not implemented, report an error */
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_primary_sim_slot ||
         !MM_IFACE_MODEM_GET_INTERFACE (self)->set_primary_sim_slot_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                               "Operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Operation not supported");
         handle_set_primary_sim_slot_context_free (ctx);
         return;
     }
@@ -1338,8 +1336,8 @@ handle_set_primary_sim_slot_auth_ready (MMBaseModem                    *self,
     /* Validate SIM slot number */
     sim_slot_paths = mm_gdbus_modem_get_sim_slots (ctx->skeleton);
     if (!sim_slot_paths || (ctx->requested_sim_slot > g_strv_length ((gchar **)sim_slot_paths))) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
-                                               "Requested SIM slot number is out of bounds");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                        "Requested SIM slot number is out of bounds");
         handle_set_primary_sim_slot_context_free (ctx);
         return;
     }
@@ -1419,7 +1417,7 @@ get_cell_info_ready (MMIfaceModem             *self,
     info_list = MM_IFACE_MODEM_GET_INTERFACE (self)->get_cell_info_finish (self, res, &error);
     if (error) {
         mm_obj_dbg (self, "failed retrieving cell info: %s", error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
         g_autoptr(GVariant) dict_array = NULL;
 
@@ -1440,7 +1438,7 @@ handle_get_cell_info_auth_ready (MMBaseModem              *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_get_cell_info_context_free (ctx);
         return;
     }
@@ -1448,8 +1446,8 @@ handle_get_cell_info_auth_ready (MMBaseModem              *self,
     /* If getting cell info is not implemented, report an error */
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->get_cell_info ||
         !MM_IFACE_MODEM_GET_INTERFACE (self)->get_cell_info_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot get cell info: operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot get cell info: operation not supported");
         handle_get_cell_info_context_free (ctx);
         return;
     }
@@ -2216,7 +2214,7 @@ enable_ready (MMBaseModem         *self,
     if (ctx->enable) {
         if (!mm_base_modem_enable_finish (self, res, &error)) {
             mm_obj_warn (self, "failed enabling modem: %s", error->message);
-            g_dbus_method_invocation_take_error (ctx->invocation, error);
+            mm_dbus_method_invocation_take_error (ctx->invocation, error);
         } else {
             mm_obj_info (self, "enabled modem");
             mm_gdbus_modem_complete_enable (ctx->skeleton, ctx->invocation);
@@ -2224,7 +2222,7 @@ enable_ready (MMBaseModem         *self,
     } else {
         if (!mm_base_modem_disable_finish (self, res, &error)) {
             mm_obj_warn (self, "failed disabling modem: %s", error->message);
-            g_dbus_method_invocation_take_error (ctx->invocation, error);
+            mm_dbus_method_invocation_take_error (ctx->invocation, error);
         } else {
             mm_obj_info (self, "disabled modem");
             mm_gdbus_modem_complete_enable (ctx->skeleton, ctx->invocation);
@@ -2242,7 +2240,7 @@ handle_enable_auth_ready (MMBaseModem *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_enable_context_free (ctx);
         return;
     }
@@ -2314,7 +2312,7 @@ set_power_state_ready (MMIfaceModem               *self,
 
     if (!mm_iface_modem_set_power_state_finish (self, res, &error)) {
         mm_obj_warn (self, "failed setting power state '%s': %s", mm_modem_power_state_get_string (ctx->power_state), error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
         mm_obj_info (self, "set power state '%s'", mm_modem_power_state_get_string (ctx->power_state));
         mm_gdbus_modem_complete_set_power_state (ctx->skeleton, ctx->invocation);
@@ -2331,7 +2329,7 @@ handle_set_power_state_auth_ready (MMBaseModem                *self,
     GError       *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_power_state_context_free (ctx);
         return;
     }
@@ -2340,9 +2338,9 @@ handle_set_power_state_auth_ready (MMBaseModem                *self,
     if (ctx->power_state != MM_MODEM_POWER_STATE_LOW &&
         ctx->power_state != MM_MODEM_POWER_STATE_ON &&
         ctx->power_state != MM_MODEM_POWER_STATE_OFF) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
-                                               "Unknown power state: '%s'",
-                                               mm_modem_power_state_get_string (ctx->power_state));
+        mm_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                "Unknown power state: '%s'",
+                                                mm_modem_power_state_get_string (ctx->power_state));
         handle_set_power_state_context_free (ctx);
         return;
     }
@@ -2356,8 +2354,8 @@ handle_set_power_state_auth_ready (MMBaseModem                *self,
     if ((ctx->power_state == MM_MODEM_POWER_STATE_LOW || ctx->power_state == MM_MODEM_POWER_STATE_ON) &&
         modem_state != MM_MODEM_STATE_FAILED &&
         modem_state != MM_MODEM_STATE_DISABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
-                                               "Must be in disabled or failed state");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Must be in disabled or failed state");
         handle_set_power_state_context_free (ctx);
         return;
     }
@@ -2367,10 +2365,8 @@ handle_set_power_state_auth_ready (MMBaseModem                *self,
         modem_state != MM_MODEM_STATE_FAILED &&
         modem_state != MM_MODEM_STATE_LOCKED &&
         modem_state != MM_MODEM_STATE_DISABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Modem either enabled or initializing");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Modem either enabled or initializing");
         handle_set_power_state_context_free (ctx);
         return;
     }
@@ -2430,7 +2426,7 @@ handle_reset_ready (MMIfaceModem       *self,
 
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->reset_finish (self, res, &error)) {
         mm_obj_warn (self, "failed requesting modem reset: %s", error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
         mm_obj_info (self, "modem reset requested");
         mm_gdbus_modem_complete_reset (ctx->skeleton, ctx->invocation);
@@ -2447,15 +2443,15 @@ handle_reset_auth_ready (MMBaseModem        *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_reset_context_free (ctx);
         return;
     }
 
     /* If reseting is not implemented, report an error */
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->reset || !MM_IFACE_MODEM_GET_INTERFACE (self)->reset_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                               "Operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Operation not supported");
         handle_reset_context_free (ctx);
         return;
     }
@@ -2515,7 +2511,7 @@ handle_factory_reset_ready (MMIfaceModem              *self,
 
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->factory_reset_finish (self, res, &error)) {
         mm_obj_warn (self, "failed requesting modem factory reset: %s", error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
         mm_obj_info (self, "modem factory reset requested");
         mm_gdbus_modem_complete_factory_reset (ctx->skeleton, ctx->invocation);
@@ -2532,15 +2528,15 @@ handle_factory_reset_auth_ready (MMBaseModem               *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_factory_reset_context_free (ctx);
         return;
     }
 
     /* If reseting is not implemented, report an error */
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->factory_reset || !MM_IFACE_MODEM_GET_INTERFACE (self)->factory_reset_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                               "Operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Operation not supported");
         handle_factory_reset_context_free (ctx);
         return;
     }
@@ -2610,7 +2606,7 @@ set_current_capabilities_ready (MMIfaceModem                        *self,
 
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_capabilities_finish (self, res, &error)) {
         mm_obj_warn (self, "failed setting current capabilities to '%s': %s", ctx->capabilities_str, error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
         /* Capabilities updated: explicitly refresh signal and access technology */
         mm_iface_modem_refresh_signal (self);
@@ -2632,7 +2628,7 @@ handle_set_current_capabilities_auth_ready (MMBaseModem                         
     guint              i;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_current_capabilities_context_free (ctx);
         return;
     }
@@ -2647,8 +2643,8 @@ handle_set_current_capabilities_auth_ready (MMBaseModem                         
     /* If setting current capabilities is not implemented, report an error */
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_capabilities ||
         !MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_capabilities_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                               "Setting current capabilities not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Setting current capabilities not supported");
         handle_set_current_capabilities_context_free (ctx);
         return;
     }
@@ -2658,8 +2654,8 @@ handle_set_current_capabilities_auth_ready (MMBaseModem                         
 
     /* Don't allow capability switching if only one item given in the supported list */
     if (supported->len == 1) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot change capabilities: only one combination supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot change capabilities: only one combination supported");
         handle_set_current_capabilities_context_free (ctx);
         return;
     }
@@ -2673,8 +2669,8 @@ handle_set_current_capabilities_auth_ready (MMBaseModem                         
                 matched = TRUE;
     }
     if (!matched) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                               "The given combination of capabilities is not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "The given combination of capabilities is not supported");
         handle_set_current_capabilities_context_free (ctx);
         return;
     }
@@ -3093,7 +3089,7 @@ handle_set_current_bands_ready (MMIfaceModem                 *self,
 
     if (!mm_iface_modem_set_current_bands_finish (self, res, &error)) {
         mm_obj_warn (self, "failed setting current bands to '%s': %s", ctx->bands_str, error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
         /* Bands updated: explicitly refresh signal and access technology */
         mm_iface_modem_refresh_signal (self);
@@ -3113,7 +3109,7 @@ handle_set_current_bands_auth_ready (MMBaseModem                  *self,
     GError            *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_current_bands_context_free (ctx);
         return;
     }
@@ -3491,7 +3487,7 @@ handle_set_current_modes_ready (MMIfaceModem                 *self,
     if (!mm_iface_modem_set_current_modes_finish (self, res, &error)) {
         mm_obj_warn (self, "failed setting current modes to '%s' (preferred '%s'): %s",
                      ctx->allowed_str, ctx->preferred_str, error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
         /* Modes updated: explicitly refresh signal and access technology */
         mm_iface_modem_refresh_signal (self);
@@ -3511,7 +3507,7 @@ handle_set_current_modes_auth_ready (MMBaseModem                  *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_current_modes_context_free (ctx);
         return;
     }

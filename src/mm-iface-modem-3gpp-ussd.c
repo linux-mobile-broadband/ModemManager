@@ -26,6 +26,7 @@
 #include "mm-iface-modem-3gpp-ussd.h"
 #include "mm-base-modem.h"
 #include "mm-modem-helpers.h"
+#include "mm-error-helpers.h"
 #include "mm-log-object.h"
 
 #define SUPPORT_CHECKED_TAG "3gpp-ussd-support-checked-tag"
@@ -68,7 +69,7 @@ handle_cancel_ready (MMIfaceModem3gppUssd *self,
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->cancel_finish (self, res, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem3gpp_ussd_complete_cancel (ctx->skeleton, ctx->invocation);
 
@@ -83,7 +84,7 @@ handle_cancel_auth_ready (MMBaseModem *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_cancel_context_free (ctx);
         return;
     }
@@ -153,7 +154,7 @@ handle_respond_ready (MMIfaceModem3gppUssd *self,
 
     reply = MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send_finish (self, res, &error);
     if (!reply)
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         mm_gdbus_modem3gpp_ussd_complete_respond (ctx->skeleton,
                                                   ctx->invocation,
@@ -171,7 +172,7 @@ handle_respond_auth_ready (MMBaseModem *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_respond_context_free (ctx);
         return;
     }
@@ -189,11 +190,8 @@ handle_respond_auth_ready (MMBaseModem *self,
     switch (mm_gdbus_modem3gpp_ussd_get_state (ctx->skeleton)) {
     case MM_MODEM_3GPP_USSD_SESSION_STATE_ACTIVE:
     case MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE:
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot respond USSD: "
-                                               "no active session");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot respond USSD: no active session");
         break;
 
     case MM_MODEM_3GPP_USSD_SESSION_STATE_USER_RESPONSE:
@@ -265,7 +263,7 @@ handle_initiate_ready (MMIfaceModem3gppUssd *self,
 
     reply = MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send_finish (self, res, &error);
     if (!reply)
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         mm_gdbus_modem3gpp_ussd_complete_initiate (ctx->skeleton,
                                                    ctx->invocation,
@@ -283,7 +281,7 @@ handle_initiate_auth_ready (MMBaseModem *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_initiate_context_free (ctx);
         return;
     }
@@ -301,11 +299,8 @@ handle_initiate_auth_ready (MMBaseModem *self,
     switch (mm_gdbus_modem3gpp_ussd_get_state (ctx->skeleton)) {
     case MM_MODEM_3GPP_USSD_SESSION_STATE_ACTIVE:
     case MM_MODEM_3GPP_USSD_SESSION_STATE_USER_RESPONSE:
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot initiate USSD: "
-                                               "a session is already active");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot initiate USSD: a session is already active");
         break;
 
     case MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE:

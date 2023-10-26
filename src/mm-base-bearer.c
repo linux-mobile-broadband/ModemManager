@@ -1127,7 +1127,7 @@ handle_connect_ready (MMBaseBearer *self,
     GError *error = NULL;
 
     if (!mm_base_bearer_connect_finish (self, res, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_bearer_complete_connect (MM_GDBUS_BEARER (self), ctx->invocation);
 
@@ -1142,7 +1142,7 @@ handle_connect_auth_ready (MMBaseModem *modem,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (modem, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_connect_context_free (ctx);
         return;
     }
@@ -1319,7 +1319,7 @@ handle_disconnect_ready (MMBaseBearer *self,
     GError *error = NULL;
 
     if (!mm_base_bearer_disconnect_finish (self, res, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_bearer_complete_disconnect (MM_GDBUS_BEARER (self), ctx->invocation);
 
@@ -1334,7 +1334,7 @@ handle_disconnect_auth_ready (MMBaseModem *modem,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (modem, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_disconnect_context_free (ctx);
         return;
     }

@@ -26,6 +26,7 @@
 #include "mm-iface-modem-3gpp-profile-manager.h"
 #include "mm-base-modem.h"
 #include "mm-log-object.h"
+#include "mm-error-helpers.h"
 #include "mm-log-helpers.h"
 
 #define SUPPORT_CHECKED_TAG "3gpp-profile-manager-support-checked-tag"
@@ -1011,7 +1012,7 @@ list_profiles_ready (MMIfaceModem3gppProfileManager *self,
 
     if (!mm_iface_modem_3gpp_profile_manager_list_profiles_finish (self, res, &profiles, &error)) {
         mm_obj_warn (self, "failed listing 3GPP profiles: %s", error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_list_context_free (ctx);
         return;
     }
@@ -1031,7 +1032,7 @@ handle_list_auth_ready (MMBaseModem       *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_list_context_free (ctx);
         return;
     }
@@ -1104,7 +1105,7 @@ set_profile_ready (MMIfaceModem3gppProfileManager *self,
     profile_stored = mm_iface_modem_3gpp_profile_manager_set_profile_finish (self, res, &error);
     if (!profile_stored) {
         mm_obj_warn (self, "failed setting 3GPP profile: %s", error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_context_free (ctx);
         return;
     }
@@ -1127,7 +1128,7 @@ handle_set_auth_ready (MMBaseModem      *self,
     g_autoptr(MM3gppProfile)  profile_requested = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_context_free (ctx);
         return;
     }
@@ -1140,7 +1141,7 @@ handle_set_auth_ready (MMBaseModem      *self,
     }
 
     if (!ctx->requested_dictionary) {
-        g_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
                                                        "Missing requested profile settings");
         handle_set_context_free (ctx);
         return;
@@ -1148,7 +1149,7 @@ handle_set_auth_ready (MMBaseModem      *self,
 
     profile_requested = mm_3gpp_profile_new_from_dictionary (ctx->requested_dictionary, &error);
     if (!profile_requested) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_context_free (ctx);
         return;
     }
@@ -1219,7 +1220,7 @@ delete_profile_ready (MMIfaceModem3gppProfileManager *self,
 
     if (!MM_IFACE_MODEM_3GPP_PROFILE_MANAGER_GET_INTERFACE (self)->delete_profile_finish (self, res, &error)) {
         mm_obj_warn (self, "failed deleting 3GPP profile: %s", error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
         mm_obj_info (self, "3GPP profile deleted");
         mm_gdbus_modem3gpp_profile_manager_complete_delete (ctx->skeleton, ctx->invocation);
@@ -1239,7 +1240,7 @@ handle_delete_auth_ready (MMBaseModem         *self,
     MMBearerApnType           apn_type = MM_BEARER_APN_TYPE_NONE;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_delete_context_free (ctx);
         return;
     }
@@ -1253,22 +1254,22 @@ handle_delete_auth_ready (MMBaseModem         *self,
 
     if (!MM_IFACE_MODEM_3GPP_PROFILE_MANAGER_GET_INTERFACE (self)->delete_profile ||
         !MM_IFACE_MODEM_3GPP_PROFILE_MANAGER_GET_INTERFACE (self)->delete_profile_finish) {
-        g_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                                       "Deleting profiles is not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Deleting profiles is not supported");
         handle_delete_context_free (ctx);
         return;
     }
 
     if (!ctx->dictionary) {
-        g_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
-                                                       "Missing profile settings");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                        "Missing profile settings");
         handle_delete_context_free (ctx);
         return;
     }
 
     profile = mm_3gpp_profile_new_from_dictionary (ctx->dictionary, &error);
     if (!profile) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_delete_context_free (ctx);
         return;
     }
@@ -1277,16 +1278,16 @@ handle_delete_auth_ready (MMBaseModem         *self,
     if (g_strcmp0 (index_field, "profile-id") == 0) {
         profile_id = mm_3gpp_profile_get_profile_id (profile);
         if (profile_id == MM_3GPP_PROFILE_ID_UNKNOWN) {
-            g_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
-                                                           "Missing index field ('profile-id') in profile settings");
+            mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                            "Missing index field ('profile-id') in profile settings");
             handle_delete_context_free (ctx);
             return;
         }
     } else if (g_strcmp0 (index_field, "apn-type") == 0) {
         apn_type = mm_3gpp_profile_get_apn_type (profile);
         if (apn_type == MM_BEARER_APN_TYPE_NONE) {
-            g_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
-                                                           "Missing index field ('apn-type') in profile settings");
+            mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                            "Missing index field ('apn-type') in profile settings");
             handle_delete_context_free (ctx);
             return;
         }
@@ -1298,7 +1299,7 @@ handle_delete_auth_ready (MMBaseModem         *self,
                                                    profile_id,
                                                    apn_type,
                                                    &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_delete_context_free (ctx);
         return;
     }

@@ -19,6 +19,7 @@
 
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-oma.h"
+#include "mm-error-helpers.h"
 #include "mm-log-object.h"
 
 #define SUPPORT_CHECKED_TAG "oma-support-checked-tag"
@@ -168,7 +169,7 @@ setup_ready (MMIfaceModemOma *self,
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->setup_finish (self, res, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         /* Update current features in the interface */
         mm_gdbus_modem_oma_set_features (ctx->skeleton, ctx->features);
@@ -188,7 +189,7 @@ handle_setup_auth_ready (MMBaseModem *self,
     gchar *str;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_setup_context_free (ctx);
         return;
     }
@@ -198,22 +199,16 @@ handle_setup_auth_ready (MMBaseModem *self,
                   MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
     if (modem_state < MM_MODEM_STATE_ENABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot setup OMA: "
-                                               "device not yet enabled");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot setup OMA: device not yet enabled");
         handle_setup_context_free (ctx);
         return;
     }
 
     if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->setup ||
         !MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->setup_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot setup OMA: "
-                                               "operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot setup OMA: operation not supported");
         handle_setup_context_free (ctx);
         return;
     }
@@ -278,7 +273,7 @@ start_client_initiated_session_ready (MMIfaceModemOma *self,
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->start_client_initiated_session_finish (self, res, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         /* Update interface info */
         mm_gdbus_modem_oma_set_session_type (ctx->skeleton, ctx->session_type);
@@ -298,7 +293,7 @@ handle_start_client_initiated_session_auth_ready (MMBaseModem *self,
     MMModemState modem_state;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_start_client_initiated_session_context_free (ctx);
         return;
     }
@@ -308,22 +303,18 @@ handle_start_client_initiated_session_auth_ready (MMBaseModem *self,
                   MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
     if (modem_state < MM_MODEM_STATE_ENABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot start client-initiated OMA session: "
-                                               "device not yet enabled");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot start client-initiated OMA session: "
+                                                        "device not yet enabled");
         handle_start_client_initiated_session_context_free (ctx);
         return;
     }
 
     if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->start_client_initiated_session ||
         !MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->start_client_initiated_session_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot start client-initiated OMA session: "
-                                               "operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot start client-initiated OMA session: "
+                                                        "operation not supported");
         handle_start_client_initiated_session_context_free (ctx);
         return;
     }
@@ -331,12 +322,10 @@ handle_start_client_initiated_session_auth_ready (MMBaseModem *self,
     if (ctx->session_type != MM_OMA_SESSION_TYPE_CLIENT_INITIATED_DEVICE_CONFIGURE &&
         ctx->session_type != MM_OMA_SESSION_TYPE_CLIENT_INITIATED_PRL_UPDATE &&
         ctx->session_type != MM_OMA_SESSION_TYPE_CLIENT_INITIATED_HANDS_FREE_ACTIVATION) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot start client-initiated OMA session: "
-                                               "invalid session type specified (%s)",
-                                               mm_oma_session_type_get_string (ctx->session_type));
+        mm_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                "Cannot start client-initiated OMA session: "
+                                                "invalid session type specified (%s)",
+                                                mm_oma_session_type_get_string (ctx->session_type));
         handle_start_client_initiated_session_context_free (ctx);
         return;
     }
@@ -401,7 +390,7 @@ accept_network_initiated_session_ready (MMIfaceModemOma *self,
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->accept_network_initiated_session_finish (self, res, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         /* If accepted or rejected, remove from pending */
         add_or_remove_pending_network_initiated_session (self, FALSE, ctx->session_type, ctx->session_id);
@@ -458,7 +447,7 @@ handle_accept_network_initiated_session_auth_ready (MMBaseModem *self,
     MMModemState modem_state;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_accept_network_initiated_session_context_free (ctx);
         return;
     }
@@ -468,34 +457,28 @@ handle_accept_network_initiated_session_auth_ready (MMBaseModem *self,
                   MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
     if (modem_state < MM_MODEM_STATE_ENABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot accept network-initiated OMA session: "
-                                               "device not yet enabled");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot accept network-initiated OMA session: "
+                                                        "device not yet enabled");
         handle_accept_network_initiated_session_context_free (ctx);
         return;
     }
 
     if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->accept_network_initiated_session ||
         !MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->accept_network_initiated_session_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot accept network-initiated OMA session: "
-                                               "operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot accept network-initiated OMA session: "
+                                                        "operation not supported");
         handle_accept_network_initiated_session_context_free (ctx);
         return;
     }
 
     ctx->session_type = get_pending_network_initiated_session_type (ctx->self, ctx->session_id);
     if (ctx->session_type == MM_OMA_SESSION_TYPE_UNKNOWN) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot accept network-initiated OMA session: "
-                                               "unknown session id (%u)",
-                                               ctx->session_id);
+        mm_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                "Cannot accept network-initiated OMA session: "
+                                                "unknown session id (%u)",
+                                                ctx->session_id);
         handle_accept_network_initiated_session_context_free (ctx);
         return;
     }
@@ -563,7 +546,7 @@ cancel_session_ready (MMIfaceModemOma *self,
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->cancel_session_finish (self, res, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         /* Clear interface info when cancelled */
         mm_gdbus_modem_oma_set_session_type (ctx->skeleton, MM_OMA_SESSION_TYPE_UNKNOWN);
@@ -584,7 +567,7 @@ handle_cancel_session_auth_ready (MMBaseModem *self,
     MMModemState modem_state;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_cancel_session_context_free (ctx);
         return;
     }
@@ -594,22 +577,16 @@ handle_cancel_session_auth_ready (MMBaseModem *self,
                   MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
     if (modem_state < MM_MODEM_STATE_ENABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot cancel OMA session: "
-                                               "device not yet enabled");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot cancel OMA session: device not yet enabled");
         handle_cancel_session_context_free (ctx);
         return;
     }
 
     if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->cancel_session ||
         !MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->cancel_session_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot cancel OMA session: "
-                                               "operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot cancel OMA session: operation not supported");
         handle_cancel_session_context_free (ctx);
         return;
     }

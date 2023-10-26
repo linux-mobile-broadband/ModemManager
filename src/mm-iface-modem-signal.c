@@ -20,6 +20,7 @@
 
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-signal.h"
+#include "mm-error-helpers.h"
 #include "mm-log-object.h"
 
 #define SUPPORT_CHECKED_TAG "signal-support-checked-tag"
@@ -380,7 +381,7 @@ handle_setup_auth_ready (MMBaseModem        *_self,
     Private            *priv;
 
     if (!mm_base_modem_authorize_finish (_self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_setup_context_free (ctx);
         return;
     }
@@ -455,7 +456,7 @@ setup_thresholds_restart_ready (MMIfaceModemSignal           *self,
     if (!thresholds_restart_finish (self, res, &error)) {
         priv->rssi_threshold = ctx->previous_rssi_threshold;
         priv->error_rate_threshold = ctx->previous_error_rate_threshold;
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
         check_interface_reset (self);
         mm_gdbus_modem_signal_set_rssi_threshold (ctx->skeleton, priv->rssi_threshold);
@@ -481,15 +482,15 @@ handle_setup_thresholds_auth_ready (MMBaseModem                  *_self,
     priv = get_private (self);
 
     if (!mm_base_modem_authorize_finish (_self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_setup_thresholds_context_free (ctx);
         return;
     }
 
     if (!MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->setup_thresholds ||
         !MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->setup_thresholds_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot setup thresholds: operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot setup thresholds: operation not supported");
         handle_setup_thresholds_context_free (ctx);
         return;
     }
@@ -503,7 +504,7 @@ handle_setup_thresholds_auth_ready (MMBaseModem                  *_self,
 
     properties = mm_signal_threshold_properties_new_from_dictionary (ctx->settings, &error);
     if (!properties) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_setup_thresholds_context_free (ctx);
         return;
     }

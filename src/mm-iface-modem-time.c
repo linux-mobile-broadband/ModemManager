@@ -19,6 +19,7 @@
 
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-time.h"
+#include "mm-error-helpers.h"
 #include "mm-log-object.h"
 
 #define SUPPORT_CHECKED_TAG          "time-support-checked-tag"
@@ -64,7 +65,7 @@ load_network_time_ready (MMIfaceModemTime            *self,
 
     time_str = MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_time_finish (self, res, &error);
     if (error)
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem_time_complete_get_network_time (ctx->skeleton, ctx->invocation, time_str);
     g_free (time_str);
@@ -80,7 +81,7 @@ handle_get_network_time_auth_ready (MMBaseModem                 *self,
     GError       *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_get_network_time_context_free (ctx);
         return;
     }
@@ -91,22 +92,16 @@ handle_get_network_time_auth_ready (MMBaseModem                 *self,
                   NULL);
     /* If we're not yet registered, we cannot get the network time */
     if (state < MM_MODEM_STATE_REGISTERED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot load network time: "
-                                               "not registered yet");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot load network time: not registered yet");
         handle_get_network_time_context_free (ctx);
         return;
     }
 
     if (!MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_time ||
         !MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_time_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot load network time: "
-                                               "operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot load network time: operation not supported");
         handle_get_network_time_context_free (ctx);
         return;
     }

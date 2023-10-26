@@ -19,6 +19,7 @@
 
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-sar.h"
+#include "mm-error-helpers.h"
 #include "mm-log-object.h"
 
 #define SUPPORT_CHECKED_TAG "sar-support-checked-tag"
@@ -82,7 +83,7 @@ enable_ready (MMIfaceModemSar     *self,
 
     if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->enable_finish (self, res, &power_level, &error)) {
         mm_obj_warn (self, "failed %s SAR: %s", ctx->enable ? "enabling" : "disabling", error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
         mm_obj_info (self, "%s SAR", ctx->enable ? "enabled" : "disabled");
         mm_gdbus_modem_sar_set_state (ctx->skeleton, ctx->enable);
@@ -102,18 +103,15 @@ handle_enable_auth_ready (MMBaseModem         *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_enable_context_free (ctx);
         return;
     }
 
     if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->enable ||
         !MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->enable_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot setup SAR: "
-                                               "operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot setup SAR: operation not supported");
         handle_enable_context_free (ctx);
         return;
     }
@@ -181,7 +179,7 @@ set_power_level_ready (MMIfaceModemSar            *self,
 
     if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->set_power_level_finish (self, res, &error)) {
         mm_obj_warn (self, "failed setting SAR power level to %u: %s", ctx->power_level, error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
         mm_obj_info (self, "SAR power level set to %u", ctx->power_level);
         mm_gdbus_modem_sar_set_power_level (ctx->skeleton, ctx->power_level);
@@ -199,27 +197,22 @@ handle_set_power_level_auth_ready (MMBaseModem                *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_power_level_context_free (ctx);
         return;
     }
 
     if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->set_power_level ||
         !MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->set_power_level_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot set SAR power level: "
-                                               "operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot set SAR power level: operation not supported");
         handle_set_power_level_context_free (ctx);
         return;
     }
 
     if (!mm_gdbus_modem_sar_get_state (ctx->skeleton)) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot set SAR power level: SAR is disabled");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot set SAR power level: SAR is disabled");
         handle_set_power_level_context_free (ctx);
         return;
     }

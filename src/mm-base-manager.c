@@ -40,6 +40,8 @@
 #include <ModemManager-tags.h>
 
 #include <mm-errors-types.h>
+#include "mm-error-helpers.h"
+
 #include <mm-gdbus-manager.h>
 #if defined WITH_TESTS
 # include <mm-gdbus-test.h>
@@ -807,9 +809,9 @@ set_logging_auth_ready (MMAuthProvider    *authp,
     GError *error = NULL;
 
     if (!mm_auth_provider_authorize_finish (authp, res, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else if (!mm_log_set_level (ctx->level, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         mm_obj_msg (ctx->self, "logging: level '%s'", ctx->level);
         mm_gdbus_org_freedesktop_modem_manager1_complete_set_logging (
@@ -865,7 +867,7 @@ scan_devices_auth_ready (MMAuthProvider *authp,
     GError *error = NULL;
 
     if (!mm_auth_provider_authorize_finish (authp, res, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
 #if defined WITH_UDEV
         if (!mm_context_get_test_no_udev ()) {
@@ -876,9 +878,8 @@ scan_devices_auth_ready (MMAuthProvider *authp,
                 ctx->invocation);
         } else
 #endif
-            g_dbus_method_invocation_return_error_literal (
-                ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                "Cannot request manual scan of devices: unsupported");
+            mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                            "Cannot request manual scan of devices: unsupported");
     }
 
     scan_devices_context_free (ctx);
@@ -949,7 +950,7 @@ report_kernel_event_auth_ready (MMAuthProvider           *authp,
 out:
     if (error) {
         mm_obj_warn (ctx->self, "couldn't handle kernel event: %s", error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else
         mm_gdbus_org_freedesktop_modem_manager1_complete_report_kernel_event (
             MM_GDBUS_ORG_FREEDESKTOP_MODEM_MANAGER1 (ctx->self),
@@ -1226,7 +1227,7 @@ device_inhibit_ready (MMDevice             *device,
     GError                   *error = NULL;
 
     if (!mm_device_inhibit_finish (device, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         inhibit_device_context_free (ctx);
         return;
     }
@@ -1266,15 +1267,15 @@ base_manager_inhibit_device (InhibitDeviceContext *ctx)
 
     device = find_device_by_physdev_uid (ctx->self, ctx->uid);
     if (!device) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
-                                               "No device found with uid '%s'", ctx->uid);
+        mm_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
+                                                "No device found with uid '%s'", ctx->uid);
         inhibit_device_context_free (ctx);
         return;
     }
 
     if (mm_device_get_inhibited (device)) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_IN_PROGRESS,
-                                               "Device '%s' is already inhibited", ctx->uid);
+        mm_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_IN_PROGRESS,
+                                                "Device '%s' is already inhibited", ctx->uid);
         inhibit_device_context_free (ctx);
         return;
     }
@@ -1295,8 +1296,8 @@ base_manager_uninhibit_device (InhibitDeviceContext *ctx)
     sender = g_dbus_method_invocation_get_sender (ctx->invocation);
     info = find_inhibited_device_info_by_physdev_uid (ctx->self, ctx->uid);
     if (!info || (g_strcmp0 (info->sender, sender) != 0)) {
-        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
-                                               "No inhibition found for uid '%s'", ctx->uid);
+        mm_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
+                                                "No inhibition found for uid '%s'", ctx->uid);
         inhibit_device_context_free (ctx);
         return;
     }
@@ -1319,7 +1320,7 @@ inhibit_device_auth_ready (MMAuthProvider       *authp,
     GError *error = NULL;
 
     if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         inhibit_device_context_free (ctx);
         return;
     }
@@ -1412,7 +1413,7 @@ out:
     if (error) {
         mm_device_remove_modem (device);
         g_hash_table_remove (self->priv->devices, mm_device_get_uid (device));
-        g_dbus_method_invocation_return_gerror (invocation, error);
+        mm_dbus_method_invocation_return_gerror (invocation, error);
         g_error_free (error);
     } else
         mm_gdbus_test_complete_set_profile (skeleton, invocation);

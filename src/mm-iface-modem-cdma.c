@@ -23,6 +23,7 @@
 #include "mm-iface-modem-cdma.h"
 #include "mm-base-modem.h"
 #include "mm-modem-helpers.h"
+#include "mm-error-helpers.h"
 #include "mm-log-object.h"
 
 #define SUBSYSTEM_CDMA1X "cdma1x"
@@ -125,7 +126,7 @@ handle_activate_ready (MMIfaceModemCdma *self,
     priv->activation_ongoing = FALSE;
 
     if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_finish (self, res,&error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem_cdma_complete_activate (ctx->skeleton, ctx->invocation);
 
@@ -144,17 +145,15 @@ handle_activate_auth_ready (MMBaseModem *self,
     priv = get_private (MM_IFACE_MODEM_CDMA (self));
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_activate_context_free (ctx);
         return;
     }
 
     /* Fail if we have already an activation ongoing */
     if (priv->activation_ongoing) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_IN_PROGRESS,
-                                               "An activation operation is already in progress");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_IN_PROGRESS,
+                                                        "An activation operation is already in progress");
         handle_activate_context_free (ctx);
         return;
     }
@@ -170,22 +169,16 @@ handle_activate_auth_ready (MMBaseModem *self,
     /* If activating OTA is not implemented, report an error */
     if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate ||
         !MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot perform OTA activation: "
-                                               "operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot perform OTA activation: operation not supported");
         handle_activate_context_free (ctx);
         return;
     }
 
     /* Error if carrier code is empty */
     if (!ctx->carrier || !ctx->carrier[0]) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_INVALID_ARGS,
-                                               "Cannot perform OTA activation: "
-                                               "invalid empty carrier code");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                        "Cannot perform OTA activation: invalid empty carrier code");
         handle_activate_context_free (ctx);
         return;
     }
@@ -204,11 +197,8 @@ handle_activate_auth_ready (MMBaseModem *self,
         break;
 
     case MM_MODEM_STATE_INITIALIZING:
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot perform OTA activation: "
-                                               "device not fully initialized yet");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot perform OTA activation: device not fully initialized yet");
         handle_activate_context_free (ctx);
         return;
 
@@ -224,30 +214,21 @@ handle_activate_auth_ready (MMBaseModem *self,
         return;
 
     case MM_MODEM_STATE_DISABLING:
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot perform OTA activation: "
-                                               "currently being disabled");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot perform OTA activation: currently being disabled");
         break;
 
     case MM_MODEM_STATE_ENABLING:
     case MM_MODEM_STATE_DISABLED:
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot perform OTA activation: "
-                                               "not enabled yet");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot perform OTA activation: not enabled yet");
         break;
 
     case MM_MODEM_STATE_DISCONNECTING:
     case MM_MODEM_STATE_CONNECTING:
     case MM_MODEM_STATE_CONNECTED:
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot perform OTA activation: "
-                                               "modem is connected");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot perform OTA activation: modem is connected");
         break;
 
     default:
@@ -311,7 +292,7 @@ handle_activate_manual_ready (MMIfaceModemCdma *self,
     priv->activation_ongoing = FALSE;
 
     if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual_finish (self, res,&error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem_cdma_complete_activate_manual (ctx->skeleton, ctx->invocation);
 
@@ -331,17 +312,15 @@ handle_activate_manual_auth_ready (MMBaseModem *self,
     priv = get_private (MM_IFACE_MODEM_CDMA (self));
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_activate_manual_context_free (ctx);
         return;
     }
 
     /* Fail if we have already an activation ongoing */
     if (priv->activation_ongoing) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_IN_PROGRESS,
-                                               "An activation operation is already in progress");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_IN_PROGRESS,
+                                                        "An activation operation is already in progress");
         handle_activate_manual_context_free (ctx);
         return;
     }
@@ -357,11 +336,8 @@ handle_activate_manual_auth_ready (MMBaseModem *self,
     /* If manual activation is not implemented, report an error */
     if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual ||
         !MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot perform manual activation: "
-                                               "operation not supported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot perform manual activation: operation not supported");
         handle_activate_manual_context_free (ctx);
         return;
     }
@@ -369,7 +345,7 @@ handle_activate_manual_auth_ready (MMBaseModem *self,
     /* Parse input properties */
     properties = mm_cdma_manual_activation_properties_new_from_dictionary (ctx->dictionary, &error);
     if (!properties) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_activate_manual_context_free (ctx);
         return;
     }
@@ -388,11 +364,8 @@ handle_activate_manual_auth_ready (MMBaseModem *self,
         break;
 
     case MM_MODEM_STATE_INITIALIZING:
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot perform manual activation: "
-                                               "device not fully initialized yet");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot perform manual activation: device not fully initialized yet");
         break;
 
     case MM_MODEM_STATE_ENABLED:
@@ -408,30 +381,21 @@ handle_activate_manual_auth_ready (MMBaseModem *self,
         return;
 
     case MM_MODEM_STATE_DISABLING:
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot perform manual activation: "
-                                               "currently being disabled");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot perform manual activation: currently being disabled");
         break;
 
     case MM_MODEM_STATE_ENABLING:
     case MM_MODEM_STATE_DISABLED:
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot perform manual activation: "
-                                               "not enabled yet");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot perform manual activation: not enabled yet");
         break;
 
     case MM_MODEM_STATE_DISCONNECTING:
     case MM_MODEM_STATE_CONNECTING:
     case MM_MODEM_STATE_CONNECTED:
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot perform manual activation: "
-                                               "modem is connected");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot perform manual activation: modem is connected");
         break;
 
     default:

@@ -35,6 +35,7 @@
 #include "mm-base-modem.h"
 #include "mm-log-object.h"
 #include "mm-modem-helpers.h"
+#include "mm-error-helpers.h"
 
 static void log_object_iface_init (MMLogObjectInterface *iface);
 
@@ -346,7 +347,7 @@ handle_store_ready (MMBaseSms          *self,
 
     if (!MM_BASE_SMS_GET_CLASS (self)->store_finish (self, res, &error)) {
         mm_obj_warn (self, "failed storing SMS message: %s", error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_store_context_free (ctx);
         return;
     }
@@ -412,7 +413,7 @@ handle_store_auth_ready (MMBaseModem        *modem,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (modem, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_store_context_free (ctx);
         return;
     }
@@ -434,7 +435,7 @@ handle_store_auth_ready (MMBaseModem        *modem,
                                  mm_sms_storage_get_string (mm_base_sms_get_storage (ctx->self)),
                                  mm_sms_storage_get_string (ctx->storage));
             mm_obj_warn (ctx->self, "failed storing SMS message: %s", error->message);
-            g_dbus_method_invocation_take_error (ctx->invocation, error);
+            mm_dbus_method_invocation_take_error (ctx->invocation, error);
         }
         handle_store_context_free (ctx);
         return;
@@ -445,7 +446,7 @@ handle_store_auth_ready (MMBaseModem        *modem,
                                                                     ctx->storage,
                                                                     &error)) {
         mm_obj_warn (ctx->self, "failed storing SMS message: %s", error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_store_context_free (ctx);
         return;
     }
@@ -453,7 +454,7 @@ handle_store_auth_ready (MMBaseModem        *modem,
     /* Prepare the SMS to be stored, creating the PDU list if required */
     if (!prepare_sms_to_be_stored (ctx->self, &error)) {
         mm_obj_warn (ctx->self, "failed preparing SMS message to be stored: %s", error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_store_context_free (ctx);
         return;
     }
@@ -462,10 +463,8 @@ handle_store_auth_ready (MMBaseModem        *modem,
     if (!MM_BASE_SMS_GET_CLASS (ctx->self)->store ||
         !MM_BASE_SMS_GET_CLASS (ctx->self)->store_finish) {
         mm_obj_warn (ctx->self, "failed storing SMS message: unsupported");
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Storing SMS is not supported by this modem");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Storing SMS is not supported by this modem");
         handle_store_context_free (ctx);
         return;
     }
@@ -534,7 +533,7 @@ handle_send_ready (MMBaseSms         *self,
 
     if (!MM_BASE_SMS_GET_CLASS (self)->send_finish (self, res, &error)) {
         mm_obj_warn (self, "failed sending SMS message: %s", error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_send_context_free (ctx);
         return;
     }
@@ -595,7 +594,7 @@ handle_send_auth_ready (MMBaseModem       *modem,
     GError     *error = NULL;
 
     if (!mm_base_modem_authorize_finish (modem, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_send_context_free (ctx);
         return;
     }
@@ -603,20 +602,16 @@ handle_send_auth_ready (MMBaseModem       *modem,
     /* We can only send SMS created by the user */
     state = mm_gdbus_sms_get_state (MM_GDBUS_SMS (ctx->self));
     if (state == MM_SMS_STATE_RECEIVED || state == MM_SMS_STATE_RECEIVING) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_FAILED,
-                                               "This SMS was received, cannot send it");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                                        "This SMS was received, cannot send it");
         handle_send_context_free (ctx);
         return;
     }
 
     /* Don't allow sending the same SMS multiple times, we would lose the message reference */
     if (state == MM_SMS_STATE_SENT) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_FAILED,
-                                               "This SMS was already sent, cannot send it again");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                                        "This SMS was already sent, cannot send it again");
         handle_send_context_free (ctx);
         return;
     }
@@ -626,7 +621,7 @@ handle_send_auth_ready (MMBaseModem       *modem,
     /* Prepare the SMS to be sent, creating the PDU list if required */
     if (!prepare_sms_to_be_sent (ctx->self, &error)) {
         mm_obj_warn (ctx->self, "failed preparing SMS message to be sent: %s", error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_send_context_free (ctx);
         return;
     }
@@ -635,10 +630,8 @@ handle_send_auth_ready (MMBaseModem       *modem,
     if (!MM_BASE_SMS_GET_CLASS (ctx->self)->send ||
         !MM_BASE_SMS_GET_CLASS (ctx->self)->send_finish) {
         mm_obj_warn (ctx->self, "failed sending SMS message: unsupported");
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Sending SMS is not supported by this modem");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Sending SMS is not supported by this modem");
         handle_send_context_free (ctx);
         return;
     }

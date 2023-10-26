@@ -20,6 +20,7 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-messaging.h"
 #include "mm-sms-list.h"
+#include "mm-error-helpers.h"
 #include "mm-log-object.h"
 
 #define SUPPORT_CHECKED_TAG "messaging-support-checked-tag"
@@ -168,7 +169,7 @@ handle_delete_ready (MMSmsList           *list,
 
     if (!mm_sms_list_delete_sms_finish (list, res, &error)) {
         mm_obj_warn (ctx->self, "failed deleting SMS message '%s': %s", ctx->path, error->message);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
         mm_obj_info (ctx->self, "deleted SMS message '%s'", ctx->path);
         mm_gdbus_modem_messaging_complete_delete (ctx->skeleton, ctx->invocation);
@@ -185,7 +186,7 @@ handle_delete_auth_ready (MMBaseModem         *self,
     GError               *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_delete_context_free (ctx);
         return;
     }
@@ -206,10 +207,8 @@ handle_delete_auth_ready (MMBaseModem         *self,
                   MM_IFACE_MODEM_MESSAGING_SMS_LIST, &list,
                   NULL);
     if (!list) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot delete SMS: missing SMS list");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot delete SMS: missing SMS list");
         handle_delete_context_free (ctx);
         return;
     }
@@ -273,7 +272,7 @@ handle_create_auth_ready (MMBaseModem         *self,
     g_autoptr(MMBaseSms)        sms = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_create_context_free (ctx);
         return;
     }
@@ -288,14 +287,14 @@ handle_create_auth_ready (MMBaseModem         *self,
     /* Parse input properties */
     properties = mm_sms_properties_new_from_dictionary (ctx->dictionary, &error);
     if (!properties) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_create_context_free (ctx);
         return;
     }
 
     sms = mm_base_sms_new_from_properties (MM_BASE_MODEM (self), properties, &error);
     if (!sms) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_create_context_free (ctx);
         return;
     }
@@ -304,10 +303,8 @@ handle_create_auth_ready (MMBaseModem         *self,
                   MM_IFACE_MODEM_MESSAGING_SMS_LIST, &list,
                   NULL);
     if (!list) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot create SMS: missing SMS list");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot create SMS: missing SMS list");
         handle_create_context_free (ctx);
         return;
     }
@@ -362,10 +359,8 @@ handle_list (MmGdbusModemMessaging *skeleton,
                   MM_IFACE_MODEM_MESSAGING_SMS_LIST, &list,
                   NULL);
     if (!list) {
-        g_dbus_method_invocation_return_error (invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot list SMS: missing SMS list");
+        mm_dbus_method_invocation_return_error_literal (invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot list SMS: missing SMS list");
         return TRUE;
     }
 

@@ -21,6 +21,7 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-voice.h"
 #include "mm-call-list.h"
+#include "mm-error-helpers.h"
 #include "mm-log-object.h"
 
 #define CALL_LIST_POLLING_CONTEXT_TAG "voice-call-list-polling-context-tag"
@@ -597,7 +598,7 @@ handle_delete_auth_ready (MMBaseModem *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_delete_context_free (ctx);
         return;
     }
@@ -606,16 +607,14 @@ handle_delete_auth_ready (MMBaseModem *self,
                   MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
                   NULL);
     if (!list) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot delete call: missing call list");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot delete call: missing call list");
         handle_delete_context_free (ctx);
         return;
     }
 
     if (!mm_call_list_delete_call (list, ctx->path, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem_voice_complete_delete_call (ctx->skeleton, ctx->invocation);
 
@@ -675,7 +674,7 @@ handle_create_auth_ready (MMBaseModem *self,
     MMBaseCall *call;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_create_context_free (ctx);
         return;
     }
@@ -683,7 +682,7 @@ handle_create_auth_ready (MMBaseModem *self,
     /* Parse input properties */
     properties = mm_call_properties_new_from_dictionary (ctx->dictionary, &error);
     if (!properties) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_create_context_free (ctx);
         return;
     }
@@ -691,7 +690,7 @@ handle_create_auth_ready (MMBaseModem *self,
     call = create_outgoing_call_from_properties (MM_IFACE_MODEM_VOICE (self), properties, &error);
     if (!call) {
         g_object_unref (properties);
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_create_context_free (ctx);
         return;
     }
@@ -702,10 +701,8 @@ handle_create_auth_ready (MMBaseModem *self,
     if (!list) {
         g_object_unref (properties);
         g_object_unref (call);
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot create CALL: missing CALL list");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot create call: missing call list");
         handle_create_context_free (ctx);
         return;
     }
@@ -762,10 +759,8 @@ handle_list (MmGdbusModemVoice *skeleton,
                   MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
                   NULL);
     if (!list) {
-        g_dbus_method_invocation_return_error (invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot list CALL: missing CALL list");
+        mm_dbus_method_invocation_return_error_literal (invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot list call: missing call list");
         return TRUE;
     }
 
@@ -808,7 +803,7 @@ hold_and_accept_ready (MMIfaceModemVoice          *self,
     GList  *l;
 
     if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hold_and_accept_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_hold_and_accept_context_free (ctx);
         return;
     }
@@ -857,17 +852,15 @@ handle_hold_and_accept_auth_ready (MMBaseModem                *self,
     MMCallList *list = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_hold_and_accept_context_free (ctx);
         return;
     }
 
     if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hold_and_accept ||
         !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hold_and_accept_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot hold and accept: unsupported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot hold and accept: unsupported");
         handle_hold_and_accept_context_free (ctx);
         return;
     }
@@ -876,10 +869,8 @@ handle_hold_and_accept_auth_ready (MMBaseModem                *self,
                   MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
                   NULL);
     if (!list) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot hold and accept: missing call list");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot hold and accept: missing call list");
         handle_hold_and_accept_context_free (ctx);
         return;
     }
@@ -941,7 +932,7 @@ hangup_and_accept_ready (MMIfaceModemVoice            *self,
     GList  *l;
 
     if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_and_accept_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_hangup_and_accept_context_free (ctx);
         return;
     }
@@ -990,17 +981,15 @@ handle_hangup_and_accept_auth_ready (MMBaseModem                  *self,
     MMCallList *list = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_hangup_and_accept_context_free (ctx);
         return;
     }
 
     if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_and_accept ||
         !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_and_accept_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot hangup and accept: unsupported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot hangup and accept: unsupported");
         handle_hangup_and_accept_context_free (ctx);
         return;
     }
@@ -1009,10 +998,8 @@ handle_hangup_and_accept_auth_ready (MMBaseModem                  *self,
                   MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
                   NULL);
     if (!list) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot hangup and accept: missing call list");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot hangup and accept: missing call list");
         handle_hangup_and_accept_context_free (ctx);
         return;
     }
@@ -1072,7 +1059,7 @@ hangup_all_ready (MMIfaceModemVoice      *self,
     GList  *l;
 
     if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_all_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_hangup_all_context_free (ctx);
         return;
     }
@@ -1133,17 +1120,15 @@ handle_hangup_all_auth_ready (MMBaseModem            *self,
     MMCallList *list = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_hangup_all_context_free (ctx);
         return;
     }
 
     if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_all ||
         !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_all_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot hangup all: unsupported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot hangup all: unsupported");
         handle_hangup_all_context_free (ctx);
         return;
     }
@@ -1152,10 +1137,8 @@ handle_hangup_all_auth_ready (MMBaseModem            *self,
                   MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
                   NULL);
     if (!list) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot hangup all: missing call list");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot hangup all: missing call list");
         handle_hangup_all_context_free (ctx);
         return;
     }
@@ -1215,7 +1198,7 @@ transfer_ready (MMIfaceModemVoice     *self,
     GList  *l;
 
     if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->transfer_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_transfer_context_free (ctx);
         return;
     }
@@ -1256,17 +1239,15 @@ handle_transfer_auth_ready (MMBaseModem           *self,
     MMCallList *list = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_transfer_context_free (ctx);
         return;
     }
 
     if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->transfer ||
         !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->transfer_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot transfer: unsupported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot transfer: unsupported");
         handle_transfer_context_free (ctx);
         return;
     }
@@ -1275,10 +1256,8 @@ handle_transfer_auth_ready (MMBaseModem           *self,
                   MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
                   NULL);
     if (!list) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot transfer: missing call list");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "Cannot transfer: missing call list");
         handle_transfer_context_free (ctx);
         return;
     }
@@ -1336,7 +1315,7 @@ call_waiting_setup_ready (MMIfaceModemVoice             *self,
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_setup_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_call_waiting_setup_context_free (ctx);
         return;
     }
@@ -1353,17 +1332,15 @@ handle_call_waiting_setup_auth_ready (MMBaseModem                   *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_call_waiting_setup_context_free (ctx);
         return;
     }
 
     if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_setup ||
         !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_setup_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot setup call waiting: unsupported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot setup call waiting: unsupported");
         handle_call_waiting_setup_context_free (ctx);
         return;
     }
@@ -1423,7 +1400,7 @@ call_waiting_query_ready (MMIfaceModemVoice             *self,
     gboolean  status = FALSE;
 
     if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_query_finish (self, res, &status, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_call_waiting_query_context_free (ctx);
         return;
     }
@@ -1440,17 +1417,15 @@ handle_call_waiting_query_auth_ready (MMBaseModem                   *self,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_call_waiting_query_context_free (ctx);
         return;
     }
 
     if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_query ||
         !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_query_finish) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot query call waiting: unsupported");
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot query call waiting: unsupported");
         handle_call_waiting_query_context_free (ctx);
         return;
     }
