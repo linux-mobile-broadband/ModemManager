@@ -3226,7 +3226,7 @@ static const InternalErrorMap internal_error_map[] = {
     /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_MAX_V4_CONNECTIONS */
     /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_MAX_V6_CONNECTIONS */
     { QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_APN_MISMATCH, FALSE, MM_MOBILE_EQUIPMENT_ERROR_MISSING_OR_UNKNOWN_APN },
-    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_IP_VERSION_MISMATCH */
+    /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_IP_VERSION_MISMATCH: NOTE: this one is treated in a special way */
     /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_DUN_CALL_DISALLOWED */
     /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_INVALID_PROFILE */
     /* QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_EPC_NONEPC_TRANSITION */
@@ -3250,9 +3250,19 @@ static const InternalErrorMap internal_error_map[] = {
 static GError *
 error_from_wds_verbose_call_end_reason_internal (QmiWdsVerboseCallEndReasonInternal  vcer_reason,
                                                  const gchar                        *vcer_reason_str,
+                                                 MMBearerIpFamily                    ip_type,
                                                  gpointer                            log_object)
 {
     guint i;
+
+    /* Try to normalize the "IP version mismatch" error based on the IP type being connected. But
+     * leave the original reason string to clearly show that we did this translation. */
+    if (vcer_reason == QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_IP_VERSION_MISMATCH) {
+        if (ip_type == MM_BEARER_IP_FAMILY_IPV4)
+            vcer_reason = QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_PDN_IPV4_CALL_DISALLOWED;
+        else if (ip_type == MM_BEARER_IP_FAMILY_IPV6)
+            vcer_reason = QMI_WDS_VERBOSE_CALL_END_REASON_INTERNAL_PDN_IPV6_CALL_DISALLOWED;
+    }
 
     for (i = 0; i < G_N_ELEMENTS (internal_error_map); i++) {
         if (internal_error_map[i].vcer == vcer_reason) {
@@ -3339,6 +3349,7 @@ error_from_wds_verbose_call_end_reason_3gpp (QmiWdsVerboseCallEndReason3gpp  vce
 GError *
 mm_error_from_wds_verbose_call_end_reason (QmiWdsVerboseCallEndReasonType vcer_type,
                                            guint                          vcer_reason,
+                                           MMBearerIpFamily               ip_type,
                                            gpointer                       log_object)
 {
     GError      *error = NULL;
@@ -3352,7 +3363,7 @@ mm_error_from_wds_verbose_call_end_reason (QmiWdsVerboseCallEndReasonType vcer_t
 
     switch (vcer_type) {
         case QMI_WDS_VERBOSE_CALL_END_REASON_TYPE_INTERNAL:
-            error = error_from_wds_verbose_call_end_reason_internal (vcer_reason, vcer_reason_str, log_object);
+            error = error_from_wds_verbose_call_end_reason_internal (vcer_reason, vcer_reason_str, ip_type, log_object);
             break;
         case QMI_WDS_VERBOSE_CALL_END_REASON_TYPE_3GPP:
             error = error_from_wds_verbose_call_end_reason_3gpp (vcer_reason, vcer_reason_str, log_object);

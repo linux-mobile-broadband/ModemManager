@@ -1213,6 +1213,7 @@ register_for_wds_indication (ConnectContext *ctx,
 
 static GError *
 error_from_start_network_output (MMBearerQmi                     *self,
+                                 gboolean                         running_ipv4,
                                  QmiMessageWdsStartNetworkOutput *output)
 {
     QmiWdsCallEndReason            cer;
@@ -1224,7 +1225,9 @@ error_from_start_network_output (MMBearerQmi                     *self,
             &verbose_cer_type,
             &verbose_cer_reason,
             NULL)) {
-        return mm_error_from_wds_verbose_call_end_reason (verbose_cer_type, verbose_cer_reason, self);
+        return mm_error_from_wds_verbose_call_end_reason (verbose_cer_type, verbose_cer_reason,
+                                                          running_ipv4 ? MM_BEARER_IP_FAMILY_IPV4 : MM_BEARER_IP_FAMILY_IPV6,
+                                                          self);
     }
 
     if (qmi_message_wds_start_network_output_get_call_end_reason (
@@ -1277,7 +1280,7 @@ start_network_ready (QmiClientWds *client,
             mm_obj_msg (self, "couldn't start %s network: %s", ctx->running_ipv4 ? "IPv4" : "IPv6", error->message);
             if (g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_CALL_FAILED)) {
                 g_clear_error (&error);
-                error = error_from_start_network_output (self, output);
+                error = error_from_start_network_output (self, ctx->running_ipv4, output);
             }
         }
     }
@@ -1374,8 +1377,14 @@ packet_service_status_indication_cb (QmiClientWds *client,
                 &verbose_cer_type,
                 &verbose_cer_reason,
                 NULL)) {
-            /* Create MM error based on the verbose call end reason details */
-            connection_error = mm_error_from_wds_verbose_call_end_reason (verbose_cer_type, verbose_cer_reason, self);
+            /* Create MM error based on the verbose call end reason details. There is no real
+             * need for now to provide the correct IP type associated to the QMI WDS client
+             * that received the indication, because the type of errors that need this info
+             * would happen upon a Start Network operation, not after the modem has been
+             * connected. */
+            connection_error = mm_error_from_wds_verbose_call_end_reason (verbose_cer_type, verbose_cer_reason,
+                                                                          MM_BEARER_IP_FAMILY_NONE,
+                                                                          self);
         } else if (qmi_indication_wds_packet_service_status_output_get_call_end_reason (
                        output,
                        &cer,

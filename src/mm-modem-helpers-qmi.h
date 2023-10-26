@@ -258,6 +258,7 @@ gboolean qmi_personalization_feature_from_mm_modem_3gpp_facility (MMModem3gppFac
 void      mm_register_qmi_errors                    (void);
 GError   *mm_error_from_wds_verbose_call_end_reason (QmiWdsVerboseCallEndReasonType   vcer_type,
                                                      guint                            vcer_reason,
+                                                     MMBearerIpFamily                 ip_type,
                                                      gpointer                         log_object);
 gboolean  mm_error_from_qmi_loc_indication_status   (QmiLocIndicationStatus           status,
                                                      GError                         **error);
