@@ -521,6 +521,27 @@ cdma_activation_error_get_string (MMCdmaActivationError code)
 }
 
 /******************************************************************************/
+/* Carrier lock errors */
+
+/* Human friendly messages for each error type */
+static const gchar *carrier_lock_error_messages[] = {
+    [MM_CARRIER_LOCK_ERROR_UNKNOWN]                           = "Unknown",
+    [MM_CARRIER_LOCK_ERROR_INVALID_SIGNATURE]                 = "Invalid signature",
+    [MM_CARRIER_LOCK_ERROR_INVALID_IMEI]                      = "Invalid IMEI",
+    [MM_CARRIER_LOCK_ERROR_INVALID_TIMESTAMP]                 = "Invalid timestamp",
+    [MM_CARRIER_LOCK_ERROR_NETWORK_LIST_TOO_LARGE]            = "Network list too large",
+    [MM_CARRIER_LOCK_ERROR_SIGNATURE_ALGORITHM_NOT_SUPPORTED] = "Signature algorithm not supported",
+    [MM_CARRIER_LOCK_ERROR_FEATURE_NOT_SUPPORTED]             = "Feature not supported",
+    [MM_CARRIER_LOCK_ERROR_DECODE_OR_PARSING_ERROR]           = "Decode or parsing error",
+};
+
+static const gchar *
+carrier_lock_error_get_string (MMCarrierLockError code)
+{
+    return (code < G_N_ELEMENTS (carrier_lock_error_messages)) ? carrier_lock_error_messages[code] : NULL;
+}
+
+/******************************************************************************/
 /* Registered error mappings */
 
 typedef struct {
@@ -685,6 +706,8 @@ mm_normalize_error (const GError *error)
         return normalize_mm_error (error, message_error_get_string (error->code), "message");
     if (error->domain == MM_CDMA_ACTIVATION_ERROR)
         return normalize_mm_error (error, cdma_activation_error_get_string (error->code), "CDMA activation");
+    if (error->domain == MM_CARRIER_LOCK_ERROR)
+        return normalize_mm_error (error, carrier_lock_error_get_string (error->code), "carrier lock");
 
     /* Normalize mapped errors */
     return normalize_mapped_error (error);

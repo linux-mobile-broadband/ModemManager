@@ -2081,6 +2081,7 @@ mm_common_register_errors (void)
     aux |= MM_SERIAL_ERROR;
     aux |= MM_MESSAGE_ERROR;
     aux |= MM_CDMA_ACTIVATION_ERROR;
+    aux |= MM_CARRIER_LOCK_ERROR;
 
     return TRUE;
 }
