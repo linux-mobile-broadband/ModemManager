@@ -29,6 +29,7 @@
 
 #if defined WITH_MBIM
 # include <libmbim-glib.h>
+# include "mm-modem-helpers-mbim.h"
 #endif
 
 /******************************************************************************/
@@ -589,6 +590,10 @@ normalize_mapped_error (const GError *error)
 {
     DomainCodePair *output = NULL;
     const gchar    *input_error_type;
+
+#if defined WITH_MBIM
+    mm_register_mbim_errors ();
+#endif
 
 #if defined WITH_QMI
     if (error->domain == QMI_CORE_ERROR)

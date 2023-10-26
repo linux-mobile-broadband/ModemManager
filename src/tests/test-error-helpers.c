@@ -200,14 +200,14 @@ test_error_helpers_normalize (void)
 #endif
 
 #if defined WITH_MBIM
-    normalize_and_assert_mm_error (TRUE, MBIM_CORE_ERROR, MBIM_CORE_ERROR_ABORTED, "Known MBIM core error");
-    normalize_and_assert_mm_error (TRUE, MBIM_CORE_ERROR, 123456,                  "Unknown MBIM core error");
+    normalize_and_assert_mm_error (FALSE, MBIM_CORE_ERROR, MBIM_CORE_ERROR_ABORTED, "Known MBIM core error");
+    normalize_and_assert_mm_error (TRUE,  MBIM_CORE_ERROR, 123456,                  "Unknown MBIM core error");
 
-    normalize_and_assert_mm_error (TRUE, MBIM_PROTOCOL_ERROR, MBIM_PROTOCOL_ERROR_CANCEL, "Known MBIM protocol error");
-    normalize_and_assert_mm_error (TRUE, MBIM_PROTOCOL_ERROR, 123456,                     "Unknown MBIM protocol error");
+    normalize_and_assert_mm_error (FALSE, MBIM_PROTOCOL_ERROR, MBIM_PROTOCOL_ERROR_CANCEL, "Known MBIM protocol error");
+    normalize_and_assert_mm_error (TRUE,  MBIM_PROTOCOL_ERROR, 123456,                     "Unknown MBIM protocol error");
 
-    normalize_and_assert_mm_error (TRUE, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_BUSY, "Known MBIM status error");
-    normalize_and_assert_mm_error (TRUE, MBIM_STATUS_ERROR, 123456,                 "Unknown MBIM status error");
+    normalize_and_assert_mm_error (FALSE, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_BUSY, "Known MBIM status error");
+    normalize_and_assert_mm_error (TRUE,  MBIM_STATUS_ERROR, 123456,                 "Unknown MBIM status error");
 #endif
 }
 

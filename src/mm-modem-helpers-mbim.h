@@ -182,8 +182,8 @@ gdouble mm_nrarfcn_to_frequency (guint32  nrarfcn,
 /*****************************************************************************/
 /* MM error translations */
 
+void    mm_register_mbim_errors     (void);
 GError *mm_error_from_mbim_nw_error (MbimNwError nw_error,
                                      gpointer    log_object);
-
 
 #endif  /* MM_MODEM_HELPERS_MBIM_H */
