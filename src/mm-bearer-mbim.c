@@ -718,7 +718,7 @@ connect_set_ready (MbimDevice   *device,
             activation_state != MBIM_ACTIVATION_STATE_ACTIVATED &&
             activation_state != MBIM_ACTIVATION_STATE_ACTIVATING) {
             g_clear_error (&error);
-            error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error, self);
+            error = mm_error_from_mbim_nw_error (nw_error, self);
         }
     }
 
@@ -1499,7 +1499,7 @@ disconnect_set_ready (MbimDevice   *device,
     if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_FAILURE) && parsed_result && nw_error != 0) {
         g_assert (!inner_error);
         g_error_free (error);
-        error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error, self);
+        error = mm_error_from_mbim_nw_error (nw_error, self);
         /* error out with nw_error error */
         goto out;
     }

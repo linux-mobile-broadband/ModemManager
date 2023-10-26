@@ -460,10 +460,10 @@ static const MMMobileEquipmentError mbim_nw_errors[] = {
 };
 
 GError *
-mm_mobile_equipment_error_from_mbim_nw_error (MbimNwError nw_error,
-                                              gpointer    log_object)
+mm_error_from_mbim_nw_error (MbimNwError nw_error,
+                             gpointer    log_object)
 {
-    const gchar            *msg;
+    const gchar *msg;
 
     if (nw_error < G_N_ELEMENTS (mbim_nw_errors)) {
         MMMobileEquipmentError  error_code;
