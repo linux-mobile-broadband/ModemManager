@@ -6471,9 +6471,11 @@ basic_sim_details_subscriber_ready_state_ready (MbimDevice   *device,
         sim_details = g_slice_new0 (SimDetails);
         if (ready_state != MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED) {
             sim_details->sim_inserted = TRUE;
-            sim_details->iccid = mm_3gpp_parse_iccid (raw_iccid, &inner_error);
-            if (!sim_details->iccid) {
-                mm_obj_warn (self, "can not get ICCID info: couldn't parse SIM ICCID: %s", inner_error->message);
+            if (raw_iccid) {
+                sim_details->iccid = mm_3gpp_parse_iccid (raw_iccid, &inner_error);
+                if (!sim_details->iccid) {
+                    mm_obj_warn (self, "can not get ICCID info: couldn't parse SIM ICCID: %s", inner_error->message);
+                }
             }
             sim_details->imsi = imsi;
         }
