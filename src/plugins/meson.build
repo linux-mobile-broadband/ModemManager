@@ -636,7 +636,7 @@ if plugins_options['mtk-legacy']
     'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="mtk-legacy"']},
   }}
 
-  plugins_udev_rules += files('mtk/77-mm-mtk-port-types.rules')
+  plugins_udev_rules += files('mtk/77-mm-mtk-legacy-port-types.rules')
 endif
 
 # plugin: mtk
