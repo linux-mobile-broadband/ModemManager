@@ -641,9 +641,6 @@ endif
 
 # plugin: mtk
 if plugins_options['mtk']
-  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_MTK="@0@"'.format(plugins_dir / 'mtk')]
-  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
-
   sources = files(
     'mtk/mm-plugin-mtk.c',
   )
