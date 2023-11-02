@@ -125,47 +125,6 @@ mm_iface_modem_3gpp_profile_manager_updated (MMIfaceModem3gppProfileManager *sel
     priv->updated_timeout_source = g_timeout_add_seconds (UPDATED_TIMEOUT_SECS, (GSourceFunc) profile_manager_updated_emit, self);
 }
 
-static gboolean
-profile_manager_fail_if_connected_bearer (MMIfaceModem3gppProfileManager  *self,
-                                          const gchar                     *index_field,
-                                          gint                             profile_id,
-                                          MMBearerApnType                  apn_type,
-                                          GError                         **error)
-{
-    g_autoptr(MMBearerList) bearer_list = NULL;
-    g_autoptr(MMBaseBearer) bearer = NULL;
-
-    g_object_get (self, MM_IFACE_MODEM_BEARER_LIST, &bearer_list, NULL);
-    if (bearer_list) {
-        if (g_strcmp0 (index_field, "profile-id") == 0)
-            bearer = mm_bearer_list_find_by_profile_id (bearer_list, profile_id);
-        else if (g_strcmp0 (index_field, "apn-type") == 0)
-            bearer = mm_bearer_list_find_by_apn_type (bearer_list, apn_type);
-        else
-            g_assert_not_reached ();
-    }
-
-    /* If a bearer is found reporting the profile id we're targeting to use,
-     * it means we have a known connected bearer, and we must abort the
-     * operation right away. */
-    if (bearer) {
-        if (g_strcmp0 (index_field, "profile-id") == 0) {
-            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_CONNECTED,
-                         "Cannot use profile %d: found an already connected bearer", profile_id);
-        } else if (g_strcmp0 (index_field, "apn-type") == 0) {
-            g_autofree gchar *apn_type_str = NULL;
-
-            apn_type_str = mm_bearer_apn_type_build_string_from_mask (apn_type);
-            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_CONNECTED,
-                         "Cannot use profile %s: found an already connected bearer", apn_type_str);
-        } else
-            g_assert_not_reached ();
-        return FALSE;
-    }
-
-    return TRUE;
-}
-
 /*****************************************************************************/
 /* Set profile (3GPP profile management interface) */
 
@@ -389,6 +348,47 @@ profile_manager_check_activated_profile_ready (MMIfaceModem3gppProfileManager *s
         ctx->step = SET_PROFILE_STEP_STORE_PROFILE;
     }
     set_profile_step (task);
+}
+
+static gboolean
+profile_manager_fail_if_connected_bearer (MMIfaceModem3gppProfileManager  *self,
+                                          const gchar                     *index_field,
+                                          gint                             profile_id,
+                                          MMBearerApnType                  apn_type,
+                                          GError                         **error)
+{
+    g_autoptr(MMBearerList) bearer_list = NULL;
+    g_autoptr(MMBaseBearer) bearer = NULL;
+
+    g_object_get (self, MM_IFACE_MODEM_BEARER_LIST, &bearer_list, NULL);
+    if (bearer_list) {
+        if (g_strcmp0 (index_field, "profile-id") == 0)
+            bearer = mm_bearer_list_find_by_profile_id (bearer_list, profile_id);
+        else if (g_strcmp0 (index_field, "apn-type") == 0)
+            bearer = mm_bearer_list_find_by_apn_type (bearer_list, apn_type);
+        else
+            g_assert_not_reached ();
+    }
+
+    /* If a bearer is found reporting the profile id we're targeting to use,
+     * it means we have a known connected bearer, and we must abort the
+     * operation right away. */
+    if (bearer) {
+        if (g_strcmp0 (index_field, "profile-id") == 0) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_CONNECTED,
+                         "Cannot use profile %d: found an already connected bearer", profile_id);
+        } else if (g_strcmp0 (index_field, "apn-type") == 0) {
+            g_autofree gchar *apn_type_str = NULL;
+
+            apn_type_str = mm_bearer_apn_type_build_string_from_mask (apn_type);
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_CONNECTED,
+                         "Cannot use profile %s: found an already connected bearer", apn_type_str);
+        } else
+            g_assert_not_reached ();
+        return FALSE;
+    }
+
+    return TRUE;
 }
 
 static void
