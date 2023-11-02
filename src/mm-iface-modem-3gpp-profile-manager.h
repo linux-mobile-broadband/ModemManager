@@ -222,6 +222,12 @@ void mm_iface_modem_3gpp_profile_manager_shutdown (MMIfaceModem3gppProfileManage
 void mm_iface_modem_3gpp_profile_manager_bind_simple_status (MMIfaceModem3gppProfileManager *self,
                                                              MMSimpleStatus                 *status);
 
+/* Helpers to request ignorig Updated signal emission requests sent by implementations during
+ * our own operations */
+void mm_iface_modem_3gpp_profile_manager_update_ignore_start        (MMIfaceModem3gppProfileManager *self);
+void mm_iface_modem_3gpp_profile_manager_update_ignore_stop         (MMIfaceModem3gppProfileManager *self);
+void mm_iface_modem_3gpp_profile_manager_update_ignore_stop_delayed (MMIfaceModem3gppProfileManager *self);
+
 /* Helper to emit the Updated signal by implementations */
 void mm_iface_modem_3gpp_profile_manager_updated (MMIfaceModem3gppProfileManager *self);
 
@@ -249,6 +255,5 @@ void           mm_iface_modem_3gpp_profile_manager_set_profile          (MMIface
 MM3gppProfile *mm_iface_modem_3gpp_profile_manager_set_profile_finish   (MMIfaceModem3gppProfileManager  *self,
                                                                          GAsyncResult                    *res,
                                                                          GError                         **error);
-
 
 #endif /* MM_IFACE_MODEM_3GPP_PROFILE_MANAGER_H */

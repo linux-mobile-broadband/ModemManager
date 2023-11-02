@@ -31,6 +31,7 @@
 #include "mm-daemon-enums-types.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-iface-modem-3gpp-profile-manager.h"
 #include "mm-iface-modem-cdma.h"
 #include "mm-base-bearer.h"
 #include "mm-base-modem-at.h"
@@ -974,9 +975,16 @@ connect_ready (MMBaseBearer *self,
         mm_obj_warn (self, "connection attempt #%u failed: %s",
                      mm_bearer_stats_get_attempts (self->priv->stats),
                      error->message);
+        /* process profile manager updates right away on error */
+        if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self->priv->modem)))
+            mm_iface_modem_3gpp_profile_manager_update_ignore_stop (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self->priv->modem));
         connect_failed (self, task, error);
         return;
     }
+
+    /* delay processing profile manager updates on success */
+    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self->priv->modem)))
+        mm_iface_modem_3gpp_profile_manager_update_ignore_stop_delayed (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self->priv->modem));
 
     /* Handle cancellations detected after successful connection */
     if (connect_check_cancel (self, task))
@@ -1092,6 +1100,10 @@ mm_base_bearer_connect (MMBaseBearer *self,
 
     /* Clear previous connection error, if any */
     bearer_update_connection_error (self, NULL);
+
+    /* The connect request may imply a profile update internally, so ignore it */
+    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self->priv->modem)))
+        mm_iface_modem_3gpp_profile_manager_update_ignore_start (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self->priv->modem));
 
     /* Connecting! */
     mm_obj_dbg (self, "connecting...");

@@ -24,6 +24,7 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-location.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-iface-modem-3gpp-profile-manager.h"
 #include "mm-base-modem.h"
 #include "mm-modem-helpers.h"
 #include "mm-error-helpers.h"
@@ -1267,12 +1268,17 @@ set_initial_eps_bearer_settings_ready (MMIfaceModem3gpp                         
 
     if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_initial_eps_bearer_settings_finish (self, res, &error)) {
         mm_obj_warn (self, "failed setting initial EPS bearer settings: %s", error->message);
+        /* process profile manager updates right away on error */
+        mm_iface_modem_3gpp_profile_manager_update_ignore_stop (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self));
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_initial_eps_bearer_settings_context_free (ctx);
         return;
     }
 
     mm_obj_info (self, "initial EPS bearer settings updated");
+
+    /* delay processing profile manager updates on success */
+    mm_iface_modem_3gpp_profile_manager_update_ignore_stop_delayed (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self));
 
     if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_settings &&
         MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_settings_finish) {
@@ -1335,6 +1341,9 @@ set_initial_eps_bearer_settings_auth_ready (MMBaseModem                         
         handle_set_initial_eps_bearer_settings_context_free (ctx);
         return;
     }
+
+    /* Start ignoring our own indications */
+    mm_iface_modem_3gpp_profile_manager_update_ignore_start (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self));
 
     MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_initial_eps_bearer_settings (
         MM_IFACE_MODEM_3GPP (self),
