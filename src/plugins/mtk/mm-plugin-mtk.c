@@ -24,6 +24,7 @@
 #if defined WITH_MBIM
 #include "mm-broadband-modem-mbim.h"
 #include "mm-broadband-modem-mbim-mtk.h"
+#include "mm-broadband-modem-mbim-mtk-fibocom.h"
 #endif
 #include "mm-log.h"
 
@@ -44,6 +45,16 @@ create_modem (MMPlugin *self,
 {
 #if defined WITH_MBIM
     if (mm_port_probe_list_has_mbim_port (probes)) {
+        /* FM350 support with Fibocom-specific changes */
+        if (vendor == 0x14c3 && product == 0x4d75) {
+            mm_obj_dbg (self, "MBIM-powered MTK-based Fibocom modem found...");
+            return MM_BASE_MODEM (mm_broadband_modem_mbim_mtk_fibocom_new (uid,
+                                                                           physdev,
+                                                                           drivers,
+                                                                           mm_plugin_get_name (self),
+                                                                           vendor,
+                                                                           product));
+        }
         mm_obj_dbg (self, "MBIM-powered MTK modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_mbim_mtk_new (uid,
                                                                physdev,

@@ -5,6 +5,9 @@ GOTO="mm_mtk_port_types_end"
 
 LABEL="mm_mtk_port_types"
 
+# Fibocom FM350 attach APN with toggle modem power
+ATTRS{vendor}=="0x14c3", ATTRS{device}=="0x4d75", ENV{ID_MM_FIBOCOM_INITIAL_EPS_OFF_ON}="1"
+
 # Fibocom FM350 doesn't correctly support multiplexing yet
 ATTRS{vendor}=="0x14c3", ATTRS{device}=="0x4d75", ENV{ID_MM_MAX_MULTIPLEXED_LINKS}="0"
 

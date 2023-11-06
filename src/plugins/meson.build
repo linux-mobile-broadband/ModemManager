@@ -643,19 +643,23 @@ endif
 if plugins_options['mtk']
   test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_MTK="@0@"'.format(plugins_dir / 'mtk')]
   plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
+
+  incs = plugins_incs
   sources = files(
     'mtk/mm-plugin-mtk.c',
   )
 
   if enable_mbim
+    incs += [fibocom_inc]
     sources += files(
-      'mtk/mm-broadband-modem-mbim-mtk.c'
+      'mtk/mm-broadband-modem-mbim-mtk.c',
+      'mtk/mm-broadband-modem-mbim-mtk-fibocom.c'
     )
   endif
 
   plugins += {'plugin-mtk': {
     'plugin': true,
-    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="mtk"']},
+    'module': {'sources': sources, 'include_directories': incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="mtk"']},
   }}
 
   plugins_udev_rules += files('mtk/77-mm-mtk-port-types.rules')

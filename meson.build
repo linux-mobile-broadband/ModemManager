@@ -311,9 +311,11 @@ plugins_shared_reqs = {
 
 fibocom_shared_reqs = ['xmm']
 dell_shared_reqs = ['novatel', 'sierra', 'telit', 'xmm']
+mtk_shared_reqs = []
 if enable_mbim
   fibocom_shared_reqs += ['fibocom']
   dell_shared_reqs += ['foxconn']
+  mtk_shared_reqs += ['fibocom']
 endif
 
 plugins_options_reqs = {
@@ -336,7 +338,7 @@ plugins_options_reqs = {
   'mbm': {'available': true, 'shared': []},
   'motorola': {'available': true, 'shared': []},
   'mtk-legacy': {'available': true, 'shared': []},
-  'mtk': {'available': true, 'shared': []},
+  'mtk': {'available': true, 'shared': mtk_shared_reqs},
   'nokia': {'available': true, 'shared': []},
   'nokia-icera': {'available': true, 'shared': ['icera']},
   'novatel': {'available': true, 'shared': ['novatel']},
