@@ -43,6 +43,7 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbimMtkFibocom, mm_broadband_modem_mbim_
 
 struct _MMBroadbandModemMbimMtkFibocomPrivate {
     /* Supported features */
+    gboolean is_multiplex_supported;
     gboolean is_async_slaac_supported;
 };
 
@@ -52,6 +53,10 @@ struct _MMBroadbandModemMbimMtkFibocomPrivate {
  * modem-SLAAC operation with the network are not supported in old firmware
  * versions. */
 #define ASYNC_SLAAC_SUPPORTED_VERSION 29, 23, 6
+
+/* Multiple Multiplexed PDNs are not correctly supported in old firmware
+ * versions. */
+#define MULTIPLEX_SUPPORTED_VERSION 29, 23, 6
 
 static inline gboolean
 fm350_check_version (guint A1, guint A2, guint A3,
@@ -92,6 +97,11 @@ process_fm350_version_features (MMBroadbandModemMbimMtkFibocom *self,
     self->priv->is_async_slaac_supported = fm350_check_version (major, minor, micro, ASYNC_SLAAC_SUPPORTED_VERSION);
     mm_obj_info (self, "FM350 async SLAAC result indications are %ssupported",
                  self->priv->is_async_slaac_supported ? "" : "not ");
+
+    /* Check if multiplex is supported */
+    self->priv->is_multiplex_supported = fm350_check_version (major, minor, micro, MULTIPLEX_SUPPORTED_VERSION);
+    mm_obj_info (self, "FM350 multiplexing is %ssupported",
+                 self->priv->is_multiplex_supported ? "" : "not ");
 }
 
 /*****************************************************************************/
@@ -166,6 +176,26 @@ create_bearer (MMIfaceModem        *_self,
     g_object_unref (task);
 }
 
+/*****************************************************************************/
+/* Create Bearer List (Modem interface) */
+
+static MMBearerList *
+create_bearer_list (MMIfaceModem *self)
+{
+    MMBearerList *bearer_list;
+
+    bearer_list = iface_modem_parent->create_bearer_list (self);
+
+    if (!MM_BROADBAND_MODEM_MBIM_MTK_FIBOCOM (self)->priv->is_multiplex_supported) {
+        g_object_set (bearer_list,
+                      MM_BEARER_LIST_MAX_ACTIVE_MULTIPLEXED_BEARERS, 0,
+                      NULL);
+        mm_obj_dbg (self, "FM350 firmware version doesn't support multiplexed bearers");
+    }
+
+    return bearer_list;
+}
+
 /******************************************************************************/
 
 MMBroadbandModemMbimMtkFibocom *
@@ -211,6 +241,7 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_revision_finish = load_revision_finish;
     iface->create_bearer = create_bearer;
     iface->create_bearer_finish = create_bearer_finish;
+    iface->create_bearer_list = create_bearer_list;
 }
 
 static void

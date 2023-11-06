@@ -499,6 +499,6 @@ mm_bearer_list_class_init (MMBearerListClass *klass)
                            0,
                            G_MAXUINT,
                            0,
-                           G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+                           G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_MAX_ACTIVE_MULTIPLEXED_BEARERS, properties[PROP_MAX_ACTIVE_MULTIPLEXED_BEARERS]);
 }
