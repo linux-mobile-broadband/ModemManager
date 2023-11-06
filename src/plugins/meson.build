@@ -647,6 +647,12 @@ if plugins_options['mtk']
     'mtk/mm-plugin-mtk.c',
   )
 
+  if enable_mbim
+    sources += files(
+      'mtk/mm-broadband-modem-mbim-mtk.c'
+    )
+  endif
+
   plugins += {'plugin-mtk': {
     'plugin': true,
     'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="mtk"']},
