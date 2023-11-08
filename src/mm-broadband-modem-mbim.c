@@ -5163,14 +5163,6 @@ basic_connect_notification_subscriber_ready_status (MMBroadbandModemMbim *self,
         active_sim_event = TRUE;
     }
 
-    if ((self->priv->enabled_cache.last_ready_state != MBIM_SUBSCRIBER_READY_STATE_DEVICE_LOCKED &&
-         ready_state == MBIM_SUBSCRIBER_READY_STATE_DEVICE_LOCKED) ||
-        (self->priv->enabled_cache.last_ready_state == MBIM_SUBSCRIBER_READY_STATE_DEVICE_LOCKED &&
-         ready_state != MBIM_SUBSCRIBER_READY_STATE_DEVICE_LOCKED)) {
-        mm_obj_dbg (self, "Lock state change detected");
-        active_sim_event = TRUE;
-    }
-
     self->priv->enabled_cache.last_ready_state = ready_state;
 
     if (active_sim_event) {
