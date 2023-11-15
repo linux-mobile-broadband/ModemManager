@@ -32,8 +32,6 @@
 #define MM_IS_BEARER_MBIM_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_BEARER_MBIM))
 #define MM_BEARER_MBIM_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_BEARER_MBIM, MMBearerMbimClass))
 
-#define MM_BEARER_MBIM_SESSION_ID "bearer-mbim-session-id"
-
 typedef struct _MMBearerMbim MMBearerMbim;
 typedef struct _MMBearerMbimClass MMBearerMbimClass;
 typedef struct _MMBearerMbimPrivate MMBearerMbimPrivate;
