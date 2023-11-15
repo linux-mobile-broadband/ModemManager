@@ -36,12 +36,27 @@
 
 G_DEFINE_TYPE (MMBearerMbim, mm_bearer_mbim, MM_TYPE_BASE_BEARER)
 
+enum {
+    PROP_0,
+    PROP_ASYNC_SLAAC,
+    PROP_LAST
+};
+
 struct _MMBearerMbimPrivate {
     MMPortMbim *mbim;
     MMPort     *data;
     MMPort     *link;
     guint32     session_id;
+
+    /* Whether IP configuration indications should be expected before finalizing
+     * a connection attempt. */
+    gboolean async_slaac;
+
+    /* Ongoing connection attempt waiting for async SLAAC result */
+    GTask *attempt_ongoing;
 };
+
+static GParamSpec *properties[PROP_LAST];
 
 /*****************************************************************************/
 
@@ -230,6 +245,7 @@ build_disconnect_message (MMBearerMbim *self,
 /* Connect */
 
 #define WAIT_LINK_PORT_TIMEOUT_MS 2500
+#define WAIT_IP_CONFIGURATION_ASYNC_TIMEOUT_S 20
 
 typedef enum {
     CONNECT_STEP_FIRST,
@@ -240,6 +256,7 @@ typedef enum {
     CONNECT_STEP_ENSURE_DISCONNECTED,
     CONNECT_STEP_CONNECT,
     CONNECT_STEP_IP_CONFIGURATION,
+    CONNECT_STEP_IP_CONFIGURATION_ASYNC,
     CONNECT_STEP_LAST
 } ConnectStep;
 
@@ -264,11 +281,19 @@ typedef struct {
     gchar                 *link_prefix_hint;
     gchar                 *link_name;
     MMPort                *link;
+    /* async slaac support */
+    guint                  async_slaac_timeout_id;
+    gulong                 async_slaac_notification_id;
+    gulong                 async_slaac_cancellation_id;
 } ConnectContext;
 
 static void
 connect_context_free (ConnectContext *ctx)
 {
+    g_assert (!ctx->async_slaac_cancellation_id);
+    g_assert (!ctx->async_slaac_timeout_id);
+    g_assert (!ctx->async_slaac_notification_id);
+
     if (ctx->abort_on_failure) {
         mbim_device_command (mm_port_mbim_peek_device (ctx->mbim),
                              ctx->abort_on_failure,
@@ -308,6 +333,471 @@ connect_finish (MMBaseBearer  *self,
 static void connect_context_step (GTask *task);
 
 static void
+process_ip_configuration (MMBearerMbim                     *self,
+                          ConnectContext                   *ctx,
+                          MbimIPConfigurationAvailableFlag  ipv4configurationavailable,
+                          MbimIPConfigurationAvailableFlag  ipv6configurationavailable,
+                          guint32                           ipv4addresscount,
+                          const MbimIPv4ElementArray       *ipv4address,
+                          guint32                           ipv6addresscount,
+                          const MbimIPv6ElementArray       *ipv6address,
+                          const MbimIPv4                   *ipv4gateway,
+                          const MbimIPv6                   *ipv6gateway,
+                          guint32                           ipv4dnsservercount,
+                          const MbimIPv4                   *ipv4dnsserver,
+                          guint32                           ipv6dnsservercount,
+                          const MbimIPv6                   *ipv6dnsserver,
+                          guint32                           ipv4mtu,
+                          guint32                           ipv6mtu)
+{
+    g_autofree gchar            *ipv4configurationavailable_str = NULL;
+    g_autofree gchar            *ipv6configurationavailable_str = NULL;
+    g_autoptr(MMBearerIpConfig)  ipv4_config = NULL;
+    g_autoptr(MMBearerIpConfig)  ipv6_config = NULL;
+    guint64                      uplink_speed = 0;
+    guint64                      downlink_speed = 0;
+
+    /* Always recreate the connect result completely */
+    g_clear_pointer (&ctx->connect_result, (GDestroyNotify)mm_bearer_connect_result_unref);
+
+    /* IPv4 info */
+
+    ipv4configurationavailable_str = mbim_ip_configuration_available_flag_build_string_from_mask (ipv4configurationavailable);
+    mm_obj_dbg (self, "IPv4 configuration available: '%s'", ipv4configurationavailable_str);
+
+    if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS) && ipv4addresscount) {
+        guint i;
+
+        mm_obj_dbg (self, "  IP addresses (%u)", ipv4addresscount);
+        for (i = 0; i < ipv4addresscount; i++) {
+            g_autoptr(GInetAddress)  addr = NULL;
+            g_autofree gchar        *str = NULL;
+
+            addr = g_inet_address_new_from_bytes ((guint8 *)&ipv4address[i]->ipv4_address, G_SOCKET_FAMILY_IPV4);
+            str = g_inet_address_to_string (addr);
+            mm_obj_dbg (self, "    IP [%u]: '%s/%u'", i, str, ipv4address[i]->on_link_prefix_length);
+        }
+    }
+
+    if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) && ipv4gateway) {
+        g_autoptr(GInetAddress)  addr = NULL;
+        g_autofree gchar        *str = NULL;
+
+        addr = g_inet_address_new_from_bytes ((guint8 *)ipv4gateway, G_SOCKET_FAMILY_IPV4);
+        str = g_inet_address_to_string (addr);
+        mm_obj_dbg (self, "  gateway: '%s'", str);
+    }
+
+    if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS) && ipv4dnsservercount) {
+        guint i;
+
+        mm_obj_dbg (self, "  DNS addresses (%u)", ipv4dnsservercount);
+        for (i = 0; i < ipv4dnsservercount; i++) {
+            g_autoptr(GInetAddress)  addr = NULL;
+
+            addr = g_inet_address_new_from_bytes ((guint8 *)&ipv4dnsserver[i], G_SOCKET_FAMILY_IPV4);
+            if (!g_inet_address_get_is_any (addr)) {
+                g_autofree gchar *str = NULL;
+
+                str = g_inet_address_to_string (addr);
+                mm_obj_dbg (self, "    DNS [%u]: '%s'", i, str);
+            }
+        }
+    }
+
+    if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU) && ipv4mtu)
+        mm_obj_dbg (self, "  MTU: '%u'", ipv4mtu);
+
+    /* IPv6 info */
+
+    ipv6configurationavailable_str = mbim_ip_configuration_available_flag_build_string_from_mask (ipv6configurationavailable);
+    mm_obj_dbg (self, "IPv6 configuration available: '%s'", ipv6configurationavailable_str);
+
+    if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS) && ipv6addresscount) {
+        guint i;
+
+        mm_obj_dbg (self, "  IP addresses (%u)", ipv6addresscount);
+        for (i = 0; i < ipv6addresscount; i++) {
+            g_autoptr(GInetAddress)  addr = NULL;
+            g_autofree gchar        *str = NULL;
+
+            addr = g_inet_address_new_from_bytes ((guint8 *)&ipv6address[i]->ipv6_address, G_SOCKET_FAMILY_IPV6);
+            str = g_inet_address_to_string (addr);
+            mm_obj_dbg (self, "    IP [%u]: '%s/%u'", i, str, ipv6address[i]->on_link_prefix_length);
+        }
+    }
+
+    if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) && ipv6gateway) {
+        g_autoptr(GInetAddress)  addr = NULL;
+        g_autofree gchar        *str = NULL;
+
+        addr = g_inet_address_new_from_bytes ((guint8 *)ipv6gateway, G_SOCKET_FAMILY_IPV6);
+        str = g_inet_address_to_string (addr);
+        mm_obj_dbg (self, "  gateway: '%s'", str);
+    }
+
+    if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS) && ipv6dnsservercount) {
+        guint i;
+
+        mm_obj_dbg (self, "  DNS addresses (%u)", ipv6dnsservercount);
+        for (i = 0; i < ipv6dnsservercount; i++) {
+            g_autoptr(GInetAddress)  addr = NULL;
+
+            addr = g_inet_address_new_from_bytes ((guint8 *)&ipv6dnsserver[i], G_SOCKET_FAMILY_IPV6);
+            if (!g_inet_address_get_is_any (addr)) {
+                g_autofree gchar *str = NULL;
+
+                str = g_inet_address_to_string (addr);
+                mm_obj_dbg (self, "    DNS [%u]: '%s'", i, str);
+            }
+        }
+    }
+
+    if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU) && ipv6mtu)
+        mm_obj_dbg (self, "  MTU: '%u'", ipv6mtu);
+
+    /* Build connection results */
+
+    /* Build IPv4 config */
+    if (ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_IPV4 ||
+        ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_IPV4V6 ||
+        ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
+        gboolean address_set = FALSE;
+
+        ipv4_config = mm_bearer_ip_config_new ();
+
+        /* We assume that if we have an IP we can use static configuration.
+         * Not all modems or providers will return DNS servers or even a
+         * gateway, and not all modems support DHCP either. The IP management
+         * daemon/script just has to deal with this...
+         */
+        if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS) && (ipv4addresscount > 0)) {
+            g_autoptr(GInetAddress)  addr = NULL;
+            g_autofree gchar        *str = NULL;
+
+            mm_bearer_ip_config_set_method (ipv4_config, MM_BEARER_IP_METHOD_STATIC);
+
+            /* IP address, pick the first one */
+            addr = g_inet_address_new_from_bytes ((guint8 *)&ipv4address[0]->ipv4_address, G_SOCKET_FAMILY_IPV4);
+            str = g_inet_address_to_string (addr);
+            mm_bearer_ip_config_set_address (ipv4_config, str);
+            address_set = TRUE;
+
+            /* Netmask */
+            mm_bearer_ip_config_set_prefix (ipv4_config, ipv4address[0]->on_link_prefix_length);
+
+            /* Gateway */
+            if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) {
+                g_autoptr(GInetAddress)  gw_addr = NULL;
+                g_autofree gchar        *gw_str = NULL;
+
+                gw_addr = g_inet_address_new_from_bytes ((guint8 *)ipv4gateway, G_SOCKET_FAMILY_IPV4);
+                gw_str = g_inet_address_to_string (gw_addr);
+                mm_bearer_ip_config_set_gateway (ipv4_config, gw_str);
+            }
+        } else
+            mm_bearer_ip_config_set_method (ipv4_config, MM_BEARER_IP_METHOD_DHCP);
+
+        /* DNS */
+        if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS) && (ipv4dnsservercount > 0)) {
+            g_auto(GStrv) strarr = NULL;
+            guint         i;
+            guint         n;
+
+            strarr = g_new0 (gchar *, ipv4dnsservercount + 1);
+            for (i = 0, n = 0; i < ipv4dnsservercount; i++) {
+                g_autoptr(GInetAddress) addr = NULL;
+
+                addr = g_inet_address_new_from_bytes ((guint8 *)&ipv4dnsserver[i], G_SOCKET_FAMILY_IPV4);
+                if (!g_inet_address_get_is_any (addr))
+                    strarr[n++] = g_inet_address_to_string (addr);
+            }
+            mm_bearer_ip_config_set_dns (ipv4_config, (const gchar **)strarr);
+        }
+
+        /* MTU */
+        if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU)
+            mm_bearer_ip_config_set_mtu (ipv4_config, ipv4mtu);
+
+        /* We requested IPv4, but it wasn't reported as activated. If there is no IP address
+         * provided by the modem, we assume the IPv4 bearer wasn't truly activated */
+        if (!address_set &&
+            ctx->activated_ip_type != MBIM_CONTEXT_IP_TYPE_IPV4 &&
+            ctx->activated_ip_type != MBIM_CONTEXT_IP_TYPE_IPV4V6 &&
+            ctx->activated_ip_type != MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
+            mm_obj_dbg (self, "IPv4 requested but no IPv4 activated and no IPv4 address set: ignoring");
+            g_clear_object (&ipv4_config);
+        }
+    }
+
+    /* Build IPv6 config */
+    if (ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_IPV6 ||
+        ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_IPV4V6 ||
+        ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
+        gboolean address_set = FALSE;
+
+        ipv6_config = mm_bearer_ip_config_new ();
+
+        if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS) && (ipv6addresscount > 0)) {
+            g_autoptr(GInetAddress)  addr = NULL;
+            g_autofree gchar        *str = NULL;
+
+            /* IP address, pick the first one */
+            addr = g_inet_address_new_from_bytes ((guint8 *)&ipv6address[0]->ipv6_address, G_SOCKET_FAMILY_IPV6);
+            str = g_inet_address_to_string (addr);
+            mm_bearer_ip_config_set_address (ipv6_config, str);
+            address_set = TRUE;
+
+            /* If the address is a link-local one, then SLAAC or DHCP must be used
+             * to get the real prefix and address.
+             * If the address is a global one, then the modem did SLAAC already and
+             * there is no need to run host SLAAC.
+             */
+            if (g_inet_address_get_is_link_local (addr))
+                mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_DHCP);
+            else
+                mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_STATIC);
+
+            /* Netmask */
+            mm_bearer_ip_config_set_prefix (ipv6_config, ipv6address[0]->on_link_prefix_length);
+
+            /* If the modem has done SLAAC itself, it is never expected to return a /128 prefix,
+             * warn if it happens and workaround it. Use /64 as default. */
+            if ((mm_bearer_ip_config_get_method (ipv6_config) == MM_BEARER_IP_METHOD_STATIC) &&
+                (mm_bearer_ip_config_get_prefix (ipv6_config) == 128)) {
+                mm_obj_warn (self, "unexpected link prefix returned with global IPv6 address (128): ignoring");
+                mm_bearer_ip_config_set_prefix (ipv6_config, 64);
+            }
+
+            /* Gateway */
+            if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) {
+                g_autoptr(GInetAddress)  gw_addr = NULL;
+                g_autofree gchar        *gw_str = NULL;
+
+                gw_addr = g_inet_address_new_from_bytes ((guint8 *)ipv6gateway, G_SOCKET_FAMILY_IPV6);
+                gw_str = g_inet_address_to_string (gw_addr);
+                mm_bearer_ip_config_set_gateway (ipv6_config, gw_str);
+            }
+        } else {
+            /* If no address is given, this is likely a bug in the modem firmware, because even in the
+             * case of needing to run host SLAAC, a link-local IPv6 address must be given. Either way,
+             * go on requesting the need of host SLAAC, and let the network decide whether our SLAAC
+             * Router Solicitation messages with an unexpected link-local address are accepted or not. */
+            mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_DHCP);
+        }
+
+        if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS) && (ipv6dnsservercount > 0)) {
+            g_auto(GStrv) strarr = NULL;
+            guint         i;
+            guint         n;
+
+            /* DNS */
+            strarr = g_new0 (gchar *, ipv6dnsservercount + 1);
+            for (i = 0, n = 0; i < ipv6dnsservercount; i++) {
+                g_autoptr(GInetAddress) addr = NULL;
+
+                addr = g_inet_address_new_from_bytes ((guint8 *)&ipv6dnsserver[i], G_SOCKET_FAMILY_IPV6);
+                if (!g_inet_address_get_is_any (addr))
+                    strarr[n++] = g_inet_address_to_string (addr);
+            }
+            mm_bearer_ip_config_set_dns (ipv6_config, (const gchar **)strarr);
+        }
+
+        /* MTU */
+        if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU)
+            mm_bearer_ip_config_set_mtu (ipv6_config, ipv6mtu);
+
+        /* We requested IPv6, but it wasn't reported as activated. If there is no IPv6 address
+         * provided by the modem, we assume the IPv6 bearer wasn't truly activated */
+        if (!address_set &&
+            ctx->activated_ip_type != MBIM_CONTEXT_IP_TYPE_IPV6 &&
+            ctx->activated_ip_type != MBIM_CONTEXT_IP_TYPE_IPV4V6 &&
+            ctx->activated_ip_type != MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
+            mm_obj_dbg (self, "IPv6 requested but no IPv6 activated and no IPv6 address set: ignoring");
+            g_clear_object (&ipv6_config);
+        }
+    }
+
+    /* Store result */
+    ctx->connect_result = mm_bearer_connect_result_new (ctx->link ? ctx->link : ctx->data,
+                                                        ipv4_config,
+                                                        ipv6_config);
+    mm_bearer_connect_result_set_multiplexed (ctx->connect_result, !!ctx->link);
+
+    if (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN)
+        mm_bearer_connect_result_set_profile_id (ctx->connect_result, ctx->profile_id);
+
+    /* Propagate speeds from modem object */
+    mm_broadband_modem_mbim_get_speeds (ctx->modem, &uplink_speed, &downlink_speed);
+    mm_bearer_connect_result_set_uplink_speed (ctx->connect_result, uplink_speed);
+    mm_bearer_connect_result_set_downlink_speed (ctx->connect_result, downlink_speed);
+}
+
+static void
+ip_configuration_async_cleanup (GTask *task)
+{
+    ConnectContext *ctx;
+
+    ctx  = g_task_get_task_data (task);
+
+    g_assert (ctx->async_slaac_cancellation_id);
+    g_cancellable_disconnect (g_task_get_cancellable (task), ctx->async_slaac_cancellation_id);
+    ctx->async_slaac_cancellation_id = 0;
+
+    g_assert (ctx->async_slaac_notification_id);
+    if (g_signal_handler_is_connected (ctx->mbim, ctx->async_slaac_notification_id))
+        g_signal_handler_disconnect (ctx->mbim, ctx->async_slaac_notification_id);
+    ctx->async_slaac_notification_id = 0;
+
+    g_assert (ctx->async_slaac_timeout_id);
+    g_source_remove (ctx->async_slaac_timeout_id);
+    ctx->async_slaac_timeout_id = 0;
+}
+
+static gboolean
+ip_configuration_async_timeout (GTask *task)
+{
+    ip_configuration_async_cleanup (task);
+    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_TIMEOUT,
+                             "Timed out waiting for SLAAC notification");
+    g_object_unref (task);
+
+    return G_SOURCE_REMOVE;
+}
+
+static void
+ip_configuration_async_cancelled (GTask *task)
+{
+    ip_configuration_async_cleanup (task);
+    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED,
+                             "Cancelled waiting for SLAAC notification");
+    g_object_unref (task);
+}
+
+static void
+ip_configuration_async_notification (GTask        *task,
+                                     MbimMessage  *notification,
+                                     MMPortMbim   *port)
+{
+    MMBearerMbim                     *self;
+    ConnectContext                   *ctx;
+    MMBearerIpConfig                 *ipv6_config;
+    g_autoptr(GError)                 error = NULL;
+    guint32                           session_id;
+    MbimIPConfigurationAvailableFlag  ipv4configurationavailable;
+    MbimIPConfigurationAvailableFlag  ipv6configurationavailable;
+    guint32                           ipv4addresscount;
+    g_autoptr(MbimIPv4ElementArray)   ipv4address = NULL;
+    guint32                           ipv6addresscount;
+    g_autoptr(MbimIPv6ElementArray)   ipv6address = NULL;
+    const MbimIPv4                   *ipv4gateway;
+    const MbimIPv6                   *ipv6gateway;
+    guint32                           ipv4dnsservercount;
+    g_autofree MbimIPv4              *ipv4dnsserver = NULL;
+    guint32                           ipv6dnsservercount;
+    g_autofree MbimIPv6              *ipv6dnsserver = NULL;
+    guint32                           ipv4mtu;
+    guint32                           ipv6mtu;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    /* Only process notifications if the device still exists */
+    if (!mm_port_mbim_peek_device (port))
+        return;
+
+    /* We only want the IP configuration updates */
+    if ((mbim_message_indicate_status_get_service (notification) != MBIM_SERVICE_BASIC_CONNECT) ||
+        (mbim_message_indicate_status_get_cid (notification) != MBIM_CID_BASIC_CONNECT_IP_CONFIGURATION))
+        return;
+
+    if (!mbim_message_ip_configuration_notification_parse (
+            notification,
+            &session_id,
+            &ipv4configurationavailable,
+            &ipv6configurationavailable,
+            &ipv4addresscount, &ipv4address,
+            &ipv6addresscount, &ipv6address,
+            &ipv4gateway, &ipv6gateway,
+            &ipv4dnsservercount, &ipv4dnsserver,
+            &ipv6dnsservercount, &ipv6dnsserver,
+            &ipv4mtu, &ipv6mtu,
+            &error)) {
+        mm_obj_warn (self, "couldn't parse IP configuration indication: %s", error->message);
+        return;
+    }
+
+    /* We only want the updates for the current session ongoing */
+    if (ctx->session_id != session_id)
+        return;
+
+    /* Process content in a common way */
+    process_ip_configuration (self,
+                              ctx,
+                              ipv4configurationavailable,
+                              ipv6configurationavailable,
+                              ipv4addresscount, ipv4address,
+                              ipv6addresscount, ipv6address,
+                              ipv4gateway, ipv6gateway,
+                              ipv4dnsservercount, ipv4dnsserver,
+                              ipv6dnsservercount, ipv6dnsserver,
+                              ipv4mtu, ipv6mtu);
+
+    /* We will be done once method is STATIC (i.e. when a global IPv6 is detected) */
+    ipv6_config = mm_bearer_connect_result_peek_ipv6_config (ctx->connect_result);
+    if (!ipv6_config || (mm_bearer_ip_config_get_method (ipv6_config) != MM_BEARER_IP_METHOD_STATIC)) {
+        mm_obj_dbg (self, "SLAAC process didn't finish yet");
+        return;
+    }
+
+    mm_obj_dbg (self, "SLAAC process finished");
+    ip_configuration_async_cleanup (task);
+
+    /* Keep on */
+    ctx->step++;
+    connect_context_step (task);
+}
+
+static gboolean
+ip_configuration_async_setup (GTask *task)
+{
+    MMBearerMbim     *self;
+    ConnectContext   *ctx;
+    MMBearerIpConfig *ipv6_config;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    /* On async SLAAC results if not supported by modem */
+    if (!self->priv->async_slaac)
+        return FALSE;
+
+    /* Only expect SLAAC results if the attempt required IPv6 and if we didn't already
+     * get a global IPv6 address reported. */
+    ipv6_config = mm_bearer_connect_result_peek_ipv6_config (ctx->connect_result);
+    if (!ipv6_config || (mm_bearer_ip_config_get_method (ipv6_config) != MM_BEARER_IP_METHOD_DHCP))
+        return FALSE;
+
+    mm_obj_info (self, "connection attempt requires async updated with SLAAC results");
+
+    /* The task implementing the connection attempt is now shared between the timeout, the notification
+     * signal handler and the cancellation signal handler. Whichever decides to complete the task must
+     * cancel the others right away. */
+    ctx->async_slaac_cancellation_id = g_cancellable_connect (g_task_get_cancellable (task),
+                                                              G_CALLBACK (ip_configuration_async_cancelled),
+                                                              task,
+                                                              NULL);
+    ctx->async_slaac_timeout_id = g_timeout_add_seconds (WAIT_IP_CONFIGURATION_ASYNC_TIMEOUT_S,
+                                                         (GSourceFunc) ip_configuration_async_timeout,
+                                                         task);
+    ctx->async_slaac_notification_id = g_signal_connect_swapped (ctx->mbim,
+                                                                 MM_PORT_MBIM_SIGNAL_NOTIFICATION,
+                                                                 G_CALLBACK (ip_configuration_async_notification),
+                                                                 task);
+    return TRUE;
+}
+
+static void
 ip_configuration_query_ready (MbimDevice   *device,
                               GAsyncResult *res,
                               GTask        *task)
@@ -342,297 +832,24 @@ ip_configuration_query_ready (MbimDevice   *device,
             NULL, /* sessionid */
             &ipv4configurationavailable,
             &ipv6configurationavailable,
-            &ipv4addresscount,
-            &ipv4address,
-            &ipv6addresscount,
-            &ipv6address,
-            &ipv4gateway,
-            &ipv6gateway,
-            &ipv4dnsservercount,
-            &ipv4dnsserver,
-            &ipv6dnsservercount,
-            &ipv6dnsserver,
-            &ipv4mtu,
-            &ipv6mtu,
+            &ipv4addresscount, &ipv4address,
+            &ipv6addresscount, &ipv6address,
+            &ipv4gateway, &ipv6gateway,
+            &ipv4dnsservercount, &ipv4dnsserver,
+            &ipv6dnsservercount, &ipv6dnsserver,
+            &ipv4mtu, &ipv6mtu,
             &error)) {
-        g_autofree gchar            *ipv4configurationavailable_str = NULL;
-        g_autofree gchar            *ipv6configurationavailable_str = NULL;
-        g_autoptr(MMBearerIpConfig)  ipv4_config = NULL;
-        g_autoptr(MMBearerIpConfig)  ipv6_config = NULL;
-        guint64                      uplink_speed = 0;
-        guint64                      downlink_speed = 0;
-
-        /* IPv4 info */
-
-        ipv4configurationavailable_str = mbim_ip_configuration_available_flag_build_string_from_mask (ipv4configurationavailable);
-        mm_obj_dbg (self, "IPv4 configuration available: '%s'", ipv4configurationavailable_str);
-
-        if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS) && ipv4addresscount) {
-            guint i;
-
-            mm_obj_dbg (self, "  IP addresses (%u)", ipv4addresscount);
-            for (i = 0; i < ipv4addresscount; i++) {
-                g_autoptr(GInetAddress)  addr = NULL;
-                g_autofree gchar        *str = NULL;
-
-                addr = g_inet_address_new_from_bytes ((guint8 *)&ipv4address[i]->ipv4_address, G_SOCKET_FAMILY_IPV4);
-                str = g_inet_address_to_string (addr);
-                mm_obj_dbg (self, "    IP [%u]: '%s/%u'", i, str, ipv4address[i]->on_link_prefix_length);
-            }
-        }
-
-        if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) && ipv4gateway) {
-            g_autoptr(GInetAddress)  addr = NULL;
-            g_autofree gchar        *str = NULL;
-
-            addr = g_inet_address_new_from_bytes ((guint8 *)ipv4gateway, G_SOCKET_FAMILY_IPV4);
-            str = g_inet_address_to_string (addr);
-            mm_obj_dbg (self, "  gateway: '%s'", str);
-        }
-
-        if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS) && ipv4dnsservercount) {
-            guint i;
-
-            mm_obj_dbg (self, "  DNS addresses (%u)", ipv4dnsservercount);
-            for (i = 0; i < ipv4dnsservercount; i++) {
-                g_autoptr(GInetAddress)  addr = NULL;
-
-                addr = g_inet_address_new_from_bytes ((guint8 *)&ipv4dnsserver[i], G_SOCKET_FAMILY_IPV4);
-                if (!g_inet_address_get_is_any (addr)) {
-                    g_autofree gchar *str = NULL;
-
-                    str = g_inet_address_to_string (addr);
-                    mm_obj_dbg (self, "    DNS [%u]: '%s'", i, str);
-                }
-            }
-        }
-
-        if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU) && ipv4mtu)
-            mm_obj_dbg (self, "  MTU: '%u'", ipv4mtu);
-
-        /* IPv6 info */
-
-        ipv6configurationavailable_str = mbim_ip_configuration_available_flag_build_string_from_mask (ipv6configurationavailable);
-        mm_obj_dbg (self, "IPv6 configuration available: '%s'", ipv6configurationavailable_str);
-
-        if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS) && ipv6addresscount) {
-            guint i;
-
-            mm_obj_dbg (self, "  IP addresses (%u)", ipv6addresscount);
-            for (i = 0; i < ipv6addresscount; i++) {
-                g_autoptr(GInetAddress)  addr = NULL;
-                g_autofree gchar        *str = NULL;
-
-                addr = g_inet_address_new_from_bytes ((guint8 *)&ipv6address[i]->ipv6_address, G_SOCKET_FAMILY_IPV6);
-                str = g_inet_address_to_string (addr);
-                mm_obj_dbg (self, "    IP [%u]: '%s/%u'", i, str, ipv6address[i]->on_link_prefix_length);
-            }
-        }
-
-        if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) && ipv6gateway) {
-            g_autoptr(GInetAddress)  addr = NULL;
-            g_autofree gchar        *str = NULL;
-
-            addr = g_inet_address_new_from_bytes ((guint8 *)ipv6gateway, G_SOCKET_FAMILY_IPV6);
-            str = g_inet_address_to_string (addr);
-            mm_obj_dbg (self, "  gateway: '%s'", str);
-        }
-
-        if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS) && ipv6dnsservercount) {
-            guint i;
-
-            mm_obj_dbg (self, "  DNS addresses (%u)", ipv6dnsservercount);
-            for (i = 0; i < ipv6dnsservercount; i++) {
-                g_autoptr(GInetAddress)  addr = NULL;
-
-                addr = g_inet_address_new_from_bytes ((guint8 *)&ipv6dnsserver[i], G_SOCKET_FAMILY_IPV6);
-                if (!g_inet_address_get_is_any (addr)) {
-                    g_autofree gchar *str = NULL;
-
-                    str = g_inet_address_to_string (addr);
-                    mm_obj_dbg (self, "    DNS [%u]: '%s'", i, str);
-                }
-            }
-        }
-
-        if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU) && ipv6mtu)
-            mm_obj_dbg (self, "  MTU: '%u'", ipv6mtu);
-
-        /* Build connection results */
-
-        /* Build IPv4 config */
-        if (ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_IPV4 ||
-            ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_IPV4V6 ||
-            ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
-            gboolean address_set = FALSE;
-
-            ipv4_config = mm_bearer_ip_config_new ();
-
-            /* We assume that if we have an IP we can use static configuration.
-             * Not all modems or providers will return DNS servers or even a
-             * gateway, and not all modems support DHCP either. The IP management
-             * daemon/script just has to deal with this...
-             */
-            if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS) && (ipv4addresscount > 0)) {
-                g_autoptr(GInetAddress)  addr = NULL;
-                g_autofree gchar        *str = NULL;
-
-                mm_bearer_ip_config_set_method (ipv4_config, MM_BEARER_IP_METHOD_STATIC);
-
-                /* IP address, pick the first one */
-                addr = g_inet_address_new_from_bytes ((guint8 *)&ipv4address[0]->ipv4_address, G_SOCKET_FAMILY_IPV4);
-                str = g_inet_address_to_string (addr);
-                mm_bearer_ip_config_set_address (ipv4_config, str);
-                address_set = TRUE;
-
-                /* Netmask */
-                mm_bearer_ip_config_set_prefix (ipv4_config, ipv4address[0]->on_link_prefix_length);
-
-                /* Gateway */
-                if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) {
-                    g_autoptr(GInetAddress)  gw_addr = NULL;
-                    g_autofree gchar        *gw_str = NULL;
-
-                    gw_addr = g_inet_address_new_from_bytes ((guint8 *)ipv4gateway, G_SOCKET_FAMILY_IPV4);
-                    gw_str = g_inet_address_to_string (gw_addr);
-                    mm_bearer_ip_config_set_gateway (ipv4_config, gw_str);
-                }
-            } else
-                mm_bearer_ip_config_set_method (ipv4_config, MM_BEARER_IP_METHOD_DHCP);
-
-            /* DNS */
-            if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS) && (ipv4dnsservercount > 0)) {
-                g_auto(GStrv) strarr = NULL;
-                guint         i;
-                guint         n;
-
-                strarr = g_new0 (gchar *, ipv4dnsservercount + 1);
-                for (i = 0, n = 0; i < ipv4dnsservercount; i++) {
-                    g_autoptr(GInetAddress) addr = NULL;
-
-                    addr = g_inet_address_new_from_bytes ((guint8 *)&ipv4dnsserver[i], G_SOCKET_FAMILY_IPV4);
-                    if (!g_inet_address_get_is_any (addr))
-                        strarr[n++] = g_inet_address_to_string (addr);
-                }
-                mm_bearer_ip_config_set_dns (ipv4_config, (const gchar **)strarr);
-            }
-
-            /* MTU */
-            if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU)
-                mm_bearer_ip_config_set_mtu (ipv4_config, ipv4mtu);
-
-            /* We requested IPv4, but it wasn't reported as activated. If there is no IP address
-             * provided by the modem, we assume the IPv4 bearer wasn't truly activated */
-            if (!address_set &&
-                ctx->activated_ip_type != MBIM_CONTEXT_IP_TYPE_IPV4 &&
-                ctx->activated_ip_type != MBIM_CONTEXT_IP_TYPE_IPV4V6 &&
-                ctx->activated_ip_type != MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
-                mm_obj_dbg (self, "IPv4 requested but no IPv4 activated and no IPv4 address set: ignoring");
-                g_clear_object (&ipv4_config);
-            }
-        }
-
-        /* Build IPv6 config */
-        if (ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_IPV6 ||
-            ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_IPV4V6 ||
-            ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
-            gboolean address_set = FALSE;
-
-            ipv6_config = mm_bearer_ip_config_new ();
-
-            if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS) && (ipv6addresscount > 0)) {
-                g_autoptr(GInetAddress)  addr = NULL;
-                g_autofree gchar        *str = NULL;
-
-                /* IP address, pick the first one */
-                addr = g_inet_address_new_from_bytes ((guint8 *)&ipv6address[0]->ipv6_address, G_SOCKET_FAMILY_IPV6);
-                str = g_inet_address_to_string (addr);
-                mm_bearer_ip_config_set_address (ipv6_config, str);
-                address_set = TRUE;
-
-                /* If the address is a link-local one, then SLAAC or DHCP must be used
-                 * to get the real prefix and address.
-                 * If the address is a global one, then the modem did SLAAC already and
-                 * there is no need to run host SLAAC.
-                 */
-                if (g_inet_address_get_is_link_local (addr))
-                    mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_DHCP);
-                else
-                    mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_STATIC);
-
-                /* Netmask */
-                mm_bearer_ip_config_set_prefix (ipv6_config, ipv6address[0]->on_link_prefix_length);
-
-                /* If the modem has done SLAAC itself, it is never expected to return a /128 prefix,
-                 * warn if it happens and workaround it. Use /64 as default. */
-                if ((mm_bearer_ip_config_get_method (ipv6_config) == MM_BEARER_IP_METHOD_STATIC) &&
-                    (mm_bearer_ip_config_get_prefix (ipv6_config) == 128)) {
-                    mm_obj_warn (self, "unexpected link prefix returned with global IPv6 address (128): ignoring");
-                    mm_bearer_ip_config_set_prefix (ipv6_config, 64);
-                }
-
-                /* Gateway */
-                if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) {
-                    g_autoptr(GInetAddress)  gw_addr = NULL;
-                    g_autofree gchar        *gw_str = NULL;
-
-                    gw_addr = g_inet_address_new_from_bytes ((guint8 *)ipv6gateway, G_SOCKET_FAMILY_IPV6);
-                    gw_str = g_inet_address_to_string (gw_addr);
-                    mm_bearer_ip_config_set_gateway (ipv6_config, gw_str);
-                }
-            } else {
-                /* If no address is given, this is likely a bug in the modem firmware, because even in the
-                 * case of needing to run host SLAAC, a link-local IPv6 address must be given. Either way,
-                 * go on requesting the need of host SLAAC, and let the network decide whether our SLAAC
-                 * Router Solicitation messages with an unexpected link-local address are accepted or not. */
-                mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_DHCP);
-            }
-
-            if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS) && (ipv6dnsservercount > 0)) {
-                g_auto(GStrv) strarr = NULL;
-                guint         i;
-                guint         n;
-
-                /* DNS */
-                strarr = g_new0 (gchar *, ipv6dnsservercount + 1);
-                for (i = 0, n = 0; i < ipv6dnsservercount; i++) {
-                    g_autoptr(GInetAddress) addr = NULL;
-
-                    addr = g_inet_address_new_from_bytes ((guint8 *)&ipv6dnsserver[i], G_SOCKET_FAMILY_IPV6);
-                    if (!g_inet_address_get_is_any (addr))
-                        strarr[n++] = g_inet_address_to_string (addr);
-                }
-                mm_bearer_ip_config_set_dns (ipv6_config, (const gchar **)strarr);
-            }
-
-            /* MTU */
-            if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU)
-                mm_bearer_ip_config_set_mtu (ipv6_config, ipv6mtu);
-
-            /* We requested IPv6, but it wasn't reported as activated. If there is no IPv6 address
-             * provided by the modem, we assume the IPv6 bearer wasn't truly activated */
-            if (!address_set &&
-                ctx->activated_ip_type != MBIM_CONTEXT_IP_TYPE_IPV6 &&
-                ctx->activated_ip_type != MBIM_CONTEXT_IP_TYPE_IPV4V6 &&
-                ctx->activated_ip_type != MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
-                mm_obj_dbg (self, "IPv6 requested but no IPv6 activated and no IPv6 address set: ignoring");
-                g_clear_object (&ipv6_config);
-            }
-        }
-
-        /* Store result */
-        ctx->connect_result = mm_bearer_connect_result_new (ctx->link ? ctx->link : ctx->data,
-                                                            ipv4_config,
-                                                            ipv6_config);
-        mm_bearer_connect_result_set_multiplexed (ctx->connect_result, !!ctx->link);
-
-        if (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN)
-            mm_bearer_connect_result_set_profile_id (ctx->connect_result, ctx->profile_id);
-
-        /* Propagate speeds from modem object */
-        mm_broadband_modem_mbim_get_speeds (ctx->modem, &uplink_speed, &downlink_speed);
-        mm_bearer_connect_result_set_uplink_speed (ctx->connect_result, uplink_speed);
-        mm_bearer_connect_result_set_downlink_speed (ctx->connect_result, downlink_speed);
+        /* Process content in a common way */
+        process_ip_configuration (self,
+                                  ctx,
+                                  ipv4configurationavailable,
+                                  ipv6configurationavailable,
+                                  ipv4addresscount, ipv4address,
+                                  ipv6addresscount, ipv6address,
+                                  ipv4gateway, ipv6gateway,
+                                  ipv4dnsservercount, ipv4dnsserver,
+                                  ipv6dnsservercount, ipv6dnsserver,
+                                  ipv4mtu, ipv6mtu);
     }
 
     if (error) {
@@ -1181,6 +1398,17 @@ connect_context_step (GTask *task)
                              task);
         return;
 
+    case CONNECT_STEP_IP_CONFIGURATION_ASYNC:
+        /* At this point, we must have IP settings ready. Now, if we know the modem
+         * supports modem-SLAAC and we're returning IPv6 settings, we must make sure
+         * we're returning already a global IPv6 address and method STATIC, or otherwise
+         * we need to wait for indications to happen. */
+        if (ip_configuration_async_setup (task))
+            return;
+
+        ctx->step++;
+        /* fall through */
+
     case CONNECT_STEP_LAST:
         /* Cleanup the abort message so that we don't
          * run it */
@@ -1220,7 +1448,7 @@ connect_context_step (GTask *task)
 static gboolean
 load_settings_from_bearer (MMBearerMbim        *self,
                            ConnectContext      *ctx,
-                           MMBearerProperties  *properties,
+                           MMBearerProperties  *props,
                            GError             **error)
 {
     MMBearerMultiplexSupport  multiplex;
@@ -1241,7 +1469,7 @@ load_settings_from_bearer (MMBearerMbim        *self,
         multiplex_supported = FALSE;
 
     /* If no multiplex setting given by the user, assume none */
-    multiplex = mm_bearer_properties_get_multiplex (properties);
+    multiplex = mm_bearer_properties_get_multiplex (props);
     if (multiplex == MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN) {
         if (mm_context_get_test_multiplex_requested ())
             multiplex = MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED;
@@ -1279,14 +1507,14 @@ load_settings_from_bearer (MMBearerMbim        *self,
 
     /* If profile id is given, we'll load all settings from the stored profile,
      * so ignore any other setting received in the bearer properties */
-    ctx->profile_id = mm_bearer_properties_get_profile_id (properties);
+    ctx->profile_id = mm_bearer_properties_get_profile_id (props);
     if (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN) {
         MMBearerIpFamily  ip_type;
         GError           *inner_error = NULL;
 
         /* If we're loading settings from a profile, still read the ip-type
          * from the user input, as that is not stored in the profile */
-        ip_type = mm_bearer_properties_get_ip_type (properties);
+        ip_type = mm_bearer_properties_get_ip_type (props);
         mm_3gpp_normalize_ip_family (&ip_type, FALSE);
         ctx->requested_ip_type = mm_bearer_ip_family_to_mbim_context_ip_type (ip_type, &inner_error);
         if (inner_error) {
@@ -1301,7 +1529,7 @@ load_settings_from_bearer (MMBearerMbim        *self,
      * (TYPE_DEFAULT) by default, which is what we've done until now. */
     if (!load_settings_from_profile (self,
                                      ctx,
-                                     mm_bearer_properties_peek_3gpp_profile (properties),
+                                     mm_bearer_properties_peek_3gpp_profile (props),
                                      MM_BEARER_APN_TYPE_DEFAULT,
                                      error))
         return FALSE;
@@ -1328,7 +1556,7 @@ _connect (MMBaseBearer        *self,
     GTask                         *task;
     GError                        *error = NULL;
     g_autoptr(MMBaseModem)         modem  = NULL;
-    g_autoptr(MMBearerProperties)  properties = NULL;
+    g_autoptr(MMBearerProperties)  props = NULL;
 
     if (!peek_ports (self, &mbim, &data, callback, user_data))
         return;
@@ -1337,7 +1565,7 @@ _connect (MMBaseBearer        *self,
 
     g_object_get (self,
                   MM_BASE_BEARER_MODEM,  &modem,
-                  MM_BASE_BEARER_CONFIG, &properties,
+                  MM_BASE_BEARER_CONFIG, &props,
                   NULL);
     g_assert (modem);
 
@@ -1350,7 +1578,7 @@ _connect (MMBaseBearer        *self,
     ctx->activated_ip_type = MBIM_CONTEXT_IP_TYPE_DEFAULT;
     g_task_set_task_data (task, ctx, (GDestroyNotify)connect_context_free);
 
-    if (!load_settings_from_bearer (MM_BEARER_MBIM (self), ctx, properties, &error)) {
+    if (!load_settings_from_bearer (MM_BEARER_MBIM (self), ctx, props, &error)) {
         g_prefix_error (&error, "Invalid bearer properties: ");
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -1797,6 +2025,42 @@ mm_bearer_mbim_init (MMBearerMbim *self)
 }
 
 static void
+set_property (GObject      *object,
+              guint         prop_id,
+              const GValue *value,
+              GParamSpec   *pspec)
+{
+    MMBearerMbim *self = MM_BEARER_MBIM (object);
+
+    switch (prop_id) {
+    case PROP_ASYNC_SLAAC:
+        self->priv->async_slaac = g_value_get_boolean (value);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
+}
+
+static void
+get_property (GObject    *object,
+              guint       prop_id,
+              GValue     *value,
+              GParamSpec *pspec)
+{
+    MMBearerMbim *self = MM_BEARER_MBIM (object);
+
+    switch (prop_id) {
+    case PROP_ASYNC_SLAAC:
+        g_value_set_boolean (value, self->priv->async_slaac);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
+}
+
+static void
 dispose (GObject *object)
 {
     MMBearerMbim *self = MM_BEARER_MBIM (object);
@@ -1815,6 +2079,8 @@ mm_bearer_mbim_class_init (MMBearerMbimClass *klass)
     g_type_class_add_private (object_class, sizeof (MMBearerMbimPrivate));
 
     /* Virtual methods */
+    object_class->get_property = get_property;
+    object_class->set_property = set_property;
     object_class->dispose = dispose;
 
     base_bearer_class->connect = _connect;
@@ -1830,4 +2096,12 @@ mm_bearer_mbim_class_init (MMBearerMbimClass *klass)
     base_bearer_class->reload_connection_status = reload_connection_status;
     base_bearer_class->reload_connection_status_finish = reload_connection_status_finish;
 #endif
+
+    properties[PROP_ASYNC_SLAAC] =
+            g_param_spec_boolean (MM_BEARER_MBIM_ASYNC_SLAAC,
+                                  "Async SLAAC",
+                                  "Whether async SLAAC updates are expected.",
+                                  FALSE,
+                                  G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_ASYNC_SLAAC, properties[PROP_ASYNC_SLAAC]);
 }
