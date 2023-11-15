@@ -27,9 +27,11 @@
 
 typedef struct _MMBroadbandModemMbimMtkFibocom MMBroadbandModemMbimMtkFibocom;
 typedef struct _MMBroadbandModemMbimMtkFibocomClass MMBroadbandModemMbimMtkFibocomClass;
+typedef struct _MMBroadbandModemMbimMtkFibocomPrivate MMBroadbandModemMbimMtkFibocomPrivate;
 
 struct _MMBroadbandModemMbimMtkFibocom {
     MMBroadbandModemMbimMtk parent;
+    MMBroadbandModemMbimMtkFibocomPrivate *priv;
 };
 
 struct _MMBroadbandModemMbimMtkFibocomClass{

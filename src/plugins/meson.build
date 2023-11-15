@@ -652,6 +652,7 @@ if plugins_options['mtk']
   if enable_mbim
     incs += [fibocom_inc]
     sources += files(
+      'mtk/mm-bearer-mbim-mtk-fibocom.c',
       'mtk/mm-broadband-modem-mbim-mtk.c',
       'mtk/mm-broadband-modem-mbim-mtk-fibocom.c'
     )

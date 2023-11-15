@@ -25,16 +25,146 @@
 #include "mm-log-object.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-bearer-mbim-mtk-fibocom.h"
 #include "mm-broadband-modem-mbim-mtk-fibocom.h"
 #include "mm-shared-fibocom.h"
 
+static void iface_modem_init      (MMIfaceModem     *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 static void shared_fibocom_init   (MMSharedFibocom  *iface);
+
+static MMIfaceModem     *iface_modem_parent;
 static MMIfaceModem3gpp *iface_modem_3gpp_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbimMtkFibocom, mm_broadband_modem_mbim_mtk_fibocom, MM_TYPE_BROADBAND_MODEM_MBIM_MTK, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM,      iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_FIBOCOM,  shared_fibocom_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_FIBOCOM,   shared_fibocom_init))
+
+struct _MMBroadbandModemMbimMtkFibocomPrivate {
+    /* Supported features */
+    gboolean is_async_slaac_supported;
+};
+
+/*****************************************************************************/
+
+/* Asynchronous indications of IP configuration updates during the initial
+ * modem-SLAAC operation with the network are not supported in old firmware
+ * versions. */
+#define ASYNC_SLAAC_SUPPORTED_VERSION 29, 23, 6
+
+static inline gboolean
+fm350_check_version (guint A1, guint A2, guint A3,
+                     guint B1, guint B2, guint B3)
+{
+    return ((A1 > B1) || ((A1 == B1) && ((A2 > B2) || ((A2 == B2) && (A3 >= B3)))));
+}
+
+static void
+process_fm350_version_features (MMBroadbandModemMbimMtkFibocom *self,
+                                const gchar                    *revision)
+{
+    g_auto(GStrv) split = NULL;
+    guint         major;
+    guint         minor;
+    guint         micro;
+
+    /* Expected revision string is a multi-line value like this:
+     *   81600.0000.00.MM.mm.uu_GC
+     *   F09
+     * For version comparison we care only about the "MM.mm.uu" part.
+     */
+    split = g_strsplit_set (revision, "._", -1);
+    if (!split || g_strv_length (split) < 6) {
+        mm_obj_warn (self, "failed to process FM350 firmware version string");
+        return;
+    }
+
+    if (!mm_get_uint_from_str (split[3], &major) ||
+        !mm_get_uint_from_str (split[4], &minor) ||
+        !mm_get_uint_from_str (split[5], &micro)) {
+        mm_obj_warn (self, "failed to process FM350 firmware version string: %s.%s.%s",
+                     split[3], split[4], split[5]);
+        return;
+    }
+
+    /* Check if async SLAAC is supported */
+    self->priv->is_async_slaac_supported = fm350_check_version (major, minor, micro, ASYNC_SLAAC_SUPPORTED_VERSION);
+    mm_obj_info (self, "FM350 async SLAAC result indications are %ssupported",
+                 self->priv->is_async_slaac_supported ? "" : "not ");
+}
+
+/*****************************************************************************/
+/* Revision loading (Modem interface) */
+
+static gchar *
+load_revision_finish (MMIfaceModem  *self,
+                      GAsyncResult  *res,
+                      GError       **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+parent_load_revision_ready (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GTask        *task)
+{
+    GError *error = NULL;
+    gchar  *revision;
+
+    revision = iface_modem_parent->load_revision_finish (self, res, &error);
+    if (!revision) {
+        g_task_return_error (task, error);
+    } else {
+        process_fm350_version_features (MM_BROADBAND_MODEM_MBIM_MTK_FIBOCOM (self), revision);
+        g_task_return_pointer (task, revision, g_free);
+    }
+    g_object_unref (task);
+}
+
+static void
+load_revision (MMIfaceModem        *self,
+               GAsyncReadyCallback  callback,
+               gpointer             user_data)
+{
+    g_assert (iface_modem_parent->load_revision);
+    g_assert (iface_modem_parent->load_revision_finish);
+    iface_modem_parent->load_revision (self,
+                                       (GAsyncReadyCallback)parent_load_revision_ready,
+                                       g_task_new (self, NULL, callback, user_data));
+}
+
+/*****************************************************************************/
+/* Create Bearer (Modem interface) */
+
+static MMBaseBearer *
+create_bearer_finish (MMIfaceModem  *self,
+                      GAsyncResult  *res,
+                      GError       **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+create_bearer (MMIfaceModem        *_self,
+               MMBearerProperties  *properties,
+               GAsyncReadyCallback  callback,
+               gpointer             user_data)
+{
+    MMBroadbandModemMbimMtkFibocom *self = MM_BROADBAND_MODEM_MBIM_MTK_FIBOCOM (_self);
+    MMBaseBearer                   *bearer;
+    GTask                          *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    mm_obj_dbg (self, "creating MTK Fibocom MBIM bearer (async SLAAC %s)",
+                self->priv->is_async_slaac_supported ? "supported" : "unsupported");
+    bearer = mm_bearer_mbim_mtk_fibocom_new (MM_BROADBAND_MODEM_MBIM (self),
+                                             self->priv->is_async_slaac_supported,
+                                             properties);
+    g_task_return_pointer (task, bearer, g_object_unref);
+    g_object_unref (task);
+}
 
 /******************************************************************************/
 
@@ -67,6 +197,20 @@ mm_broadband_modem_mbim_mtk_fibocom_new (const gchar  *device,
 static void
 mm_broadband_modem_mbim_mtk_fibocom_init (MMBroadbandModemMbimMtkFibocom *self)
 {
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
+                                              MM_TYPE_BROADBAND_MODEM_MBIM_MTK_FIBOCOM,
+                                              MMBroadbandModemMbimMtkFibocomPrivate);
+}
+
+static void
+iface_modem_init (MMIfaceModem *iface)
+{
+    iface_modem_parent = g_type_interface_peek_parent (iface);
+
+    iface->load_revision = load_revision;
+    iface->load_revision_finish = load_revision_finish;
+    iface->create_bearer = create_bearer;
+    iface->create_bearer_finish = create_bearer_finish;
 }
 
 static void
@@ -93,4 +237,7 @@ shared_fibocom_init (MMSharedFibocom *iface)
 static void
 mm_broadband_modem_mbim_mtk_fibocom_class_init (MMBroadbandModemMbimMtkFibocomClass *klass)
 {
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+    g_type_class_add_private (object_class, sizeof (MMBroadbandModemMbimMtkFibocomPrivate));
 }
