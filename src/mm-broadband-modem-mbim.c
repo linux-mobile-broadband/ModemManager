@@ -96,6 +96,7 @@ typedef enum {
     PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO      = 1 << 8,
     PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS = 1 << 9,
     PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS     = 1 << 10,
+    PROCESS_NOTIFICATION_FLAG_IP_CONFIGURATION     = 1 << 11,
 } ProcessNotificationFlag;
 
 enum {
@@ -5537,6 +5538,8 @@ basic_connect_notification (MMBroadbandModemMbim *self,
     case MBIM_CID_BASIC_CONNECT_PROVISIONED_CONTEXTS:
         if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS)
             basic_connect_notification_provisioned_contexts (self, device, notification);
+    case MBIM_CID_BASIC_CONNECT_IP_CONFIGURATION:
+        /* Ignored at modem level, only managed by bearer if waiting for async SLAAC results */
     default:
         /* Ignore */
         break;
@@ -5931,7 +5934,8 @@ common_setup_cleanup_unsolicited_events_sync (MMBroadbandModemMbim *self,
 
     mm_obj_dbg (self, "supported notifications: signal (%s), registration (%s), sms (%s), "
                 "connect (%s), subscriber (%s), packet (%s), pco (%s), ussd (%s), "
-                "lte attach info (%s), provisioned contexts (%s), slot_info_status (%s)",
+                "lte attach info (%s), provisioned contexts (%s), slot info status (%s), "
+                "ip configuration (%s)",
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY ? "yes" : "no",
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES ? "yes" : "no",
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SMS_READ ? "yes" : "no",
@@ -5942,7 +5946,8 @@ common_setup_cleanup_unsolicited_events_sync (MMBroadbandModemMbim *self,
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_USSD ? "yes" : "no",
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO ? "yes" : "no",
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS ? "yes" : "no",
-                self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS ? "yes" : "no");
+                self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS ? "yes" : "no",
+                self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_IP_CONFIGURATION ? "yes" : "no");
 
     if (setup) {
         /* Don't re-enable it if already there */
@@ -6048,6 +6053,7 @@ cleanup_unsolicited_events_3gpp (MMIfaceModem3gpp *_self,
     self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_CONNECT;
     self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE;
+    self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_IP_CONFIGURATION;
     if (self->priv->is_pco_supported)
         self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_PCO;
     if (self->priv->is_lte_attach_info_supported)
@@ -6072,6 +6078,7 @@ setup_unsolicited_events_3gpp (MMIfaceModem3gpp *_self,
     self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_CONNECT;
     self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE;
+    self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_IP_CONFIGURATION;
     if (self->priv->is_pco_supported)
         self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_PCO;
     if (self->priv->is_lte_attach_info_supported)
@@ -6154,7 +6161,8 @@ common_enable_disable_unsolicited_events (MMBroadbandModemMbim *self,
 
     mm_obj_dbg (self, "enabled notifications: signal (%s), registration (%s), sms (%s), "
                 "connect (%s), subscriber (%s), packet (%s), pco (%s), ussd (%s), "
-                "lte attach info (%s), provisioned contexts (%s), slot_info_status (%s)",
+                "lte attach info (%s), provisioned contexts (%s), slot info status (%s), "
+                "ip configuration (%s)",
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY ? "yes" : "no",
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES ? "yes" : "no",
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SMS_READ ? "yes" : "no",
@@ -6165,7 +6173,8 @@ common_enable_disable_unsolicited_events (MMBroadbandModemMbim *self,
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_USSD ? "yes" : "no",
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO ? "yes" : "no",
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS ? "yes" : "no",
-                self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS ? "yes" : "no");
+                self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS ? "yes" : "no",
+                self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_IP_CONFIGURATION ? "yes" : "no");
 
     entries = g_new0 (MbimEventEntry *, 5);
 
@@ -6175,11 +6184,12 @@ common_enable_disable_unsolicited_events (MMBroadbandModemMbim *self,
         self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_CONNECT ||
         self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO ||
         self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE ||
-        self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS) {
+        self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS ||
+        self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_IP_CONFIGURATION) {
         entries[n_entries] = g_new (MbimEventEntry, 1);
         memcpy (&(entries[n_entries]->device_service_id), MBIM_UUID_BASIC_CONNECT, sizeof (MbimUuid));
         entries[n_entries]->cids_count = 0;
-        entries[n_entries]->cids = g_new0 (guint32, 6);
+        entries[n_entries]->cids = g_new0 (guint32, 7);
         if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY)
             entries[n_entries]->cids[entries[n_entries]->cids_count++] = MBIM_CID_BASIC_CONNECT_SIGNAL_STATE;
         if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES)
@@ -6192,6 +6202,8 @@ common_enable_disable_unsolicited_events (MMBroadbandModemMbim *self,
             entries[n_entries]->cids[entries[n_entries]->cids_count++] = MBIM_CID_BASIC_CONNECT_PACKET_SERVICE;
         if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS)
             entries[n_entries]->cids[entries[n_entries]->cids_count++] = MBIM_CID_BASIC_CONNECT_PROVISIONED_CONTEXTS;
+        if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_IP_CONFIGURATION)
+            entries[n_entries]->cids[entries[n_entries]->cids_count++] = MBIM_CID_BASIC_CONNECT_IP_CONFIGURATION;
         n_entries++;
     }
 
@@ -6594,6 +6606,7 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *_self,
     self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_CONNECT;
     self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE;
+    self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_IP_CONFIGURATION;
     if (self->priv->is_pco_supported)
         self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_PCO;
     if (self->priv->is_lte_attach_info_supported)
@@ -6615,6 +6628,7 @@ modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *_self,
     self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_CONNECT;
     self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE;
+    self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_IP_CONFIGURATION;
     if (self->priv->is_pco_supported)
         self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_PCO;
     if (self->priv->is_lte_attach_info_supported)
