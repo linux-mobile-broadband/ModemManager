@@ -149,7 +149,7 @@ struct _MMBroadbandModemMbimPrivate {
     gboolean is_google_carrier_lock_supported;
 
     /* Process unsolicited notifications */
-    guint notification_id;
+    gulong                  notification_id;
     ProcessNotificationFlag setup_flags;
     ProcessNotificationFlag enable_flags;
 
@@ -5836,7 +5836,7 @@ port_notification_cb (MMPortMbim           *port,
     MbimService  service;
     MbimDevice  *device;
 
-    /* Onlyu process notifications if the device still exists */
+    /* Only process notifications if the device still exists */
     device = mm_port_mbim_peek_device (port);
     if (!device)
         return;
