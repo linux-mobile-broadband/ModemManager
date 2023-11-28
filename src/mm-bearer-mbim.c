@@ -563,6 +563,14 @@ ip_configuration_query_ready (MbimDevice   *device,
                 /* Netmask */
                 mm_bearer_ip_config_set_prefix (ipv6_config, ipv6address[0]->on_link_prefix_length);
 
+                /* If the modem has done SLAAC itself, it is never expected to return a /128 prefix,
+                 * warn if it happens and workaround it. Use /64 as default. */
+                if ((mm_bearer_ip_config_get_method (ipv6_config) == MM_BEARER_IP_METHOD_STATIC) &&
+                    (mm_bearer_ip_config_get_prefix (ipv6_config) == 128)) {
+                    mm_obj_warn (self, "unexpected link prefix returned with global IPv6 address (128): ignoring");
+                    mm_bearer_ip_config_set_prefix (ipv6_config, 64);
+                }
+
                 /* Gateway */
                 if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) {
                     g_autoptr(GInetAddress)  gw_addr = NULL;
