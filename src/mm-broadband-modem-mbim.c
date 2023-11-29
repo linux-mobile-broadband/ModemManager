@@ -1633,14 +1633,13 @@ unlock_required_subscriber_ready_state_ready (MbimDevice   *device,
             mm_obj_dbg (self, "processed subscriber ready status response");
     }
 
-    if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_NOT_INITIALIZED)) {
-        g_clear_error (&error);
-        ready_state = MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED;
-    }
-
     if (!error) {
-        /* Store last valid status loaded */
-        self->priv->enabled_cache.last_ready_state = ready_state;
+        /* Store last valid ready state until it is NOT_INITIALIZED which is temporary */
+        if (ready_state != MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED) {
+            self->priv->enabled_cache.last_ready_state = ready_state;
+        } else {
+            self->priv->enabled_cache.last_ready_state = prev_ready_state;
+        }
 
         switch (ready_state) {
         case MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED:
@@ -1662,6 +1661,11 @@ unlock_required_subscriber_ready_state_ready (MbimDevice   *device,
             error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE, self);
             break;
         }
+    }
+
+    if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_NOT_INITIALIZED)) {
+        g_clear_error (&error);
+        ready_state = MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED;
     }
 
     /* Fatal errors are reported right away */
@@ -5152,18 +5156,17 @@ basic_connect_notification_subscriber_ready_status (MMBroadbandModemMbim *self,
     if ((self->priv->enabled_cache.last_ready_state != MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED &&
          ready_state == MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED) ||
         (self->priv->enabled_cache.last_ready_state == MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED &&
-         ready_state != MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED) ||
-        /*SIM state becomes "not initialized" when queried shortly after being inserted. Its state
-         * transitions are: "not inserted" --> "not initialized" --> "initialized". To detect SIM
-         * hotswap event from this sequence, we need the check condition below*/
-        (self->priv->enabled_cache.last_ready_state == MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED &&
          ready_state != MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED)) {
         /* SIM has been removed or reinserted, re-probe to ensure correct interfaces are exposed */
         mm_obj_dbg (self, "SIM hot swap detected");
         active_sim_event = TRUE;
     }
 
-    self->priv->enabled_cache.last_ready_state = ready_state;
+    /* Ignore NOT_INITIALIZED state when setting the last_ready_state as it is
+     * reported regardless of whether SIM was inserted or unlocked */
+    if (ready_state != MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED) {
+        self->priv->enabled_cache.last_ready_state = ready_state;
+    }
 
     if (active_sim_event) {
         mm_iface_modem_process_sim_event (MM_IFACE_MODEM (self));
