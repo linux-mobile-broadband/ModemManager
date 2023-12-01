@@ -122,13 +122,14 @@ struct _MMIfaceModem {
                                       GError **error);
 
     /* Loading of the UnlockRequired property */
-    void (*load_unlock_required) (MMIfaceModem *self,
-                                  gboolean last_attempt,
-                                  GAsyncReadyCallback callback,
-                                  gpointer user_data);
-    MMModemLock (*load_unlock_required_finish) (MMIfaceModem *self,
-                                                GAsyncResult *res,
-                                                GError **error);
+    void        (*load_unlock_required)        (MMIfaceModem        *self,
+                                                gboolean             last_attempt,
+                                                GCancellable        *cancellable,
+                                                GAsyncReadyCallback  callback,
+                                                gpointer             user_data);
+    MMModemLock (*load_unlock_required_finish) (MMIfaceModem        *self,
+                                                GAsyncResult        *res,
+                                                GError             **error);
 
     /* Loading of the UnlockRetries property */
     void (*load_unlock_retries) (MMIfaceModem *self,
@@ -516,13 +517,13 @@ gboolean mm_iface_modem_set_power_state_finish (MMIfaceModem *self,
  * It will not only return the lock status, but also set the property values
  * in the DBus interface. If 'known_lock' is given, that lock status will be
  * assumed. */
-void        mm_iface_modem_update_lock_info        (MMIfaceModem *self,
-                                                    MMModemLock known_lock,
-                                                    GAsyncReadyCallback callback,
-                                                    gpointer user_data);
-MMModemLock mm_iface_modem_update_lock_info_finish (MMIfaceModem *self,
-                                                    GAsyncResult *res,
-                                                    GError **error);
+void        mm_iface_modem_update_lock_info        (MMIfaceModem        *self,
+                                                    MMModemLock          known_lock,
+                                                    GAsyncReadyCallback  callback,
+                                                    gpointer             user_data);
+MMModemLock mm_iface_modem_update_lock_info_finish (MMIfaceModem        *self,
+                                                    GAsyncResult        *res,
+                                                    GError             **error);
 
 MMModemLock      mm_iface_modem_get_unlock_required (MMIfaceModem *self);
 MMUnlockRetries *mm_iface_modem_get_unlock_retries  (MMIfaceModem *self);

@@ -571,10 +571,19 @@ mm_iface_modem_abort_invocation_if_state_not_reached (MMIfaceModem          *sel
 #define UNLOAD_REQUIRED_RETRY_TIMEOUT_SECS 2
 
 typedef struct {
-    guint retries;
-    guint max_retries;
-    guint timeout_id;
+    guint  retries;
+    guint  max_retries;
+    guint  timeout_id;
+    gulong cancellable_id;
 } InternalLoadUnlockRequiredContext;
+
+static void
+internal_load_unlock_required_context_free (InternalLoadUnlockRequiredContext *ctx)
+{
+    g_assert (!ctx->timeout_id);
+    g_assert (!ctx->cancellable_id);
+    g_slice_free (InternalLoadUnlockRequiredContext, ctx);
+}
 
 static MMModemLock
 internal_load_unlock_required_finish (MMIfaceModem  *self,
@@ -601,9 +610,38 @@ load_unlock_required_again (GTask *task)
 
     ctx = g_task_get_task_data (task);
     ctx->timeout_id = 0;
+
+    g_assert (ctx->cancellable_id);
+    g_cancellable_disconnect (g_task_get_cancellable (task), ctx->cancellable_id);
+    ctx->cancellable_id = 0;
+
     /* Retry the step */
     internal_load_unlock_required_context_step (task);
     return G_SOURCE_REMOVE;
+}
+
+static void
+load_unlock_required_again_cancelled (GCancellable *cancellable,
+                                      GTask        *task)
+{
+    InternalLoadUnlockRequiredContext *ctx;
+    MMIfaceModem                      *self;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    ctx->cancellable_id = 0;
+
+    if (ctx->timeout_id) {
+        g_source_remove (ctx->timeout_id);
+        ctx->timeout_id = 0;
+    }
+
+    mm_obj_dbg (self, "unlock required check retries cancelled");
+
+    if (!g_task_return_error_if_cancelled (task))
+        g_assert_not_reached ();
+    g_object_unref (task);
 }
 
 static void
@@ -655,6 +693,18 @@ load_unlock_required_ready (MMIfaceModem *self,
             else
                 mm_obj_info (self, "retrying (%u/%u) unlock required check", ctx->retries, ctx->max_retries);
 
+            /* Ownership of the task will be shared between the timeout and the cancellable. As soon as one
+             * of them is triggered, it should cancel the other. */
+
+            g_assert (ctx->cancellable_id == 0);
+            ctx->cancellable_id = g_cancellable_connect (g_task_get_cancellable (task),
+                                                         (GCallback) load_unlock_required_again_cancelled,
+                                                         task,
+                                                         NULL);
+            /* Do nothing if already cancelled, the callback will already be called */
+            if (!ctx->cancellable_id)
+                return;
+
             g_assert (ctx->timeout_id == 0);
             ctx->timeout_id = g_timeout_add_seconds (UNLOAD_REQUIRED_RETRY_TIMEOUT_SECS,
                                                      (GSourceFunc)load_unlock_required_again,
@@ -686,10 +736,18 @@ internal_load_unlock_required_context_step (GTask *task)
     self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
+    /* Don't run a new check if we were already cancelled */
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
+        return;
+    }
+
+    g_assert (ctx->cancellable_id == 0);
     g_assert (ctx->timeout_id == 0);
     MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_required (
         self,
         (ctx->retries >= ctx->max_retries), /* last_attempt? */
+        g_task_get_cancellable (task),
         (GAsyncReadyCallback) load_unlock_required_ready,
         task);
 }
@@ -708,17 +766,18 @@ load_unlock_required_max_retries (MMIfaceModem *self)
 
 static void
 internal_load_unlock_required (MMIfaceModem        *self,
+                               GCancellable        *cancellable,
                                GAsyncReadyCallback  callback,
                                gpointer             user_data)
 {
     InternalLoadUnlockRequiredContext *ctx;
     GTask                             *task;
 
-    ctx = g_new0 (InternalLoadUnlockRequiredContext, 1);
-    ctx->max_retries = load_unlock_required_max_retries (self);
+    task = g_task_new (self, cancellable, callback, user_data);
 
-    task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task, ctx, g_free);
+    ctx = g_slice_new0 (InternalLoadUnlockRequiredContext);
+    ctx->max_retries = load_unlock_required_max_retries (self);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)internal_load_unlock_required_context_free);
 
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_required ||
         !MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_required_finish) {
@@ -3725,10 +3784,9 @@ typedef struct {
 static void
 update_lock_info_context_free (UpdateLockInfoContext *ctx)
 {
-    g_assert (ctx->saved_error == NULL);
-
-    if (ctx->skeleton)
-        g_object_unref (ctx->skeleton);
+    /* saved error may exist if we were cancelled */
+    g_clear_pointer (&ctx->saved_error, g_error_free);
+    g_clear_object (&ctx->skeleton);
     g_slice_free (UpdateLockInfoContext, ctx);
 }
 
@@ -3855,11 +3913,17 @@ internal_load_unlock_required_ready (MMIfaceModem *self,
 static void
 update_lock_info_context_step (GTask *task)
 {
-    MMIfaceModem *self;
+    MMIfaceModem          *self;
     UpdateLockInfoContext *ctx;
 
     self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
+
+    if (g_task_return_error_if_cancelled (task)) {
+        mm_obj_dbg (self, "lock info update cancelled");
+        g_object_unref (task);
+        return;
+    }
 
     switch (ctx->step) {
     case UPDATE_LOCK_INFO_CONTEXT_STEP_FIRST:
@@ -3881,6 +3945,7 @@ update_lock_info_context_step (GTask *task)
             /* If we're already unlocked, we're done */
             internal_load_unlock_required (
                 self,
+                g_task_get_cancellable (task),
                 (GAsyncReadyCallback)internal_load_unlock_required_ready,
                 task);
             return;
@@ -3946,20 +4011,20 @@ update_lock_info_context_step (GTask *task)
 }
 
 void
-mm_iface_modem_update_lock_info (MMIfaceModem *self,
-                                 MMModemLock known_lock,
-                                 GAsyncReadyCallback callback,
-                                 gpointer user_data)
+mm_iface_modem_update_lock_info (MMIfaceModem        *self,
+                                 MMModemLock          known_lock,
+                                 GAsyncReadyCallback  callback,
+                                 gpointer             user_data)
 {
     UpdateLockInfoContext *ctx;
-    GTask *task;
+    GTask                 *task;
 
     ctx = g_slice_new0 (UpdateLockInfoContext);
 
     /* If the given lock is known, we will avoid re-asking for it */
     ctx->lock = known_lock;
 
-    task = g_task_new (self, NULL, callback, user_data);
+    task = g_task_new (self, mm_base_modem_peek_cancellable (MM_BASE_MODEM (self)), callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)update_lock_info_context_free);
 
     g_object_get (self,
@@ -4683,6 +4748,7 @@ interface_syncing_step (GTask *task)
         MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_required (
             self,
             FALSE,
+            NULL,
             (GAsyncReadyCallback)sync_sim_lock_ready,
             task);
         return;

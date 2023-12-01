@@ -863,9 +863,9 @@ typedef struct {
 } LoadUnlockRequiredContext;
 
 static MMModemLock
-modem_load_unlock_required_finish (MMIfaceModem *self,
-                                   GAsyncResult *res,
-                                   GError **error)
+modem_load_unlock_required_finish (MMIfaceModem  *self,
+                                   GAsyncResult  *res,
+                                   GError       **error)
 {
     GError *inner_error = NULL;
     gssize value;
@@ -883,7 +883,7 @@ static void load_unlock_required_context_step (GTask *task);
 static void
 unlock_required_uim_get_card_status_ready (QmiClientUim *client,
                                            GAsyncResult *res,
-                                           GTask *task)
+                                           GTask        *task)
 {
     MMBroadbandModemQmi *self;
     LoadUnlockRequiredContext *ctx;
@@ -928,7 +928,7 @@ unlock_required_uim_get_card_status_ready (QmiClientUim *client,
 static void
 dms_uim_get_pin_status_ready (QmiClientDms *client,
                               GAsyncResult *res,
-                              GTask *task)
+                              GTask        *task)
 {
     MMBroadbandModemQmi *self;
     LoadUnlockRequiredContext *ctx;
@@ -1025,13 +1025,18 @@ dms_uim_get_pin_status_ready (QmiClientDms *client,
 static void
 load_unlock_required_context_step (GTask *task)
 {
-    MMBroadbandModemQmi *self;
+    MMBroadbandModemQmi       *self;
     LoadUnlockRequiredContext *ctx;
-    GError *error = NULL;
-    QmiClient *client;
+    GError                    *error = NULL;
+    QmiClient                 *client;
 
     self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
+
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
+        return;
+    }
 
     switch (ctx->step) {
     case LOAD_UNLOCK_REQUIRED_STEP_FIRST:
@@ -1066,7 +1071,7 @@ load_unlock_required_context_step (GTask *task)
             qmi_client_dms_uim_get_pin_status (QMI_CLIENT_DMS (client),
                                                NULL,
                                                5,
-                                               NULL,
+                                               g_task_get_cancellable (task),
                                                (GAsyncReadyCallback) dms_uim_get_pin_status_ready,
                                                task);
             return;
@@ -1090,7 +1095,7 @@ load_unlock_required_context_step (GTask *task)
         qmi_client_uim_get_card_status (QMI_CLIENT_UIM (client),
                                         NULL,
                                         5,
-                                        NULL,
+                                        g_task_get_cancellable (task),
                                         (GAsyncReadyCallback) unlock_required_uim_get_card_status_ready,
                                         task);
         return;
@@ -1101,19 +1106,20 @@ load_unlock_required_context_step (GTask *task)
 }
 
 static void
-modem_load_unlock_required (MMIfaceModem *self,
-                            gboolean last_attempt,
-                            GAsyncReadyCallback callback,
-                            gpointer user_data)
+modem_load_unlock_required (MMIfaceModem        *self,
+                            gboolean             last_attempt,
+                            GCancellable        *cancellable,
+                            GAsyncReadyCallback  callback,
+                            gpointer             user_data)
 {
     LoadUnlockRequiredContext *ctx;
-    GTask *task;
+    GTask                     *task;
 
     ctx = g_new0 (LoadUnlockRequiredContext, 1);
     ctx->step = LOAD_UNLOCK_REQUIRED_STEP_FIRST;
     ctx->last_attempt = last_attempt;
 
-    task = g_task_new (self, NULL, callback, user_data);
+    task = g_task_new (self, cancellable, callback, user_data);
     g_task_set_task_data (task, ctx, g_free);
 
     load_unlock_required_context_step (task);
