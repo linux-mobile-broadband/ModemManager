@@ -57,7 +57,6 @@
 #include "mm-filter.h"
 #include "mm-log-object.h"
 #include "mm-base-modem.h"
-#include "mm-iface-modem.h"
 
 static void initable_iface_init   (GInitableIface       *iface);
 static void log_object_iface_init (MMLogObjectInterface *iface);
@@ -653,91 +652,39 @@ mm_base_manager_start (MMBaseManager *self,
 
 /*****************************************************************************/
 
-typedef struct {
-    MMBaseManager *self;
-    gboolean       low_power;
-} DisableContext;
-
 static void
-disable_context_free (DisableContext *ctx)
-{
-    g_object_unref (ctx->self);
-    g_slice_free (DisableContext, ctx);
-}
-
-static void
-remove_device_after_disable (MMBaseModem    *modem,
-                             DisableContext *ctx)
+remove_disable_ready (MMBaseModem *modem,
+                      GAsyncResult *res,
+                      MMBaseManager *self)
 {
     MMDevice *device;
 
-    device = find_device_by_modem (ctx->self, modem);
+    /* We don't care about errors disabling at this point */
+    mm_base_modem_disable_finish (modem, res, NULL);
+
+    device = find_device_by_modem (self, modem);
     if (device) {
         g_cancellable_cancel (mm_base_modem_peek_cancellable (modem));
         mm_device_remove_modem (device);
-        g_hash_table_remove (ctx->self->priv->devices, mm_device_get_uid (device));
+        g_hash_table_remove (self->priv->devices, mm_device_get_uid (device));
     }
-
-    disable_context_free (ctx);
 }
 
 static void
-shutdown_low_power_ready (MMIfaceModem   *modem,
-                          GAsyncResult   *res,
-                          DisableContext *ctx)
+foreach_disable (gpointer key,
+                 MMDevice *device,
+                 MMBaseManager *self)
 {
-    g_autoptr(GError) error = NULL;
-
-    if (!mm_iface_modem_set_power_state_finish (modem, res, &error))
-        mm_obj_info (ctx->self, "changing to low power state failed: %s", error->message);
-
-    remove_device_after_disable (MM_BASE_MODEM (modem), ctx);
-}
-
-static void
-shutdown_disable_ready (MMBaseModem    *modem,
-                        GAsyncResult   *res,
-                        DisableContext *ctx)
-{
-    g_autoptr(GError) error = NULL;
-
-    /* We don't care about errors disabling at this point */
-    if (!mm_base_modem_disable_finish (modem, res, &error)) {
-        mm_obj_info (ctx->self, "disabling modem failed: %s", error->message);
-    }
-    /* Bring the modem to low power mode if requested */
-    else if (ctx->low_power) {
-        mm_iface_modem_set_power_state (MM_IFACE_MODEM (modem),
-                                        MM_MODEM_POWER_STATE_LOW,
-                                        (GAsyncReadyCallback)shutdown_low_power_ready,
-                                        ctx);
-        return;
-    }
-
-    remove_device_after_disable (modem, ctx);
-}
-
-static void
-foreach_disable (gpointer        key,
-                 MMDevice       *device,
-                 DisableContext *foreach_ctx)
-{
-    MMBaseModem    *modem;
-    DisableContext *ctx;
+    MMBaseModem *modem;
 
     modem = mm_device_peek_modem (device);
-    if (!modem)
-        return;
-
-    ctx = g_slice_new0 (DisableContext);
-    ctx->self = g_object_ref (foreach_ctx->self);
-    ctx->low_power = foreach_ctx->low_power;
-    mm_base_modem_disable (modem, (GAsyncReadyCallback)shutdown_disable_ready, ctx);
+    if (modem)
+        mm_base_modem_disable (modem, (GAsyncReadyCallback)remove_disable_ready, self);
 }
 
 static gboolean
-foreach_remove (gpointer       key,
-                MMDevice      *device,
+foreach_remove (gpointer key,
+                MMDevice *device,
                 MMBaseManager *self)
 {
     MMBaseModem *modem;
@@ -751,8 +698,7 @@ foreach_remove (gpointer       key,
 
 void
 mm_base_manager_shutdown (MMBaseManager *self,
-                          gboolean       disable,
-                          gboolean       low_power)
+                          gboolean disable)
 {
     g_return_if_fail (self != NULL);
     g_return_if_fail (MM_IS_BASE_MANAGER (self));
@@ -761,11 +707,7 @@ mm_base_manager_shutdown (MMBaseManager *self,
     g_cancellable_cancel (self->priv->authp_cancellable);
 
     if (disable) {
-        DisableContext foreach_ctx = {
-            .self = self,
-            .low_power = low_power,
-        };
-        g_hash_table_foreach (self->priv->devices, (GHFunc)foreach_disable, &foreach_ctx);
+        g_hash_table_foreach (self->priv->devices, (GHFunc)foreach_disable, self);
 
         /* Disabling may take a few iterations of the mainloop, so the caller
          * has to iterate the mainloop until all devices have been disabled and
