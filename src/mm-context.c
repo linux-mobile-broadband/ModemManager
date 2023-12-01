@@ -238,6 +238,7 @@ static gboolean  test_no_udev;
 #if defined WITH_SUSPEND_RESUME
 static gboolean  test_no_suspend_resume;
 static gboolean  test_quick_suspend_resume;
+static gboolean  test_radio_off_suspend_resume;
 #endif
 #if defined WITH_QRTR
 static gboolean  test_no_qrtr;
@@ -285,6 +286,11 @@ static const GOptionEntry test_entries[] = {
         "Enable quick suspend/resume support for modems which stay on during host suspension",
         NULL
     },
+    {
+        "test-radio-off-suspend-resume", 0, 0, G_OPTION_ARG_NONE, &test_radio_off_suspend_resume,
+        "Enable support to turn radio off during suspend/resume",
+        NULL
+},
 #endif
 #if defined WITH_QRTR
     {
@@ -358,10 +364,17 @@ mm_context_get_test_no_suspend_resume (void)
 {
     return test_no_suspend_resume;
 }
+
 gboolean
 mm_context_get_test_quick_suspend_resume (void)
 {
     return test_quick_suspend_resume;
+}
+
+gboolean
+mm_context_get_test_radio_off_suspend_resume (void)
+{
+    return test_radio_off_suspend_resume;
 }
 #endif
 
