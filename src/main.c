@@ -63,10 +63,10 @@ sleeping_cb (MMSleepMonitor *sleep_monitor)
 {
     if (mm_context_get_test_low_power_suspend_resume ()) {
         mm_dbg ("removing devices and setting them in low power mode... (sleeping)");
-        mm_base_manager_shutdown (manager, TRUE, TRUE);
+        mm_base_manager_shutdown (manager, TRUE, TRUE, TRUE);
     } else {
         mm_dbg ("removing devices... (sleeping)");
-        mm_base_manager_shutdown (manager, FALSE, FALSE);
+        mm_base_manager_shutdown (manager, FALSE, FALSE, TRUE);
     }
 }
 
@@ -75,6 +75,15 @@ resuming_cb (MMSleepMonitor *sleep_monitor)
 {
     mm_dbg ("re-scanning (resuming)");
     mm_base_manager_start (manager, FALSE);
+}
+
+static void
+sleeping_quick_cb (MMSleepMonitor *sleep_monitor)
+{
+    if (mm_context_get_test_low_power_suspend_resume ()) {
+        mm_dbg ("setting modem in low power mode... (sleeping)");
+        mm_base_manager_shutdown (manager, TRUE, TRUE, FALSE);
+    }
 }
 
 static void
@@ -211,6 +220,7 @@ main (int argc, char *argv[])
         else if (mm_context_get_test_quick_suspend_resume ()) {
             mm_dbg ("Quick suspend/resume hooks enabled");
             sleep_monitor = mm_sleep_monitor_get ();
+            g_signal_connect (sleep_monitor, MM_SLEEP_MONITOR_SLEEPING, G_CALLBACK (sleeping_quick_cb), NULL);
             g_signal_connect (sleep_monitor, MM_SLEEP_MONITOR_RESUMING, G_CALLBACK (resuming_quick_cb), NULL);
         } else {
             mm_dbg ("Full suspend/resume hooks enabled");
@@ -233,7 +243,7 @@ main (int argc, char *argv[])
     if (manager) {
         GTimer *timer;
 
-        mm_base_manager_shutdown (manager, TRUE, FALSE);
+        mm_base_manager_shutdown (manager, TRUE, FALSE, TRUE);
 
         /* Wait for all modems to be disabled and removed, but don't wait
          * forever: if disabling the modems takes longer than 20s, just

@@ -73,7 +73,8 @@ void             mm_base_manager_start       (MMBaseManager *manager,
 
 void             mm_base_manager_shutdown    (MMBaseManager *manager,
                                               gboolean       disable,
-                                              gboolean       power_low);
+                                              gboolean       power_low,
+                                              gboolean       remove);
 
 #if defined WITH_SUSPEND_RESUME
 void             mm_base_manager_sync        (MMBaseManager *manager);

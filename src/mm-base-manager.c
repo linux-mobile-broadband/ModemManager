@@ -656,6 +656,7 @@ mm_base_manager_start (MMBaseManager *self,
 typedef struct {
     MMBaseManager *self;
     gboolean       low_power;
+    gboolean       remove;
 } DisableContext;
 
 static void
@@ -691,7 +692,10 @@ shutdown_low_power_ready (MMIfaceModem   *modem,
     if (!mm_iface_modem_set_power_state_finish (modem, res, &error))
         mm_obj_info (ctx->self, "changing to low power state failed: %s", error->message);
 
-    remove_device_after_disable (MM_BASE_MODEM (modem), ctx);
+    if (ctx->remove)
+        remove_device_after_disable (MM_BASE_MODEM (modem), ctx);
+    else
+        disable_context_free (ctx);
 }
 
 static void
@@ -714,7 +718,10 @@ shutdown_disable_ready (MMBaseModem    *modem,
         return;
     }
 
-    remove_device_after_disable (modem, ctx);
+    if (ctx->remove)
+        remove_device_after_disable (modem, ctx);
+    else
+        disable_context_free (ctx);
 }
 
 static void
@@ -732,6 +739,8 @@ foreach_disable (gpointer        key,
     ctx = g_slice_new0 (DisableContext);
     ctx->self = g_object_ref (foreach_ctx->self);
     ctx->low_power = foreach_ctx->low_power;
+    ctx->remove = foreach_ctx->remove;
+
     mm_base_modem_disable (modem, (GAsyncReadyCallback)shutdown_disable_ready, ctx);
 }
 
@@ -752,7 +761,8 @@ foreach_remove (gpointer       key,
 void
 mm_base_manager_shutdown (MMBaseManager *self,
                           gboolean       disable,
-                          gboolean       low_power)
+                          gboolean       low_power,
+                          gboolean       remove)
 {
     g_return_if_fail (self != NULL);
     g_return_if_fail (MM_IS_BASE_MANAGER (self));
@@ -764,6 +774,7 @@ mm_base_manager_shutdown (MMBaseManager *self,
         DisableContext foreach_ctx = {
             .self = self,
             .low_power = low_power,
+            .remove = remove,
         };
         g_hash_table_foreach (self->priv->devices, (GHFunc)foreach_disable, &foreach_ctx);
 
@@ -774,8 +785,10 @@ mm_base_manager_shutdown (MMBaseManager *self,
         return;
     }
 
-    /* Otherwise, just remove directly */
-    g_hash_table_foreach_remove (self->priv->devices, (GHRFunc)foreach_remove, self);
+    if (remove) {
+        /* Otherwise, just remove directly */
+        g_hash_table_foreach_remove (self->priv->devices, (GHRFunc)foreach_remove, self);
+    }
 }
 
 guint32
