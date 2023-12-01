@@ -74,13 +74,28 @@ get_private (MMSharedFibocom *self)
 typedef struct {
     MMBearerProperties *config;
     gboolean            initial_eps_off_on;
+    GError             *saved_error;
 } SetInitialEpsBearerSettingsContext;
 
 static void
 set_initial_eps_bearer_settings_context_free (SetInitialEpsBearerSettingsContext *ctx)
 {
+    g_clear_error (&ctx->saved_error);
     g_clear_object (&ctx->config);
     g_slice_free (SetInitialEpsBearerSettingsContext, ctx);
+}
+
+static void
+set_initial_eps_bearer_settings_complete (GTask *task)
+{
+    SetInitialEpsBearerSettingsContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+    if (ctx->saved_error)
+        g_task_return_error (task, g_steal_pointer (&ctx->saved_error));
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 gboolean
@@ -96,18 +111,19 @@ after_attach_apn_modem_power_up_ready (MMIfaceModem *self,
                                        GAsyncResult *res,
                                        GTask        *task)
 {
-    GError *error = NULL;
+    SetInitialEpsBearerSettingsContext *ctx;
+    g_autoptr(GError)                   error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     if (!mm_iface_modem_set_power_state_finish (self, res, &error)) {
         mm_obj_warn (self, "failed to power up modem after attach APN settings update: %s", error->message);
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
+        if (!ctx->saved_error)
+            ctx->saved_error = g_steal_pointer (&error);
+    } else
+        mm_obj_dbg (self, "success toggling modem power up after attach APN");
 
-    mm_obj_dbg (self, "success toggling modem power up after attach APN");
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+    set_initial_eps_bearer_settings_complete (task);
 }
 
 static void
@@ -117,16 +133,12 @@ parent_set_initial_eps_bearer_settings_ready (MMIfaceModem3gpp *self,
 {
     SetInitialEpsBearerSettingsContext *ctx;
     Private                            *priv;
-    GError                             *error = NULL;
 
     ctx = g_task_get_task_data (task);
     priv = get_private (MM_SHARED_FIBOCOM (self));
 
-    if (!priv->iface_modem_3gpp_parent->set_initial_eps_bearer_settings_finish (self, res, &error)) {
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
+    if (!priv->iface_modem_3gpp_parent->set_initial_eps_bearer_settings_finish (self, res, &ctx->saved_error))
+        mm_obj_warn (self, "failed to update APN settings: %s", ctx->saved_error->message);
 
     if (ctx->initial_eps_off_on) {
         mm_obj_dbg (self, "toggle modem power up after attach APN");
@@ -137,8 +149,7 @@ parent_set_initial_eps_bearer_settings_ready (MMIfaceModem3gpp *self,
         return;
     }
 
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+    set_initial_eps_bearer_settings_complete (task);
 }
 
 static void
