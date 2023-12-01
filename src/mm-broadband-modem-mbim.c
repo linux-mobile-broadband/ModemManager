@@ -3720,12 +3720,11 @@ load_enabled_facility_pin_query_ready (MbimDevice *device,
     LoadEnabledFacilityLocksContext *ctx;
     MbimMessage *response;
     MbimMessage *message;
-    GError *error = NULL;
     MbimPinType pin_type;
     MbimPinState pin_state;
 
     ctx = g_task_get_task_data (task);
-    response = mbim_device_command_finish (device, res, &error);
+    response = mbim_device_command_finish (device, res, NULL);
     if (response) {
         if (mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, NULL) &&
             mbim_message_pin_response_parse (response, &pin_type, &pin_state, NULL, NULL) &&
