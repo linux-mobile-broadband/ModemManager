@@ -2,6 +2,7 @@
 # Copyright (C) 2021 Iñigo Martinez <inigomartinez@gmail.com>
 
 test_units = {
+  'mmcbmmonitor': libhelpers_dep,
   'mmrules': libkerneldevice_dep,
   'mmsmsmonitor': libhelpers_dep,
   'mmsmspdu': libhelpers_dep,
