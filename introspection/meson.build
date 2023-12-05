@@ -13,6 +13,7 @@ mm_ifaces_bearer = files('org.freedesktop.ModemManager1.Bearer.xml')
 mm_ifaces_call = files('org.freedesktop.ModemManager1.Call.xml')
 
 mm_ifaces_modem = files(
+  'org.freedesktop.ModemManager1.Modem.CellBroadcast.xml',
   'org.freedesktop.ModemManager1.Modem.Firmware.xml',
   'org.freedesktop.ModemManager1.Modem.Location.xml',
   'org.freedesktop.ModemManager1.Modem.Messaging.xml',
@@ -29,10 +30,12 @@ mm_ifaces_modem = files(
   'org.freedesktop.ModemManager1.Modem.xml',
 )
 
+mm_ifaces_cbm = files('org.freedesktop.ModemManager1.Cbm.xml',)
 mm_ifaces_sim = files('org.freedesktop.ModemManager1.Sim.xml')
 mm_ifaces_sms = files('org.freedesktop.ModemManager1.Sms.xml',)
 
 install_data(
-  mm_ifaces + mm_ifaces_bearer + mm_ifaces_call + mm_ifaces_modem + mm_ifaces_sim + mm_ifaces_sms,
+  mm_ifaces + mm_ifaces_bearer + mm_ifaces_call + mm_ifaces_cbm +
+  mm_ifaces_modem + mm_ifaces_sim + mm_ifaces_sms,
   install_dir: dbus_interfaces_dir,
 )

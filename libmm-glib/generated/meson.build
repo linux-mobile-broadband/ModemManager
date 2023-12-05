@@ -132,6 +132,7 @@ gen_sources += custom_target(
 gdbus_ifaces = {
   'bearer': {'sources': mm_ifaces_bearer, 'object_manager': false},
   'call': {'sources':  mm_ifaces_call, 'object_manager': false},
+  'cbm': {'sources': mm_ifaces_cbm, 'object_manager': false},
   'manager': {'sources': mm_ifaces, 'object_manager': false},
   'sim': {'sources': mm_ifaces_sim, 'object_manager': false},
 }

@@ -1108,6 +1108,22 @@ typedef enum { /*< underscore_name=mm_sms_cdma_service_category >*/
 } MMSmsCdmaServiceCategory;
 
 /**
+ * MMCbmState:
+ * @MM_CBM_STATE_UNKNOWN: State unknown or not reportable.
+ * @MM_CBM_STATE_RECEIVING: The message is being received but is not yet complete.
+ * @MM_CBM_STATE_RECEIVED: The message has been completely received.
+ *
+ * State of a given CBM.
+ *
+ * Since: 1.24
+ */
+typedef enum { /*< underscore_name=mm_cbm_state >*/
+    MM_CBM_STATE_UNKNOWN   = 0,
+    MM_CBM_STATE_RECEIVING = 1,
+    MM_CBM_STATE_RECEIVED  = 2,
+} MMCbmState;
+
+/**
  * MMModemLocationSource:
  * @MM_MODEM_LOCATION_SOURCE_NONE: None.
  * @MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI: Location Area Code and Cell ID.

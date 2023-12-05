@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!--
+ ModemManager 1.0 Interface Specification
+
+   Copyright (C) 2024 Guido Günther <agx@sigxcpu.org>
+-->
+
+<node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
+
+  <!--
+      org.freedesktop.ModemManager1.Modem.CellBroadcast:
+      @short_description: The ModemManager CellBroadcast service interface.
+
+      This interface allows clients to configure the details of CellBroadcast
+      service information.
+
+      This interface will only be available once the modem is ready to be
+      registered in the cellular network.
+  -->
+  <interface name="org.freedesktop.ModemManager1.Modem.CellBroadcast">
+    <!--
+        List:
+        @result: The list of CBM object paths.
+
+        Retrieve all cell broadcast messages.
+
+        This method should only be used once and subsequent information
+        retrieved either by listening for the
+        #org.freedesktop.ModemManager1.Modem.CellBroadcast::Added signal,
+        or by querying the specific CBM object of interest.
+
+        Since: 1.24
+    -->
+    <method name="List">
+      <arg name="result" type="ao" direction="out" />
+    </method>
+
+    <!--
+        Delete:
+        @path: The object path of the CBM to delete.
+
+        Delete an cell broadcast message
+
+        Since: 1.24
+    -->
+    <method name="Delete">
+      <arg name="path" type="o" direction="in" />
+    </method>
+
+    <!--
+        Added:
+        @path: Object path of the new CBM.
+
+        Emitted when any part of a new cell broadcast message has been
+        received. Not all parts may have been received and the message may not
+        be complete.
+
+        Check the
+        '<link linkend="gdbus-property-org-freedesktop-ModemManager1-Cbm.State">State</link>'
+        property to determine if the message is complete.
+
+        Since: 1.24
+    -->
+    <signal name="Added">
+      <arg name="path" type="o" />
+    </signal>
+
+    <!--
+        Deleted:
+        @path: Object path of the now deleted CBM.
+
+        Emitted when a message has been deleted.
+
+        Since: 1.24
+    -->
+    <signal name="Deleted">
+      <arg name="path" type="o" />
+    </signal>
+
+    <!--
+        CellBroadcasts:
+
+        The list of CBM object paths.
+
+        Since: 1.24
+    -->
+    <property name="CellBroadcasts" type="ao" access="read" />
+
+  </interface>
+</node>

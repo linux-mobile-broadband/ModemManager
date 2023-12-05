@@ -103,6 +103,7 @@
 #include <mm-gdbus-manager.h>
 #include <mm-gdbus-modem.h>
 #include <mm-gdbus-bearer.h>
+#include <mm-gdbus-cbm.h>
 #include <mm-gdbus-sim.h>
 #include <mm-gdbus-sms.h>
 #include <mm-gdbus-call.h>

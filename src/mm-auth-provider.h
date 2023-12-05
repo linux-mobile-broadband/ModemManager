@@ -37,6 +37,7 @@
 #define MM_AUTHORIZATION_LOCATION        "org.freedesktop.ModemManager1.Location"
 #define MM_AUTHORIZATION_TIME            "org.freedesktop.ModemManager1.Time"
 #define MM_AUTHORIZATION_FIRMWARE        "org.freedesktop.ModemManager1.Firmware"
+#define MM_AUTHORIZATION_CELL_BROADCAST  "org.freedesktop.ModemManager1.CellBroadcast"
 
 typedef struct _MMAuthProvider        MMAuthProvider;
 typedef struct _MMAuthProviderClass   MMAuthProviderClass;

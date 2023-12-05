@@ -133,6 +133,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 /* Prefix for object paths */
 #define MM_DBUS_MODEM_PREFIX  MM_DBUS_PATH "/Modem"
 #define MM_DBUS_BEARER_PREFIX MM_DBUS_PATH "/Bearer"
+#define MM_DBUS_CBM_PREFIX    MM_DBUS_PATH "/CBM"
 #define MM_DBUS_SIM_PREFIX    MM_DBUS_PATH "/SIM"
 #define MM_DBUS_SMS_PREFIX    MM_DBUS_PATH "/SMS"
 #define MM_DBUS_CALL_PREFIX   MM_DBUS_PATH "/Call"

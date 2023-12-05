@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!--
+ ModemManager 1.0 Interface Specification
+
+   Copyright (C) 2024 Guido Günther <agx@sigxcpu.org>
+-->
+
+<node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
+
+  <!--
+      org.freedesktop.ModemManager1.Cbm:
+      @short_description: The ModemManager Cbm interface.
+
+      The Cbm interface defines operations and properties of a single cell broadcast message.
+  -->
+  <interface name="org.freedesktop.ModemManager1.Cbm">
+
+    <!--
+        State:
+
+        A <link linkend="MMCbmState">MMCbmState</link> value,
+        describing the state of the message.
+
+        Since: 1.24
+    -->
+    <property name="State" type="u" access="read" />
+
+    <!--
+        Text:
+
+        Message text, in UTF-8.
+
+        Since: 1.24
+    -->
+    <property name="Text" type="s" access="read" />
+
+    <!--
+        Channel:
+
+        The channel (or message identifier) specifying the source and
+        type of the cell broadcast message.
+
+        Since: 1.24
+    -->
+    <property name="Channel" type="u" access="read" />
+
+    <!--
+        MessageCode:
+
+        The message code of this CBM. The message code differentiates
+	between CBMs from the same channel.
+
+        Since: 1.24
+    -->
+    <property name="MessageCode" type="u" access="read" />
+
+    <!--
+        Update:
+
+        The update number of this CBM. The update number allows to update CBMs
+        with the same channel and message code.
+
+        Since: 1.24
+    -->
+    <property name="Update" type="u" access="read" />
+
+  </interface>
+</node>
