@@ -43,6 +43,7 @@ enums_sources += custom_target(
 )
 
 sources = files(
+  'mm-cbm-part.c',
   'mm-charsets.c',
   'mm-error-helpers.c',
   'mm-log.c',

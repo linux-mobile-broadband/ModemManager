@@ -3,6 +3,7 @@
 
 test_units = {
   'at-serial-port': libport_dep,
+  'cbm-part': libhelpers_dep,
   'charsets': libhelpers_dep,
   'error-helpers': libhelpers_dep,
   'kernel-device-helpers': libkerneldevice_dep,
