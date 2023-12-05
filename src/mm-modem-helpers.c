@@ -968,6 +968,16 @@ mm_3gpp_cds_regex_get (void)
                         NULL);
 }
 
+GRegex *
+mm_3gpp_cbm_regex_get (void)
+{
+    /* +CBM: <length><CR><LF><PDU> */
+    return g_regex_new ("\\r\\n\\+CBM:\\s*(\\d+)\\r\\n(.*)\\r\\n",
+                        G_REGEX_RAW | G_REGEX_OPTIMIZE,
+                        0,
+                        NULL);
+}
+
 /*************************************************************************/
 /* AT+WS46=? response parser
  *
