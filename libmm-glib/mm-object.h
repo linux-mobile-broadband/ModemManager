@@ -36,6 +36,7 @@
 #include "mm-modem-3gpp-profile-manager.h"
 #include "mm-modem-3gpp-ussd.h"
 #include "mm-modem-cdma.h"
+#include "mm-modem-cell-broadcast.h"
 #include "mm-modem-simple.h"
 #include "mm-modem-location.h"
 #include "mm-modem-messaging.h"
@@ -86,6 +87,7 @@ MMModem3gpp                *mm_object_get_modem_3gpp                  (MMObject 
 MMModem3gppProfileManager  *mm_object_get_modem_3gpp_profile_manager  (MMObject *self);
 MMModem3gppUssd            *mm_object_get_modem_3gpp_ussd             (MMObject *self);
 MMModemCdma                *mm_object_get_modem_cdma                  (MMObject *self);
+MMModemCellBroadcast       *mm_object_get_modem_cell_broadcast        (MMObject *self);
 MMModemSimple              *mm_object_get_modem_simple                (MMObject *self);
 MMModemLocation            *mm_object_get_modem_location              (MMObject *self);
 MMModemMessaging           *mm_object_get_modem_messaging             (MMObject *self);
@@ -101,6 +103,7 @@ MMModem3gpp                *mm_object_peek_modem_3gpp                 (MMObject 
 MMModem3gppProfileManager  *mm_object_peek_modem_3gpp_profile_manager (MMObject *self);
 MMModem3gppUssd            *mm_object_peek_modem_3gpp_ussd            (MMObject *self);
 MMModemCdma                *mm_object_peek_modem_cdma                 (MMObject *self);
+MMModemCellBroadcast       *mm_object_peek_modem_cell_broadcast       (MMObject *self);
 MMModemSimple              *mm_object_peek_modem_simple               (MMObject *self);
 MMModemLocation            *mm_object_peek_modem_location             (MMObject *self);
 MMModemMessaging           *mm_object_peek_modem_messaging            (MMObject *self);

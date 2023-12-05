@@ -32,6 +32,7 @@
 
 #if !defined (_LIBMM_INSIDE_MM)
 /* This headers are not exported within ModemManager */
+# include <mm-cbm.h>
 # include <mm-manager.h>
 # include <mm-object.h>
 # include <mm-sim.h>
@@ -43,6 +44,7 @@
 # include <mm-modem-3gpp-profile-manager.h>
 # include <mm-modem-3gpp-ussd.h>
 # include <mm-modem-cdma.h>
+# include <mm-modem-cell-broadcast.h>
 # include <mm-modem-simple.h>
 # include <mm-modem-location.h>
 # include <mm-modem-messaging.h>
