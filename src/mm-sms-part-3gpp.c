@@ -244,13 +244,13 @@ sms_encoding_type (int dcs)
     return scheme;
 }
 
-static gchar *
-sms_decode_text (const guint8   *text,
-                 int             len,
-                 MMSmsEncoding   encoding,
-                 int             bit_offset,
-                 gpointer        log_object,
-                 GError        **error)
+gchar *
+mm_sms_decode_text (const guint8   *text,
+                    int             len,
+                    MMSmsEncoding   encoding,
+                    int             bit_offset,
+                    gpointer        log_object,
+                    GError        **error)
 {
     if (!text || len == 0) {
         g_set_error (error,
@@ -779,12 +779,12 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint         index,
 
                 /* Otherwise if it's 7-bit or UCS2 we can decode it */
                 mm_obj_dbg (log_object, "decoding SMS text with %u elements", tp_user_data_size_elements);
-                text = sms_decode_text (&pdu[tp_user_data_offset],
-                                        tp_user_data_size_elements,
-                                        user_data_encoding,
-                                        bit_offset,
-                                        log_object,
-                                        error);
+                text = mm_sms_decode_text (&pdu[tp_user_data_offset],
+                                           tp_user_data_size_elements,
+                                           user_data_encoding,
+                                           bit_offset,
+                                           log_object,
+                                           error);
                 if (!text) {
                     mm_sms_part_free (sms_part);
                     return NULL;

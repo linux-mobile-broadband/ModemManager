@@ -38,6 +38,13 @@ guint8    *mm_sms_part_3gpp_get_submit_pdu      (MMSmsPart     *part,
                                                  gpointer       log_object,
                                                  GError       **error);
 
+gchar     *mm_sms_decode_text (const guint8   *text,
+                               int             len,
+                               MMSmsEncoding   encoding,
+                               int             bit_offset,
+                               gpointer        log_object,
+                               GError        **error);
+
 /* For testcases only */
 
 guint       mm_sms_part_3gpp_encode_address   (const gchar   *address,
