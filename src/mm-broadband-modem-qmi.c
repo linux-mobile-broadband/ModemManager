@@ -177,7 +177,6 @@ struct _MMBroadbandModemQmiPrivate {
 
     /* WDS Profile changed notification ID (3gpp Profile Manager) */
     guint profile_changed_indication_id;
-    gint  profile_changed_indication_ignored;
 
     /* Packet service state helpers when using NAS System Info and DSD
      * (not applicable when using NAS Serving System) */
@@ -6533,9 +6532,6 @@ modem_3gpp_profile_manager_list_profiles (MMIfaceModem3gppProfileManager  *self,
 /*****************************************************************************/
 /* Store profile (3GPP profile management interface) */
 
-static void profile_changed_indication_ignore (MMBroadbandModemQmi *self,
-                                               gboolean             ignore);
-
 typedef struct {
     QmiClientWds         *client;
     gint                  profile_id;
@@ -6591,7 +6587,6 @@ modify_profile_ready (QmiClientWds *client,
     g_autoptr(QmiMessageWdsModifyProfileOutput) output = NULL;
 
     self = g_task_get_source_object (task);
-    profile_changed_indication_ignore (self, FALSE);
 
     output = qmi_client_wds_modify_profile_finish (client, res, &error);
     if (!output) {
@@ -6632,9 +6627,8 @@ create_profile_ready (QmiClientWds *client,
     guint8               profile_index;
     g_autoptr(QmiMessageWdsCreateProfileOutput) output = NULL;
 
-    ctx = g_task_get_task_data (task);
     self = g_task_get_source_object (task);
-    profile_changed_indication_ignore (self, FALSE);
+    ctx = g_task_get_task_data (task);
 
     output = qmi_client_wds_create_profile_finish (client, res, &error);
     if (!output) {
@@ -6691,7 +6685,6 @@ store_profile_run (GTask *task)
         if (!self->priv->apn_type_not_supported)
             qmi_message_wds_create_profile_input_set_apn_type_mask (input, ctx->qmi_apn_type, NULL);
 
-        profile_changed_indication_ignore (self, TRUE);
         qmi_client_wds_create_profile (ctx->client,
                                        input,
                                        10,
@@ -6712,7 +6705,6 @@ store_profile_run (GTask *task)
         if (!self->priv->apn_type_not_supported)
             qmi_message_wds_modify_profile_input_set_apn_type_mask (input, ctx->qmi_apn_type, NULL);
 
-        profile_changed_indication_ignore (self, TRUE);
         qmi_client_wds_modify_profile (ctx->client,
                                        input,
                                        10,
@@ -6802,12 +6794,8 @@ delete_profile_ready (QmiClientWds *client,
                       GAsyncResult *res,
                       GTask        *task)
 {
-    MMBroadbandModemQmi *self;
-    GError              *error = NULL;
+    GError *error = NULL;
     g_autoptr(QmiMessageWdsDeleteProfileOutput) output = NULL;
-
-    self = g_task_get_source_object (task);
-    profile_changed_indication_ignore (self, FALSE);
 
     output = qmi_client_wds_delete_profile_finish (client, res, &error);
     if (!output || !qmi_message_wds_delete_profile_output_get_result (output, &error)) {
@@ -6847,7 +6835,6 @@ modem_3gpp_profile_manager_delete_profile (MMIfaceModem3gppProfileManager *self,
     input = qmi_message_wds_delete_profile_input_new ();
     qmi_message_wds_delete_profile_input_set_profile_identifier (input, QMI_WDS_PROFILE_TYPE_3GPP, profile_id, NULL);
 
-    profile_changed_indication_ignore (MM_BROADBAND_MODEM_QMI (self), TRUE);
     qmi_client_wds_delete_profile (QMI_CLIENT_WDS (client),
                                    input,
                                    10,
@@ -6876,36 +6863,8 @@ profile_changed_indication_received (QmiClientWds                         *clien
                                      QmiIndicationWdsProfileChangedOutput *output,
                                      MMBroadbandModemQmi                  *self)
 {
-    if (self->priv->profile_changed_indication_ignored > 0) {
-        mm_obj_dbg (self, "profile changed indication ignored");
-        return;
-    }
-
     mm_obj_dbg (self, "profile changed indication was received");
     mm_iface_modem_3gpp_profile_manager_updated (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self));
-}
-
-static void
-profile_changed_indication_ignore (MMBroadbandModemQmi *self,
-                                   gboolean             ignore)
-{
-    /* Note: multiple concurrent profile create/update/deletes may be happening,
-     * so ensure the indication ignore logic applies as long as at least one
-     * operation is ongoing. */
-    if (ignore) {
-        g_assert_cmpint (self->priv->profile_changed_indication_ignored, >=, 0);
-        self->priv->profile_changed_indication_ignored++;
-        mm_obj_dbg (self, "ignoring profile update indications during our own operations (%d ongoing)",
-                    self->priv->profile_changed_indication_ignored);
-    } else {
-        g_assert_cmpint (self->priv->profile_changed_indication_ignored, >, 0);
-        self->priv->profile_changed_indication_ignored--;
-        if (self->priv->profile_changed_indication_ignored > 0)
-            mm_obj_dbg (self, "still ignoring profile update indications during our own operations (%d ongoing)",
-                        self->priv->profile_changed_indication_ignored);
-        else
-            mm_obj_dbg (self, "no longer ignoring profile update indications during our own operations");
-    }
 }
 
 /*****************************************************************************/
