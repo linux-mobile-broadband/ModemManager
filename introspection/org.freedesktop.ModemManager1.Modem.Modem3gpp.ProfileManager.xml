@@ -142,6 +142,17 @@
         Emitted when the profiles are updated by the network through OTA
         procedures.
 
+        This signal should not be emitted due to operations performed through
+        this interface, e.g. with a Set() call. The logic implementing this
+        support has certain limitations, so it is suggested to reload the
+        full list of profiles with a new List() call and check for differences
+        as needed.
+
+        The emission of this signal may also not be fully reliable, if for
+        example the support for this type of notifications is not provided by
+        the modem itself, or if the modem report for an OTA update happens too
+        close to one of our own operations.
+
         Since: 1.18
     -->
     <signal name="Updated" />
