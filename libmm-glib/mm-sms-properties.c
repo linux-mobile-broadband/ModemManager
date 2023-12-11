@@ -312,7 +312,8 @@ mm_sms_properties_get_smsc (MMSmsProperties *self)
  * @self: A #MMSmsProperties.
  * @validity: The validity of %MM_SMS_VALIDITY_TYPE_RELATIVE type.
  *
- * Sets the relative validity time of the SMS.
+ * Sets the relative validity time of the SMS. Validity time is in minutes.
+ * If relative validity time is not set, the default is 24 hours.
  *
  * Since: 1.0
  */
