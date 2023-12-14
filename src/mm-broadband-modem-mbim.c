@@ -119,6 +119,7 @@ typedef struct {
     guint64                  packet_service_uplink_speed;
     guint64                  packet_service_downlink_speed;
     MbimSubscriberReadyState last_ready_state;
+    MbimPinType              last_pin_type;
 } EnabledCache;
 
 struct _MMBroadbandModemMbimPrivate {
@@ -1542,7 +1543,9 @@ pin_query_ready (MbimDevice   *device,
     GError *error = NULL;
     MbimPinType pin_type;
     MbimPinState pin_state;
+    MMBroadbandModemMbim *self;
 
+    self = g_task_get_source_object (task);
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
         mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
@@ -1560,6 +1563,7 @@ pin_query_ready (MbimDevice   *device,
             unlock_required = mm_modem_lock_from_mbim_pin_type (pin_type);
 
         g_task_return_int (task, unlock_required);
+        self->priv->enabled_cache.last_pin_type = pin_type;
     }
     /* VZ20M reports an error when SIM-PIN is required... */
     else if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_PIN_REQUIRED)) {
@@ -1807,6 +1811,7 @@ pin_query_unlock_retries_ready (MbimDevice *device,
 
         mm_broadband_modem_mbim_set_unlock_retries (self, lock, remaining_attempts);
         g_task_return_pointer (task, g_object_ref (self->priv->unlock_retries), g_object_unref);
+        self->priv->enabled_cache.last_pin_type = pin_type;
     } else
         g_task_return_error (task, error);
 
@@ -3722,14 +3727,19 @@ load_enabled_facility_pin_query_ready (MbimDevice *device,
     MbimMessage *message;
     MbimPinType pin_type;
     MbimPinState pin_state;
+    MMBroadbandModemMbim *self;
 
+    self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
     response = mbim_device_command_finish (device, res, NULL);
     if (response) {
         if (mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, NULL) &&
-            mbim_message_pin_response_parse (response, &pin_type, &pin_state, NULL, NULL) &&
-            (pin_state == MBIM_PIN_STATE_LOCKED))
-            ctx->facilities |= mm_modem_3gpp_facility_from_mbim_pin_type (pin_type);
+            mbim_message_pin_response_parse (response, &pin_type, &pin_state, NULL, NULL)) {
+            if (pin_state == MBIM_PIN_STATE_LOCKED)
+                ctx->facilities |= mm_modem_3gpp_facility_from_mbim_pin_type (pin_type);
+
+            self->priv->enabled_cache.last_pin_type = pin_type;
+        }
 
         mbim_message_unref (response);
     }
@@ -5094,6 +5104,44 @@ basic_connect_notification_connect (MMBroadbandModemMbim *self,
 }
 
 static void
+pin_query_after_subscriber_ready_status_ready (MbimDevice           *device,
+                                               GAsyncResult         *res,
+                                               MMBroadbandModemMbim *self) /* full reference! */
+{
+    g_autoptr(MbimMessage) response = NULL;
+    g_autoptr(GError)      error = NULL;
+    MbimPinType            pin_type;
+    MbimPinState           pin_state;
+    gboolean               sim_event = FALSE;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
+        mbim_message_pin_response_parse (
+            response,
+            &pin_type,
+            &pin_state,
+            NULL,
+            &error)) {
+        if (pin_type == MBIM_PIN_TYPE_NETWORK_PIN ||
+            pin_type == MBIM_PIN_TYPE_NETWORK_PUK ||
+            (pin_state == MBIM_PIN_STATE_UNLOCKED &&
+             self->priv->enabled_cache.last_pin_type == MBIM_PIN_TYPE_NETWORK_PIN)) {
+            sim_event = TRUE;
+        }
+        self->priv->enabled_cache.last_pin_type = pin_type;
+    }
+
+    if (error)
+        mm_obj_dbg (self, "PIN query for basic connect failed: %s", error->message);
+
+    if (sim_event)
+        mm_iface_modem_process_sim_event (MM_IFACE_MODEM (self));
+
+    g_object_unref (self);
+}
+
+static void
 basic_connect_notification_subscriber_ready_status (MMBroadbandModemMbim *self,
                                                     MbimDevice           *device,
                                                     MbimMessage          *notification)
@@ -5158,6 +5206,22 @@ basic_connect_notification_subscriber_ready_status (MMBroadbandModemMbim *self,
         /* SIM has been removed or reinserted, re-probe to ensure correct interfaces are exposed */
         mm_obj_dbg (self, "SIM hot swap detected");
         active_sim_event = TRUE;
+    }
+
+    if ((self->priv->enabled_cache.last_ready_state != MBIM_SUBSCRIBER_READY_STATE_DEVICE_LOCKED &&
+         ready_state == MBIM_SUBSCRIBER_READY_STATE_DEVICE_LOCKED) ||
+        (self->priv->enabled_cache.last_ready_state == MBIM_SUBSCRIBER_READY_STATE_DEVICE_LOCKED &&
+         ready_state != MBIM_SUBSCRIBER_READY_STATE_DEVICE_LOCKED)) {
+        g_autoptr(MbimMessage) message = NULL;
+
+        /* Query which lock has changed */
+        message = mbim_message_pin_query_new (NULL);
+        mbim_device_command (device,
+                             message,
+                             10,
+                             NULL,
+                             (GAsyncReadyCallback)pin_query_after_subscriber_ready_status_ready,
+                             g_object_ref (self));
     }
 
     /* Ignore NOT_INITIALIZED state when setting the last_ready_state as it is
@@ -5957,6 +6021,7 @@ cleanup_enabled_cache (MMBroadbandModemMbim *self)
     self->priv->enabled_cache.packet_service_state = MBIM_PACKET_SERVICE_STATE_UNKNOWN;
     self->priv->enabled_cache.packet_service_uplink_speed = 0;
     self->priv->enabled_cache.packet_service_downlink_speed = 0;
+    self->priv->enabled_cache.last_pin_type = MBIM_PIN_TYPE_UNKNOWN;
 
     /* NOTE: FLAG_SUBSCRIBER_INFO is managed both via 3GPP unsolicited
      * events and via SIM hot swap setup. We only reset the last ready state
@@ -9910,6 +9975,7 @@ mm_broadband_modem_mbim_init (MMBroadbandModemMbim *self)
     self->priv->enabled_cache.reg_state = MBIM_REGISTER_STATE_UNKNOWN;
     self->priv->enabled_cache.packet_service_state = MBIM_PACKET_SERVICE_STATE_UNKNOWN;
     self->priv->enabled_cache.last_ready_state = MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED;
+    self->priv->enabled_cache.last_pin_type = MBIM_PIN_TYPE_UNKNOWN;
 }
 
 static void
