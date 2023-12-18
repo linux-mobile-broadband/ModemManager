@@ -2652,26 +2652,26 @@ mm_port_qmi_is_open (MMPortQmi *self)
 }
 
 /*****************************************************************************/
+/* Sets network details that the QMI port should be aware of before even
+ * a data connection is started. */
 
 void
-mm_port_qmi_set_net_driver (MMPortQmi   *self,
-                            const gchar *net_driver)
+mm_port_qmi_set_net_details (MMPortQmi *self,
+                             MMPort    *first_net)
 {
+    MMKernelDevice *first_net_dev;
+
+    first_net_dev = mm_port_peek_kernel_device (first_net);
+
     g_assert (MM_IS_PORT_QMI (self));
+
     g_assert (!self->priv->net_driver);
-    self->priv->net_driver = g_strdup (net_driver);
-    initialize_endpoint_info (self);
-}
+    self->priv->net_driver = g_strdup (mm_kernel_device_get_driver (first_net_dev));
 
-/*****************************************************************************/
-
-void
-mm_port_qmi_set_net_sysfs_path (MMPortQmi   *self,
-                                const gchar *net_sysfs_path)
-{
-    g_assert (MM_IS_PORT_QMI (self));
     g_assert (!self->priv->net_sysfs_path);
-    self->priv->net_sysfs_path = g_strdup (net_sysfs_path);
+    self->priv->net_sysfs_path = g_strdup (mm_kernel_device_get_sysfs_path (first_net_dev));
+
+    initialize_endpoint_info (self);
 }
 
 /*****************************************************************************/
