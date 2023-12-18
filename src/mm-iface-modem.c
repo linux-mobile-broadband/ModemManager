@@ -47,6 +47,14 @@
 #define SIGNAL_CHECK_INITIAL_TIMEOUT_SEC  3
 #define SIGNAL_CHECK_TIMEOUT_SEC          30
 
+/* Make sure this amount of seconds is left between two power state transitions,
+ * so that the modem can have time to process them properly. This is just a safe
+ * measure taken because we know modems may report us that the power state
+ * transition has already finished even if it hasn't. The timeout will really
+ * only apply if doing many power state transitions quickly one after the other,
+ * so this is just to cover that corner case. */
+#define POWER_STATE_MIN_TIME_BETWEEN_UPDATES_SEC 2
+
 /*****************************************************************************/
 /* Private data context */
 
@@ -79,6 +87,10 @@ typedef struct {
 
     /* SIM hot swap setup done flag */
     gboolean sim_hot_swap_configured;
+
+    /* Timer that tracks when the last power operation request was
+     * performed, so that we can throttle the requests to the modem. */
+    GTimer *power_state_timer;
 } Private;
 
 static void
@@ -92,6 +104,7 @@ private_free (Private *priv)
         g_source_remove (priv->signal_check_timeout_source);
     if (priv->restart_initialize_idle_id)
         g_source_remove (priv->restart_initialize_idle_id);
+    g_clear_pointer (&priv->power_state_timer, (GDestroyNotify) g_timer_destroy);
     g_slice_free (Private, priv);
 }
 
@@ -4050,6 +4063,7 @@ typedef enum {
     SET_POWER_STATE_STEP_FIRST,
     SET_POWER_STATE_STEP_LOAD,
     SET_POWER_STATE_STEP_CHECK,
+    SET_POWER_STATE_STEP_WAIT_BEFORE_UPDATE,
     SET_POWER_STATE_STEP_UPDATE,
     SET_POWER_STATE_STEP_FCC_UNLOCK,
     SET_POWER_STATE_STEP_AFTER_UPDATE,
@@ -4183,14 +4197,32 @@ requested_power_setup_ready (MMIfaceModem *self,
                              GTask        *task)
 {
     SetPowerStateContext *ctx;
+    Private              *priv;
 
     ctx = g_task_get_task_data (task);
+    priv = get_private (self);
+
     g_assert (!ctx->saved_error);
     if (!ctx->requested_power_setup_finish (self, res, &ctx->saved_error))
         mm_obj_info (self, "couldn't update power state: %s", ctx->saved_error->message);
 
+    /* Reset time of last power update */
+    g_timer_reset (priv->power_state_timer);
+
     ctx->step++;
     set_power_state_step (task);
+}
+
+static gboolean
+wait_before_update_ready (GTask *task)
+{
+    SetPowerStateContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+    ctx->step++;
+    set_power_state_step (task);
+
+    return G_SOURCE_REMOVE;
 }
 
 static void
@@ -4219,9 +4251,11 @@ set_power_state_step (GTask *task)
 {
     MMIfaceModem         *self;
     SetPowerStateContext *ctx;
+    Private              *priv;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data     (task);
+    priv = get_private (self);
 
     switch (ctx->step) {
     case SET_POWER_STATE_STEP_FIRST:
@@ -4253,6 +4287,28 @@ set_power_state_step (GTask *task)
             set_power_state_step (task);
             return;
         }
+        ctx->step++;
+        /* fall-through */
+
+    case SET_POWER_STATE_STEP_WAIT_BEFORE_UPDATE:
+        /* No wait if this is the first time */
+        if (!priv->power_state_timer)
+            priv->power_state_timer = g_timer_new ();
+        else {
+            gdouble time_since_last_update_sec;
+
+            time_since_last_update_sec = g_timer_elapsed (priv->power_state_timer, NULL);
+            if (time_since_last_update_sec < (gdouble)POWER_STATE_MIN_TIME_BETWEEN_UPDATES_SEC) {
+                guint wait_time_ms;
+
+                /* Compute wait time in ms */
+                wait_time_ms = (guint)(((gdouble)POWER_STATE_MIN_TIME_BETWEEN_UPDATES_SEC - time_since_last_update_sec) * 1000.0);
+                mm_obj_dbg (self, "waiting before updating power state: %ums", wait_time_ms);
+                g_timeout_add (wait_time_ms, (GSourceFunc) wait_before_update_ready, task);
+                return;
+            }
+        }
+        mm_obj_dbg (self, "no need to wait before updating power state");
         ctx->step++;
         /* fall-through */
 
