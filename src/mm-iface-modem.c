@@ -2364,6 +2364,7 @@ typedef struct {
     GDBusMethodInvocation *invocation;
     MMIfaceModem          *self;
     MMModemPowerState      power_state;
+    gboolean               disable_after_update;
 } HandleSetPowerStateContext;
 
 static void
@@ -2376,6 +2377,23 @@ handle_set_power_state_context_free (HandleSetPowerStateContext *ctx)
 }
 
 static void
+disable_after_low_ready (MMBaseModem                *self,
+                         GAsyncResult               *res,
+                         HandleSetPowerStateContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_disable_finish (self, res, &error)) {
+        mm_obj_warn (self, "failed disabling modem after low-power mode: %s", error->message);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
+    } else {
+        mm_obj_info (self, "disabled modem");
+        mm_gdbus_modem_complete_set_power_state (ctx->skeleton, ctx->invocation);
+    }
+    handle_set_power_state_context_free (ctx);
+}
+
+static void
 set_power_state_ready (MMIfaceModem               *self,
                        GAsyncResult               *res,
                        HandleSetPowerStateContext *ctx)
@@ -2385,11 +2403,22 @@ set_power_state_ready (MMIfaceModem               *self,
     if (!mm_iface_modem_set_power_state_finish (self, res, &error)) {
         mm_obj_warn (self, "failed setting power state '%s': %s", mm_modem_power_state_get_string (ctx->power_state), error->message);
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
-    } else {
-        mm_obj_info (self, "set power state '%s'", mm_modem_power_state_get_string (ctx->power_state));
-        mm_gdbus_modem_complete_set_power_state (ctx->skeleton, ctx->invocation);
+        handle_set_power_state_context_free (ctx);
+        return;
     }
-    handle_set_power_state_context_free (ctx);
+
+    mm_obj_info (self, "set power state '%s'", mm_modem_power_state_get_string (ctx->power_state));
+
+    if (!ctx->disable_after_update) {
+        mm_gdbus_modem_complete_set_power_state (ctx->skeleton, ctx->invocation);
+        handle_set_power_state_context_free (ctx);
+        return;
+    }
+
+    mm_obj_info (self, "automatically disable modem after low-power mode...");
+    mm_base_modem_disable (MM_BASE_MODEM (self),
+                           (GAsyncReadyCallback)disable_after_low_ready,
+                           ctx);
 }
 
 static void
@@ -2422,8 +2451,16 @@ handle_set_power_state_auth_ready (MMBaseModem                *self,
                   MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
 
-    /* Going into LOW or ON only allowed in disabled and failed states */
-    if ((ctx->power_state == MM_MODEM_POWER_STATE_LOW || ctx->power_state == MM_MODEM_POWER_STATE_ON) &&
+    /* Going into LOW is allowed even when enabled or connected, the modem will automatically
+     * transition to disabled state in that case. */
+    if (ctx->power_state == MM_MODEM_POWER_STATE_LOW &&
+        modem_state > MM_MODEM_STATE_DISABLED) {
+        mm_obj_info (self, "will automatically disable after setting low-power mode");
+        ctx->disable_after_update = TRUE;
+    }
+
+    /* Going into ON only allowed in disabled and failed states */
+    if (ctx->power_state == MM_MODEM_POWER_STATE_ON &&
         modem_state != MM_MODEM_STATE_FAILED &&
         modem_state != MM_MODEM_STATE_DISABLED) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
