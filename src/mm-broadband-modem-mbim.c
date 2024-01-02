@@ -5125,8 +5125,7 @@ pin_query_after_subscriber_ready_status_ready (MbimDevice           *device,
             &error)) {
         if (pin_type == MBIM_PIN_TYPE_NETWORK_PIN ||
             pin_type == MBIM_PIN_TYPE_NETWORK_PUK ||
-            (pin_state == MBIM_PIN_STATE_UNLOCKED &&
-             self->priv->enabled_cache.last_pin_type == MBIM_PIN_TYPE_NETWORK_PIN)) {
+            self->priv->enabled_cache.last_pin_type == MBIM_PIN_TYPE_NETWORK_PIN) {
             sim_event = TRUE;
         }
         self->priv->enabled_cache.last_pin_type = pin_type;
