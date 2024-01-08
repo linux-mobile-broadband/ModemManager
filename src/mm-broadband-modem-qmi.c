@@ -1987,6 +1987,8 @@ typedef struct {
     gboolean             event_report_set;
     guint                indication_id;
     guint                timeout_id;
+    gboolean             indication_received;
+    gboolean             response_received;
     gboolean             reload;
     GError              *saved_error;
 } SetOperatingModeContext;
@@ -2150,10 +2152,16 @@ dms_set_operating_mode_timeout_cb (MMBroadbandModemQmi *self)
     g_assert (self->priv->set_operating_mode_task);
     ctx = g_task_get_task_data (self->priv->set_operating_mode_task);
 
-    /* Save a timeout error, but also request to reload, in case the modem
-     * failed to send the indication even if it did update the power state */
-    ctx->saved_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_TIMEOUT, "Power update operation timed out");
-    ctx->reload = TRUE;
+    /* We may have received an indication but not the response to the request. In this case,
+     * complete with the results already set in the indication. */
+    if (ctx->indication_received && !ctx->response_received) {
+        mm_obj_dbg (self, "Power update operation timed out, but result was already received");
+    } else {
+        /* Save a timeout error, but also request to reload, in case the modem
+         * failed to send the indication even if it did update the power state */
+        ctx->saved_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_TIMEOUT, "Power update operation timed out");
+        ctx->reload = TRUE;
+    }
 
     set_operating_mode_complete (self);
     return G_SOURCE_REMOVE;
@@ -2170,6 +2178,8 @@ power_event_report_indication_cb (QmiClientDms                      *client,
     g_assert (self->priv->set_operating_mode_task);
     ctx = g_task_get_task_data (self->priv->set_operating_mode_task);
 
+    ctx->indication_received = TRUE;
+
     g_assert (!ctx->saved_error);
     if (!qmi_indication_dms_event_report_output_get_operating_mode (output, &state, NULL))
         ctx->saved_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Invalid power indication received");
@@ -2182,7 +2192,9 @@ power_event_report_indication_cb (QmiClientDms                      *client,
     else
         mm_obj_dbg (self, "Power state successfully updated: '%s'", qmi_dms_operating_mode_get_string (state));
 
-    set_operating_mode_complete (self);
+    /* The indication only completes the operation if it is received AFTER the response */
+    if (ctx->response_received)
+        set_operating_mode_complete (self);
 }
 
 static void
@@ -2195,11 +2207,12 @@ dms_set_operating_mode_ready (QmiClientDms        *client,
     GError                                          *error = NULL;
     SetOperatingModeContext                         *ctx;
 
-    /* We may have completed the operation already via indication */
+    /* We may have completed the operation already as a timeout */
     if (!self->priv->set_operating_mode_task)
         return;
 
     ctx = g_task_get_task_data (self->priv->set_operating_mode_task);
+    ctx->response_received = TRUE;
 
     output = qmi_client_dms_set_operating_mode_finish (client, res, &error);
     if (!output || !qmi_message_dms_set_operating_mode_output_get_result (output, &error)) {
@@ -2227,25 +2240,27 @@ dms_set_operating_mode_ready (QmiClientDms        *client,
     if (g_error_matches (error, QMI_CORE_ERROR, QMI_CORE_ERROR_UNSUPPORTED)) {
         mm_obj_dbg (self, "device doesn't support operating mode setting: ignoring power update");
         g_clear_error (&error);
+        g_clear_error (&ctx->saved_error);
         set_operating_mode_complete (self);
         return;
     }
 
-    /* An error reported right away */
+    /* An error reported right away, prefer it to the one received via indication, if any */
     if (error) {
+        g_clear_error (&ctx->saved_error);
         ctx->saved_error = error;
         set_operating_mode_complete (self);
         return;
     }
 
     /* Request successful but indication not yet received */
-    if (ctx->event_report_set) {
+    if (ctx->event_report_set && !ctx->indication_received) {
         g_assert (ctx->timeout_id);
         mm_obj_dbg (self, "operating mode request sent, waiting for power update indication");
         return;
     }
 
-    /* Request successful and no indication needed */
+    /* Request successful and no indication needed, or indication already received */
     mm_obj_dbg (self, "operating mode request finished: no need to wait for indications");
     set_operating_mode_complete (self);
 }
