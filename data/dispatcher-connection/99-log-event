@@ -14,8 +14,8 @@ BEARER_PATH="$2"
 INTERFACE="$3"
 STATE="$4"
 
-MODEM_ID=$(basename ${MODEM_PATH})
-BEARER_ID=$(basename ${BEARER_PATH})
+MODEM_ID=$(basename "${MODEM_PATH}")
+BEARER_ID=$(basename "${BEARER_PATH}")
 
 # report in syslog the event
 logger -t "connection-dispatch" "modem${MODEM_ID}: bearer${BEARER_ID}: interface ${INTERFACE} ${STATE}"
