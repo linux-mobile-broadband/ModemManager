@@ -13,6 +13,11 @@ project(
   meson_version: '>= 0.53.0',
 )
 
+meson_version = meson.version()
+if meson_version.version_compare('>=0.64')
+  fs = import('fs')
+endif
+
 mm_name = meson.project_name()
 mm_version = meson.project_version()
 version_array = mm_version.split('.')
