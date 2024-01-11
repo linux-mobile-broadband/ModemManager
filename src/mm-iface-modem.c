@@ -6032,7 +6032,7 @@ interface_initialization_step (GTask *task)
              * validate whether we're already using the best config or not. */
             if (!sim)
                 mm_obj_dbg (self, "not setting up carrier config: SIM not found");
-            else if (!mm_base_sim_is_esim_without_profiles (sim))
+            else if (mm_base_sim_is_esim_without_profiles (sim))
                 mm_obj_dbg (self, "not setting up carrier config: eSIM without profiles");
             else if (!carrier_config_mapping)
                 mm_obj_dbg (self, "not setting up carrier config: mapping file not configured");
