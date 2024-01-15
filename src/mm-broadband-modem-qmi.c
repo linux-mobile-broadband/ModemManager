@@ -1981,7 +1981,21 @@ get_cell_info (MMIfaceModem        *self,
 /*****************************************************************************/
 /* Powering up/down/off the modem (Modem interface) */
 
+typedef enum {
+    SET_OPERATING_MODE_STEP_FIRST,
+    SET_OPERATING_MODE_STEP_INDICATION_REGISTER,
+    SET_OPERATING_MODE_STEP_SETUP_WAIT_INDICATION,
+    SET_OPERATING_MODE_STEP_SEND_REQUEST,
+    SET_OPERATING_MODE_STEP_WAIT_FOR_INDICATION,
+    SET_OPERATING_MODE_STEP_DONE,
+    SET_OPERATING_MODE_STEP_CLEANUP_WAIT_INDICATION,
+    SET_OPERATING_MODE_STEP_INDICATION_UNREGISTER,
+    SET_OPERATING_MODE_STEP_RELOAD,
+    SET_OPERATING_MODE_STEP_LAST,
+} SetOperatingModeStep;
+
 typedef struct {
+    SetOperatingModeStep step;
     QmiDmsOperatingMode  mode;
     QmiClientDms        *client;
     gboolean             event_report_set;
@@ -2011,22 +2025,7 @@ modem_power_up_down_off_finish (MMIfaceModem  *self,
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static void
-set_operating_mode_done (MMBroadbandModemQmi *self)
-{
-    GTask                   *task;
-    SetOperatingModeContext *ctx;
-
-    g_assert (self->priv->set_operating_mode_task);
-    task = g_steal_pointer (&self->priv->set_operating_mode_task);
-    ctx = g_task_get_task_data (task);
-
-    if (ctx->saved_error)
-        g_task_return_error (task, g_steal_pointer (&ctx->saved_error));
-    else
-        g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
-}
+static void set_operating_mode_context_step (MMBroadbandModemQmi *self);
 
 static void
 dms_reload_current_operating_mode_ready (QmiClientDms        *client,
@@ -2049,7 +2048,8 @@ dms_reload_current_operating_mode_ready (QmiClientDms        *client,
     output = qmi_client_dms_get_operating_mode_finish (client, res, &error);
     if (!output || !qmi_message_dms_get_operating_mode_output_get_result (output, &error)) {
         mm_obj_warn (self, "couldn't reload current operating mode: %s", error->message);
-        set_operating_mode_done (self);
+        ctx->step++;
+        set_operating_mode_context_step (self);
         return;
     }
 
@@ -2059,7 +2059,8 @@ dms_reload_current_operating_mode_ready (QmiClientDms        *client,
                         "Requested (%s) and reloaded (%s) modes did not match: ",
                         qmi_dms_operating_mode_get_string (ctx->mode),
                         qmi_dms_operating_mode_get_string (mode));
-        set_operating_mode_done (self);
+        ctx->step++;
+        set_operating_mode_context_step (self);
         return;
     }
 
@@ -2067,7 +2068,8 @@ dms_reload_current_operating_mode_ready (QmiClientDms        *client,
      * as the operation did really not fail */
     mm_obj_info (self, "power update operation successful even after error");
     g_clear_error (&ctx->saved_error);
-    set_operating_mode_done (self);
+    ctx->step++;
+    set_operating_mode_context_step (self);
 }
 
 static void
@@ -2077,18 +2079,13 @@ set_operating_mode_reload (MMBroadbandModemQmi *self)
 
     g_assert (self->priv->set_operating_mode_task);
     ctx = g_task_get_task_data (self->priv->set_operating_mode_task);
-    if (ctx->reload) {
-        mm_obj_dbg (self, "reload current device operating mode...");
-        qmi_client_dms_get_operating_mode (ctx->client,
-                                           NULL,
-                                           5,
-                                           NULL,
-                                           (GAsyncReadyCallback)dms_reload_current_operating_mode_ready,
-                                           g_object_ref (self));
-        return;
-    }
 
-    set_operating_mode_done (self);
+    qmi_client_dms_get_operating_mode (ctx->client,
+                                       NULL,
+                                       5,
+                                       NULL,
+                                       (GAsyncReadyCallback)dms_reload_current_operating_mode_ready,
+                                       g_object_ref (self));
 }
 
 static void
@@ -2099,53 +2096,42 @@ dms_set_event_report_operating_mode_deactivate_ready (QmiClientDms        *clien
     g_autoptr(MMBroadbandModemQmi)                self = _self;
     g_autoptr(QmiMessageDmsSetEventReportOutput)  output = NULL;
     g_autoptr(GError)                             error = NULL;
+    SetOperatingModeContext                      *ctx;
 
     g_assert (self->priv->set_operating_mode_task);
+    ctx = g_task_get_task_data (self->priv->set_operating_mode_task);
 
     output = qmi_client_dms_set_event_report_finish (client, res, &error);
     if (!output || !qmi_message_dms_set_event_report_output_get_result (output, &error))
         mm_obj_dbg (self, "couldn't deregister for power indications: %s", error->message);
 
-    set_operating_mode_reload (self);
+    /* go on to next step */
+    ctx->step++;
+    set_operating_mode_context_step (self);
 }
 
 static void
-set_operating_mode_complete (MMBroadbandModemQmi *self)
+set_operating_mode_indication_unregister (MMBroadbandModemQmi *self)
 {
-    SetOperatingModeContext *ctx;
+    g_autoptr(QmiMessageDmsSetEventReportInput)  input = NULL;
+    SetOperatingModeContext                     *ctx;
 
     g_assert (self->priv->set_operating_mode_task);
     ctx = g_task_get_task_data (self->priv->set_operating_mode_task);
 
-    if (ctx->timeout_id) {
-        g_source_remove (ctx->timeout_id);
-        ctx->timeout_id = 0;
-    }
-
-    if (ctx->indication_id) {
-        g_signal_handler_disconnect (ctx->client, ctx->indication_id);
-        ctx->indication_id = 0;
-    }
-
-    if (ctx->event_report_set) {
-        g_autoptr(QmiMessageDmsSetEventReportInput) input = NULL;
-
-        input = qmi_message_dms_set_event_report_input_new ();
-        qmi_message_dms_set_event_report_input_set_operating_mode_reporting (input, FALSE, NULL);
-        qmi_client_dms_set_event_report (ctx->client,
-                                         input,
-                                         5,
-                                         NULL,
-                                         (GAsyncReadyCallback)dms_set_event_report_operating_mode_deactivate_ready,
-                                         g_object_ref (self));
-        return;
-    }
-
-    set_operating_mode_reload (self);
+    input = qmi_message_dms_set_event_report_input_new ();
+    qmi_message_dms_set_event_report_input_set_operating_mode_reporting (input, FALSE, NULL);
+    qmi_client_dms_set_event_report (
+        ctx->client,
+        input,
+        5,
+        NULL,
+        (GAsyncReadyCallback)dms_set_event_report_operating_mode_deactivate_ready,
+        g_object_ref (self));
 }
 
 static gboolean
-dms_set_operating_mode_timeout_cb (MMBroadbandModemQmi *self)
+set_operating_mode_timeout_cb (MMBroadbandModemQmi *self)
 {
     SetOperatingModeContext *ctx;
 
@@ -2163,7 +2149,8 @@ dms_set_operating_mode_timeout_cb (MMBroadbandModemQmi *self)
         ctx->reload = TRUE;
     }
 
-    set_operating_mode_complete (self);
+    ctx->step = SET_OPERATING_MODE_STEP_DONE;
+    set_operating_mode_context_step (self);
     return G_SOURCE_REMOVE;
 }
 
@@ -2180,21 +2167,26 @@ power_event_report_indication_cb (QmiClientDms                      *client,
 
     ctx->indication_received = TRUE;
 
-    g_assert (!ctx->saved_error);
-    if (!qmi_indication_dms_event_report_output_get_operating_mode (output, &state, NULL))
+    /* Always keep last error only */
+    g_clear_error (&ctx->saved_error);
+
+    if (!qmi_indication_dms_event_report_output_get_operating_mode (output, &state, NULL)) {
         ctx->saved_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Invalid power indication received");
-    else if (ctx->mode != state)
+    } else if (ctx->mode != state) {
         ctx->saved_error = g_error_new (MM_CORE_ERROR,
                                         MM_CORE_ERROR_FAILED,
                                         "Requested (%s) and notified (%s) modes did not match",
                                         qmi_dms_operating_mode_get_string (ctx->mode),
                                         qmi_dms_operating_mode_get_string (state));
-    else
-        mm_obj_dbg (self, "Power state successfully updated: '%s'", qmi_dms_operating_mode_get_string (state));
+    } else {
+        mm_obj_dbg (self, "power state successfully updated: '%s'", qmi_dms_operating_mode_get_string (state));
+    }
 
     /* The indication only completes the operation if it is received AFTER the response */
-    if (ctx->response_received)
-        set_operating_mode_complete (self);
+    if (ctx->response_received) {
+        ctx->step = SET_OPERATING_MODE_STEP_DONE;
+        set_operating_mode_context_step (self);
+    }
 }
 
 static void
@@ -2204,7 +2196,7 @@ dms_set_operating_mode_ready (QmiClientDms        *client,
 {
     g_autoptr(MMBroadbandModemQmi)                   self = _self;
     g_autoptr (QmiMessageDmsSetOperatingModeOutput)  output = NULL;
-    GError                                          *error = NULL;
+    g_autoptr(GError)                                error = NULL;
     SetOperatingModeContext                         *ctx;
 
     /* We may have completed the operation already as a timeout */
@@ -2239,34 +2231,36 @@ dms_set_operating_mode_ready (QmiClientDms        *client,
     /* If unsupported, just complete without errors */
     if (g_error_matches (error, QMI_CORE_ERROR, QMI_CORE_ERROR_UNSUPPORTED)) {
         mm_obj_dbg (self, "device doesn't support operating mode setting: ignoring power update");
-        g_clear_error (&error);
         g_clear_error (&ctx->saved_error);
-        set_operating_mode_complete (self);
+        ctx->step = SET_OPERATING_MODE_STEP_DONE;
+        set_operating_mode_context_step (self);
         return;
     }
 
     /* An error reported right away, prefer it to the one received via indication, if any */
     if (error) {
         g_clear_error (&ctx->saved_error);
-        ctx->saved_error = error;
-        set_operating_mode_complete (self);
+        ctx->saved_error = g_steal_pointer (&error);
+        ctx->step = SET_OPERATING_MODE_STEP_DONE;
+        set_operating_mode_context_step (self);
         return;
     }
 
     /* Request successful but indication not yet received */
     if (ctx->event_report_set && !ctx->indication_received) {
-        g_assert (ctx->timeout_id);
-        mm_obj_dbg (self, "operating mode request sent, waiting for power update indication");
+        ctx->step = SET_OPERATING_MODE_STEP_WAIT_FOR_INDICATION;
+        set_operating_mode_context_step (self);
         return;
     }
 
     /* Request successful and no indication needed, or indication already received */
     mm_obj_dbg (self, "operating mode request finished: no need to wait for indications");
-    set_operating_mode_complete (self);
+    ctx->step = SET_OPERATING_MODE_STEP_DONE;
+    set_operating_mode_context_step (self);
 }
 
 static void
-dms_set_operating_mode (MMBroadbandModemQmi *self)
+set_operating_mode_send_request (MMBroadbandModemQmi *self)
 {
     g_autoptr (QmiMessageDmsSetOperatingModeInput)  input = NULL;
     SetOperatingModeContext                        *ctx;
@@ -2282,13 +2276,6 @@ dms_set_operating_mode (MMBroadbandModemQmi *self)
                                        NULL,
                                        (GAsyncReadyCallback)dms_set_operating_mode_ready,
                                        g_object_ref (self));
-
-    if (ctx->event_report_set) {
-        mm_obj_dbg (self, "Starting timeout for indication receiving for 10 seconds");
-        ctx->timeout_id = g_timeout_add_seconds (10,
-                                                (GSourceFunc) dms_set_operating_mode_timeout_cb,
-                                                self);
-    }
 }
 
 static void
@@ -2298,7 +2285,7 @@ dms_set_event_report_operating_mode_activate_ready (QmiClientDms        *client,
 {
     g_autoptr(MMBroadbandModemQmi)                self = _self;
     g_autoptr(QmiMessageDmsSetEventReportOutput)  output = NULL;
-    GError                                       *error = NULL;
+    g_autoptr(GError)                             error = NULL;
     SetOperatingModeContext                      *ctx;
 
     g_assert (self->priv->set_operating_mode_task);
@@ -2306,34 +2293,27 @@ dms_set_event_report_operating_mode_activate_ready (QmiClientDms        *client,
 
     output = qmi_client_dms_set_event_report_finish (client, res, &error);
     if (!output || !qmi_message_dms_set_event_report_output_get_result (output, &error)) {
-        if (g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_MISSING_ARGUMENT)) {
-            mm_obj_dbg (self, "device doesn't support power indication registration: ignore it and continue");
-            g_clear_error (&error);
-        } else {
+        if (!g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_MISSING_ARGUMENT)) {
+            /* fatal error */
             g_prefix_error (&error, "Couldn't register for power indications: ");
-            ctx->saved_error = error;
-            set_operating_mode_complete (self);
+            ctx->saved_error = g_steal_pointer (&error);
+            ctx->step = SET_OPERATING_MODE_STEP_LAST;
+            set_operating_mode_context_step (self);
             return;
         }
+        mm_obj_dbg (self, "device doesn't support power indication registration: ignore it and continue");
     } else {
         mm_obj_dbg (self, "device supports power indications");
         ctx->event_report_set = TRUE;
     }
 
-    g_assert (ctx->indication_id == 0);
-    if (ctx->event_report_set) {
-        ctx->indication_id = g_signal_connect (client,
-                                               "event-report",
-                                                G_CALLBACK (power_event_report_indication_cb),
-                                                self);
-        mm_obj_dbg (self, "Power operation is pending");
-    }
-
-    dms_set_operating_mode (self);
+    /* go on to next step */
+    ctx->step++;
+    set_operating_mode_context_step (self);
 }
 
 static void
-modem_power_indication_register (MMBroadbandModemQmi *self)
+set_operating_mode_indication_register (MMBroadbandModemQmi *self)
 {
     g_autoptr(QmiMessageDmsSetEventReportInput)  input = NULL;
     SetOperatingModeContext                     *ctx;
@@ -2343,7 +2323,6 @@ modem_power_indication_register (MMBroadbandModemQmi *self)
 
     input = qmi_message_dms_set_event_report_input_new ();
     qmi_message_dms_set_event_report_input_set_operating_mode_reporting (input, TRUE, NULL);
-    mm_obj_dbg (self, "Power indication registration request is sent");
     qmi_client_dms_set_event_report (
         ctx->client,
         input,
@@ -2351,6 +2330,137 @@ modem_power_indication_register (MMBroadbandModemQmi *self)
         NULL,
         (GAsyncReadyCallback)dms_set_event_report_operating_mode_activate_ready,
         g_object_ref (self));
+}
+
+static void
+set_operating_mode_context_step (MMBroadbandModemQmi *self)
+{
+    SetOperatingModeContext *ctx;
+
+    g_assert (self->priv->set_operating_mode_task);
+    ctx = g_task_get_task_data (self->priv->set_operating_mode_task);
+
+    switch (ctx->step) {
+        case SET_OPERATING_MODE_STEP_FIRST:
+            ctx->step++;
+            /* fall through */
+
+        case SET_OPERATING_MODE_STEP_INDICATION_REGISTER:
+            mm_obj_dbg (self, "operating mode update (%d/%d): indication register",
+                        ctx->step, SET_OPERATING_MODE_STEP_LAST);
+            set_operating_mode_indication_register (self);
+            return;
+
+        case SET_OPERATING_MODE_STEP_SETUP_WAIT_INDICATION:
+            g_assert (ctx->indication_id == 0);
+            g_assert (ctx->timeout_id == 0);
+            if (ctx->event_report_set) {
+                mm_obj_dbg (self, "operating mode update (%d/%d): setup wait indication",
+                            ctx->step, SET_OPERATING_MODE_STEP_LAST);
+                ctx->indication_id = g_signal_connect (ctx->client,
+                                                       "event-report",
+                                                       G_CALLBACK (power_event_report_indication_cb),
+                                                       self);
+                ctx->timeout_id = g_timeout_add_seconds (10,
+                                                         (GSourceFunc) set_operating_mode_timeout_cb,
+                                                         self);
+            } else {
+                mm_obj_dbg (self, "operating mode update (%d/%d): setup wait indication not needed",
+                            ctx->step, SET_OPERATING_MODE_STEP_LAST);
+            }
+            ctx->step++;
+            /* fall through */
+
+        case SET_OPERATING_MODE_STEP_SEND_REQUEST:
+            mm_obj_dbg (self, "operating mode update (%d/%d): send request",
+                        ctx->step, SET_OPERATING_MODE_STEP_LAST);
+            set_operating_mode_send_request (self);
+            return;
+
+        case SET_OPERATING_MODE_STEP_WAIT_FOR_INDICATION:
+            g_assert (ctx->event_report_set);
+            g_assert (ctx->indication_id);
+            g_assert (ctx->timeout_id);
+            mm_obj_dbg (self, "operating mode update (%d/%d): wait indication",
+                        ctx->step, SET_OPERATING_MODE_STEP_LAST);
+            return;
+
+        case SET_OPERATING_MODE_STEP_DONE:
+            if (!ctx->saved_error) {
+                mm_obj_dbg (self, "operating mode update (%d/%d): done",
+                            ctx->step, SET_OPERATING_MODE_STEP_LAST);
+            } else {
+                mm_obj_dbg (self, "operating mode update (%d/%d): done with failure: %s",
+                            ctx->step, SET_OPERATING_MODE_STEP_LAST, ctx->saved_error->message);
+            }
+            ctx->step++;
+            /* fall through */
+
+        case SET_OPERATING_MODE_STEP_CLEANUP_WAIT_INDICATION:
+            if (ctx->timeout_id || ctx->indication_id) {
+                mm_obj_dbg (self, "operating mode update (%d/%d): cleanup wait indication",
+                            ctx->step, SET_OPERATING_MODE_STEP_LAST);
+                if (ctx->timeout_id) {
+                    g_source_remove (ctx->timeout_id);
+                    ctx->timeout_id = 0;
+                }
+                if (ctx->indication_id) {
+                    g_signal_handler_disconnect (ctx->client, ctx->indication_id);
+                    ctx->indication_id = 0;
+                }
+            } else {
+                mm_obj_dbg (self, "operating mode update (%d/%d): cleanup wait indication not needed",
+                            ctx->step, SET_OPERATING_MODE_STEP_LAST);
+            }
+            ctx->step++;
+            /* fall through */
+
+        case SET_OPERATING_MODE_STEP_INDICATION_UNREGISTER:
+            if (ctx->event_report_set) {
+                mm_obj_dbg (self, "operating mode update (%d/%d): indication unregister",
+                            ctx->step, SET_OPERATING_MODE_STEP_LAST);
+                set_operating_mode_indication_unregister (self);
+                return;
+            }
+
+            mm_obj_dbg (self, "operating mode update (%d/%d): indication unregister not needed",
+                        ctx->step, SET_OPERATING_MODE_STEP_LAST);
+            ctx->step++;
+            /* fall through */
+
+        case SET_OPERATING_MODE_STEP_RELOAD:
+            if (ctx->reload) {
+                mm_obj_dbg (self, "operating mode update (%d/%d): reload",
+                            ctx->step, SET_OPERATING_MODE_STEP_LAST);
+                set_operating_mode_reload (self);
+                return;
+            }
+
+            mm_obj_dbg (self, "operating mode update (%d/%d): reload not needed",
+                        ctx->step, SET_OPERATING_MODE_STEP_LAST);
+            ctx->step++;
+            /* fall through */
+
+        case SET_OPERATING_MODE_STEP_LAST: {
+            GTask *task;
+
+            task = g_steal_pointer (&self->priv->set_operating_mode_task);
+            if (ctx->saved_error) {
+                mm_obj_dbg (self, "operating mode update (%d/%d): failed: %s",
+                            ctx->step, SET_OPERATING_MODE_STEP_LAST, ctx->saved_error->message);
+                g_task_return_error (task, g_steal_pointer (&ctx->saved_error));
+            } else {
+                mm_obj_dbg (self, "operating mode update (%d/%d): all done",
+                            ctx->step, SET_OPERATING_MODE_STEP_LAST);
+                g_task_return_boolean (task, TRUE);
+            }
+            g_object_unref (task);
+            return;
+        }
+
+    default:
+        g_assert_not_reached ();
+    }
 }
 
 static void
@@ -2385,12 +2495,14 @@ common_power_up_down_off (MMIfaceModem        *_self,
     }
 
     ctx = g_slice_new0 (SetOperatingModeContext);
+    ctx->step = SET_OPERATING_MODE_STEP_FIRST;
     ctx->mode = mode;
     ctx->client = QMI_CLIENT_DMS (g_object_ref (client));
     g_task_set_task_data (task, ctx, (GDestroyNotify)set_operating_mode_context_free);
 
+    /* Store the task in the private info, and start the state machine sequence */
     self->priv->set_operating_mode_task = task;
-    modem_power_indication_register (self);
+    set_operating_mode_context_step (self);
 }
 
 static void
