@@ -18,8 +18,7 @@ install_headers(
 
 header = 'ModemManager-names.h'
 
-mm_names_header = custom_target(
-  header,
+mm_names_header = configure_file(
   input: [build_aux_dir / 'header-generator.xsl', mm_ifaces_all],
   output: header,
   command: [find_program('xsltproc'), '--xinclude', '--nonet', '--output', '@OUTPUT@', '@INPUT@'],
