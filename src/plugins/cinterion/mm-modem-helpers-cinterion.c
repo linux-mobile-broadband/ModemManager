@@ -1817,6 +1817,19 @@ mm_cinterion_build_auth_string (gpointer                log_object,
     has_passwd   = (passwd && passwd[0]);
     encoded_auth = parse_auth_type (auth);
 
+    /* No explicit auth type requested? */
+    if (encoded_auth == BEARER_CINTERION_AUTH_UNKNOWN) {
+        if (!has_user && !has_passwd) {
+            /* If no user/passwd given, default to 'none' */
+            mm_obj_dbg (log_object, "APN user/password and authentication type not given: defaulting to 'none'");
+            encoded_auth = BEARER_CINTERION_AUTH_NONE;
+        } else {
+            /* If user/passwd given, default to CHAP (more common than PAP) */
+            mm_obj_dbg (log_object, "APN user/password given but no authentication type explicitly requested: defaulting to 'CHAP'");
+            encoded_auth = BEARER_CINTERION_AUTH_CHAP;
+        }
+    }
+
     /* When 'none' requested, we won't require user/password */
     if (encoded_auth == BEARER_CINTERION_AUTH_NONE) {
         if (has_user || has_passwd)
@@ -1824,17 +1837,6 @@ mm_cinterion_build_auth_string (gpointer                log_object,
         if (modem_family == MM_CINTERION_MODEM_FAMILY_IMT)
             return g_strdup_printf ("^SGAUTH=%u,%d,\"\",\"\"", cid, encoded_auth);
         return g_strdup_printf ("^SGAUTH=%u,%d", cid, encoded_auth);
-    }
-
-    /* No explicit auth type requested? */
-    if (encoded_auth == BEARER_CINTERION_AUTH_UNKNOWN) {
-        /* If no user/passwd given, do nothing */
-        if (!has_user && !has_passwd)
-            return NULL;
-
-        /* If user/passwd given, default to CHAP (more common than PAP) */
-        mm_obj_dbg (log_object, "APN user/password given but no authentication type explicitly requested: defaulting to 'CHAP'");
-        encoded_auth = BEARER_CINTERION_AUTH_CHAP;
     }
 
     quoted_user   = mm_port_serial_at_quote_string (user   ? user   : "");
