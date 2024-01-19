@@ -1643,23 +1643,23 @@ common_load_initial_eps_step (GTask *task)
 
     case COMMON_LOAD_INITIAL_EPS_STEP_APN:
         if (ctx->runtime) {
+            g_autofree gchar *cmd = NULL;
+
+            cmd = g_strdup_printf ("+CGCONTRDP=%u", self->priv->initial_eps_bearer_cid);
+            mm_base_modem_at_command (
+                MM_BASE_MODEM (self),
+                cmd,
+                20,
+                FALSE,
+                (GAsyncReadyCallback)common_load_initial_eps_cgcontrdp_ready,
+                task);
+        } else {
             mm_base_modem_at_command (
                 MM_BASE_MODEM (self),
                 "+CGDCONT?",
                 20,
                 FALSE,
                 (GAsyncReadyCallback)common_load_initial_eps_cgdcont_ready,
-                task);
-        } else {
-            g_autofree gchar *cmd = NULL;
-
-            cmd = g_strdup_printf ("+CGCONTRDP=%u", self->priv->initial_eps_bearer_cid);
-            mm_base_modem_at_command (
-                MM_BASE_MODEM (self),
-                "+CGCONTRDP",
-                20,
-                FALSE,
-                (GAsyncReadyCallback)common_load_initial_eps_cgcontrdp_ready,
                 task);
         }
         return;
