@@ -272,7 +272,7 @@ connect_3gpp (MMBroadbandBearer   *self,
     ctx->primary   = g_object_ref (primary);
     ctx->secondary = secondary ? g_object_ref (secondary) : NULL;
     ctx->ip_family = mm_bearer_properties_get_ip_type (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
-    mm_3gpp_normalize_ip_family (&ctx->ip_family);
+    mm_3gpp_normalize_ip_family (&ctx->ip_family, TRUE);
 
     task = g_task_new (self, cancellable, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify) connect_context_free);

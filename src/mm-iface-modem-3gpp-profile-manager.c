@@ -869,7 +869,7 @@ mm_iface_modem_3gpp_profile_manager_set_profile (MMIfaceModem3gppProfileManager 
 
     /* normalize IP family right away */
     ip_family = mm_3gpp_profile_get_ip_type (ctx->requested);
-    mm_3gpp_normalize_ip_family (&ip_family);
+    mm_3gpp_normalize_ip_family (&ip_family, TRUE);
     mm_3gpp_profile_set_ip_type (ctx->requested, ip_family);
 
     set_profile_step (task);

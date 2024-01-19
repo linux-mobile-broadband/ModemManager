@@ -1842,7 +1842,7 @@ load_ip_type_settings_from_profile (ConnectContext *ctx,
     MMBearerIpFamily ip_family;
 
     ip_family = mm_3gpp_profile_get_ip_type (profile);
-    if (mm_3gpp_normalize_ip_family (&ip_family))
+    if (mm_3gpp_normalize_ip_family (&ip_family, TRUE))
         ctx->no_ip_family_preference = TRUE;
     if (ip_family & MM_BEARER_IP_FAMILY_IPV4)
         ctx->ipv4 = TRUE;

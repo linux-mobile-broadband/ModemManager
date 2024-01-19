@@ -966,7 +966,7 @@ load_settings_from_profile (MMBearerMbim    *self,
         MMBearerIpFamily ip_type;
 
         ip_type = mm_3gpp_profile_get_ip_type (profile);
-        mm_3gpp_normalize_ip_family (&ip_type);
+        mm_3gpp_normalize_ip_family (&ip_type, TRUE);
         ctx->requested_ip_type = mm_bearer_ip_family_to_mbim_context_ip_type (ip_type, &inner_error);
         if (inner_error) {
             g_propagate_error (error, inner_error);
@@ -1287,7 +1287,7 @@ load_settings_from_bearer (MMBearerMbim        *self,
         /* If we're loading settings from a profile, still read the ip-type
          * from the user input, as that is not stored in the profile */
         ip_type = mm_bearer_properties_get_ip_type (properties);
-        mm_3gpp_normalize_ip_family (&ip_type);
+        mm_3gpp_normalize_ip_family (&ip_type, FALSE);
         ctx->requested_ip_type = mm_bearer_ip_family_to_mbim_context_ip_type (ip_type, &inner_error);
         if (inner_error) {
             g_propagate_error (error, inner_error);

@@ -4119,11 +4119,16 @@ mm_3gpp_get_ip_family_from_pdp_type (const gchar *pdp_type)
 }
 
 gboolean
-mm_3gpp_normalize_ip_family (MMBearerIpFamily *family)
+mm_3gpp_normalize_ip_family (MMBearerIpFamily *family, gboolean from_user)
 {
-    /* if nothing specific requested, default to IPv4 */
+    /* To address limitations in reading IP_TYPE information (in some cases) for
+     * profile requests, default to IPv4v6 (dual-stack) for profile requests and
+     * IPv4 only for user requests (to ensure backward compatibility) if nothing
+     * specific is requested. This ensures network compatibility across IPv4 and IPv6 networks,
+     * preventing potential connectivity issues in IPv6 environments.
+    */
     if (*family == MM_BEARER_IP_FAMILY_NONE || *family == MM_BEARER_IP_FAMILY_ANY) {
-        *family = MM_BEARER_IP_FAMILY_IPV4;
+        *family = from_user ? MM_BEARER_IP_FAMILY_IPV4 : MM_BEARER_IP_FAMILY_IPV4V6;
         return TRUE;
     }
 
