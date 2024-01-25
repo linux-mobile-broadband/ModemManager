@@ -1482,7 +1482,7 @@ set_data_format_ready (QmiClientWda *client,
 
     output = qmi_client_wda_set_data_format_finish (client, res, &error);
     if (!output || !qmi_message_wda_set_data_format_output_get_result (output, &error)) {
-        g_task_return_error (task, error);
+        g_task_return_error (task, g_steal_pointer (&error));
         g_object_unref (task);
         return;
     }
