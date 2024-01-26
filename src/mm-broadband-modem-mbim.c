@@ -7692,7 +7692,10 @@ modem_3gpp_profile_manager_list_profiles (MMIfaceModem3gppProfileManager  *_self
 
     mm_obj_dbg (self, "querying provisioned contexts...");
 
-    if (self->priv->is_profile_management_ext_supported) {
+    /* We will use the MBIMEx operation not only when testing with MBIMEx profile management
+     * support, but also any time the command is supported by the modem, because it gives much
+     * more information than the default one. */
+    if (self->priv->is_context_type_ext_supported) {
         message = mbim_message_ms_basic_connect_extensions_provisioned_contexts_query_new (NULL);
         mbim_device_command (device,
                              message,
