@@ -7574,6 +7574,7 @@ provisioned_context_element_v2_to_3gpp_profile (MMBroadbandModemMbim            
     mm_3gpp_profile_set_user         (profile, element->user_name);
     mm_3gpp_profile_set_password     (profile, element->password);
     mm_3gpp_profile_set_allowed_auth (profile, (mm_bearer_allowed_auth_from_mbim_auth_protocol (element->auth_protocol)));
+    mm_3gpp_profile_set_ip_type      (profile, mm_bearer_ip_family_from_mbim_context_ip_type (element->ip_type));
 
     if (!mm_boolean_from_mbim_context_state (element->state, &enabled, &error)) {
         mm_obj_dbg (self, "ignoring enable setting: %s", error->message);
@@ -7601,7 +7602,7 @@ provisioned_context_element_v2_to_3gpp_profile (MMBroadbandModemMbim            
     } else
         mm_3gpp_profile_set_profile_source (profile, profile_source);
 
-    /* compression unused, and ip-type not provided */
+    /* compression unused */
     return profile;
 }
 
