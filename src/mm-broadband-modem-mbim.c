@@ -7533,17 +7533,12 @@ modem_3gpp_profile_manager_list_profiles_finish (MMIfaceModem3gppProfileManager 
 static MM3gppProfile *
 provisioned_context_element_to_3gpp_profile (MbimProvisionedContextElement *element)
 {
-    MM3gppProfile   *profile;
-    MMBearerApnType  apn_type;
-
-    apn_type = mm_bearer_apn_type_from_mbim_context_type (mbim_uuid_to_context_type (&element->context_type));
-    if (apn_type == MM_BEARER_APN_TYPE_NONE)
-        return NULL;
+    MM3gppProfile *profile;
 
     profile = mm_3gpp_profile_new ();
     mm_3gpp_profile_set_profile_id   (profile, element->context_id);
     mm_3gpp_profile_set_apn          (profile, element->access_string);
-    mm_3gpp_profile_set_apn_type     (profile, apn_type);
+    mm_3gpp_profile_set_apn_type     (profile, mm_bearer_apn_type_from_mbim_context_type (mbim_uuid_to_context_type (&element->context_type)));
     mm_3gpp_profile_set_user         (profile, element->user_name);
     mm_3gpp_profile_set_password     (profile, element->password);
     mm_3gpp_profile_set_allowed_auth (profile, (mm_bearer_allowed_auth_from_mbim_auth_protocol (element->auth_protocol)));
@@ -7556,21 +7551,16 @@ provisioned_context_element_v2_to_3gpp_profile (MMBroadbandModemMbim            
                                                 MbimProvisionedContextElementV2 *element)
 {
     MM3gppProfile                *profile;
-    MMBearerApnType               apn_type;
     GError                       *error = NULL;
     gboolean                      enabled;
     MMBearerRoamingAllowance      roaming_allowance;
     MMBearerAccessTypePreference  access_type_preference;
     MMBearerProfileSource         profile_source;
 
-    apn_type = mm_bearer_apn_type_from_mbim_context_type (mbim_uuid_to_context_type (&element->context_type));
-    if (apn_type == MM_BEARER_APN_TYPE_NONE)
-        return NULL;
-
     profile = mm_3gpp_profile_new ();
     mm_3gpp_profile_set_profile_id   (profile, element->context_id);
     mm_3gpp_profile_set_apn          (profile, element->access_string);
-    mm_3gpp_profile_set_apn_type     (profile, apn_type);
+    mm_3gpp_profile_set_apn_type     (profile, mm_bearer_apn_type_from_mbim_context_type (mbim_uuid_to_context_type (&element->context_type)));
     mm_3gpp_profile_set_user         (profile, element->user_name);
     mm_3gpp_profile_set_password     (profile, element->password);
     mm_3gpp_profile_set_allowed_auth (profile, (mm_bearer_allowed_auth_from_mbim_auth_protocol (element->auth_protocol)));
@@ -7636,8 +7626,7 @@ profile_manager_provisioned_contexts_query_ready (MbimDevice   *device,
         MM3gppProfile *profile;
 
         profile = provisioned_context_element_to_3gpp_profile (provisioned_contexts[i]);
-        if (profile)
-            ctx->profiles = g_list_append (ctx->profiles, profile);
+        ctx->profiles = g_list_append (ctx->profiles, profile);
     }
 
     g_task_return_boolean (task, TRUE);
@@ -7676,8 +7665,7 @@ profile_manager_provisioned_contexts_v2_query_ready (MbimDevice   *device,
         MM3gppProfile *profile;
 
         profile = provisioned_context_element_v2_to_3gpp_profile (self, provisioned_contexts_v2[i]);
-        if (profile)
-            ctx->profiles = g_list_append (ctx->profiles, profile);
+        ctx->profiles = g_list_append (ctx->profiles, profile);
     }
 
     g_task_return_boolean (task, TRUE);
