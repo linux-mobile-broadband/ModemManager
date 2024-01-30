@@ -676,12 +676,17 @@ mm_3gpp_profile_get_dictionary (MM3gppProfile *self)
                                PROPERTY_ACCESS_TYPE_PREFERENCE,
                                g_variant_new_uint32 (self->priv->access_type_preference));
 
+    if (self->priv->profile_source != MM_BEARER_PROFILE_SOURCE_UNKNOWN)
+        g_variant_builder_add (&builder,
+                               "{sv}",
+                               PROPERTY_SOURCE,
+                               g_variant_new_uint32 (self->priv->profile_source));
+
     if (self->priv->enabled_set)
         g_variant_builder_add (&builder,
                                "{sv}",
                                PROPERTY_ENABLED,
                                g_variant_new_boolean (self->priv->enabled));
-
 
     return g_variant_ref_sink (g_variant_builder_end (&builder));
 }
