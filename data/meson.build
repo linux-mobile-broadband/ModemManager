@@ -11,7 +11,7 @@ service_conf = {
 }
 
 # DBus Service file
-if meson_version.version_compare('>=0.64')
+if meson_version.version_compare('>=1.0.0')
   fs.copyfile(
     'org.freedesktop.ModemManager1.conf.@0@polkit'.format(enable_polkit ? '' : 'no'),
     '@BASENAME@',

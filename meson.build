@@ -14,7 +14,7 @@ project(
 )
 
 meson_version = meson.version()
-if meson_version.version_compare('>=0.64')
+if meson_version.version_compare('>=1.0.0')
   fs = import('fs')
 endif
 
