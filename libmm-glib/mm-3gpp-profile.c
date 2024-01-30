@@ -682,6 +682,12 @@ mm_3gpp_profile_get_dictionary (MM3gppProfile *self)
                                PROPERTY_SOURCE,
                                g_variant_new_uint32 (self->priv->profile_source));
 
+    if (self->priv->roaming_allowance != MM_BEARER_ROAMING_ALLOWANCE_NONE)
+        g_variant_builder_add (&builder,
+                               "{sv}",
+                               PROPERTY_ROAMING_ALLOWANCE,
+                               g_variant_new_uint32 (self->priv->roaming_allowance));
+
     if (self->priv->enabled_set)
         g_variant_builder_add (&builder,
                                "{sv}",
@@ -884,6 +890,10 @@ mm_3gpp_profile_consume_variant (MM3gppProfile  *self,
             g_variant_get_boolean (value));
     else if (g_str_equal (key, PROPERTY_SOURCE))
         mm_3gpp_profile_set_profile_source (
+            self,
+            g_variant_get_uint32 (value));
+    else if (g_str_equal (key, PROPERTY_ROAMING_ALLOWANCE))
+        mm_3gpp_profile_set_roaming_allowance (
             self,
             g_variant_get_uint32 (value));
     else {
