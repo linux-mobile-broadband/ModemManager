@@ -3467,10 +3467,18 @@ get_plmn_name_ready (QmiClientNas *client,
             mm_obj_dbg (self, "current operator short name: %s",   short_name);
             mm_obj_dbg (self, "current operator service name: %s", service_name);
             if (!self->priv->current_operator_description) {
-                self->priv->current_operator_description = (service_name ? g_steal_pointer (&service_name) :
-                                                            (long_name   ? g_steal_pointer (&long_name)    :
-                                                             (short_name ? g_steal_pointer (&short_name)   :
-                                                              NULL)));
+                if (service_name) {
+                    mm_obj_dbg (self, "setting operator description to service name: %s", service_name);
+                    self->priv->current_operator_description = g_steal_pointer (&service_name);
+                } else if (long_name) {
+                    mm_obj_dbg (self, "setting operator description to long name: %s", long_name);
+                    self->priv->current_operator_description = g_steal_pointer (&long_name);
+                } else if (short_name) {
+                    mm_obj_dbg (self, "setting operator description to short name: %s", short_name);
+                    self->priv->current_operator_description = g_steal_pointer (&short_name);
+                } else {
+                    mm_obj_dbg (self, "unable to set operator description");
+                }
             }
     }
 
