@@ -585,21 +585,37 @@ mm_cinterion_get_available_from_simlocal (const gchar  *response,
                                           GError      **error)
 {
     g_autoptr(GArray)  tmp_available = NULL;
+    g_auto(GStrv)      sim_groups = NULL;
     GError            *inner_error = NULL;
+    guint              sim_length;
+    guint              i;
 
     if (!response) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Missing response");
         return FALSE;
     }
 
-    tmp_available = mm_parse_uint_list (response, &inner_error);
-    if (inner_error) {
-        g_propagate_error (error, inner_error);
-        return FALSE;
+    sim_groups = mm_split_string_groups (response);
+    sim_length = g_strv_length (sim_groups);
+    tmp_available = g_array_sized_new (FALSE, FALSE, sizeof (gboolean), sim_length);
+
+    for (i = 0; i < sim_length; i++) {
+        guint    index_value;
+        gboolean is_available;
+
+        if (!mm_get_uint_from_str (sim_groups[i], &index_value)) {
+            inner_error = g_error_new (MM_CORE_ERROR,
+                                       MM_CORE_ERROR_FAILED,
+                                       "Could not parse SIM index value '%s'",
+                                       sim_groups[i]);
+            g_propagate_error (error, inner_error);
+            return FALSE;
+        }
+        is_available = (gboolean) index_value;
+        g_array_append_val (tmp_available, is_available);
     }
 
     *available = g_steal_pointer (&tmp_available);
-
     return TRUE;
 }
 
