@@ -12,6 +12,22 @@ ModemManager provides a unified high level API for communicating with mobile
 broadband modems, regardless of the protocol used to communicate with the
 actual device (Generic AT, vendor-specific AT, QCDM, QMI, MBIM...).
 
+## Getting Started
+
+ModemManager uses the meson build system. Meson is likely available as a
+package from your Linux distrubtion, but if not please refer to the [Meson
+project](https://mesonbuild.com/Quick-guide.html) for installation instructions. Once you have Meson installed you'll
+probably want to install [libmbim](https://gitlab.freedesktop.org/mobile-broadband/libmbim) and [libqmi](https://gitlab.freedesktop.org/mobile-broadband/libqmi) which most modems require.
+
+After dependencies are installed you can build ModemManager with:
+
+    $ meson setup build --prefix=/usr --buildtype=release
+    $ ninja -C build
+
+And after a successful build, install with:
+
+    $ sudo ninja -C build install
+
 ## Using
 
 ModemManager is a system daemon and is not meant to be used directly from
