@@ -31,6 +31,10 @@ ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="00a7", ENV{.MM_USBIFNUM}=="02", SUBS
 ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="00a7", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="00a7", ENV{ID_MM_MTK_TAGGED}="1"
 
+ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="0023", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="0023", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="0023", ENV{ID_MM_MTK_TAGGED}="1"
+
 GOTO="mm_mtk_legacy_port_types_end"
 
 # D-Link devices ---------------------------
