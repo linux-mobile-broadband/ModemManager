@@ -91,7 +91,12 @@ typedef struct {
     gpointer                    response_processor_context;
     GDestroyNotify              response_processor_context_free;
     GVariant                   *result;
+    guint                       next_command_wait_id;
 } AtSequenceContext;
+
+static void at_sequence_parse_response (MMPortSerialAt    *port,
+                                        GAsyncResult      *res,
+                                        GTask             *task);
 
 static void
 at_sequence_context_free (AtSequenceContext *ctx)
@@ -107,6 +112,11 @@ at_sequence_context_free (AtSequenceContext *ctx)
         g_cancellable_disconnect (ctx->parent_cancellable,
                                   ctx->cancelled_id);
         g_object_unref (ctx->parent_cancellable);
+    }
+
+    if (ctx->next_command_wait_id > 0) {
+        g_source_remove (ctx->next_command_wait_id);
+        ctx->next_command_wait_id = 0;
     }
 
     if (ctx->result)
@@ -138,6 +148,28 @@ mm_base_modem_at_sequence_full_finish (MMBaseModem   *self,
 
     /* transfer-none! (so that we can ignore it) */
     return result;
+}
+
+static gboolean
+at_sequence_next_command (GTask *task)
+{
+    AtSequenceContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+    ctx->next_command_wait_id = 0;
+
+    /* Schedule the next command in the probing group */
+    mm_port_serial_at_command (
+        ctx->port,
+        ctx->current->command,
+        ctx->current->timeout,
+        FALSE,
+        ctx->current->allow_cached,
+        g_task_get_cancellable (task),
+        (GAsyncReadyCallback)at_sequence_parse_response,
+        task);
+
+    return G_SOURCE_REMOVE;
 }
 
 static void
@@ -201,16 +233,8 @@ at_sequence_parse_response (MMPortSerialAt    *port,
     if (processor_result == MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE) {
         ctx->current++;
         if (ctx->current->command) {
-            /* Schedule the next command in the probing group */
-            mm_port_serial_at_command (
-                ctx->port,
-                ctx->current->command,
-                ctx->current->timeout,
-                FALSE,
-                ctx->current->allow_cached,
-                g_task_get_cancellable (task),
-                (GAsyncReadyCallback)at_sequence_parse_response,
-                task);
+            g_assert (!ctx->next_command_wait_id);
+            ctx->next_command_wait_id = g_timeout_add_seconds (ctx->current->wait_seconds, (GSourceFunc) at_sequence_next_command, task);
             return;
         }
         /* On last command, end. */

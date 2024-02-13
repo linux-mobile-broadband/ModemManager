@@ -67,6 +67,8 @@ typedef struct {
     gboolean allow_cached;
     /* The response processor */
     MMBaseModemAtResponseProcessor response_processor;
+    /* Time to wait before sending this command (in seconds) */
+    guint wait_seconds;
 } MMBaseModemAtCommand;
 
 /* Generic AT sequence handling, using the best AT port available and without
@@ -220,6 +222,7 @@ typedef struct {
     guint     timeout;
     gboolean  allow_cached;
     MMBaseModemAtResponseProcessor response_processor;
+    guint     wait_seconds;
 } MMBaseModemAtCommandAlloc;
 
 G_STATIC_ASSERT (sizeof (MMBaseModemAtCommandAlloc) == sizeof (MMBaseModemAtCommand));
