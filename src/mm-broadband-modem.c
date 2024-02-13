@@ -1363,19 +1363,53 @@ mdn_qcdm_ready (MMPortSerialQcdm *port,
     qcdm_result_unref (result);
 }
 
+static MMBaseModemAtResponseProcessorResult
+modem_load_own_numbers_continue_on_sim_busy (MMBaseModem   *self,
+                                             gpointer       none,
+                                             const gchar   *command,
+                                             const gchar   *response,
+                                             gboolean       last_command,
+                                             const GError  *error,
+                                             GVariant     **result,
+                                             GError       **result_error)
+{
+    if (error) {
+        *result = NULL;
+
+        if (!g_error_matches (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_SIM_BUSY) || last_command) {
+            *result_error = g_error_copy (error);
+            return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE;
+        }
+
+        /* Retry on SIM BUSY errors */
+        *result_error = NULL;
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
+    }
+
+    *result = g_variant_new_string (response);
+    return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
+}
+
+static const MMBaseModemAtCommand own_numbers_sequence[] = {
+    { "+CNUM", 3, FALSE, modem_load_own_numbers_continue_on_sim_busy, 0 },
+    { "+CNUM", 3, FALSE, modem_load_own_numbers_continue_on_sim_busy, 3 },
+    { "+CNUM", 3, FALSE, modem_load_own_numbers_continue_on_sim_busy, 3 },
+    { NULL }
+};
+
 static void
-modem_load_own_numbers_done (MMIfaceModem *self,
+modem_load_own_numbers_ready (MMIfaceModem *self,
                              GAsyncResult *res,
                              GTask *task)
 {
     OwnNumbersContext *ctx;
-    const gchar *result;
+    GVariant *result;
     GError *error = NULL;
     GStrv numbers;
 
     ctx = g_task_get_task_data (task);
 
-    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    result = mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, &error);
     if (!result) {
         /* try QCDM */
         if (ctx->qcdm) {
@@ -1398,7 +1432,7 @@ modem_load_own_numbers_done (MMIfaceModem *self,
         }
         g_task_return_error (task, error);
     } else {
-        numbers = mm_3gpp_parse_cnum_exec_response (result);
+        numbers = mm_3gpp_parse_cnum_exec_response (g_variant_get_string (result, NULL));
         g_task_return_pointer (task, numbers, (GDestroyNotify)g_strfreev);
     }
     g_object_unref (task);
@@ -1430,12 +1464,13 @@ modem_load_own_numbers (MMIfaceModem *self,
     g_task_set_task_data (task, ctx, (GDestroyNotify)own_numbers_context_free);
 
     mm_obj_dbg (self, "loading own numbers...");
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+CNUM",
-                              3,
-                              FALSE,
-                              (GAsyncReadyCallback)modem_load_own_numbers_done,
-                              task);
+    mm_base_modem_at_sequence (
+        MM_BASE_MODEM (self),
+        own_numbers_sequence,
+        NULL, /* response_processor_context */
+        NULL, /* response_processor_context_free */
+        (GAsyncReadyCallback)modem_load_own_numbers_ready,
+        task);
 }
 
 /*****************************************************************************/
