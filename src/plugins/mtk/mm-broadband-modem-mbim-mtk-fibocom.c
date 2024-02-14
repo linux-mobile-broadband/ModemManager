@@ -46,6 +46,7 @@ struct _MMBroadbandModemMbimMtkFibocomPrivate {
     gboolean is_multiplex_supported;
     gboolean is_async_slaac_supported;
     gboolean remove_ip_packet_filters;
+    gboolean normalize_nw_error;
 };
 
 /*****************************************************************************/
@@ -61,6 +62,9 @@ struct _MMBroadbandModemMbimMtkFibocomPrivate {
 
 /* Explicit IP packet filter removal required in old firmware versions. */
 #define IP_PACKET_FILTER_REMOVAL_UNNEEDED_VERSION 29, 23, 6
+
+/* NW error normalization required in old firmware versions. */
+#define NORMALIZE_NW_ERROR_UNNEEDED 29, 22, 13
 
 static inline gboolean
 fm350_check_version (guint A1, guint A2, guint A3,
@@ -111,6 +115,11 @@ process_fm350_version_features (MMBroadbandModemMbimMtkFibocom *self,
     self->priv->remove_ip_packet_filters = !fm350_check_version (major, minor, micro, IP_PACKET_FILTER_REMOVAL_UNNEEDED_VERSION);
     mm_obj_info (self, "FM350 %s IP packet filter removal",
                  self->priv->remove_ip_packet_filters ? "requires" : "does not require");
+
+    /* Check if we need to normalize network errors */
+    self->priv->normalize_nw_error = !fm350_check_version (major, minor, micro, NORMALIZE_NW_ERROR_UNNEEDED);
+    mm_obj_info (self, "FM350 %s network error normalization",
+                 self->priv->normalize_nw_error ? "requires" : "does not require");
 }
 
 /*****************************************************************************/
@@ -207,6 +216,22 @@ create_bearer_list (MMIfaceModem *self)
 }
 
 /******************************************************************************/
+/* Normalize network error */
+
+static guint32
+normalize_nw_error (MMBroadbandModemMbim *self,
+                    guint32               nw_error)
+{
+    /* Work around to convert AT error to 3GPP Error */
+    if (MM_BROADBAND_MODEM_MBIM_MTK_FIBOCOM (self)->priv->normalize_nw_error && nw_error > 100) {
+        mm_obj_dbg (self, "network error normalization required: %u -> %u",
+                    nw_error, nw_error - 100);
+        nw_error -= 100;
+    }
+    return nw_error;
+}
+
+/******************************************************************************/
 
 MMBroadbandModemMbimMtkFibocom *
 mm_broadband_modem_mbim_mtk_fibocom_new (const gchar  *device,
@@ -243,6 +268,8 @@ mm_broadband_modem_mbim_mtk_fibocom_init (MMBroadbandModemMbimMtkFibocom *self)
 
     /* By default remove, unless we have a new enough version */
     self->priv->remove_ip_packet_filters = TRUE;
+    /* By default normalize, unless have a new enough version */
+    self->priv->normalize_nw_error = TRUE;
 }
 
 static void
@@ -281,7 +308,10 @@ shared_fibocom_init (MMSharedFibocom *iface)
 static void
 mm_broadband_modem_mbim_mtk_fibocom_class_init (MMBroadbandModemMbimMtkFibocomClass *klass)
 {
-    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    GObjectClass              *object_class = G_OBJECT_CLASS (klass);
+    MMBroadbandModemMbimClass *broadband_modem_mbim_class = MM_BROADBAND_MODEM_MBIM_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandModemMbimMtkFibocomPrivate));
+
+    broadband_modem_mbim_class->normalize_nw_error = normalize_nw_error;
 }
