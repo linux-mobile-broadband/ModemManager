@@ -816,7 +816,7 @@ mm_plugin_supports_port (MMPlugin            *self,
 
     /* Build mask of flags based on plugin */
     plugin_expected_flags = MM_PORT_PROBE_NONE;
-    if (self->priv->at)
+    if (self->priv->at || self->priv->single_at)
         plugin_expected_flags |= MM_PORT_PROBE_AT;
     if (self->priv->qcdm || self->priv->qcdm_required)
         plugin_expected_flags |= MM_PORT_PROBE_QCDM;
