@@ -42,9 +42,10 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbimMtkFibocom, mm_broadband_modem_mbim_
                         G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_FIBOCOM,   shared_fibocom_init))
 
 struct _MMBroadbandModemMbimMtkFibocomPrivate {
-    /* Supported features */
+    /* Custom MTK/Fibocom bearer behavior */
     gboolean is_multiplex_supported;
     gboolean is_async_slaac_supported;
+    gboolean remove_ip_packet_filters;
 };
 
 /*****************************************************************************/
@@ -57,6 +58,9 @@ struct _MMBroadbandModemMbimMtkFibocomPrivate {
 /* Multiple Multiplexed PDNs are not correctly supported in old firmware
  * versions. */
 #define MULTIPLEX_SUPPORTED_VERSION 29, 23, 6
+
+/* Explicit IP packet filter removal required in old firmware versions. */
+#define IP_PACKET_FILTER_REMOVAL_UNNEEDED_VERSION 29, 23, 6
 
 static inline gboolean
 fm350_check_version (guint A1, guint A2, guint A3,
@@ -102,6 +106,11 @@ process_fm350_version_features (MMBroadbandModemMbimMtkFibocom *self,
     self->priv->is_multiplex_supported = fm350_check_version (major, minor, micro, MULTIPLEX_SUPPORTED_VERSION);
     mm_obj_info (self, "FM350 multiplexing is %ssupported",
                  self->priv->is_multiplex_supported ? "" : "not ");
+
+    /* Check if we need to remove IP packet filters */
+    self->priv->remove_ip_packet_filters = !fm350_check_version (major, minor, micro, IP_PACKET_FILTER_REMOVAL_UNNEEDED_VERSION);
+    mm_obj_info (self, "FM350 %s IP packet filter removal",
+                 self->priv->remove_ip_packet_filters ? "requires" : "does not require");
 }
 
 /*****************************************************************************/
@@ -171,6 +180,7 @@ create_bearer (MMIfaceModem        *_self,
                 self->priv->is_async_slaac_supported ? "supported" : "unsupported");
     bearer = mm_bearer_mbim_mtk_fibocom_new (MM_BROADBAND_MODEM_MBIM (self),
                                              self->priv->is_async_slaac_supported,
+                                             self->priv->remove_ip_packet_filters,
                                              properties);
     g_task_return_pointer (task, bearer, g_object_unref);
     g_object_unref (task);
@@ -230,6 +240,9 @@ mm_broadband_modem_mbim_mtk_fibocom_init (MMBroadbandModemMbimMtkFibocom *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BROADBAND_MODEM_MBIM_MTK_FIBOCOM,
                                               MMBroadbandModemMbimMtkFibocomPrivate);
+
+    /* By default remove, unless we have a new enough version */
+    self->priv->remove_ip_packet_filters = TRUE;
 }
 
 static void

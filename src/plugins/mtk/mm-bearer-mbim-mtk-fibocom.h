@@ -33,9 +33,11 @@
 
 typedef struct _MMBearerMbimMtkFibocom MMBearerMbimMtkFibocom;
 typedef struct _MMBearerMbimMtkFibocomClass MMBearerMbimMtkFibocomClass;
+typedef struct _MMBearerMbimMtkFibocomPrivate MMBearerMbimMtkFibocomPrivate;
 
 struct _MMBearerMbimMtkFibocom {
     MMBearerMbim parent;
+    MMBearerMbimMtkFibocomPrivate *priv;
 };
 
 struct _MMBearerMbimMtkFibocomClass {
@@ -48,6 +50,7 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBearerMbimMtkFibocom, g_object_unref)
 /* MBIM bearer creation implementation */
 MMBaseBearer *mm_bearer_mbim_mtk_fibocom_new (MMBroadbandModemMbim *modem,
                                               gboolean              is_async_slaac_supported,
+                                              gboolean              remove_ip_packet_filters,
                                               MMBearerProperties   *config);
 
 #endif /* MM_BEARER_MBIM_MTK_FIBOCOM_H */
