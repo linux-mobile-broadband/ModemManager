@@ -4922,10 +4922,10 @@ typedef enum {
     INITIALIZATION_STEP_SUPPORTED_CAPABILITIES,
     INITIALIZATION_STEP_SUPPORTED_CHARSETS,
     INITIALIZATION_STEP_CHARSET,
-    INITIALIZATION_STEP_BEARERS,
     INITIALIZATION_STEP_MANUFACTURER,
     INITIALIZATION_STEP_MODEL,
     INITIALIZATION_STEP_REVISION,
+    INITIALIZATION_STEP_BEARERS,
     INITIALIZATION_STEP_CARRIER_CONFIG,
     INITIALIZATION_STEP_HARDWARE_REVISION,
     INITIALIZATION_STEP_EQUIPMENT_ID,
@@ -5723,42 +5723,6 @@ interface_initialization_step (GTask *task)
         ctx->step++;
         /* fall-through */
 
-    case INITIALIZATION_STEP_BEARERS: {
-        g_autoptr(MMBearerList) list = NULL;
-
-        /* Bearers setup is meant to be loaded only once during the whole
-         * lifetime of the modem, so check if it exists; and if it doesn't,
-         * create it right away. */
-        g_object_get (self,
-                      MM_IFACE_MODEM_BEARER_LIST, &list,
-                      NULL);
-
-        if (!list) {
-            list = MM_IFACE_MODEM_GET_INTERFACE (self)->create_bearer_list (self);
-            g_signal_connect (list,
-                              "notify::" MM_BEARER_LIST_NUM_BEARERS,
-                              G_CALLBACK (bearer_list_updated),
-                              self);
-
-            mm_gdbus_modem_set_max_active_bearers (
-                ctx->skeleton,
-                mm_bearer_list_get_max_active (list));
-            mm_gdbus_modem_set_max_active_multiplexed_bearers (
-                ctx->skeleton,
-                mm_bearer_list_get_max_active_multiplexed (list));
-
-            /* MaxBearers set equal to MaxActiveBearers */
-            mm_gdbus_modem_set_max_bearers (
-                ctx->skeleton,
-                mm_gdbus_modem_get_max_active_bearers (ctx->skeleton));
-
-            g_object_set (self,
-                          MM_IFACE_MODEM_BEARER_LIST, list,
-                          NULL);
-        }
-        ctx->step++;
-    } /* fall-through */
-
     case INITIALIZATION_STEP_MANUFACTURER:
         /* Manufacturer is meant to be loaded only once during the whole
          * lifetime of the modem. Therefore, if we already have them loaded,
@@ -5806,6 +5770,45 @@ interface_initialization_step (GTask *task)
         }
         ctx->step++;
         /* fall-through */
+
+    case INITIALIZATION_STEP_BEARERS: {
+        /* This step should be run always after having loaded the firmware revision
+         * number, because certain modems may have multiplexing support only in
+         * new releases. */
+        g_autoptr(MMBearerList) list = NULL;
+
+        /* Bearers setup is meant to be loaded only once during the whole
+         * lifetime of the modem, so check if it exists; and if it doesn't,
+         * create it right away. */
+        g_object_get (self,
+                      MM_IFACE_MODEM_BEARER_LIST, &list,
+                      NULL);
+
+        if (!list) {
+            list = MM_IFACE_MODEM_GET_INTERFACE (self)->create_bearer_list (self);
+            g_signal_connect (list,
+                              "notify::" MM_BEARER_LIST_NUM_BEARERS,
+                              G_CALLBACK (bearer_list_updated),
+                              self);
+
+            mm_gdbus_modem_set_max_active_bearers (
+                ctx->skeleton,
+                mm_bearer_list_get_max_active (list));
+            mm_gdbus_modem_set_max_active_multiplexed_bearers (
+                ctx->skeleton,
+                mm_bearer_list_get_max_active_multiplexed (list));
+
+            /* MaxBearers set equal to MaxActiveBearers */
+            mm_gdbus_modem_set_max_bearers (
+                ctx->skeleton,
+                mm_gdbus_modem_get_max_active_bearers (ctx->skeleton));
+
+            g_object_set (self,
+                          MM_IFACE_MODEM_BEARER_LIST, list,
+                          NULL);
+        }
+        ctx->step++;
+    } /* fall-through */
 
     case INITIALIZATION_STEP_CARRIER_CONFIG:
         /* Current carrier config is meant to be loaded only once during the whole
