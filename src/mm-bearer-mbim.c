@@ -927,6 +927,7 @@ connect_set_ready (MbimDevice   *device,
             error = g_steal_pointer (&inner_error);
     } else {
         /* Report the IP type we asked for and the one returned by the modem */
+        nw_error = mm_broadband_modem_mbim_normalize_nw_error (ctx->modem, nw_error);
         mm_obj_dbg (self, "session ID '%u': %s (requested IP type: %s, activated IP type: %s, nw error: %s)",
                     session_id,
                     mbim_activation_state_get_string (activation_state),
@@ -1604,15 +1605,17 @@ typedef enum {
 } DisconnectStep;
 
 typedef struct {
-    MMPortMbim     *mbim;
-    guint           session_id;
-    DisconnectStep  step;
+    MMPortMbim           *mbim;
+    MMBroadbandModemMbim *modem;
+    guint                 session_id;
+    DisconnectStep        step;
 } DisconnectContext;
 
 static void
 disconnect_context_free (DisconnectContext *ctx)
 {
     g_object_unref (ctx->mbim);
+    g_object_unref (ctx->modem);
     g_slice_free (DisconnectContext, ctx);
 }
 
@@ -1732,6 +1735,7 @@ disconnect_set_ready (MbimDevice   *device,
         goto out;
     }
 
+    nw_error = mm_broadband_modem_mbim_normalize_nw_error (ctx->modem, nw_error);
     if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_FAILURE) && parsed_result && nw_error != 0) {
         g_assert (!inner_error);
         g_error_free (error);
@@ -1801,9 +1805,10 @@ disconnect (MMBaseBearer        *_self,
             GAsyncReadyCallback  callback,
             gpointer             user_data)
 {
-    MMBearerMbim      *self = MM_BEARER_MBIM (_self);
-    DisconnectContext *ctx;
-    GTask             *task;
+    MMBearerMbim           *self = MM_BEARER_MBIM (_self);
+    DisconnectContext      *ctx;
+    GTask                  *task;
+    g_autoptr(MMBaseModem)  modem  = NULL;
 
     task = g_task_new (self, NULL, callback, user_data);
 
@@ -1815,11 +1820,17 @@ disconnect (MMBaseBearer        *_self,
         return;
     }
 
+    g_object_get (self,
+                  MM_BASE_BEARER_MODEM,  &modem,
+                  NULL);
+    g_assert (modem);
+
     mm_obj_dbg (self, "launching disconnection on data port (%s/%s)",
                 mm_port_subsys_get_string (mm_port_get_subsys (self->priv->data)),
                 mm_port_get_device (self->priv->data));
 
     ctx = g_slice_new0 (DisconnectContext);
+    ctx->modem = MM_BROADBAND_MODEM_MBIM (g_object_ref (modem));
     ctx->mbim = g_object_ref (self->priv->mbim);
     ctx->session_id = self->priv->session_id;
     ctx->step = DISCONNECT_STEP_FIRST;

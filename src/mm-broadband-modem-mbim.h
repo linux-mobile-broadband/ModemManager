@@ -43,6 +43,8 @@ struct _MMBroadbandModemMbimClass{
     MMPortMbim * (* peek_port_mbim_for_data) (MMBroadbandModemMbim  *self,
                                               MMPort                *data,
                                               GError               **error);
+    guint32      (* normalize_nw_error)      (MMBroadbandModemMbim *self,
+                                              guint32               nw_error);
 };
 
 GType mm_broadband_modem_mbim_get_type (void);
@@ -63,6 +65,9 @@ MMPortMbim *mm_broadband_modem_mbim_get_port_mbim           (MMBroadbandModemMbi
 MMPortMbim *mm_broadband_modem_mbim_get_port_mbim_for_data  (MMBroadbandModemMbim  *self,
                                                              MMPort                *data,
                                                              GError               **error);
+
+guint32    mm_broadband_modem_mbim_normalize_nw_error       (MMBroadbandModemMbim *self,
+                                                             guint32               nw_error);
 
 void mm_broadband_modem_mbim_set_unlock_retries (MMBroadbandModemMbim *self,
                                                  MMModemLock           lock_type,
