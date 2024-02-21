@@ -1877,15 +1877,13 @@ get_profile_ready (MMIfaceModem3gppProfileManager *modem,
 
     profile = mm_iface_modem_3gpp_profile_manager_get_profile_finish (modem, res, &error);
     if (!profile) {
-        g_task_return_error (task, error);
-        g_object_unref (task);
+        complete_connect (task, NULL, error);
         return;
     }
 
     if (!load_ip_type_settings_from_profile (ctx, profile, &error)) {
         g_prefix_error (&error, "Couldn't load ip type settings from profile: ");
-        g_task_return_error (task, error);
-        g_object_unref (task);
+        complete_connect (task, NULL, error);
         return;
     }
 
