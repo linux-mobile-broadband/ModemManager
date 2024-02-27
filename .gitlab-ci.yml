@@ -46,8 +46,7 @@ before_script:
         git clone --depth 1 --branch ${LIBMBIM_BRANCH} https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
         pushd libmbim
         meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=false -Dbash_completion=false
-        ninja -C build
-        ninja -C build install
+        meson install -C build
         popd
       fi
     - >
@@ -55,8 +54,7 @@ before_script:
         git clone --depth 1 --branch ${LIBQRTR_BRANCH} https://gitlab.freedesktop.org/mobile-broadband/libqrtr-glib.git
         pushd libqrtr-glib
         meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=false
-        ninja -C build
-        ninja -C build install
+        meson install -C build
         popd
       fi
     - >
@@ -64,8 +62,7 @@ before_script:
         git clone --depth 1 --branch ${LIBQMI_BRANCH} https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
         pushd libqmi
         meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=false -Dbash_completion=false -Dmbim_qmux=$BUILD_MBIM -Dqrtr=$BUILD_QRTR -Dcollection=basic
-        ninja -C build
-        ninja -C build install
+        meson install -C build
         popd
       fi
 
@@ -84,8 +81,7 @@ build-no-qmi:
     - export BUILD_QMI=false
     - *prepare_deps
     - meson setup build --prefix=/usr -Dwerror=true -Dgtk_doc=false -Dqmi=false -Dqrtr=false -Dmbim=true
-    - ninja -C build
-    - ninja -C build install
+    - meson install -C build
 
 build-qmi-qrtr-no-mbim:
   stage: build
@@ -101,8 +97,7 @@ build-qmi-qrtr-no-mbim:
     - export BUILD_MBIM=false
     - *prepare_deps
     - meson setup build --prefix=/usr -Dwerror=true -Dgtk_doc=false -Dqmi=true -Dqrtr=true -Dmbim=false
-    - ninja -C build
-    - ninja -C build install
+    - meson install -C build
 
 build-qmi-no-qrtr-no-mbim:
   stage: build
@@ -119,8 +114,7 @@ build-qmi-no-qrtr-no-mbim:
     - export BUILD_QRTR=false
     - *prepare_deps
     - meson setup build --prefix=/usr -Dwerror=true -Dgtk_doc=false -Dqmi=true -Dqrtr=false -Dmbim=false
-    - ninja -C build
-    - ninja -C build install
+    - meson install -C build
 
 build-no-qmi-no-mbim:
   stage: build
@@ -138,9 +132,8 @@ build-no-qmi-no-mbim:
     - export BUILD_QMI=false
     - *prepare_deps
     - meson setup build --prefix=/usr -Dwerror=true -Dgtk_doc=false -Dqmi=false -Dqrtr=false -Dmbim=false
-    - ninja -C build
-    - ninja -C build test
-    - ninja -C build install
+    - meson test -C build
+    - meson install -C build
 
 build-no-qmi-no-mbim-no-tests:
   stage: build
@@ -158,8 +151,7 @@ build-no-qmi-no-mbim-no-tests:
     - export BUILD_QMI=false
     - *prepare_deps
     - meson setup build --prefix=/usr -Dwerror=true -Dgtk_doc=false -Dqmi=false -Dqrtr=false -Dmbim=false -Dtests=false
-    - ninja -C build
-    - ninja -C build install
+    - meson install -C build
 
 build-no-deprecated:
   stage: build
@@ -177,9 +169,8 @@ build-no-deprecated:
     - export BUILD_QMI=false
     - *prepare_deps
     - CFLAGS="-DMM_DISABLE_DEPRECATED" meson setup build --prefix=/usr -Dwerror=true -Dgtk_doc=false -Dqmi=false -Dqrtr=false -Dmbim=false
-    - ninja -C build
-    - ninja -C build test
-    - ninja -C build install
+    - meson test -C build
+    - meson install -C build
 
 build-no-suspend-resume:
   stage: build
@@ -194,8 +185,7 @@ build-no-suspend-resume:
   script:
     - *prepare_deps
     - meson setup build --prefix=/usr -Dwerror=true -Dgtk_doc=false -Dsystemd_suspend_resume=false -Dpowerd_suspend_resume=false
-    - ninja -C build
-    - ninja -C build install
+    - meson install -C build
 
 build-suspend-resume-powerd:
   stage: build
@@ -210,8 +200,7 @@ build-suspend-resume-powerd:
   script:
     - *prepare_deps
     - meson setup build --prefix=/usr -Dgtk_doc=false -Dsystemd_suspend_resume=false -Dpowerd_suspend_resume=true
-    - ninja -C build
-    - ninja -C build install
+    - meson install -C build
 
 build-single-plugins:
   stage: build
@@ -226,7 +215,7 @@ build-single-plugins:
     - *prepare_deps
     - for PLUGIN in $(grep "plugin_"  meson_options.txt | awk -F"'" '{ print $2 }'); do
         meson setup build_$PLUGIN --prefix=/usr -Dwerror=true -Dgtk_doc=false -Dintrospection=false -Dbash_completion=false -Dauto_features=disabled -D$PLUGIN=enabled;
-        ninja -C build_$PLUGIN;
+        meson compile -C build_$PLUGIN;
       done
 
 build-single-plugins-builtin:
@@ -242,7 +231,7 @@ build-single-plugins-builtin:
     - *prepare_deps
     - for PLUGIN in $(grep "plugin_"  meson_options.txt | awk -F"'" '{ print $2 }'); do
         meson setup build_$PLUGIN --prefix=/usr -Dgtk_doc=false -Dintrospection=false -Dbash_completion=false -Dauto_features=disabled -D$PLUGIN=enabled -Dbuiltin_plugins=true;
-        ninja -C build_$PLUGIN;
+        meson compile -C build_$PLUGIN;
       done
 
 build-debug:
@@ -258,9 +247,8 @@ build-debug:
   script:
     - *prepare_deps
     - meson setup build --buildtype=debug --prefix=/usr -Dwerror=true -Dgtk_doc=true -Dpolkit=strict -Dsystemdsystemunitdir=/lib/systemd/system
-    - ninja -C build
-    - ninja -C build test
-    - ninja -C build install
+    - meson test -C build
+    - meson install -C build
     - ninja -C build uninstall
 
 build-release:
@@ -276,9 +264,8 @@ build-release:
   script:
     - *prepare_deps
     - meson setup build --buildtype=release --prefix=/usr -Dwerror=true -Dgtk_doc=true -Dpolkit=strict -Dsystemdsystemunitdir=/lib/systemd/system
-    - ninja -C build
-    - ninja -C build test
-    - ninja -C build install
+    - meson test -C build
+    - meson install -C build
     - ninja -C build uninstall
 
 build-release-builtin:
@@ -294,7 +281,6 @@ build-release-builtin:
   script:
     - *prepare_deps
     - meson setup build --buildtype=release --prefix=/usr -Dwerror=true -Dgtk_doc=true -Dpolkit=strict -Dsystemdsystemunitdir=/lib/systemd/system -Dbuiltin_plugins=true
-    - ninja -C build
-    - ninja -C build test
-    - ninja -C build install
+    - meson test -C build
+    - meson install -C build
     - ninja -C build uninstall
