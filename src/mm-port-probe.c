@@ -1932,6 +1932,9 @@ initialize_port_type_hints (MMPortProbe *self)
             } else if (!g_strcmp0 (type, "FIREHOSE")) {
                 mm_obj_dbg (self, "port may be FIREHOSE based on the wwan type attribute");
                 auto_ignored = TRUE;
+            } else if (!g_strcmp0 (type, "FASTBOOT")) {
+                mm_obj_dbg (self, "port may be FASTBOOT based on the wwan type attribute");
+                auto_ignored = TRUE;
             }
         }
         /* Linux 5.13 does not have 'type' attribute yet, match kernel name instead */
