@@ -114,7 +114,6 @@ GObject         *mm_device_peek_port_probe      (MMDevice       *self,
 GObject         *mm_device_get_port_probe       (MMDevice       *self,
                                                  MMKernelDevice *kernel_port);
 GList           *mm_device_peek_port_probe_list (MMDevice       *self);
-GList           *mm_device_get_port_probe_list  (MMDevice       *self);
 gboolean         mm_device_get_hotplugged       (MMDevice       *self);
 gboolean         mm_device_get_inhibited        (MMDevice       *self);
 

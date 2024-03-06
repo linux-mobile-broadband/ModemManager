@@ -627,14 +627,6 @@ mm_device_peek_port_probe_list (MMDevice *self)
     return self->priv->port_probes;
 }
 
-GList *
-mm_device_get_port_probe_list (MMDevice *self)
-{
-    return g_list_copy_deep (self->priv->port_probes,
-                             (GCopyFunc)g_object_ref,
-                             NULL);
-}
-
 gboolean
 mm_device_get_hotplugged (MMDevice *self)
 {
