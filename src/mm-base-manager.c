@@ -206,34 +206,31 @@ device_support_check_ready (MMPluginManager          *plugin_manager,
                             GAsyncResult             *res,
                             FindDeviceSupportContext *ctx)
 {
-    GError   *error = NULL;
-    MMPlugin *plugin;
+    g_autoptr(GError)   error = NULL;
+    g_autoptr(MMPlugin) plugin = NULL;
 
     /* If the device support check fails, either with an error, or afterwards
-     * when trying to create a modem object, we must remove the MMDevice from
-     * the tracking table of devices, so that a manual scan request afterwards
-     * re-scans all ports. */
+     * when trying to create a modem object, we must reset the port probe list
+     * in the MMDevice, so that a manual scan request afterwards re-scans all
+     * ports. */
 
     /* Receive plugin result from the plugin manager */
     plugin = mm_plugin_manager_device_support_check_finish (plugin_manager, res, &error);
     if (!plugin) {
         mm_obj_msg (ctx->self, "couldn't check support for device '%s': %s",
                     mm_device_get_uid (ctx->device), error->message);
-        g_error_free (error);
-        g_hash_table_remove (ctx->self->priv->devices, mm_device_get_uid (ctx->device));
+        mm_device_reset_port_probe_list (ctx->device);
         find_device_support_context_free (ctx);
         return;
     }
 
     /* Set the plugin as the one expected in the device */
     mm_device_set_plugin (ctx->device, G_OBJECT (plugin));
-    g_object_unref (plugin);
 
     if (!mm_device_create_modem (ctx->device, &error)) {
         mm_obj_warn (ctx->self, "couldn't create modem for device '%s': %s",
                      mm_device_get_uid (ctx->device), error->message);
-        g_error_free (error);
-        g_hash_table_remove (ctx->self->priv->devices, mm_device_get_uid (ctx->device));
+        mm_device_reset_port_probe_list (ctx->device);
         find_device_support_context_free (ctx);
         return;
     }
@@ -297,14 +294,175 @@ device_removed (MMBaseManager *self,
 }
 
 static void
+device_support_check_add_all_ports (MMBaseManager  *self,
+                                    MMDevice       *device)
+{
+    FindDeviceSupportContext *ctx;
+    GList                    *l;
+
+    g_assert (!mm_plugin_manager_device_support_check_ongoing (self->priv->plugin_manager, device));
+
+    /* There is no running device support context, so we launch a new one */
+    ctx = g_slice_new (FindDeviceSupportContext);
+    ctx->self = g_object_ref (self);
+    ctx->device = g_object_ref (device);
+    mm_plugin_manager_device_support_check (self->priv->plugin_manager,
+                                            device,
+                                            (GAsyncReadyCallback) device_support_check_ready,
+                                            ctx);
+
+    g_assert (mm_plugin_manager_device_support_check_ongoing (self->priv->plugin_manager, device));
+
+    /* Iterate all known ports and notify them one by one */
+    for (l = mm_device_peek_port_probe_list (device); l; l = g_list_next (l)) {
+        mm_plugin_manager_device_support_check_add_port (self->priv->plugin_manager,
+                                                         device,
+                                                         mm_port_probe_peek_port (MM_PORT_PROBE (l->data)));
+    }
+}
+
+static void
+device_support_check_add_single_port (MMBaseManager  *self,
+                                      MMDevice       *device,
+                                      MMKernelDevice *port)
+{
+    FindDeviceSupportContext *ctx;
+    gboolean                  added;
+
+    /* Try to add the port to an already running device support context */
+    if (mm_plugin_manager_device_support_check_add_port (self->priv->plugin_manager, device, port))
+        return;
+
+    /* There is no running device support context, so we launch a new one */
+    ctx = g_slice_new (FindDeviceSupportContext);
+    ctx->self = g_object_ref (self);
+    ctx->device = g_object_ref (device);
+    mm_plugin_manager_device_support_check (self->priv->plugin_manager,
+                                            device,
+                                            (GAsyncReadyCallback) device_support_check_ready,
+                                            ctx);
+
+    /* Retry now, which should never fail */
+    added = mm_plugin_manager_device_support_check_add_port (self->priv->plugin_manager, device, port);
+    g_assert (added);
+}
+
+static void
+existing_port (MMBaseManager  *self,
+               MMDevice       *device,
+               MMKernelDevice *port)
+{
+    const gchar *name;
+    const gchar *uid;
+
+    name = mm_kernel_device_get_name (port);
+    uid = mm_device_get_uid (device);
+
+    mm_obj_dbg (self, "port %s already available in device '%s'", name, uid);
+
+    /* If the port exists already in the device, and we already have a valid modem
+     * object created, there is no point in processing this event, we can warn about
+     * the situation and bail out. This may happen e.g. if a manual scan is requested
+     * after having successfully finished the last probing operation. */
+    if (mm_device_peek_plugin (device) && mm_device_peek_modem (device)) {
+        mm_obj_dbg (self, "ignoring port %s as device '%s' already has a valid modem", name, uid);
+        return;
+    }
+
+    /* The port exists in the device, but we don't have a valid modem associated with
+     * it. This may happen if a manual scan is requested after having failed the last
+     * device probing operation. We need to relaunch a new device probing task, unless
+     * one is already running. */
+    device_support_check_add_single_port (self, device, port);
+}
+
+static void
+additional_port (MMBaseManager  *self,
+                 MMDevice       *device,
+                 MMKernelDevice *port)
+{
+    MMBaseModem *modem;
+    const gchar *name;
+    const gchar *uid;
+
+    name = mm_kernel_device_get_name (port);
+    uid = mm_device_get_uid (device);
+
+    mm_obj_dbg (self, "additional port %s in device '%s'", name, uid);
+
+    /* Do nothing if the device is ignoring the new port */
+    if (!mm_device_grab_port (device, port))
+        return;
+
+    /* If there is an ongoing support check, we can add the single port right away */
+    if (mm_plugin_manager_device_support_check_ongoing (self->priv->plugin_manager, device)) {
+        device_support_check_add_single_port (self, device, port);
+        return;
+    }
+
+    mm_obj_warn (self, "additional port %s in device '%s' added after device probing has already finished", name, uid);
+
+    /* If there is no plugin assigned in the device, it means the device probing had failed earlier,
+     * for example if none of the ports that were used for the device probing were usable control ports */
+    if (!mm_device_peek_plugin (device)) {
+        g_assert (!mm_device_peek_modem (device));
+        mm_obj_info (self, "last device '%s' probing had failed, will retry", uid);
+        device_support_check_add_all_ports (self, device);
+        return;
+    }
+
+    /* If there is no modem object assigned to the device, it means the modem object creation had failed earlier,
+     * for example if a required port was missing (e.g. missing net port in a QMI or MBIM modem) */
+    modem = mm_device_peek_modem (device);
+    if (!modem) {
+        mm_obj_info (self, "last modem object creation in device '%s' had failed, will retry", uid);
+        device_support_check_add_all_ports (self, device);
+        return;
+    }
+
+    mm_obj_info (self, "last modem object creation in device '%s' succeeded, but we have a new port addition, will retry", uid);
+    g_cancellable_cancel (mm_base_modem_peek_cancellable (modem));
+    mm_device_remove_modem (device);
+    device_support_check_add_all_ports (self, device);
+}
+
+static void
+first_port (MMBaseManager  *self,
+            MMKernelDevice *port,
+            gboolean        hotplugged)
+{
+    g_autoptr(MMDevice)  device = NULL;
+    const gchar         *name;
+    const gchar         *uid;
+    const gchar         *physdev;
+
+    name = mm_kernel_device_get_name (port);
+    uid = mm_kernel_device_get_physdev_uid (port);
+
+    mm_obj_dbg (self, "port %s is first in device '%s'", name, uid);
+
+    physdev = mm_kernel_device_get_physdev_sysfs_path (port);
+    device = mm_device_new (uid, physdev, hotplugged, FALSE, self->priv->object_manager);
+
+    /* If the device is ignoring the new port, discard the new device as well */
+    if (!mm_device_grab_port (device, port)) {
+        mm_obj_dbg (self, "discarding device '%s' as the first port is not grabbed", uid);
+        return;
+    }
+
+    /* Store the device */
+    g_hash_table_insert (self->priv->devices, g_strdup (uid), g_steal_pointer (&device));
+}
+
+static void
 device_added (MMBaseManager  *self,
               MMKernelDevice *port,
               gboolean        hotplugged,
               gboolean        manual_scan)
 {
     MMDevice    *device;
-    const gchar *physdev_uid;
     const gchar *name;
+    const gchar *uid;
 
     g_return_if_fail (port != NULL);
 
@@ -333,15 +491,15 @@ device_added (MMBaseManager  *self,
 
     /* Get the port's physical device's uid. All ports of the same physical
      * device will share the same uid. */
-    physdev_uid = mm_kernel_device_get_physdev_uid (port);
-    g_assert (physdev_uid);
+    uid = mm_kernel_device_get_physdev_uid (port);
+    g_assert (uid);
 
     /* If the device is inhibited, do nothing else */
-    if (is_device_inhibited (self, physdev_uid)) {
+    if (is_device_inhibited (self, uid)) {
         /* Note: we will not report as hotplugged an inhibited device port
          * because we don't know what was done with the port out of our
          * context. */
-        device_inhibited_track_port (self, physdev_uid, port, manual_scan);
+        device_inhibited_track_port (self, uid, port, manual_scan);
         return;
     }
 
@@ -349,42 +507,22 @@ device_added (MMBaseManager  *self,
     if (!mm_filter_port (self->priv->filter, port, manual_scan))
         return;
 
-    /* If already added, ignore new event */
-    if (find_device_by_port (self, port)) {
-        mm_obj_dbg (self, "port %s already added", name);
+    /* If the port is already added, don't add it again */
+    device = find_device_by_port (self, port);
+    if (device) {
+        existing_port (self, device, port);
         return;
     }
 
     /* See if we already created an object to handle ports in this device */
-    device = find_device_by_physdev_uid (self, physdev_uid);
-    if (!device) {
-        const gchar *physdev;
-        FindDeviceSupportContext *ctx;
+    device = find_device_by_physdev_uid (self, uid);
+    if (device) {
+        additional_port (self, device, port);
+        return;
+    }
 
-        mm_obj_dbg (self, "port %s is first in device %s", name, physdev_uid);
-
-        physdev = mm_kernel_device_get_physdev_sysfs_path (port);
-
-        /* Keep the device listed in the Manager */
-        device = mm_device_new (physdev_uid, physdev, hotplugged, FALSE, self->priv->object_manager);
-        g_hash_table_insert (self->priv->devices,
-                             g_strdup (physdev_uid),
-                             device);
-
-        /* Launch device support check */
-        ctx = g_slice_new (FindDeviceSupportContext);
-        ctx->self = g_object_ref (self);
-        ctx->device = g_object_ref (device);
-        mm_plugin_manager_device_support_check (
-            self->priv->plugin_manager,
-            device,
-            (GAsyncReadyCallback) device_support_check_ready,
-            ctx);
-    } else
-        mm_obj_dbg (self, "additional port %s in device %s", name, physdev_uid);
-
-    /* Grab the port in the existing device. */
-    mm_device_grab_port (device, port);
+    /* This is the first port in a new device */
+    first_port (self, port, hotplugged);
 }
 
 #if defined WITH_QRTR

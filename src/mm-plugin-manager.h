@@ -67,6 +67,14 @@ gboolean         mm_plugin_manager_device_support_check_cancel (MMPluginManager 
 MMPlugin *       mm_plugin_manager_device_support_check_finish (MMPluginManager      *self,
                                                                 GAsyncResult         *res,
                                                                 GError              **error);
+
+gboolean         mm_plugin_manager_device_support_check_ongoing (MMPluginManager *self,
+                                                                 MMDevice        *device);
+
+gboolean         mm_plugin_manager_device_support_check_add_port (MMPluginManager *self,
+                                                                  MMDevice        *device,
+                                                                  MMKernelDevice  *port);
+
 MMPlugin        *mm_plugin_manager_peek_plugin                 (MMPluginManager      *self,
                                                                 const gchar          *plugin_name);
 const gchar    **mm_plugin_manager_get_subsystems              (MMPluginManager      *self);

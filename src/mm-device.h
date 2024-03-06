@@ -10,7 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2012 Google, Inc.
+ * Copyright (C) 2012-2024 Google, Inc.
  */
 
 #ifndef MM_DEVICE_H
@@ -42,7 +42,6 @@ typedef struct _MMDevicePrivate MMDevicePrivate;
 #define MM_DEVICE_INHIBITED      "inhibited"
 #define MM_DEVICE_OBJECT_MANAGER "object-manager"
 
-#define MM_DEVICE_PORT_GRABBED  "port-grabbed"
 #define MM_DEVICE_PORT_RELEASED "port-released"
 
 struct _MMDevice {
@@ -54,8 +53,6 @@ struct _MMDeviceClass {
     GObjectClass parent;
 
     /* signals */
-    void (* port_grabbed)  (MMDevice       *self,
-                            MMKernelDevice *port);
     void (* port_released) (MMDevice       *self,
                             MMKernelDevice *port);
 };
@@ -69,7 +66,7 @@ MMDevice *mm_device_new (const gchar              *uid,
                          gboolean                  virtual,
                          GDBusObjectManagerServer *object_manager);
 
-void     mm_device_grab_port   (MMDevice       *self,
+gboolean mm_device_grab_port   (MMDevice       *self,
                                 MMKernelDevice *kernel_port);
 gboolean mm_device_owns_port   (MMDevice       *self,
                                 MMKernelDevice *kernel_port);
@@ -96,7 +93,6 @@ gboolean mm_device_inhibit_finish (MMDevice                  *self,
 gboolean mm_device_uninhibit      (MMDevice                  *self,
                                    GError                   **error);
 
-
 const gchar     *mm_device_get_uid              (MMDevice       *self);
 const gchar     *mm_device_get_physdev          (MMDevice       *self);
 const gchar    **mm_device_get_drivers          (MMDevice       *self);
@@ -109,13 +105,15 @@ GObject         *mm_device_peek_plugin          (MMDevice       *self);
 GObject         *mm_device_get_plugin           (MMDevice       *self);
 MMBaseModem     *mm_device_peek_modem           (MMDevice       *self);
 MMBaseModem     *mm_device_get_modem            (MMDevice       *self);
-GObject         *mm_device_peek_port_probe      (MMDevice       *self,
-                                                 MMKernelDevice *kernel_port);
-GObject         *mm_device_get_port_probe       (MMDevice       *self,
-                                                 MMKernelDevice *kernel_port);
-GList           *mm_device_peek_port_probe_list (MMDevice       *self);
 gboolean         mm_device_get_hotplugged       (MMDevice       *self);
 gboolean         mm_device_get_inhibited        (MMDevice       *self);
+
+GObject         *mm_device_peek_port_probe       (MMDevice       *self,
+                                                  MMKernelDevice *kernel_port);
+GObject         *mm_device_get_port_probe        (MMDevice       *self,
+                                                  MMKernelDevice *kernel_port);
+GList           *mm_device_peek_port_probe_list  (MMDevice       *self);
+void             mm_device_reset_port_probe_list (MMDevice       *self);
 
 /* For testing purposes */
 void          mm_device_virtual_grab_ports (MMDevice     *self,

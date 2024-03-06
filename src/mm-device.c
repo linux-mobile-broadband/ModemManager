@@ -10,7 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2012 Google, Inc.
+ * Copyright (C) 2012-2024 Google, Inc.
  */
 
 #include <config.h>
@@ -26,6 +26,7 @@
 #include "mm-device.h"
 #include "mm-plugin.h"
 #include "mm-log-object.h"
+#include "mm-daemon-enums-types.h"
 
 static void log_object_iface_init (MMLogObjectInterface *iface);
 
@@ -46,7 +47,6 @@ enum {
 };
 
 enum {
-    SIGNAL_PORT_GRABBED,
     SIGNAL_PORT_RELEASED,
     SIGNAL_LAST
 };
@@ -76,7 +76,8 @@ struct _MMDevicePrivate {
     /* Kernel drivers managing this device */
     gchar **drivers;
 
-    /* Best plugin to manage this device */
+    /* Best plugin to manage this device, only if the device probing
+     * has finished successfully. */
     MMPlugin *plugin;
 
     /* Lists of port probes in the device */
@@ -213,7 +214,7 @@ add_port_driver (MMDevice       *self,
     self->priv->drivers[n_items + 1] = NULL;
 }
 
-void
+gboolean
 mm_device_grab_port (MMDevice       *self,
                      MMKernelDevice *kernel_port)
 {
@@ -221,22 +222,19 @@ mm_device_grab_port (MMDevice       *self,
     MMKernelDevice *lower_port;
 
     if (mm_device_owns_port (self, kernel_port))
-        return;
+        return TRUE;
 
     lower_port = mm_kernel_device_peek_lower_device (kernel_port);
     if (lower_port) {
         g_autoptr(GError) error = NULL;
 
         /* No port probing done, at this point this is not something we require
-         * as all the virtual instantiated ports are net devices. We also avoid
-         * emitting the PORT_GRABBED signal in the MMDevice, because that is
-         * exclusively linked to a port being added to the list of probes, which
-         * we don't do here. */
+         * as all the virtual instantiated ports are net devices. */
         if (self->priv->modem && !mm_base_modem_grab_link_port (self->priv->modem, kernel_port, &error))
             mm_obj_dbg (self, "fully ignoring link port %s from now on: %s",
                         mm_kernel_device_get_name (kernel_port),
                         error->message);
-        return;
+        return FALSE;
     }
     if (!g_strcmp0 ("net", mm_kernel_device_get_subsystem (kernel_port)) &&
         mm_kernel_device_get_wwandev_sysfs_path (kernel_port)) {
@@ -256,7 +254,7 @@ mm_device_grab_port (MMDevice       *self,
                 mm_obj_dbg (self, "fully ignoring link port %s from now on: %s",
                             mm_kernel_device_get_name (kernel_port),
                             error->message);
-            return;
+            return FALSE;
         }
     }
 
@@ -278,8 +276,7 @@ mm_device_grab_port (MMDevice       *self,
     probe = mm_port_probe_new (self, kernel_port);
     self->priv->port_probes = g_list_prepend (self->priv->port_probes, probe);
 
-    /* Notify about the grabbed port */
-    g_signal_emit (self, signals[SIGNAL_PORT_GRABBED], 0, kernel_port);
+    return TRUE;
 }
 
 void
@@ -625,6 +622,17 @@ GList *
 mm_device_peek_port_probe_list (MMDevice *self)
 {
     return self->priv->port_probes;
+}
+
+void
+mm_device_reset_port_probe_list (MMDevice *self)
+{
+    GList *l;
+
+    mm_obj_dbg (self, "port probe list reset...");
+    for (l = self->priv->port_probes; l; l = g_list_next (l)) {
+        mm_port_probe_reset (MM_PORT_PROBE (l->data));
+    }
 }
 
 gboolean
@@ -980,15 +988,6 @@ mm_device_class_init (MMDeviceClass *klass)
                               FALSE,
                               G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_INHIBITED, properties[PROP_INHIBITED]);
-
-    signals[SIGNAL_PORT_GRABBED] =
-        g_signal_new (MM_DEVICE_PORT_GRABBED,
-                      G_OBJECT_CLASS_TYPE (object_class),
-                      G_SIGNAL_RUN_FIRST,
-                      G_STRUCT_OFFSET (MMDeviceClass, port_grabbed),
-                      NULL, NULL,
-                      g_cclosure_marshal_generic,
-                      G_TYPE_NONE, 1, MM_TYPE_KERNEL_DEVICE);
 
     signals[SIGNAL_PORT_RELEASED] =
         g_signal_new (MM_DEVICE_PORT_RELEASED,

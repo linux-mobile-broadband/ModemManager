@@ -86,6 +86,15 @@ struct _MMPortProbePrivate {
     MMDevice *device;
     MMKernelDevice *port;
 
+    /* From udev tags */
+    gboolean is_ignored;
+    gboolean is_gps;
+    gboolean is_audio;
+    gboolean maybe_at;
+    gboolean maybe_qcdm;
+    gboolean maybe_qmi;
+    gboolean maybe_mbim;
+
     /* Probing results */
     guint32 flags;
     gboolean is_at;
@@ -97,18 +106,26 @@ struct _MMPortProbePrivate {
     gboolean is_qmi;
     gboolean is_mbim;
 
-    /* From udev tags */
-    gboolean is_ignored;
-    gboolean is_gps;
-    gboolean is_audio;
-    gboolean maybe_at;
-    gboolean maybe_qcdm;
-    gboolean maybe_qmi;
-    gboolean maybe_mbim;
-
     /* Current probing task. Only one can be available at a time */
     GTask *task;
 };
+
+/*****************************************************************************/
+
+void
+mm_port_probe_reset (MMPortProbe *self)
+{
+    g_assert (!self->priv->task);
+    self->priv->flags = 0;
+    self->priv->is_at = FALSE;
+    self->priv->is_qcdm = FALSE;
+    g_clear_pointer (&self->priv->vendor, g_free);
+    g_clear_pointer (&self->priv->product, g_free);
+    self->priv->is_icera = FALSE;
+    self->priv->is_xmm = FALSE;
+    self->priv->is_qmi = FALSE;
+    self->priv->is_mbim = FALSE;
+}
 
 /*****************************************************************************/
 /* Probe task completions.
