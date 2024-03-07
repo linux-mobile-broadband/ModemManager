@@ -7308,6 +7308,19 @@ modem_messaging_cleanup_unsolicited_events (MMIfaceModemMessaging *self,
 /*****************************************************************************/
 /* Enable unsolicited events (SMS indications) (Messaging interface) */
 
+typedef struct {
+    MMPortSerialAt *primary;
+    MMPortSerialAt *secondary;
+} MessagingEnableUnsolicitedEventsContext;
+
+static void
+messaging_enable_unsolicited_events_context_free (MessagingEnableUnsolicitedEventsContext *ctx)
+{
+    g_clear_object (&ctx->primary);
+    g_clear_object (&ctx->secondary);
+    g_slice_free (MessagingEnableUnsolicitedEventsContext, ctx);
+}
+
 static gboolean
 modem_messaging_enable_unsolicited_events_finish (MMIfaceModemMessaging *self,
                                                   GAsyncResult *res,
@@ -7358,60 +7371,56 @@ static const MMBaseModemAtCommand cnmi_sequence[] = {
 };
 
 static void
-modem_messaging_enable_unsolicited_events_secondary_ready (MMBaseModem *self,
+modem_messaging_enable_unsolicited_events_secondary_ready (MMBaseModem  *self,
                                                            GAsyncResult *res,
-                                                           GTask *task)
+                                                           GTask        *task)
 {
-    GError *inner_error = NULL;
-    MMPortSerialAt *secondary;
+    MessagingEnableUnsolicitedEventsContext *ctx;
+    g_autoptr(GError)                        error = NULL;
 
-    secondary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+    ctx = g_task_get_task_data (task);
 
     /* Since the secondary is not required, we don't propagate the error anywhere */
-    mm_base_modem_at_sequence_full_finish (MM_BASE_MODEM (self), res, NULL, &inner_error);
-    if (inner_error) {
+    mm_base_modem_at_sequence_full_finish (MM_BASE_MODEM (self), res, NULL, &error);
+    if (error) {
         mm_obj_dbg (self, "failed to enable messaging unsolicited events on secondary port %s: %s",
-                    mm_port_get_device (MM_PORT (secondary)),
-                    inner_error->message);
-        g_error_free (inner_error);
+                    mm_port_get_device (MM_PORT (ctx->secondary)),
+                    error->message);
+    } else {
+        mm_obj_dbg (self, "messaging unsolicited events enabled on secondary port %s",
+                    mm_port_get_device (MM_PORT (ctx->secondary)));
     }
-
-    mm_obj_dbg (self, "messaging unsolicited events enabled on secondary port %s",
-                mm_port_get_device (MM_PORT (secondary)));
 
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
 
 static void
-modem_messaging_enable_unsolicited_events_primary_ready (MMBaseModem *self,
+modem_messaging_enable_unsolicited_events_primary_ready (MMBaseModem  *self,
                                                          GAsyncResult *res,
-                                                         GTask *task)
+                                                         GTask        *task)
 {
-    GError *inner_error = NULL;
-    MMPortSerialAt *primary;
-    MMPortSerialAt *secondary;
+    MessagingEnableUnsolicitedEventsContext *ctx;
+    GError                                  *error = NULL;
 
-    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
-    secondary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
-
-    mm_base_modem_at_sequence_full_finish (MM_BASE_MODEM (self), res, NULL, &inner_error);
-    if (inner_error) {
-        g_task_return_error (task, inner_error);
+    mm_base_modem_at_sequence_full_finish (MM_BASE_MODEM (self), res, NULL, &error);
+    if (error) {
+        g_task_return_error (task, error);
         g_object_unref (task);
         return;
     }
 
+    ctx = g_task_get_task_data (task);
     mm_obj_dbg (self, "messaging unsolicited events enabled on primary port %s",
-                mm_port_get_device (MM_PORT (primary)));
+                mm_port_get_device (MM_PORT (ctx->primary)));
 
     /* Try to enable unsolicited events for secondary port */
-    if (secondary) {
+    if (ctx->secondary) {
         mm_obj_dbg (self, "enabling messaging unsolicited events on secondary port %s",
-                    mm_port_get_device (MM_PORT (secondary)));
+                    mm_port_get_device (MM_PORT (ctx->secondary)));
         mm_base_modem_at_sequence_full (
             MM_BASE_MODEM (self),
-            secondary,
+            ctx->secondary,
             cnmi_sequence,
             NULL, /* response_processor_context */
             NULL, /* response_processor_context_free */
@@ -7427,18 +7436,22 @@ modem_messaging_enable_unsolicited_events_primary_ready (MMBaseModem *self,
 
 static void
 modem_messaging_enable_unsolicited_events (MMIfaceModemMessaging *self,
-                                           GAsyncReadyCallback callback,
-                                           gpointer user_data)
+                                           GAsyncReadyCallback    callback,
+                                           gpointer               user_data)
 {
-    GTask *task;
-    MMPortSerialAt *primary;
+    MessagingEnableUnsolicitedEventsContext *ctx;
+    GTask                                   *task;
 
     task = g_task_new (self, NULL, callback, user_data);
-    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+
+    ctx = g_slice_new0 (MessagingEnableUnsolicitedEventsContext);
+    ctx->primary = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    ctx->secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+    g_task_set_task_data (task, ctx, (GDestroyNotify) messaging_enable_unsolicited_events_context_free);
 
     /* Do nothing if the modem doesn't have any AT port (e.g. it could be
      * a QMI modem trying to enable the parent unsolicited messages) */
-    if (!primary) {
+    if (!ctx->primary) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                  "No AT port to enable messaging unsolicited events");
         g_object_unref (task);
@@ -7447,10 +7460,10 @@ modem_messaging_enable_unsolicited_events (MMIfaceModemMessaging *self,
 
     /* Enable unsolicited events for primary port */
     mm_obj_dbg (self, "enabling messaging unsolicited events on primary port %s",
-                mm_port_get_device (MM_PORT (primary)));
+                mm_port_get_device (MM_PORT (ctx->primary)));
     mm_base_modem_at_sequence_full (
         MM_BASE_MODEM (self),
-        primary,
+        ctx->primary,
         cnmi_sequence,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
