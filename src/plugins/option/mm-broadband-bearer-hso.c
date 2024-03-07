@@ -557,8 +557,8 @@ authenticate (GTask *task)
             return;
         }
 
-        quoted_user     = mm_port_serial_at_quote_string (user);
-        quoted_password = mm_port_serial_at_quote_string (password);
+        quoted_user     = mm_at_quote_string (user);
+        quoted_password = mm_at_quote_string (password);
         command = g_strdup_printf ("%s=%d,%u,%s,%s",
                                    auth_commands[ctx->auth_idx],
                                    ctx->cid,

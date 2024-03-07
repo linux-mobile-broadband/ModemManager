@@ -54,32 +54,6 @@ struct _MMPortSerialAtPrivate {
 
 /*****************************************************************************/
 
-gchar *
-mm_port_serial_at_quote_string (const char *string)
-{
-    int len, i;
-    gchar *quoted, *pos;
-
-    if (string == NULL)
-        len = 0;
-    else
-        len = strlen (string);
-    quoted = g_malloc (3 + 3 * len); /* worst case */
-
-    pos = quoted;
-    *pos++ = '"';
-    for (i = 0 ; i < len; i++) {
-        if (string[i] < 0x20 || string[i] == '"' || string[i] == '\\')
-            pos += sprintf (pos, "\\%02X", string[i]);
-        else
-            *pos++ = string[i];
-    }
-    *pos++ = '"';
-    *pos++ = '\0';
-
-    return quoted;
-}
-
 void
 mm_port_serial_at_set_response_parser (MMPortSerialAt *self,
                                        MMPortSerialAtResponseParserFn fn,

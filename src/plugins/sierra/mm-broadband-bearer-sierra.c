@@ -361,8 +361,8 @@ dial_3gpp_context_step (GTask *task)
                     return;
                 }
 
-                quoted_user = mm_port_serial_at_quote_string (user);
-                quoted_password = mm_port_serial_at_quote_string (password);
+                quoted_user = mm_at_quote_string (user);
+                quoted_password = mm_at_quote_string (password);
                 if (self->priv->is_icera) {
                     command = g_strdup_printf ("%%IPDPCFG=%d,0,%u,%s,%s",
                                                ctx->cid,

@@ -10897,7 +10897,7 @@ modem_3gpp_profile_manager_store_profile (MMIfaceModem3gppProfileManager *self,
     g_assert (pdp_type);
 
     apn = mm_3gpp_profile_get_apn (profile);
-    quoted_apn = mm_port_serial_at_quote_string (apn);
+    quoted_apn = mm_at_quote_string (apn);
 
     mm_obj_dbg (self, "storing profile '%d': apn '%s', ip type '%s'",
                 profile_id, apn, ip_type_str);

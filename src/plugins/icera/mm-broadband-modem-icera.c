@@ -2052,8 +2052,8 @@ profile_manager_store_profile_auth_settings (GTask *task)
                 return;
             }
 
-            quoted_user     = mm_port_serial_at_quote_string (user);
-            quoted_password = mm_port_serial_at_quote_string (password);
+            quoted_user     = mm_at_quote_string (user);
+            quoted_password = mm_at_quote_string (password);
             ctx->cmd = g_strdup_printf ("%%IPDPCFG=%d,0,%u,%s,%s",
                                         ctx->profile_id,
                                         icera_auth,

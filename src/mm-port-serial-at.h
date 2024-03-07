@@ -112,12 +112,6 @@ gchar *mm_port_serial_at_command_finish       (MMPortSerialAt *self,
                                                GAsyncResult *res,
                                                GError **error);
 
-/*
- * Convert a string into a quoted and escaped string. Returns a new
- * allocated string. Follows ITU V.250 5.4.2.2 "String constants".
- */
-gchar   *mm_port_serial_at_quote_string (const char *string);
-
 /* Just for unit tests */
 void     mm_port_serial_at_remove_echo (GByteArray *response);
 

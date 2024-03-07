@@ -299,9 +299,9 @@ connect_3gpp_authenticate (GTask *task)
     ctx = g_task_get_task_data (task);
 
     config = mm_base_bearer_peek_config (MM_BASE_BEARER (self));
-    apn = mm_port_serial_at_quote_string (mm_bearer_properties_get_apn (config));
-    user = mm_port_serial_at_quote_string (mm_bearer_properties_get_user (config));
-    password = mm_port_serial_at_quote_string (mm_bearer_properties_get_password (config));
+    apn = mm_at_quote_string (mm_bearer_properties_get_apn (config));
+    user = mm_at_quote_string (mm_bearer_properties_get_user (config));
+    password = mm_at_quote_string (mm_bearer_properties_get_password (config));
     command = g_strdup_printf ("$NWQMICONNECT=,,,,,,%s,,,%s,%s",
                                apn, user, password);
     g_free (apn);

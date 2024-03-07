@@ -1855,8 +1855,8 @@ mm_cinterion_build_auth_string (gpointer                log_object,
         return g_strdup_printf ("^SGAUTH=%u,%d", cid, encoded_auth);
     }
 
-    quoted_user   = mm_port_serial_at_quote_string (user   ? user   : "");
-    quoted_passwd = mm_port_serial_at_quote_string (passwd ? passwd : "");
+    quoted_user   = mm_at_quote_string (user   ? user   : "");
+    quoted_passwd = mm_at_quote_string (passwd ? passwd : "");
 
     if (modem_family == MM_CINTERION_MODEM_FAMILY_IMT)
         return g_strdup_printf ("^SGAUTH=%u,%d,%s,%s",

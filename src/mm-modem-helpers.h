@@ -79,6 +79,12 @@ gchar *mm_bcd_to_string (const guint8 *bcd,
                          gsize bcd_len,
                          gboolean low_nybble_first);
 
+/*
+ * Convert a string into a quoted and escaped string. Returns a new
+ * allocated string. Follows ITU V.250 5.4.2.2 "String constants".
+ */
+gchar *mm_at_quote_string (const gchar *input);
+
 /*****************************************************************************/
 /* VOICE specific helpers and utilities */
 /*****************************************************************************/

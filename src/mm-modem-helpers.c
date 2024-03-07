@@ -454,6 +454,34 @@ mm_bcd_to_string (const guint8 *bcd, gsize bcd_len, gboolean low_nybble_first)
 
 /*****************************************************************************/
 
+gchar *
+mm_at_quote_string (const gchar *input)
+{
+    GString *str;
+    gsize    input_len;
+
+    input_len = input ? strlen (input) : 0;
+    str = g_string_sized_new (3 + 3 * input_len); /* worst case */
+    g_string_append_c (str, '"');
+
+    if (input) {
+        gsize i, len;
+
+        len = strlen (input);
+        for (i = 0 ; i < len; i++) {
+            if (input[i] < 0x20 || input[i] == '"' || input[i] == '\\')
+                g_string_append_printf (str, "\\%02X", input[i]);
+            else
+                g_string_append_c (str, input[i]);
+        }
+    }
+    g_string_append_c (str, '"');
+
+    return g_string_free (str, FALSE);
+}
+
+/*****************************************************************************/
+
 GRegex *
 mm_voice_ring_regex_get (void)
 {

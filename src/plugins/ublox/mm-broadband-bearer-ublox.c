@@ -533,8 +533,8 @@ out:
         user     = mm_bearer_properties_get_user     (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
         password = mm_bearer_properties_get_password (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
 
-        quoted_user     = mm_port_serial_at_quote_string (user);
-        quoted_password = mm_port_serial_at_quote_string (password);
+        quoted_user     = mm_at_quote_string (user);
+        quoted_password = mm_at_quote_string (password);
 
         cmd = g_strdup_printf ("+UAUTHREQ=%u,%u,%s,%s",
                                ctx->cid,

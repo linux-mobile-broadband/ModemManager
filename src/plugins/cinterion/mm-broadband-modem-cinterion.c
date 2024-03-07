@@ -1374,7 +1374,7 @@ set_initial_eps_step (GTask *task)
         apn = mm_bearer_properties_get_apn (ctx->properties);
         mm_obj_dbg (self, "context %d with APN '%s' and PDP type '%s'",
                     self->priv->initial_eps_bearer_cid, apn, ip_family_str);
-        quoted_apn = mm_port_serial_at_quote_string (apn);
+        quoted_apn = mm_at_quote_string (apn);
         apn_cmd = g_strdup_printf ("+CGDCONT=%u,\"%s\",%s",
                                    self->priv->initial_eps_bearer_cid, ip_family_str, quoted_apn);
         mm_base_modem_at_command (

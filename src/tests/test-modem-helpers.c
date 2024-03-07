@@ -4546,6 +4546,34 @@ test_bcd_to_string (void *f, gpointer d)
 /*****************************************************************************/
 
 typedef struct {
+    const gchar *input;
+    const gchar *expected;
+} AtQuoteStringTest;
+
+static const AtQuoteStringTest at_quote_string_tests[] = {
+    { "", "\"\"" },
+    { "internet", "\"internet\"" },
+    { "\"internet", "\"\\22internet\"" },  /* double quote is \22 */
+    { "\r\ninternet", "\"\\0D\\0Ainternet\"" },  /* CRLF is \0D\0A */
+    { "\r\ninternet\r\n", "\"\\0D\\0Ainternet\\0D\\0A\"" },  /* CRLF is \0D\0A */
+};
+
+static void
+test_at_quote_string (void *f, gpointer d)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (at_quote_string_tests); i++) {
+        g_autofree gchar *str = NULL;
+
+        str = mm_at_quote_string (at_quote_string_tests[i].input);
+        g_assert_cmpstr (str, ==, at_quote_string_tests[i].expected);
+    }
+}
+
+/*****************************************************************************/
+
+typedef struct {
     const gchar *response;
     gboolean     expected_error;
     guint        expected_index;
@@ -4854,6 +4882,8 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_parse_uint_list, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_bcd_to_string, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_at_quote_string, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cpol_response, NULL));
 
