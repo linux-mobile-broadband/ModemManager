@@ -182,9 +182,9 @@ at_sequence_parse_response (MMPortSerialAt    *port,
     GError                               *result_error = NULL;
     AtSequenceContext                    *ctx;
     g_autofree gchar                     *response = NULL;
-    GError                               *error = NULL;
+    g_autoptr(GError)                     command_error = NULL;
 
-    response = mm_port_serial_at_command_finish (port, res, &error);
+    response = mm_port_serial_at_command_finish (port, res, &command_error);
 
     /* Cancelled? */
     if (g_task_return_error_if_cancelled (task)) {
@@ -204,7 +204,7 @@ at_sequence_parse_response (MMPortSerialAt    *port,
                                                              ctx->current->command,
                                                              response,
                                                              next->command ? FALSE : TRUE,  /* Last command in sequence? */
-                                                             error,
+                                                             command_error,
                                                              &result,
                                                              &result_error);
         switch (processor_result) {
@@ -219,16 +219,11 @@ at_sequence_parse_response (MMPortSerialAt    *port,
                 g_assert (!result && result_error); /* result is optional */
                 g_task_return_error (task, result_error);
                 g_object_unref (task);
-                if (error)
-                    g_error_free (error);
                 return;
             default:
                 g_assert_not_reached ();
         }
     }
-
-    if (error)
-        g_error_free (error);
 
     if (processor_result == MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE) {
         ctx->current++;
@@ -526,29 +521,29 @@ at_command_ready (MMPortSerialAt *port,
                   GAsyncResult *res,
                  GTask *task)
 {
-    AtCommandContext *ctx;
-    GError *error = NULL;
+    AtCommandContext  *ctx;
+    g_autoptr(GError)  command_error = NULL;
 
     ctx = g_task_get_task_data (task);
 
     g_assert (!ctx->response);
-    ctx->response = mm_port_serial_at_command_finish (port, res, &error);
+    ctx->response = mm_port_serial_at_command_finish (port, res, &command_error);
 
     /* Cancelled? */
     if (g_task_return_error_if_cancelled (task)) {
-        if (error)
-            g_error_free (error);
+        g_object_unref (task);
+        return;
     }
+
     /* Error coming from the serial port? */
-    else if (error)
-        g_task_return_error (task, error);
+    if (command_error)
+        g_task_return_error (task, g_steal_pointer (&command_error));
     /* Valid string response */
     else if (ctx->response)
         /* transfer-none, the response remains owned by the GTask context */
         g_task_return_pointer (task, ctx->response, NULL);
     else
         g_assert_not_reached ();
-
     g_object_unref (task);
 }
 
