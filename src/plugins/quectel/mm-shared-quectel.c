@@ -132,6 +132,8 @@ mm_shared_quectel_setup_ports (MMBroadbandModem *self)
     MMPortSerialAt *ports[2];
     guint           i;
 
+    mm_obj_dbg (self, "setting up ports in quectel modem...");
+
     priv = get_private (MM_SHARED_QUECTEL (self));
     g_assert (priv->broadband_modem_class_parent);
     g_assert (priv->broadband_modem_class_parent->setup_ports);

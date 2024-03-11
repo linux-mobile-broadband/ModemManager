@@ -16,6 +16,7 @@
 #include <config.h>
 
 #include "mm-broadband-modem-quectel.h"
+#include "mm-iface-modem.h"
 #include "mm-iface-modem-firmware.h"
 #include "mm-iface-modem-location.h"
 #include "mm-iface-modem-time.h"
@@ -76,18 +77,6 @@ iface_modem_init (MMIfaceModem *iface)
     iface->cleanup_sim_hot_swap = mm_shared_quectel_cleanup_sim_hot_swap;
 }
 
-static MMIfaceModem *
-peek_parent_modem_interface (MMSharedQuectel *self)
-{
-    return iface_modem_parent;
-}
-
-static MMBroadbandModemClass *
-peek_parent_broadband_modem_class (MMSharedQuectel *self)
-{
-    return MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_quectel_parent_class);
-}
-
 static void
 iface_modem_firmware_init (MMIfaceModemFirmware *iface)
 {
@@ -108,17 +97,29 @@ iface_modem_location_init (MMIfaceModemLocation *iface)
     iface->disable_location_gathering_finish = mm_shared_quectel_disable_location_gathering_finish;
 }
 
-static MMIfaceModemLocation *
-peek_parent_modem_location_interface (MMSharedQuectel *self)
-{
-    return iface_modem_location_parent;
-}
-
 static void
 iface_modem_time_init (MMIfaceModemTime *iface)
 {
     iface->check_support        = mm_shared_quectel_time_check_support;
     iface->check_support_finish = mm_shared_quectel_time_check_support_finish;
+}
+
+static MMBroadbandModemClass *
+peek_parent_broadband_modem_class (MMSharedQuectel *self)
+{
+    return MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_quectel_parent_class);
+}
+
+static MMIfaceModem *
+peek_parent_modem_interface (MMSharedQuectel *self)
+{
+    return iface_modem_parent;
+}
+
+static MMIfaceModemLocation *
+peek_parent_modem_location_interface (MMSharedQuectel *self)
+{
+    return iface_modem_location_parent;
 }
 
 static void
