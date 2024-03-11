@@ -48,6 +48,9 @@ typedef struct {
     /* Broadband modem class support */
     MMBroadbandModemClass *broadband_modem_class_parent;
 
+    /* URCs to ignore */
+    GRegex *xbipi_regex;
+
     /* Modem interface support */
     GArray      *supported_modes;
     GArray      *supported_bands;
@@ -77,6 +80,7 @@ private_free (Private *priv)
         g_array_unref (priv->supported_bands);
     g_regex_unref (priv->xlsrstop_regex);
     g_regex_unref (priv->nmea_regex);
+    g_regex_unref (priv->xbipi_regex);
     g_slice_free (Private, priv);
 }
 
@@ -94,6 +98,7 @@ get_private (MMSharedXmm *self)
         priv->gps_engine_state = GPS_ENGINE_STATE_OFF;
 
         /* Setup regex for URCs */
+        priv->xbipi_regex    = g_regex_new ("\\r\\n\\+XBIPI:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         priv->xlsrstop_regex = g_regex_new ("\\r\\n\\+XLSRSTOP:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         priv->nmea_regex     = g_regex_new ("(?:\\r\\n)?(?:\\r\\n)?(\\$G.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
@@ -1655,7 +1660,11 @@ void
 mm_shared_xmm_setup_ports (MMBroadbandModem *self)
 {
     Private                   *priv;
+    MMPortSerialAt            *ports[2];
     g_autoptr(MMPortSerialAt)  gps_port = NULL;
+    guint                      i;
+
+    mm_obj_dbg (self, "setting up ports in XMM modem...");
 
     priv = get_private (MM_SHARED_XMM (self));
     g_assert (priv->broadband_modem_class_parent);
@@ -1664,7 +1673,19 @@ mm_shared_xmm_setup_ports (MMBroadbandModem *self)
     /* Parent setup first always */
     priv->broadband_modem_class_parent->setup_ports (self);
 
-    /* Then, setup the GPS port */
+    /* Setup AT ports */
+    ports[0] = mm_base_modem_peek_port_primary   (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+    for (i = 0; i < G_N_ELEMENTS (ports); i++) {
+        if (!ports[i])
+            continue;
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            ports[i],
+            priv->xbipi_regex,
+            NULL, NULL, NULL);
+    }
+
+    /* Setup the GPS port */
     gps_port = shared_xmm_get_gps_control_port (MM_SHARED_XMM (self), NULL);
     if (gps_port) {
         /* After running AT+XLSRSTOP we may get an unsolicited response
