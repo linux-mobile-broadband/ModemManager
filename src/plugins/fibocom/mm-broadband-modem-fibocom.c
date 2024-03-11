@@ -49,7 +49,6 @@ typedef enum {
 
 struct _MMBroadbandModemFibocomPrivate {
     FeatureSupport  gtrndis_support;
-    GRegex         *sim_ready_regex;
     FeatureSupport  initial_eps_bearer_support;
     gint            initial_eps_bearer_cid;
 };
@@ -655,31 +654,6 @@ modem_3gpp_profile_manager_deactivate_profile (MMIfaceModem3gppProfileManager *_
 
 /*****************************************************************************/
 
-static void
-setup_ports (MMBroadbandModem *_self)
-{
-    MMBroadbandModemFibocom *self = (MM_BROADBAND_MODEM_FIBOCOM (_self));
-    MMPortSerialAt          *ports[2];
-    guint                    i;
-
-    /* Call parent's setup ports first always */
-    MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_fibocom_parent_class)->setup_ports (_self);
-
-    ports[0] = mm_base_modem_peek_port_primary   (MM_BASE_MODEM (self));
-    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
-
-    for (i = 0; i < G_N_ELEMENTS (ports); i++) {
-        if (!ports[i])
-            continue;
-        mm_port_serial_at_add_unsolicited_msg_handler (
-            ports[i],
-            self->priv->sim_ready_regex,
-            NULL, NULL, NULL);
-    }
-}
-
-/*****************************************************************************/
-
 MMBroadbandModemFibocom *
 mm_broadband_modem_fibocom_new (const gchar  *device,
                                 const gchar  *physdev,
@@ -708,19 +682,7 @@ mm_broadband_modem_fibocom_init (MMBroadbandModemFibocom *self)
                                               MMBroadbandModemFibocomPrivate);
 
     self->priv->gtrndis_support = FEATURE_SUPPORT_UNKNOWN;
-    self->priv->sim_ready_regex = g_regex_new ("\\r\\n\\+SIM READY\\r\\n",
-                                               G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->initial_eps_bearer_support = FEATURE_SUPPORT_UNKNOWN;
-}
-
-static void
-finalize (GObject *object)
-{
-    MMBroadbandModemFibocom *self = MM_BROADBAND_MODEM_FIBOCOM (object);
-
-    g_regex_unref (self->priv->sim_ready_regex);
-
-    G_OBJECT_CLASS (mm_broadband_modem_fibocom_parent_class)->finalize (object);
 }
 
 static void
@@ -765,6 +727,12 @@ iface_modem_firmware_init (MMIfaceModemFirmware *iface)
     iface->load_update_settings_finish = mm_shared_fibocom_firmware_load_update_settings_finish;
 }
 
+static MMBroadbandModemClass *
+peek_parent_broadband_modem_class (MMSharedFibocom *self)
+{
+    return MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_fibocom_parent_class);
+}
+
 static MMIfaceModem3gpp *
 peek_parent_3gpp_interface (MMSharedFibocom *self)
 {
@@ -774,19 +742,17 @@ peek_parent_3gpp_interface (MMSharedFibocom *self)
 static void
 shared_fibocom_init (MMSharedFibocom *iface)
 {
+    iface->peek_parent_broadband_modem_class = peek_parent_broadband_modem_class;
     iface->peek_parent_3gpp_interface = peek_parent_3gpp_interface;
 }
 
 static void
 mm_broadband_modem_fibocom_class_init (MMBroadbandModemFibocomClass *klass)
 {
-    GObjectClass *object_class = G_OBJECT_CLASS (klass);
     MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
 
     g_type_class_add_private (G_OBJECT_CLASS (klass),
                               sizeof (MMBroadbandModemFibocomPrivate));
 
-    /* Virtual methods */
-    object_class->finalize = finalize;
-    broadband_modem_class->setup_ports = setup_ports;
+    broadband_modem_class->setup_ports = mm_shared_fibocom_setup_ports;
 }

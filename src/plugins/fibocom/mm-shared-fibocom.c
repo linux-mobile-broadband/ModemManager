@@ -37,13 +37,18 @@
 static GQuark private_quark;
 
 typedef struct {
+    /* Broadband modem class support */
+    MMBroadbandModemClass *broadband_modem_class_parent;
     /* 3GPP interface support */
     MMIfaceModem3gpp *iface_modem_3gpp_parent;
+    /* URCs to ignore */
+    GRegex *sim_ready_regex;
 } Private;
 
 static void
 private_free (Private *priv)
 {
+    g_regex_unref (priv->sim_ready_regex);
     g_slice_free (Private, priv);
 }
 
@@ -59,6 +64,13 @@ get_private (MMSharedFibocom *self)
     if (!priv) {
         priv = g_slice_new0 (Private);
 
+        priv->sim_ready_regex = g_regex_new ("\\r\\n\\+SIM READY\\r\\n",
+                                             G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+
+        /* Setup parent class' MMBroadbandModemClass */
+        g_assert (MM_SHARED_FIBOCOM_GET_INTERFACE (self)->peek_parent_broadband_modem_class);
+        priv->broadband_modem_class_parent = MM_SHARED_FIBOCOM_GET_INTERFACE (self)->peek_parent_broadband_modem_class (self);
+
         /* Setup parent class' MMIfaceModem3gpp */
         g_assert (MM_SHARED_FIBOCOM_GET_INTERFACE (self)->peek_parent_3gpp_interface);
         priv->iface_modem_3gpp_parent = MM_SHARED_FIBOCOM_GET_INTERFACE (self)->peek_parent_3gpp_interface (self);
@@ -67,6 +79,37 @@ get_private (MMSharedFibocom *self)
     }
 
     return priv;
+}
+
+/*****************************************************************************/
+
+void
+mm_shared_fibocom_setup_ports (MMBroadbandModem *self)
+{
+    MMPortSerialAt *ports[2];
+    guint           i;
+    Private        *priv;
+
+    mm_obj_dbg (self, "setting up ports in fibocom modem...");
+
+    priv = get_private (MM_SHARED_FIBOCOM (self));
+    g_assert (priv->broadband_modem_class_parent);
+    g_assert (priv->broadband_modem_class_parent->setup_ports);
+
+    /* Parent setup first always */
+    priv->broadband_modem_class_parent->setup_ports (self);
+
+    ports[0] = mm_base_modem_peek_port_primary   (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+
+    for (i = 0; i < G_N_ELEMENTS (ports); i++) {
+        if (!ports[i])
+            continue;
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            ports[i],
+            priv->sim_ready_regex,
+            NULL, NULL, NULL);
+    }
 }
 
 /*****************************************************************************/

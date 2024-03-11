@@ -37,11 +37,16 @@ typedef struct _MMSharedFibocom MMSharedFibocom;
 struct _MMSharedFibocom {
     GTypeInterface g_iface;
 
+    /* Peek broadband modem class of the parent class of the object */
+    MMBroadbandModemClass * (* peek_parent_broadband_modem_class) (MMSharedFibocom *self);
+
     /* Peek 3GPP interface of the parent class of the object */
     MMIfaceModem3gpp * (* peek_parent_3gpp_interface) (MMSharedFibocom *self);
 };
 
 GType mm_shared_fibocom_get_type (void);
+
+void mm_shared_fibocom_setup_ports (MMBroadbandModem *self);
 
 void     mm_shared_fibocom_set_initial_eps_bearer_settings        (MMIfaceModem3gpp    *self,
                                                                    MMBearerProperties  *config,
