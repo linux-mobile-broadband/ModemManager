@@ -503,9 +503,9 @@ if plugins_options['huawei']
 
   plugins += {'plugin-huawei': {
     'plugin': true,
-    'helper': {'sources': files('huawei/mm-modem-helpers-huawei.c'), 'include_directories': plugins_incs + [huawei_inc], 'c_args': common_c_args},
-    'module': {'sources': sources + enums_sources, 'include_directories': plugins_incs + [huawei_inc], 'c_args': common_c_args},
-    'test': {'sources': files('huawei/tests/test-modem-helpers-huawei.c') + enums_sources, 'include_directories': huawei_inc, 'dependencies': libhelpers_dep},
+    'helper': {'sources': files('huawei/mm-modem-helpers-huawei.c') + enums_sources, 'include_directories': plugins_incs + [huawei_inc], 'c_args': common_c_args},
+    'module': {'sources': sources, 'include_directories': plugins_incs + [huawei_inc], 'c_args': common_c_args},
+    'test': {'sources': files('huawei/tests/test-modem-helpers-huawei.c'), 'include_directories': huawei_inc, 'dependencies': libhelpers_dep},
   }}
 
   plugins_udev_rules += files('huawei/77-mm-huawei-net-port-types.rules')
