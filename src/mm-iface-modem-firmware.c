@@ -350,7 +350,13 @@ mm_iface_firmware_build_generic_device_ids (MMIfaceModemFirmware  *self,
 #endif
     if (!primary)
         primary = MM_PORT (mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)));
-    g_assert (primary != NULL);
+
+    if (!primary) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "No valid primary port");
+        return NULL;
+    }
+
     rid = mm_kernel_device_get_physdev_revision (mm_port_peek_kernel_device (primary));
 
     subsystem = mm_kernel_device_get_physdev_subsystem (mm_port_peek_kernel_device (primary));
