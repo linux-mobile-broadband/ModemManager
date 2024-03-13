@@ -393,6 +393,7 @@ handle_setup_auth_ready (MMBaseModem        *_self,
         return;
     }
 
+    mm_obj_info (self, "processing user request to setup signal polling...");
     priv = get_private (self);
     priv->rate = ctx->rate;
     polling_restart (self);
@@ -518,6 +519,7 @@ handle_setup_thresholds_auth_ready (MMBaseModem                  *_self,
         return;
     }
 
+    mm_obj_info (self, "processing user request to setup signal thresholds...");
     ctx->previous_rssi_threshold = priv->rssi_threshold;
     ctx->previous_error_rate_threshold = priv->error_rate_threshold;
     priv->rssi_threshold = new_rssi_threshold;
