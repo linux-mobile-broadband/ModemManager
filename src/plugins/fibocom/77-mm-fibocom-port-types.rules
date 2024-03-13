@@ -61,6 +61,17 @@ ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a4", ENV{.MM_USBIFNUM}=="04", ENV{
 ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a4", ENV{.MM_USBIFNUM}=="05", ENV{ID_MM_PORT_IGNORE}="1"
 ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a4", ENV{.MM_USBIFNUM}=="06", ENV{ID_MM_PORT_IGNORE}="1"
 
+# Fibocom FM135 (MBIM)
+#  ttyUSB0 (if #2): Diagnostic (ignore)
+#  ttyUSB1 (if #3): AT port
+#  ttyUSB2 (if #4): debug port (ignore)
+#  Android Debug Bridge (if #5): debug port (ignore)
+ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="0115", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="0115", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="0115", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="0115", ENV{.MM_USBIFNUM}=="05", ENV{ID_MM_PORT_IGNORE}="1"
+# Fibocom FM135 attach APN with toggle modem power
+#ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="0115", ENV{ID_MM_FIBOCOM_INITIAL_EPS_OFF_ON}="1"
 
 # Fibocom MA510-GL (GTUSBMODE=31)
 #  ttyUSB0 (if #0): debug port (ignore)
