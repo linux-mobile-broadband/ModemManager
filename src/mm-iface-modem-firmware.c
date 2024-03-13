@@ -147,6 +147,7 @@ list_auth_ready (MMBaseModem *self,
         return;
     }
 
+    mm_obj_info (self, "processing user request to load firmware list...");
     MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->load_list (MM_IFACE_MODEM_FIRMWARE (self),
                                                              (GAsyncReadyCallback)load_list_ready,
                                                              ctx);
@@ -229,6 +230,7 @@ select_auth_ready (MMBaseModem *self,
         return;
     }
 
+    mm_obj_info (self, "processing user request to select firmware...");
     MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->change_current (MM_IFACE_MODEM_FIRMWARE (self),
                                                                   ctx->name,
                                                                   (GAsyncReadyCallback)change_current_ready,
