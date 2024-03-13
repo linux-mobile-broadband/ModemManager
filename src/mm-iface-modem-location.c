@@ -991,7 +991,7 @@ handle_setup_auth_ready (MMBaseModem        *self,
     }
 
     str = mm_modem_location_source_build_string_from_mask (ctx->sources);
-    mm_obj_dbg (self, "setting up location sources: '%s'", str);
+    mm_obj_info (self, "processing user request to setup location '%s'...", str);
 
     /* Go on to enable or disable the requested sources */
     setup_gathering (ctx->self,
@@ -1098,6 +1098,7 @@ handle_set_supl_server_auth_ready (MMBaseModem                *self,
     }
 
     /* Request to change SUPL server */
+    mm_obj_info (self, "processing user request to set SUPL server...");
     MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->set_supl_server (ctx->self,
                                                                    ctx->supl,
                                                                    (GAsyncReadyCallback)set_supl_server_ready,
@@ -1194,6 +1195,7 @@ handle_inject_assistance_data_auth_ready (MMBaseModem                       *sel
     data = (const guint8 *) g_variant_get_fixed_array (ctx->datav, &data_size, sizeof (guint8));
 
     /* Request to inject assistance data */
+    mm_obj_info (self, "processing user request to inject assistance data...");
     MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->inject_assistance_data (ctx->self,
                                                                           data,
                                                                           data_size,
@@ -1264,6 +1266,7 @@ handle_set_gps_refresh_rate_auth_ready (MMBaseModem                    *self,
     }
 
     /* Set the new rate in the interface */
+    mm_obj_info (self, "processing user request to set GPS refresh rate...");
     mm_gdbus_modem_location_set_gps_refresh_rate (ctx->skeleton, ctx->rate);
     mm_gdbus_modem_location_complete_set_gps_refresh_rate (ctx->skeleton, ctx->invocation);
     handle_set_gps_refresh_rate_context_free (ctx);
@@ -1322,6 +1325,7 @@ handle_get_location_auth_ready (MMBaseModem              *self,
         return;
     }
 
+    mm_obj_info (self, "processing user request to get location...");
     location_ctx = get_location_context (ctx->self);
     mm_gdbus_modem_location_complete_get_location (
         ctx->skeleton,
