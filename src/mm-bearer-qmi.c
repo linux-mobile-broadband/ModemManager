@@ -2672,6 +2672,10 @@ reset_bearer_connection (MMBearerQmi *self,
                 cleanup_event_report_unsolicited_events (self,
                                                          self->priv->client_ipv4,
                                                          &self->priv->event_report_ipv4_indication_id);
+            if (self->priv->extended_ipv4_config_change_id) {
+                g_signal_handler_disconnect (self->priv->client_ipv4, self->priv->extended_ipv4_config_change_id);
+                self->priv->extended_ipv4_config_change_id = 0;
+            }
         }
         self->priv->packet_data_handle_ipv4 = 0;
         g_clear_object (&self->priv->client_ipv4);
@@ -2688,6 +2692,10 @@ reset_bearer_connection (MMBearerQmi *self,
                 cleanup_event_report_unsolicited_events (self,
                                                          self->priv->client_ipv6,
                                                          &self->priv->event_report_ipv6_indication_id);
+            if (self->priv->extended_ipv6_config_change_id) {
+                g_signal_handler_disconnect (self->priv->client_ipv6, self->priv->extended_ipv6_config_change_id);
+                self->priv->extended_ipv6_config_change_id = 0;
+            }
         }
         self->priv->packet_data_handle_ipv6 = 0;
         g_clear_object (&self->priv->client_ipv6);
