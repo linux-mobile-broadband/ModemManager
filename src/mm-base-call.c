@@ -227,7 +227,7 @@ handle_start_auth_ready (MMBaseModem *modem,
         return;
     }
 
-    mm_obj_msg (ctx->self, "user request to start call");
+    mm_obj_info (ctx->self, "processing user request to start voice call...");
 
     /* Disallow non-emergency calls when in emergency-only state */
     if (!mm_iface_modem_voice_authorize_outgoing_call (MM_IFACE_MODEM_VOICE (modem), ctx->self, &error)) {
@@ -347,8 +347,6 @@ handle_accept_auth_ready (MMBaseModem *modem,
         return;
     }
 
-    mm_obj_msg (ctx->self, "user request to accept call");
-
     /* Check if we do support doing it */
     if (!MM_BASE_CALL_GET_CLASS (ctx->self)->accept ||
         !MM_BASE_CALL_GET_CLASS (ctx->self)->accept_finish) {
@@ -357,6 +355,8 @@ handle_accept_auth_ready (MMBaseModem *modem,
         handle_accept_context_free (ctx);
         return;
     }
+
+    mm_obj_info (ctx->self, "processing user request to accept voice call...");
 
     MM_BASE_CALL_GET_CLASS (ctx->self)->accept (ctx->self,
                                                 (GAsyncReadyCallback)handle_accept_ready,
@@ -448,8 +448,6 @@ handle_deflect_auth_ready (MMBaseModem          *modem,
         return;
     }
 
-    mm_obj_msg (ctx->self, "user request to deflect call");
-
     /* Check if we do support doing it */
     if (!MM_BASE_CALL_GET_CLASS (ctx->self)->deflect ||
         !MM_BASE_CALL_GET_CLASS (ctx->self)->deflect_finish) {
@@ -459,6 +457,7 @@ handle_deflect_auth_ready (MMBaseModem          *modem,
         return;
     }
 
+    mm_obj_info (ctx->self, "processing user request to deflect voice call...");
     MM_BASE_CALL_GET_CLASS (ctx->self)->deflect (ctx->self,
                                                  ctx->number,
                                                  (GAsyncReadyCallback)handle_deflect_ready,
@@ -532,6 +531,8 @@ handle_join_multiparty_auth_ready (MMBaseModem                  *modem,
         handle_join_multiparty_context_free (ctx);
         return;
     }
+
+    mm_obj_info (ctx->self, "processing user request to join multiparty voice call...");
 
     /* This action is provided in the Call API, but implemented in the Modem.Voice interface
      * logic, because the action affects not only one call object, but all call objects that
@@ -608,6 +609,8 @@ handle_leave_multiparty_auth_ready (MMBaseModem                  *modem,
         handle_leave_multiparty_context_free (ctx);
         return;
     }
+
+    mm_obj_info (ctx->self, "processing user request to leave multiparty voice call...");
 
     /* This action is provided in the Call API, but implemented in the Modem.Voice interface
      * logic, because the action affects not only one call object, but all call objects that
@@ -701,8 +704,6 @@ handle_hangup_auth_ready (MMBaseModem *modem,
         return;
     }
 
-    mm_obj_msg (ctx->self, "user request to hangup call");
-
     /* Check if we do support doing it */
     if (!MM_BASE_CALL_GET_CLASS (ctx->self)->hangup ||
         !MM_BASE_CALL_GET_CLASS (ctx->self)->hangup_finish) {
@@ -712,6 +713,7 @@ handle_hangup_auth_ready (MMBaseModem *modem,
         return;
     }
 
+    mm_obj_info (ctx->self, "processing user request to hangup voice call...");
     MM_BASE_CALL_GET_CLASS (ctx->self)->hangup (ctx->self,
                                                 (GAsyncReadyCallback)handle_hangup_ready,
                                                 ctx);
@@ -807,6 +809,7 @@ handle_send_dtmf_auth_ready (MMBaseModem *modem,
         return;
     }
 
+    mm_obj_info (ctx->self, "processing user request to send DTMF...");
     MM_BASE_CALL_GET_CLASS (ctx->self)->send_dtmf (ctx->self, ctx->dtmf,
                                                    (GAsyncReadyCallback)handle_send_dtmf_ready,
                                                    ctx);
