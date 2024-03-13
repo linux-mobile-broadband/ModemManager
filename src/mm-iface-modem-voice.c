@@ -613,6 +613,7 @@ handle_delete_auth_ready (MMBaseModem *self,
         return;
     }
 
+    mm_obj_info (self, "processing user request to delete voice call '%s'...", ctx->path);
     if (!mm_call_list_delete_call (list, ctx->path, &error))
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else
@@ -707,6 +708,8 @@ handle_create_auth_ready (MMBaseModem *self,
         return;
     }
 
+    mm_obj_info (self, "processing user request to create voice call...");
+
     /* Only export once properly created */
     mm_base_call_export (call);
     mm_call_list_add_call (list, call);
@@ -763,6 +766,8 @@ handle_list (MmGdbusModemVoice *skeleton,
                                                         "Cannot list call: missing call list");
         return TRUE;
     }
+
+    mm_obj_info (self, "processing user request to list voice calls...");
 
     paths = mm_call_list_get_paths (list);
     mm_gdbus_modem_voice_complete_list_calls (skeleton,
@@ -877,6 +882,7 @@ handle_hold_and_accept_auth_ready (MMBaseModem                *self,
     mm_call_list_foreach (list, (MMCallListForeachFunc)prepare_hold_and_accept_foreach, ctx);
     g_object_unref (list);
 
+    mm_obj_info (self, "processing user request to hold and accept voice call...");
     MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hold_and_accept (MM_IFACE_MODEM_VOICE (self),
                                                                 (GAsyncReadyCallback)hold_and_accept_ready,
                                                                 ctx);
@@ -1006,6 +1012,7 @@ handle_hangup_and_accept_auth_ready (MMBaseModem                  *self,
     mm_call_list_foreach (list, (MMCallListForeachFunc)prepare_hangup_and_accept_foreach, ctx);
     g_object_unref (list);
 
+    mm_obj_info (self, "processing user request to hangup and accept voice call...");
     MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_and_accept (MM_IFACE_MODEM_VOICE (self),
                                                                   (GAsyncReadyCallback)hangup_and_accept_ready,
                                                                   ctx);
@@ -1145,6 +1152,7 @@ handle_hangup_all_auth_ready (MMBaseModem            *self,
     mm_call_list_foreach (list, (MMCallListForeachFunc)prepare_hangup_all_foreach, ctx);
     g_object_unref (list);
 
+    mm_obj_info (self, "processing user request to hangup all voice calls...");
     MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_all (MM_IFACE_MODEM_VOICE (self),
                                                            (GAsyncReadyCallback)hangup_all_ready,
                                                            ctx);
@@ -1264,6 +1272,7 @@ handle_transfer_auth_ready (MMBaseModem           *self,
     mm_call_list_foreach (list, (MMCallListForeachFunc)prepare_transfer_foreach, ctx);
     g_object_unref (list);
 
+    mm_obj_info (self, "processing user request to transfer voice call...");
     MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->transfer (MM_IFACE_MODEM_VOICE (self),
                                                          (GAsyncReadyCallback)transfer_ready,
                                                          ctx);
@@ -1345,6 +1354,7 @@ handle_call_waiting_setup_auth_ready (MMBaseModem                   *self,
         return;
     }
 
+    mm_obj_info (self, "processing user request to setup voice call waiting...");
     MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_setup (MM_IFACE_MODEM_VOICE (self),
                                                                    ctx->enable,
                                                                    (GAsyncReadyCallback)call_waiting_setup_ready,
@@ -1430,6 +1440,7 @@ handle_call_waiting_query_auth_ready (MMBaseModem                   *self,
         return;
     }
 
+    mm_obj_info (self, "processing user request to query voice call waiting state...");
     MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_query (MM_IFACE_MODEM_VOICE (self),
                                                                    (GAsyncReadyCallback)call_waiting_query_ready,
                                                                    ctx);
