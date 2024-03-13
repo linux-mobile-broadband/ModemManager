@@ -273,6 +273,7 @@ handle_change_pin_auth_ready (MMBaseModem *modem,
         return;
     }
 
+    mm_obj_info (ctx->self, "processing user request to change PIN...");
     MM_BASE_SIM_GET_CLASS (ctx->self)->change_pin (ctx->self,
                                                    ctx->old_pin,
                                                    ctx->new_pin,
@@ -455,6 +456,7 @@ handle_enable_pin_auth_ready (MMBaseModem *modem,
         return;
     }
 
+    mm_obj_info (ctx->self, "processing user request to %s PIN...", ctx->enabled ? "enable" : "disable");
     MM_BASE_SIM_GET_CLASS (ctx->self)->enable_pin (ctx->self,
                                                    ctx->pin,
                                                    ctx->enabled,
@@ -868,6 +870,7 @@ handle_send_pin_auth_ready (MMBaseModem *modem,
         return;
     }
 
+    mm_obj_info (ctx->self, "processing user request to send PIN...");
     mm_base_sim_send_pin (ctx->self,
                           ctx->pin,
                           (GAsyncReadyCallback)handle_send_pin_ready,
@@ -971,6 +974,7 @@ handle_send_puk_auth_ready (MMBaseModem *modem,
         return;
     }
 
+    mm_obj_info (ctx->self, "processing user request to send PUK...");
     mm_base_sim_send_puk (ctx->self,
                           ctx->puk,
                           ctx->new_pin,
@@ -1534,6 +1538,7 @@ handle_set_preferred_networks_auth_ready (MMBaseModem *modem,
         return;
     }
 
+    mm_obj_info (ctx->self, "processing user request to set preferred networks...");
     MM_BASE_SIM_GET_CLASS (ctx->self)->set_preferred_networks (
             ctx->self,
             mm_sim_preferred_network_list_new_from_variant (ctx->networks),
