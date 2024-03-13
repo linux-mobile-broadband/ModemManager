@@ -106,6 +106,7 @@ handle_get_network_time_auth_ready (MMBaseModem                 *self,
         return;
     }
 
+    mm_obj_info (self, "processing user request to load network time...");
     MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_time (
         ctx->self,
         (GAsyncReadyCallback)load_network_time_ready,
