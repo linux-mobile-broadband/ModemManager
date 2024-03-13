@@ -99,6 +99,7 @@ handle_cancel_auth_ready (MMBaseModem *self,
     g_assert (MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->cancel != NULL);
     g_assert (MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->cancel_finish != NULL);
 
+    mm_obj_info (self, "processing user request to cancel USSD...");
     MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->cancel (
         MM_IFACE_MODEM_3GPP_USSD (self),
         (GAsyncReadyCallback)handle_cancel_ready,
@@ -195,6 +196,7 @@ handle_respond_auth_ready (MMBaseModem *self,
         break;
 
     case MM_MODEM_3GPP_USSD_SESSION_STATE_USER_RESPONSE:
+        mm_obj_info (self, "processing user request to respond USSD...");
         MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send (
             MM_IFACE_MODEM_3GPP_USSD (self),
             ctx->command,
@@ -304,6 +306,7 @@ handle_initiate_auth_ready (MMBaseModem *self,
         break;
 
     case MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE:
+        mm_obj_info (self, "processing user request to initiate USSD...");
         MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send (
             MM_IFACE_MODEM_3GPP_USSD (self),
             ctx->command,
