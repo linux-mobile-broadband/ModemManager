@@ -404,6 +404,7 @@ subdir('data')
 if get_option('examples')
   subdir('data/dispatcher-connection')
   subdir('data/dispatcher-fcc-unlock')
+  subdir('data/dispatcher-modem-setup')
 endif
 subdir('introspection')
 subdir('include')

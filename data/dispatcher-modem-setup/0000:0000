@@ -1,0 +1,25 @@
+#!/bin/sh
+
+# SPDX-License-Identifier: CC0-1.0
+# 2024 Nero Sinaro <xu.zhang@fibocom.com>
+#
+# modem setup test script
+#
+# This is the test script:
+# Parameter list: vid pid device_path port_name
+# device_path: Path of the device on the sys file system, it's a string
+# port_name: Port name of the device enumeration, It's an array of strings
+#
+
+logger "[Test] ARGV:$@, ARG count:$#"
+
+count=1
+while [ $count -lt 10 ]; do
+    # will print logger to syslog
+    logger "[Test] (attempt #${i})"
+
+    sleep 0.5
+    count=$((count + 1))
+done
+
+exit $?

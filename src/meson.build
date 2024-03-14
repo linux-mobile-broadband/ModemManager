@@ -269,6 +269,7 @@ sources = files(
   'mm-dispatcher.c',
   'mm-dispatcher-connection.c',
   'mm-dispatcher-fcc-unlock.c',
+  'mm-dispatcher-modem-setup.c',
   'mm-filter.c',
   'mm-iface-modem-3gpp.c',
   'mm-iface-modem-3gpp-profile-manager.c',
@@ -308,6 +309,8 @@ endif
 c_args = [
   '-DMM_COMPILATION',
   '-DPLUGINDIR="@0@"'.format(mm_prefix / mm_pkglibdir),
+  '-DMODEMSETUPDIRPACKAGE="@0@"'.format(mm_prefix / mm_pkglibdir / 'modem-setup.d'),
+  '-DMODEMSETUPDIRUSER="@0@"'.format(mm_prefix / mm_pkgsysconfdir / 'modem-setup.d'),
   '-DFCCUNLOCKDIRPACKAGE="@0@"'.format(mm_prefix / mm_pkglibdir / 'fcc-unlock.d'),
   '-DFCCUNLOCKDIRUSER="@0@"'.format(mm_prefix / mm_pkgsysconfdir / 'fcc-unlock.d'),
   '-DCONNECTIONDIRPACKAGE="@0@"'.format(mm_prefix / mm_pkglibdir / 'connection.d'),
