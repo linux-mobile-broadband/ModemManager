@@ -3969,6 +3969,9 @@ common_process_system_info_3gpp (MMBroadbandModemQmi              *self,
     /* Update act and location info */
     mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), act);
     mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, tac, cid);
+
+    /* Update operator name and operator description */
+    mm_iface_modem_3gpp_reload_current_registration_info (MM_IFACE_MODEM_3GPP (self), NULL, NULL);
 }
 
 static gboolean
