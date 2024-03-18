@@ -3578,12 +3578,6 @@ modem_3gpp_load_operator_name (MMIfaceModem3gpp    *_self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    if (self->priv->current_operator_description) {
-        g_task_return_pointer (task, g_strdup (self->priv->current_operator_description), g_free);
-        g_object_unref (task);
-        return;
-    }
-
     /* Check if operator id is set */
     if (!self->priv->current_operator_id) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
@@ -3961,6 +3955,8 @@ common_process_system_info_3gpp (MMBroadbandModemQmi              *self,
     if (operator_id) {
         g_free (self->priv->current_operator_id);
         self->priv->current_operator_id = operator_id;
+        g_free (self->priv->current_operator_description);
+        self->priv->current_operator_description = NULL;
     }
 
     /* Update registration states */
