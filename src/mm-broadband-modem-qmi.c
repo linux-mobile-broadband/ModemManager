@@ -1831,7 +1831,7 @@ get_cell_info_ready (QmiClientNas *client,
             NULL /* scell low thres */,
             NULL /* s intra search thres */,
             &cell_array,
-            &error)) {
+            NULL)) {
         g_autofree gchar *operator_id = NULL;
         g_autofree gchar *tac = NULL;
         g_autofree gchar *ci = NULL;
@@ -1917,7 +1917,7 @@ get_cell_info_ready (QmiClientNas *client,
                                                                                  &nr5g_rsrq,
                                                                                  &nr5g_rsrp,
                                                                                  &nr5g_snr,
-                                                                                 &error)) {
+                                                                                 NULL)) {
         MMCellInfoNr5g   *nr5g_info;
         g_autofree gchar *operator_id = NULL;
         g_autofree gchar *tac = NULL;
