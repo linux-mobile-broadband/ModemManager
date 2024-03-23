@@ -1792,6 +1792,11 @@ get_cell_info_ready (QmiClientNas *client,
     GArray* cell_array;
     GArray* frequency_array;
 
+    guint8 bsic;
+    guint16 lac;
+    guint32 timing_advance;
+    guint16 rxlev;
+
     guint16 lte_tac;
     guint16 lte_scell_id;
     guint32 lte_timing_advance;
@@ -1816,6 +1821,72 @@ get_cell_info_ready (QmiClientNas *client,
         g_object_unref (task);
         qmi_message_nas_get_cell_location_info_output_unref (output);
         return;
+    }
+
+    if (qmi_message_nas_get_cell_location_info_output_get_geran_info_v2 (
+            output,
+            &cell_id,
+            &operator,
+            &lac,
+            &arfcn,
+            &bsic,
+            &timing_advance,
+            &rxlev, /* rx-level */
+            &cell_array,
+            NULL /* error */)) {
+        MMCellInfoGsm *gsm_info;
+        guint i;
+
+        /* serving cell */
+        {
+            g_autofree gchar *operator_id = NULL;
+            g_autofree gchar *base_station_id = NULL;
+            g_autofree gchar *ci = NULL;
+            g_autofree gchar *lac_str = NULL;
+
+            gsm_info = MM_CELL_INFO_GSM (mm_cell_info_gsm_new_from_dictionary (NULL));
+            operator_id = str_from_bcd_plmn (operator);
+            base_station_id = g_strdup_printf ("%X", bsic);
+            ci = g_strdup_printf ("%X", cell_id);
+            lac_str = g_strdup_printf ("%X", lac);
+
+            mm_cell_info_set_serving (MM_CELL_INFO (gsm_info), TRUE);
+            mm_cell_info_gsm_set_operator_id (gsm_info, operator_id);
+            mm_cell_info_gsm_set_lac (gsm_info, lac_str);
+            mm_cell_info_gsm_set_base_station_id (gsm_info, base_station_id);
+            mm_cell_info_gsm_set_ci (gsm_info, ci);
+            mm_cell_info_gsm_set_arfcn (gsm_info, arfcn);
+            mm_cell_info_gsm_set_timing_advance (gsm_info, timing_advance);
+            mm_cell_info_gsm_set_rx_level (gsm_info, rxlev);
+
+            list = g_list_append (list, g_steal_pointer (&gsm_info));
+        }
+
+        for (i = 0; i < cell_array->len; i++) {
+            QmiMessageNasGetCellLocationInfoOutputGeranInfoV2CellElement *element;
+            g_autofree gchar *operator_id = NULL;
+            g_autofree gchar *base_station_id = NULL;
+            g_autofree gchar *ci = NULL;
+            g_autofree gchar *lac_str = NULL;
+
+            gsm_info = MM_CELL_INFO_GSM (mm_cell_info_gsm_new_from_dictionary (NULL));
+            element = &g_array_index (cell_array, QmiMessageNasGetCellLocationInfoOutputGeranInfoV2CellElement, i);
+
+            operator_id = str_from_bcd_plmn (element->plmn);
+            base_station_id = g_strdup_printf ("%X", element->base_station_identity_code);
+            ci = g_strdup_printf ("%X", element->cell_id);
+            lac_str = g_strdup_printf ("%X", element->lac);
+
+            mm_cell_info_gsm_set_operator_id (gsm_info, operator_id);
+            mm_cell_info_gsm_set_lac (gsm_info, lac_str);
+            mm_cell_info_gsm_set_base_station_id (gsm_info, base_station_id);
+            mm_cell_info_gsm_set_ci (gsm_info, ci);
+            mm_cell_info_gsm_set_arfcn (gsm_info, element->geran_absolute_rf_channel_number);
+            mm_cell_info_gsm_set_timing_advance (gsm_info, timing_advance);
+            mm_cell_info_gsm_set_rx_level (gsm_info, element->rx_level);
+
+            list = g_list_append (list, g_steal_pointer (&gsm_info));
+        }
     }
 
     if (qmi_message_nas_get_cell_location_info_output_get_intrafrequency_lte_info_v2 (
