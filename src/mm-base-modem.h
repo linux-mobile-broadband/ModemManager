@@ -157,8 +157,6 @@ MMPort   *mm_base_modem_wait_link_port_finish (MMBaseModem          *self,
                                                GAsyncResult         *res,
                                                GError              **error);
 
-gboolean  mm_base_modem_has_at_port  (MMBaseModem *self);
-
 gboolean  mm_base_modem_organize_ports (MMBaseModem *self,
                                         GError **error);
 
