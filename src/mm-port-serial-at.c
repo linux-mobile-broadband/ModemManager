@@ -21,10 +21,14 @@
 #include <unistd.h>
 #include <string.h>
 
+#include "mm-iface-port-at.h"
 #include "mm-port-serial-at.h"
 #include "mm-log-object.h"
 
-G_DEFINE_TYPE (MMPortSerialAt, mm_port_serial_at, MM_TYPE_PORT_SERIAL)
+static void iface_port_at_init (MMIfacePortAt *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMPortSerialAt, mm_port_serial_at, MM_TYPE_PORT_SERIAL, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_PORT_AT, iface_port_at_init))
 
 enum {
     PROP_0,
@@ -388,6 +392,39 @@ mm_port_serial_at_command (MMPortSerialAt *self,
     g_byte_array_unref (buf);
 }
 
+/*****************************************************************************/
+/* Integration with the Port AT interface */
+
+static gchar *
+iface_port_at_command_finish (MMIfacePortAt  *self,
+                              GAsyncResult   *res,
+                              GError        **error)
+{
+    return mm_port_serial_at_command_finish (MM_PORT_SERIAL_AT (self), res, error);
+}
+
+static void
+iface_port_at_command (MMIfacePortAt        *self,
+                       const gchar          *command,
+                       guint32               timeout_seconds,
+                       gboolean              is_raw,
+                       gboolean              allow_cached,
+                       GCancellable         *cancellable,
+                       GAsyncReadyCallback   callback,
+                       gpointer              user_data)
+{
+    mm_port_serial_at_command (MM_PORT_SERIAL_AT (self),
+                               command,
+                               timeout_seconds,
+                               is_raw,
+                               allow_cached,
+                               cancellable,
+                               callback,
+                               user_data);
+}
+
+/*****************************************************************************/
+
 static void
 debug_log (MMPortSerial *self,
            const gchar  *prefix,
@@ -585,6 +622,14 @@ finalize (GObject *object)
     g_strfreev (self->priv->init_sequence);
 
     G_OBJECT_CLASS (mm_port_serial_at_parent_class)->finalize (object);
+}
+
+static void
+iface_port_at_init (MMIfacePortAt *iface)
+{
+    iface->check_support = NULL;
+    iface->command = iface_port_at_command;
+    iface->command_finish = iface_port_at_command_finish;
 }
 
 static void

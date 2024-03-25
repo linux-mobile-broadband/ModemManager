@@ -130,11 +130,13 @@ libkerneldevice_dep = declare_dependency(
 
 # ports library
 headers = files(
+  'mm-iface-port-at.h',
   'mm-port.h',
   'mm-port-serial-at.h',
 )
 
 sources = files(
+  'mm-iface-port-at.c',
   'mm-netlink.c',
   'mm-port.c',
   'mm-port-net.c',
