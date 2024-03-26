@@ -5461,6 +5461,8 @@ modem_3gpp_create_initial_eps_bearer (MMIfaceModem3gpp   *self,
 /* Enable/Disable unsolicited registration events (3GPP interface) */
 
 typedef struct {
+    MMPortSerialAt *primary;
+    MMPortSerialAt *secondary; /* optional */
     gboolean enable; /* TRUE for enabling, FALSE for disabling */
     gboolean run_cs;
     gboolean run_ps;
@@ -5478,6 +5480,8 @@ typedef struct {
 static void
 unsolicited_registration_events_context_free (UnsolicitedRegistrationEventsContext *ctx)
 {
+    g_clear_object (&ctx->primary);
+    g_clear_object (&ctx->secondary);
     if (ctx->cs_error)
         g_error_free (ctx->cs_error);
     if (ctx->ps_error)
@@ -5504,6 +5508,8 @@ unsolicited_registration_events_task_new (MMBroadbandModem *self,
     ctx->run_cs = cs_supported;
     ctx->run_ps = ps_supported;
     ctx->run_eps = eps_supported;
+    ctx->primary = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    ctx->secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task,
@@ -5595,7 +5601,6 @@ unsolicited_registration_events_sequence_ready (MMBroadbandModem *self,
     UnsolicitedRegistrationEventsContext *ctx;
     GError *error = NULL;
     GVariant *command;
-    MMPortSerialAt *secondary;
 
     ctx = g_task_get_task_data (task);
 
@@ -5664,8 +5669,7 @@ unsolicited_registration_events_sequence_ready (MMBroadbandModem *self,
         /* Even if primary failed, go on and try to enable in secondary port */
     }
 
-    secondary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
-    if (secondary) {
+    if (ctx->secondary) {
         const MMBaseModemAtCommand *registration_sequence = NULL;
 
         ctx->secondary_done = TRUE;
@@ -5674,7 +5678,7 @@ unsolicited_registration_events_sequence_ready (MMBroadbandModem *self,
         if (command) {
             mm_base_modem_at_command_full (
                 MM_BASE_MODEM (self),
-                secondary,
+                ctx->secondary,
                 g_variant_get_string (command, NULL),
                 3,
                 FALSE,
@@ -5695,7 +5699,7 @@ unsolicited_registration_events_sequence_ready (MMBroadbandModem *self,
             registration_sequence = ctx->enable ? eps_registration_sequence : eps_unregistration_sequence;
         mm_base_modem_at_sequence_full (
             MM_BASE_MODEM (self),
-            secondary,
+            ctx->secondary,
             registration_sequence,
             NULL,  /* response processor context */
             NULL,  /* response processor context free */
@@ -5729,7 +5733,7 @@ unsolicited_registration_events_context_step (GTask *task)
         ctx->run_cs = FALSE;
         mm_base_modem_at_sequence_full (
             MM_BASE_MODEM (self),
-            mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+            ctx->primary,
             ctx->enable ? cs_registration_sequence : cs_unregistration_sequence,
             NULL,  /* response processor context */
             NULL,  /* response processor context free */
@@ -5744,7 +5748,7 @@ unsolicited_registration_events_context_step (GTask *task)
         ctx->run_ps = FALSE;
         mm_base_modem_at_sequence_full (
             MM_BASE_MODEM (self),
-            mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+            ctx->primary,
             ctx->enable ? ps_registration_sequence : ps_unregistration_sequence,
             NULL,  /* response processor context */
             NULL,  /* response processor context free */
@@ -5759,7 +5763,7 @@ unsolicited_registration_events_context_step (GTask *task)
         ctx->run_eps = FALSE;
         mm_base_modem_at_sequence_full (
             MM_BASE_MODEM (self),
-            mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+            ctx->primary,
             ctx->enable ? eps_registration_sequence : eps_unregistration_sequence,
             NULL,  /* response processor context */
             NULL,  /* response processor context free */
