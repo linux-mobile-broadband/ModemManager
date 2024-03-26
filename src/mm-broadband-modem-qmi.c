@@ -2015,7 +2015,7 @@ get_cell_info_ready (QmiClientNas *client,
         mm_cell_info_nr5g_set_rsrp (nr5g_info, (0.1) * ((gdouble)nr5g_rsrp));
         mm_cell_info_nr5g_set_sinr (nr5g_info, (0.1) * ((gdouble)nr5g_snr));
 
-        if (qmi_message_nas_get_cell_location_info_output_get_nr5g_arfcn (output, &nr5g_arfcn, &error)) {
+        if (qmi_message_nas_get_cell_location_info_output_get_nr5g_arfcn (output, &nr5g_arfcn, NULL)) {
             mm_cell_info_nr5g_set_nrarfcn (nr5g_info, nr5g_arfcn);
         }
 
