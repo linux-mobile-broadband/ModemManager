@@ -293,6 +293,12 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->set_initial_eps_bearer_settings_finish = mm_shared_fibocom_set_initial_eps_bearer_settings_finish;
 }
 
+static MMBroadbandModemClass *
+peek_parent_broadband_modem_class (MMSharedFibocom *self)
+{
+    return MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_mbim_mtk_fibocom_parent_class);
+}
+
 static MMIfaceModem3gpp *
 peek_parent_3gpp_interface (MMSharedFibocom *self)
 {
@@ -302,6 +308,7 @@ peek_parent_3gpp_interface (MMSharedFibocom *self)
 static void
 shared_fibocom_init (MMSharedFibocom *iface)
 {
+    iface->peek_parent_broadband_modem_class = peek_parent_broadband_modem_class;
     iface->peek_parent_3gpp_interface = peek_parent_3gpp_interface;
 }
 
