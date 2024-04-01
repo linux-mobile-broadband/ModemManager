@@ -687,6 +687,36 @@ probe_qgps_ready (MMBaseModem  *_self,
 }
 
 static void
+quectel_load_capabilities (GTask *task)
+{
+    MMSharedQuectel *self;
+    Private         *priv;
+
+    self = MM_SHARED_QUECTEL (g_task_get_source_object (task));
+    priv = get_private (self);
+
+    /* Now our own check. If we don't have any GPS port, we're done */
+    if (!mm_base_modem_peek_port_gps (MM_BASE_MODEM (self))) {
+        MMModemLocationSource sources;
+
+        sources = GPOINTER_TO_UINT (g_task_get_task_data (task));
+        mm_obj_dbg (self, "no GPS data port found: no GPS capabilities");
+        g_task_return_int (task, sources);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Probe QGPS support */
+    g_assert (priv->qgps_supported == FEATURE_SUPPORT_UNKNOWN);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+QGPS=?",
+                              3,
+                              TRUE, /* cached */
+                              (GAsyncReadyCallback)probe_qgps_ready,
+                              task);
+}
+
+static void
 parent_load_capabilities_ready (MMIfaceModemLocation *self,
                                 GAsyncResult         *res,
                                 GTask                *task)
@@ -703,25 +733,8 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
         return;
     }
 
-    /* Now our own check. If we don't have any GPS port, we're done */
-    if (!mm_base_modem_peek_port_gps (MM_BASE_MODEM (self))) {
-        mm_obj_dbg (self, "no GPS data port found: no GPS capabilities");
-        g_task_return_int (task, sources);
-        g_object_unref (task);
-        return;
-    }
-
-    /* Store parent supported sources in task data */
     g_task_set_task_data (task, GUINT_TO_POINTER (sources), NULL);
-
-    /* Probe QGPS support */
-    g_assert (priv->qgps_supported == FEATURE_SUPPORT_UNKNOWN);
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+QGPS=?",
-                              3,
-                              TRUE, /* cached */
-                              (GAsyncReadyCallback)probe_qgps_ready,
-                              task);
+    quectel_load_capabilities (task);
 }
 
 void
@@ -735,10 +748,17 @@ mm_shared_quectel_location_load_capabilities (MMIfaceModemLocation *_self,
     task = g_task_new (_self, NULL, callback, user_data);
     priv = get_private (MM_SHARED_QUECTEL (_self));
 
-    /* Chain up parent's setup */
-    priv->iface_modem_location_parent->load_capabilities (_self,
-                                                          (GAsyncReadyCallback)parent_load_capabilities_ready,
-                                                          task);
+    /* Chain up parent's setup, if any */
+    if (priv->iface_modem_location_parent->load_capabilities &&
+        priv->iface_modem_location_parent->load_capabilities_finish) {
+        priv->iface_modem_location_parent->load_capabilities (_self,
+                                                              (GAsyncReadyCallback)parent_load_capabilities_ready,
+                                                              task);
+        return;
+    }
+
+    g_task_set_task_data (task, GUINT_TO_POINTER (MM_MODEM_LOCATION_SOURCE_NONE), NULL);
+    quectel_load_capabilities (task);
 }
 
 /*****************************************************************************/
