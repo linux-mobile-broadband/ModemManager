@@ -1746,6 +1746,7 @@ interface_initialization_step (GTask *task)
 {
     MMIfaceModemLocation *self;
     InitializationContext *ctx;
+    MMModemLocationSource existing_capabilities;
 
     /* Don't run new steps if we're cancelled */
     if (g_task_return_error_if_cancelled (task)) {
@@ -1765,8 +1766,10 @@ interface_initialization_step (GTask *task)
         /* Location capabilities value is meant to be loaded only once during
          * the whole lifetime of the modem. Therefore, if we already have it
          * loaded, don't try to load it again. */
-        if (!mm_gdbus_modem_location_get_capabilities (ctx->skeleton) &&
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_capabilities &&
+        existing_capabilities = mm_gdbus_modem_location_get_capabilities (ctx->skeleton);
+        if (existing_capabilities != MM_MODEM_LOCATION_SOURCE_NONE) {
+            ctx->capabilities = existing_capabilities;
+        } else if (MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_capabilities &&
             MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_capabilities_finish) {
             MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_capabilities (
                 self,
