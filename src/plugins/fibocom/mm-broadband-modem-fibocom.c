@@ -333,26 +333,34 @@ modem_3gpp_load_initial_eps_bearer_settings (MMIfaceModem3gpp    *_self,
                                              gpointer             user_data)
 {
     MMBroadbandModemFibocom *self = MM_BROADBAND_MODEM_FIBOCOM (_self);
-    MMPortSerialAt          *port;
-    MMKernelDevice          *device;
     GTask                   *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* Initial EPS bearer CID initialization run once only */
     if (G_UNLIKELY (self->priv->initial_eps_bearer_support == FEATURE_SUPPORT_UNKNOWN)) {
+        MMPortSerialAt *port;
+        MMKernelDevice *device;
+
         /* There doesn't seem to be a programmatic way to find the initial EPS
          * bearer's CID, so we'll use a udev variable. */
         port = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+        if (!port) {
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                     "Couldn't check initial EPS cid support: primary port missing");
+            g_object_unref (task);
+            return;
+        }
+
         device = mm_port_peek_kernel_device (MM_PORT (port));
         if (mm_kernel_device_has_global_property (device, "ID_MM_FIBOCOM_INITIAL_EPS_CID")) {
             self->priv->initial_eps_bearer_support = FEATURE_SUPPORTED;
             self->priv->initial_eps_bearer_cid = mm_kernel_device_get_global_property_as_int (
                 device, "ID_MM_FIBOCOM_INITIAL_EPS_CID");
-        }
-        else
+        } else
             self->priv->initial_eps_bearer_support = FEATURE_NOT_SUPPORTED;
-    }
 
-    task = g_task_new (self, NULL, callback, user_data);
+    }
 
     if (self->priv->initial_eps_bearer_support != FEATURE_SUPPORTED) {
         g_task_return_new_error (task,
