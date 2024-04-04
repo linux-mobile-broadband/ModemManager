@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2024 Google, Inc.
  */
 
 #include <glib.h>
@@ -20,19 +21,21 @@
 
 #include "mm-base-modem-at.h"
 #include "mm-errors-types.h"
+#include "mm-iface-port-at.h"
 
 /*****************************************************************************/
 /* Port setup/teardown logic, to prepare a port to be able to run an
  * AT command with it. */
 
 static void
-teardown_port (MMPortSerialAt *port)
+teardown_port (MMIfacePortAt *port)
 {
-    mm_port_serial_close (MM_PORT_SERIAL (port));
+    if (MM_IS_PORT_SERIAL (port))
+        mm_port_serial_close (MM_PORT_SERIAL (port));
 }
 
 static gboolean
-setup_port (MMPortSerialAt *port,
+setup_port (MMIfacePortAt *port,
             GTask         *task)
 {
     g_autoptr(GError) error = NULL;
@@ -54,21 +57,23 @@ setup_port (MMPortSerialAt *port,
         return FALSE;
     }
 
-    /* Temporarily disable init sequence if we're just sending a
-     * command to a just opened port */
-    g_object_get (port, MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, &init_sequence_enabled, NULL);
-    g_object_set (port, MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, FALSE, NULL);
+    if (MM_IS_PORT_SERIAL (port)) {
+        /* Temporarily disable init sequence if we're just sending a
+         * command to a just opened port */
+        g_object_get (port, MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, &init_sequence_enabled, NULL);
+        g_object_set (port, MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, FALSE, NULL);
 
-    /* Ensure we have a port open during the sequence */
-    if (!mm_port_serial_open (MM_PORT_SERIAL (port), &error)) {
-        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                 "Cannot run AT command: Failed to open serial port: '%s'", error->message);
-        g_object_unref (task);
-        return FALSE;
+        /* Ensure we have a port open during the sequence */
+        if (!mm_port_serial_open (MM_PORT_SERIAL (port), &error)) {
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                     "Cannot run AT command: Failed to open serial port: '%s'", error->message);
+            g_object_unref (task);
+            return FALSE;
+        }
+
+        /* Reset previous init sequence state */
+        g_object_set (port, MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, init_sequence_enabled, NULL);
     }
-
-    /* Reset previous init sequence state */
-    g_object_set (port, MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, init_sequence_enabled, NULL);
 
     return TRUE;
 }
@@ -86,7 +91,7 @@ parent_cancellable_cancelled (GCancellable *parent_cancellable,
 /* AT sequence handling */
 
 typedef struct {
-    MMPortSerialAt              *port;
+    MMIfacePortAt              *port;
     gulong                      cancelled_id;
     GCancellable               *parent_cancellable;
     const MMBaseModemAtCommand *current;
@@ -97,7 +102,7 @@ typedef struct {
     guint                       next_command_wait_id;
 } AtSequenceContext;
 
-static void at_sequence_parse_response (MMPortSerialAt *port,
+static void at_sequence_parse_response (MMIfacePortAt *port,
                                         GAsyncResult   *res,
                                         GTask          *task);
 
@@ -162,7 +167,7 @@ at_sequence_next_command (GTask *task)
     ctx->next_command_wait_id = 0;
 
     /* Schedule the next command in the probing group */
-    mm_port_serial_at_command (
+    mm_iface_port_at_command (
         ctx->port,
         ctx->current->command,
         ctx->current->timeout,
@@ -176,7 +181,7 @@ at_sequence_next_command (GTask *task)
 }
 
 static void
-at_sequence_parse_response (MMPortSerialAt *port,
+at_sequence_parse_response (MMIfacePortAt *port,
                             GAsyncResult  *res,
                             GTask         *task)
 {
@@ -187,7 +192,7 @@ at_sequence_parse_response (MMPortSerialAt *port,
     g_autofree gchar                     *response = NULL;
     g_autoptr(GError)                     command_error = NULL;
 
-    response = mm_port_serial_at_command_finish (port, res, &command_error);
+    response = mm_iface_port_at_command_finish (port, res, &command_error);
 
     /* Cancelled? */
     if (g_task_return_error_if_cancelled (task)) {
@@ -271,12 +276,12 @@ mm_base_modem_at_sequence_full (MMBaseModem                *self,
     task = g_task_new (self, task_cancellable, callback, user_data);
 
     /* Ensure that we have the port ready */
-    if (!setup_port (port, task))
+    if (!setup_port (MM_IFACE_PORT_AT (port), task))
         return;
 
     /* Setup context */
     ctx = g_slice_new0 (AtSequenceContext);
-    ctx->port = g_object_ref (port);
+    ctx->port = MM_IFACE_PORT_AT (g_object_ref (port));
     ctx->current = ctx->sequence = sequence;
     ctx->response_processor_context = response_processor_context;
     ctx->response_processor_context_free = response_processor_context_free;
@@ -294,7 +299,7 @@ mm_base_modem_at_sequence_full (MMBaseModem                *self,
     g_task_set_task_data (task, ctx, (GDestroyNotify)at_sequence_context_free);
 
     /* Go on with the first one in the sequence */
-    mm_port_serial_at_command (
+    mm_iface_port_at_command (
         ctx->port,
         ctx->current->command,
         ctx->current->timeout,
@@ -467,7 +472,7 @@ mm_base_modem_response_processor_string_ignore_at_errors (MMBaseModem   *self,
 /* Single AT command handling */
 
 typedef struct {
-    MMPortSerialAt *port;
+    MMIfacePortAt *port;
     gulong         cancelled_id;
     GCancellable  *parent_cancellable;
     gchar         *response;
@@ -497,7 +502,7 @@ mm_base_modem_at_command_full_finish (MMBaseModem   *self,
 }
 
 static void
-at_command_ready (MMPortSerialAt *port,
+at_command_ready (MMIfacePortAt *port,
                   GAsyncResult   *res,
                   GTask          *task)
 {
@@ -507,7 +512,7 @@ at_command_ready (MMPortSerialAt *port,
     ctx = g_task_get_task_data (task);
 
     g_assert (!ctx->response);
-    ctx->response = mm_port_serial_at_command_finish (port, res, &command_error);
+    ctx->response = mm_iface_port_at_command_finish (port, res, &command_error);
 
     /* Cancelled? */
     if (g_task_return_error_if_cancelled (task)) {
@@ -551,11 +556,11 @@ mm_base_modem_at_command_full (MMBaseModem         *self,
     task = g_task_new (self, task_cancellable, callback, user_data);
 
     /* Ensure that we have the port ready */
-    if (!setup_port (port, task))
+    if (!setup_port (MM_IFACE_PORT_AT (port), task))
         return;
 
     ctx = g_slice_new0 (AtCommandContext);
-    ctx->port = g_object_ref (port);
+    ctx->port = MM_IFACE_PORT_AT (g_object_ref (port));
 
     /* Ensure the user-provided cancellable will also get cancelled if the modem
      * wide-one gets cancelled */
@@ -570,8 +575,8 @@ mm_base_modem_at_command_full (MMBaseModem         *self,
     g_task_set_task_data (task, ctx, (GDestroyNotify)at_command_context_free);
 
     /* Go on with the command */
-    mm_port_serial_at_command (
-        port,
+    mm_iface_port_at_command (
+        ctx->port,
         command,
         timeout,
         is_raw,
