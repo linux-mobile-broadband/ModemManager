@@ -2261,7 +2261,8 @@ parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
                                         GAsyncResult *res,
                                         GTask *task)
 {
-    GError *error = NULL;
+    MMPortSerialAt *primary;
+    GError         *error = NULL;
 
     if (!iface_modem_3gpp_parent->enable_unsolicited_events_finish (self, res, &error)) {
         g_task_return_error (task, error);
@@ -2269,10 +2270,17 @@ parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
         return;
     }
 
-    /* Our own enable now */
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    if (!primary) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Couldn't enable unsolicited events: no primary port");
+        g_object_unref (task);
+        return;
+    }
+
     mm_base_modem_at_sequence_full (
         MM_BASE_MODEM (self),
-        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+        primary,
         unsolicited_enable_sequence,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
@@ -2348,14 +2356,23 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
                                        GAsyncReadyCallback callback,
                                        gpointer user_data)
 {
-    GTask *task;
+    GTask          *task;
+    MMPortSerialAt *primary;
 
     task = g_task_new (self, NULL, callback, user_data);
+
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    if (!primary) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Couldn't disable unsolicited events: no primary port");
+        g_object_unref (task);
+        return;
+    }
 
     /* Our own disable first */
     mm_base_modem_at_command_full (
         MM_BASE_MODEM (self),
-        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+        primary,
         "^CURC=0",
         5,
         FALSE, /* allow_cached */
@@ -3610,7 +3627,8 @@ parent_voice_enable_unsolicited_events_ready (MMIfaceModemVoice *self,
                                               GAsyncResult      *res,
                                               GTask             *task)
 {
-    GError *error = NULL;
+    MMPortSerialAt *primary;
+    GError         *error = NULL;
 
     if (!iface_modem_voice_parent->enable_unsolicited_events_finish (self, res, &error)) {
         g_task_return_error (task, error);
@@ -3618,10 +3636,17 @@ parent_voice_enable_unsolicited_events_ready (MMIfaceModemVoice *self,
         return;
     }
 
-    /* Our own enable now */
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    if (!primary) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Couldn't enable voice unsolicited events: no primary port");
+        g_object_unref (task);
+        return;
+    }
+
     mm_base_modem_at_sequence_full (
         MM_BASE_MODEM (self),
-        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+        primary,
         unsolicited_voice_enable_sequence,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
@@ -3683,7 +3708,8 @@ parent_voice_disable_unsolicited_events_ready (MMIfaceModemVoice *self,
                                                GAsyncResult      *res,
                                                GTask             *task)
 {
-    GError *error = NULL;
+    MMPortSerialAt *primary;
+    GError         *error = NULL;
 
     if (!iface_modem_voice_parent->disable_unsolicited_events_finish (self, res, &error)) {
         g_task_return_error (task, error);
@@ -3691,11 +3717,17 @@ parent_voice_disable_unsolicited_events_ready (MMIfaceModemVoice *self,
         return;
     }
 
-    /* our own disable now */
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    if (!primary) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Couldn't disable voice unsolicited events: no primary port");
+        g_object_unref (task);
+        return;
+    }
 
     mm_base_modem_at_sequence_full (
         MM_BASE_MODEM (self),
-        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+        primary,
         unsolicited_voice_disable_sequence,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
@@ -4668,10 +4700,7 @@ setup_ports (MMBroadbandModem *self)
     gps_data_port = mm_base_modem_peek_port_gps (MM_BASE_MODEM (self));
     if (gps_data_port) {
         /* make sure GPS is stopped incase it was left enabled */
-        mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                       mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
-                                       "^WPEND",
-                                       3, FALSE, FALSE, NULL, NULL, NULL);
+        mm_base_modem_at_command (MM_BASE_MODEM (self), "^WPEND", 3, FALSE, NULL, NULL);
         /* Add handler for the NMEA traces */
         mm_port_serial_gps_add_trace_handler (gps_data_port,
                                               (MMPortSerialGpsTraceFn)gps_trace_received,
