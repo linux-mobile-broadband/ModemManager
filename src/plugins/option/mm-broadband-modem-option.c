@@ -980,7 +980,8 @@ parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
                                         GAsyncResult *res,
                                         GTask *task)
 {
-    GError *error = NULL;
+    MMPortSerialAt *primary;
+    GError         *error = NULL;
 
     if (!iface_modem_3gpp_parent->enable_unsolicited_events_finish (self, res, &error)) {
         g_task_return_error (task, error);
@@ -988,10 +989,18 @@ parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
         return;
     }
 
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    if (!primary) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Couldn't enable unsolicited events: no primary port");
+        g_object_unref (task);
+        return;
+    }
+
     /* Our own enable now */
     mm_base_modem_at_sequence_full (
         MM_BASE_MODEM (self),
-        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+        primary,
         unsolicited_enable_sequence,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
@@ -1072,16 +1081,29 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
                                        GAsyncReadyCallback callback,
                                        gpointer user_data)
 {
+    GTask          *task;
+    MMPortSerialAt *primary;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    if (!primary) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Couldn't disable unsolicited events: no primary port");
+        g_object_unref (task);
+        return;
+    }
+
     /* Our own disable first */
     mm_base_modem_at_sequence_full (
         MM_BASE_MODEM (self),
-        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+        primary,
         unsolicited_disable_sequence,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
         NULL, /* cancellable */
         (GAsyncReadyCallback)own_disable_unsolicited_events_ready,
-        g_task_new (self, NULL, callback, user_data));
+        task);
 }
 
 /*****************************************************************************/
