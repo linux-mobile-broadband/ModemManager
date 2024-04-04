@@ -727,6 +727,7 @@ parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
     if (!iface_modem_3gpp_parent->enable_unsolicited_events_finish (self, res, &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
+        return;
     }
 
     /* Our own enable now */
