@@ -147,7 +147,12 @@ common_get_at_data_port (MMBroadbandBearer  *self,
          * actually a 'net' port, which the generic logic cannot handle, so if
          * that is the case, and we have no AT data ports specified, just
          fallback to the primary AT port. */
-        data = (MMPort *) mm_base_modem_peek_port_primary (modem);
+        data = MM_PORT (mm_base_modem_peek_port_primary (modem));
+        if (!data) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                         "Couldn't connect: no AT data/primary port found: ");
+            return NULL;
+        }
     }
 
     g_assert (MM_IS_PORT_SERIAL_AT (data));
