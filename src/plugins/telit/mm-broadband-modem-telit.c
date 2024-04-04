@@ -620,7 +620,7 @@ qss_setup_step (GTask *task)
             return;
         case QSS_SETUP_STEP_ENABLE_PRIMARY_PORT:
             mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                           ctx->primary,
+                                           MM_IFACE_PORT_AT (ctx->primary),
                                            "#QSS=1",
                                            3,
                                            FALSE,
@@ -632,7 +632,7 @@ qss_setup_step (GTask *task)
         case QSS_SETUP_STEP_ENABLE_SECONDARY_PORT:
             if (ctx->secondary) {
                 mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                               ctx->secondary,
+                                               MM_IFACE_PORT_AT (ctx->secondary),
                                                "#QSS=1",
                                                3,
                                                FALSE,
@@ -1457,7 +1457,7 @@ own_enable_unsolicited_events (GTask *task)
     /* Our own enable now */
     mm_base_modem_at_command_full (
         MM_BASE_MODEM (self),
-        port,
+        MM_IFACE_PORT_AT (port),
         /* Enable +CIEV only for: signal, service, roam */
         "AT+CIND=0,1,1,0,0,0,1,0,0",
         5,

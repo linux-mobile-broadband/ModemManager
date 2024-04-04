@@ -730,7 +730,7 @@ modem_power_off (MMIfaceModem        *self,
      * fires */
     g_assert (MAX_POWER_OFF_WAIT_TIME_SECS > 5);
     mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                   ctx->primary,
+                                   MM_IFACE_PORT_AT (ctx->primary),
                                    "^SMSO",
                                    5,
                                    FALSE, /* allow_cached */

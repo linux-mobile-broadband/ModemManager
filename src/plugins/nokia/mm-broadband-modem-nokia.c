@@ -266,7 +266,7 @@ retry_atz (GTask *task)
     ctx = g_task_get_task_data (task);
 
     mm_base_modem_at_command_full (self,
-                                   ctx->primary,
+                                   MM_IFACE_PORT_AT (ctx->primary),
                                    "Z",
                                    6,
                                    FALSE,

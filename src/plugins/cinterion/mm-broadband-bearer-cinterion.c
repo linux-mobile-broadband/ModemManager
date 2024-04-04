@@ -359,7 +359,7 @@ handle_cancel_dial (GTask *task)
     command = g_strdup_printf ("^SWWAN=0,%u,%u",
                                ctx->cid, usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
     mm_base_modem_at_command_full (ctx->modem,
-                                   ctx->primary,
+                                   MM_IFACE_PORT_AT (ctx->primary),
                                    command,
                                    3,
                                    FALSE,
@@ -409,7 +409,7 @@ dial_3gpp_context_step (GTask *task)
             /* Send SGAUTH write, if User & Pass are provided.
              * advance to next state by callback */
             mm_base_modem_at_command_full (ctx->modem,
-                                           ctx->primary,
+                                           MM_IFACE_PORT_AT (ctx->primary),
                                            command,
                                            10,
                                            FALSE,
@@ -435,7 +435,7 @@ dial_3gpp_context_step (GTask *task)
 
         if (default_swwan_behavior) {
             mm_base_modem_at_command_full (ctx->modem,
-                                           ctx->primary,
+                                           MM_IFACE_PORT_AT (ctx->primary),
                                            command,
                                            MM_BASE_BEARER_DEFAULT_CONNECTION_TIMEOUT,
                                            FALSE,
@@ -451,7 +451,7 @@ dial_3gpp_context_step (GTask *task)
          * we'll mark the bearer disconnected later in the callback.
          */
         mm_base_modem_at_command_full (ctx->modem,
-                                       ctx->primary,
+                                       MM_IFACE_PORT_AT (ctx->primary),
                                        command,
                                        MM_BASE_BEARER_DEFAULT_CONNECTION_TIMEOUT,
                                        FALSE,
@@ -652,7 +652,7 @@ disconnect_3gpp_context_step (GTask *task)
         mm_obj_dbg (self, "disconnect step %u/%u: disconnecting PDP CID %u...",
                     ctx->step, DISCONNECT_3GPP_CONTEXT_STEP_LAST, ctx->cid);
         mm_base_modem_at_command_full (ctx->modem,
-                                       ctx->primary,
+                                       MM_IFACE_PORT_AT (ctx->primary),
                                        command,
                                        MM_BASE_BEARER_DEFAULT_DISCONNECTION_TIMEOUT,
                                        FALSE,

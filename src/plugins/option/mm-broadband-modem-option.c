@@ -1000,7 +1000,7 @@ parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
     /* Our own enable now */
     mm_base_modem_at_sequence_full (
         MM_BASE_MODEM (self),
-        primary,
+        MM_IFACE_PORT_AT (primary),
         unsolicited_enable_sequence,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
@@ -1097,7 +1097,7 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
     /* Our own disable first */
     mm_base_modem_at_sequence_full (
         MM_BASE_MODEM (self),
-        primary,
+        MM_IFACE_PORT_AT (primary),
         unsolicited_disable_sequence,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */

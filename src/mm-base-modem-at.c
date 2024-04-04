@@ -21,7 +21,6 @@
 
 #include "mm-base-modem-at.h"
 #include "mm-errors-types.h"
-#include "mm-iface-port-at.h"
 
 /*****************************************************************************/
 /* Port setup/teardown logic, to prepare a port to be able to run an
@@ -255,7 +254,7 @@ at_sequence_parse_response (MMIfacePortAt *port,
 
 void
 mm_base_modem_at_sequence_full (MMBaseModem                *self,
-                                MMPortSerialAt             *port,
+                                MMIfacePortAt              *port,
                                 const MMBaseModemAtCommand *sequence,
                                 gpointer                    response_processor_context,
                                 GDestroyNotify              response_processor_context_free,
@@ -276,12 +275,12 @@ mm_base_modem_at_sequence_full (MMBaseModem                *self,
     task = g_task_new (self, task_cancellable, callback, user_data);
 
     /* Ensure that we have the port ready */
-    if (!setup_port (MM_IFACE_PORT_AT (port), task))
+    if (!setup_port (port, task))
         return;
 
     /* Setup context */
     ctx = g_slice_new0 (AtSequenceContext);
-    ctx->port = MM_IFACE_PORT_AT (g_object_ref (port));
+    ctx->port = g_object_ref (port);
     ctx->current = ctx->sequence = sequence;
     ctx->response_processor_context = response_processor_context;
     ctx->response_processor_context_free = response_processor_context_free;
@@ -320,11 +319,11 @@ mm_base_modem_at_sequence (MMBaseModem                *self,
                            GAsyncReadyCallback         callback,
                            gpointer                    user_data)
 {
-    MMPortSerialAt *port;
-    GError         *error = NULL;
+    MMIfacePortAt *port;
+    GError        *error = NULL;
 
     /* No port given, so we'll try to guess which is best */
-    port = mm_base_modem_peek_best_at_port (self, &error);
+    port = MM_IFACE_PORT_AT (mm_base_modem_peek_best_at_port (self, &error));
     if (!port) {
         g_task_report_error (self, callback, user_data, mm_base_modem_at_sequence, error);
         return;
@@ -534,7 +533,7 @@ at_command_ready (MMIfacePortAt *port,
 
 void
 mm_base_modem_at_command_full (MMBaseModem         *self,
-                               MMPortSerialAt      *port,
+                               MMIfacePortAt       *port,
                                const gchar         *command,
                                guint                timeout,
                                gboolean             allow_cached,
@@ -556,11 +555,11 @@ mm_base_modem_at_command_full (MMBaseModem         *self,
     task = g_task_new (self, task_cancellable, callback, user_data);
 
     /* Ensure that we have the port ready */
-    if (!setup_port (MM_IFACE_PORT_AT (port), task))
+    if (!setup_port (port, task))
         return;
 
     ctx = g_slice_new0 (AtCommandContext);
-    ctx->port = MM_IFACE_PORT_AT (g_object_ref (port));
+    ctx->port = g_object_ref (port);
 
     /* Ensure the user-provided cancellable will also get cancelled if the modem
      * wide-one gets cancelled */
@@ -596,11 +595,11 @@ mm_base_modem_at_command (MMBaseModem         *self,
                           GAsyncReadyCallback  callback,
                           gpointer             user_data)
 {
-    MMPortSerialAt *port;
-    GError         *error = NULL;
+    MMIfacePortAt *port;
+    GError        *error = NULL;
 
     /* No port given, so we'll try to guess which is best */
-    port = mm_base_modem_peek_best_at_port (self, &error);
+    port = MM_IFACE_PORT_AT (mm_base_modem_peek_best_at_port (self, &error));
     if (!port) {
         g_task_report_error (self, callback, user_data, mm_base_modem_at_command, error);
         return;

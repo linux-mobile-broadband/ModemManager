@@ -181,7 +181,7 @@ get_ip_config_3gpp (MMBroadbandBearer *_self,
 
         command = g_strdup_printf ("%%IPDPADDR=%u", cid);
         mm_base_modem_at_command_full (MM_BASE_MODEM (modem),
-                                       primary,
+                                       MM_IFACE_PORT_AT (primary),
                                        command,
                                        3,
                                        FALSE,
@@ -362,7 +362,7 @@ disconnect_3gpp (MMBroadbandBearer *bearer,
     command = g_strdup_printf ("%%IPDPACT=%d,0", cid);
     mm_base_modem_at_command_full (
         MM_BASE_MODEM (modem),
-        primary,
+        MM_IFACE_PORT_AT (primary),
         command,
         MM_BASE_BEARER_DEFAULT_DISCONNECTION_TIMEOUT,
         FALSE,
@@ -444,7 +444,7 @@ connect_reset (GTask *task)
     /* Need to reset the connection attempt */
     command = g_strdup_printf ("%%IPDPACT=%d,0", ctx->cid);
     mm_base_modem_at_command_full (ctx->modem,
-                                   ctx->primary,
+                                   MM_IFACE_PORT_AT (ctx->primary),
                                    command,
                                    MM_BASE_BEARER_DEFAULT_DISCONNECTION_TIMEOUT,
                                    FALSE,
@@ -574,7 +574,7 @@ process_pending_connect_attempt (MMBroadbandBearerIcera   *self,
         /* Try to gather additional info about the connection failure */
         mm_base_modem_at_command_full (
             ctx->modem,
-            ctx->primary,
+            MM_IFACE_PORT_AT (ctx->primary),
             "%IER?",
             60,
             FALSE,
@@ -695,7 +695,7 @@ dial_3gpp (MMBroadbandBearer   *_self,
 
     cmd = g_strdup_printf ("%%IPDPACT=%d,1", ctx->cid);
     mm_base_modem_at_command_full (ctx->modem,
-                                   ctx->primary,
+                                   MM_IFACE_PORT_AT (ctx->primary),
                                    cmd,
                                    MM_BASE_BEARER_DEFAULT_CONNECTION_TIMEOUT,
                                    FALSE,

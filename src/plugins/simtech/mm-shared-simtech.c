@@ -585,7 +585,7 @@ run_voice_enable_disable_unsolicited_events (GTask *task)
 
     if (port) {
         mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                       port,
+                                       MM_IFACE_PORT_AT (port),
                                        ctx->clcc_command,
                                        3,
                                        FALSE,

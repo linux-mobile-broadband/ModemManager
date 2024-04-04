@@ -1115,7 +1115,7 @@ gps_engine_start (GTask *task)
     g_assert (priv->gps_port);
     cmd = g_strdup_printf ("AT+XLCSLSR=%u,%u,,,,,1,,,1,118,0", transport_protocol, pos_mode);
     mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                   priv->gps_port,
+                                   MM_IFACE_PORT_AT (priv->gps_port),
                                    cmd,
                                    3,
                                    FALSE,
@@ -1292,7 +1292,7 @@ gps_engine_stop (GTask *task)
         NULL);
 
     mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                   priv->gps_port,
+                                   MM_IFACE_PORT_AT (priv->gps_port),
                                    "+XLSRSTOP",
                                    3,
                                    FALSE,
@@ -1697,7 +1697,7 @@ mm_shared_xmm_setup_ports (MMBroadbandModem *self)
 
         /* make sure GPS is stopped in case it was left enabled */
         mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                       gps_port,
+                                       MM_IFACE_PORT_AT (gps_port),
                                        "+XLSRSTOP",
                                        3, FALSE, FALSE, NULL, NULL, NULL);
     }

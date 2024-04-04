@@ -245,7 +245,7 @@ connect_poll_cb (MMBroadbandBearerMbm *self)
     self->priv->connect_pending = task;
     ctx->poll_count++;
     mm_base_modem_at_command_full (ctx->modem,
-                                   ctx->primary,
+                                   MM_IFACE_PORT_AT (ctx->primary),
                                    "AT*ENAP?",
                                    3,
                                    FALSE,
@@ -316,7 +316,7 @@ activate (GTask *task)
     /* Activate the PDP context and start the data session */
     command = g_strdup_printf ("AT*ENAP=1,%d", ctx->cid);
     mm_base_modem_at_command_full (ctx->modem,
-                                   ctx->primary,
+                                   MM_IFACE_PORT_AT (ctx->primary),
                                    command,
                                    10,
                                    FALSE,
@@ -389,7 +389,7 @@ authenticate (GTask *task)
         command = g_strdup_printf ("AT*EIAAUW=%d,1,\"%s\",\"%s\"",
                                    ctx->cid, user_enc, password_enc);
         mm_base_modem_at_command_full (ctx->modem,
-                                       ctx->primary,
+                                       MM_IFACE_PORT_AT (ctx->primary),
                                        command,
                                        3,
                                        FALSE,
@@ -566,7 +566,7 @@ get_ip_config_3gpp (MMBroadbandBearer *self,
     g_task_set_task_data (task, ctx, (GDestroyNotify)get_ip_config_context_free);
 
     mm_base_modem_at_command_full (MM_BASE_MODEM (modem),
-                                   primary,
+                                   MM_IFACE_PORT_AT (primary),
                                    "*E2IPCFG?",
                                    3,
                                    FALSE,
@@ -707,7 +707,7 @@ disconnect_poll_cb (MMBroadbandBearerMbm *self)
     self->priv->disconnect_pending = task;
     ctx->poll_count++;
     mm_base_modem_at_command_full (ctx->modem,
-                                   ctx->primary,
+                                   MM_IFACE_PORT_AT (ctx->primary),
                                    "AT*ENAP?",
                                    3,
                                    FALSE,
@@ -785,7 +785,7 @@ disconnect_3gpp (MMBroadbandBearer   *_self,
     self->priv->disconnect_pending = task;
 
     mm_base_modem_at_command_full (MM_BASE_MODEM (modem),
-                                   primary,
+                                   MM_IFACE_PORT_AT (primary),
                                    "*ENAP=0",
                                    3,
                                    FALSE,

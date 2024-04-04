@@ -107,7 +107,7 @@ dial_ready (MMBaseModem *modem,
         /* Try to get more information why it failed */
         mm_base_modem_at_command_full (
             modem,
-            ctx->primary,
+            MM_IFACE_PORT_AT (ctx->primary),
             "+CEER",
             3,
             FALSE,
@@ -163,7 +163,7 @@ service_type_ready (MMBaseModem *modem,
      * one. */
     mm_base_modem_at_command_full (
         modem,
-        ctx->primary,
+        MM_IFACE_PORT_AT (ctx->primary),
         "ATDT008816000025",
         MM_BASE_BEARER_DEFAULT_CONNECTION_TIMEOUT,
         FALSE,
@@ -209,7 +209,7 @@ connect (MMBaseBearer *self,
      * default 9600bps (V.32). */
     mm_base_modem_at_command_full (
         modem,
-        ctx->primary,
+        MM_IFACE_PORT_AT (ctx->primary),
         "+CBST=71,0,1",
         3,
         FALSE,

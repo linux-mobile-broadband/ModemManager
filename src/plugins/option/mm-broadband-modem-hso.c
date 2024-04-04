@@ -525,7 +525,7 @@ disable_location_gathering (MMIfaceModemLocation *self,
         }
 
         mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                       gps_control,
+                                       MM_IFACE_PORT_AT (gps_control),
                                        "_OGPS=0",
                                        3,
                                        FALSE,
@@ -639,7 +639,7 @@ parent_enable_location_gathering_ready (MMIfaceModemLocation *_self,
         }
 
         mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                       gps_control,
+                                       MM_IFACE_PORT_AT (gps_control),
                                        "_OGPS=2",
                                        3,
                                        FALSE,
@@ -723,7 +723,7 @@ setup_ports (MMBroadbandModem *self)
          * maybe ModemManager got rebooted and it was left enabled before. We'll make
          * sure that it is disabled when we initialize the modem */
         mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                       gps_control_port,
+                                       MM_IFACE_PORT_AT (gps_control_port),
                                        "_OGPS=0",
                                        3, FALSE, FALSE, NULL, NULL, NULL);
 

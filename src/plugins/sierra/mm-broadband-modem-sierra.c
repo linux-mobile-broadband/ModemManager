@@ -765,7 +765,7 @@ load_current_modes (MMIfaceModem *self,
     }
 
     mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                   primary,
+                                   MM_IFACE_PORT_AT (primary),
                                    "!SELRAT?",
                                    3,
                                    FALSE,
@@ -883,7 +883,7 @@ set_current_modes (MMIfaceModem *self,
 
     command = g_strdup_printf ("!SELRAT=%d", idx);
     mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                   primary,
+                                   MM_IFACE_PORT_AT (primary),
                                    command,
                                    3,
                                    FALSE,

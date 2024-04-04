@@ -328,7 +328,7 @@ connect_3gpp_context_step (GTask *task)
         /* If we already sent the connetion command, send the disconnection one */
         if (ctx->step > CONNECT_3GPP_CONTEXT_STEP_NDISDUP)
             mm_base_modem_at_command_full (ctx->modem,
-                                           ctx->primary,
+                                           MM_IFACE_PORT_AT (ctx->primary),
                                            "^NDISDUP=1,0",
                                            MM_BASE_BEARER_DEFAULT_DISCONNECTION_TIMEOUT,
                                            FALSE,
@@ -385,7 +385,7 @@ connect_3gpp_context_step (GTask *task)
         }
 
         mm_base_modem_at_command_full (ctx->modem,
-                                       ctx->primary,
+                                       MM_IFACE_PORT_AT (ctx->primary),
                                        command,
                                        3,
                                        FALSE,
@@ -428,7 +428,7 @@ connect_3gpp_context_step (GTask *task)
         /* Check if connected */
         ctx->check_count++;
         mm_base_modem_at_command_full (ctx->modem,
-                                       ctx->primary,
+                                       MM_IFACE_PORT_AT (ctx->primary),
                                        "^NDISSTATQRY?",
                                        3,
                                        FALSE,
@@ -440,7 +440,7 @@ connect_3gpp_context_step (GTask *task)
 
     case CONNECT_3GPP_CONTEXT_STEP_IP_CONFIG:
         mm_base_modem_at_command_full (ctx->modem,
-                                       ctx->primary,
+                                       MM_IFACE_PORT_AT (ctx->primary),
                                        "^DHCP?",
                                        3,
                                        FALSE,
@@ -679,7 +679,7 @@ disconnect_3gpp_context_step (GTask *task)
 
     case DISCONNECT_3GPP_CONTEXT_STEP_NDISDUP:
         mm_base_modem_at_command_full (ctx->modem,
-                                       ctx->primary,
+                                       MM_IFACE_PORT_AT (ctx->primary),
                                        "^NDISDUP=1,0",
                                        3,
                                        FALSE,
@@ -717,7 +717,7 @@ disconnect_3gpp_context_step (GTask *task)
         /* Check if disconnected */
         ctx->check_count++;
         mm_base_modem_at_command_full (ctx->modem,
-                                       ctx->primary,
+                                       MM_IFACE_PORT_AT (ctx->primary),
                                        "^NDISSTATQRY?",
                                        3,
                                        FALSE,

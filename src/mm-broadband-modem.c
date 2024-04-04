@@ -2118,8 +2118,8 @@ qcdm_evdo_pilot_sets_log_handle (MMPortSerialQcdm *port,
 }
 
 typedef struct {
-    MMPortSerial *at_port;
-    MMPortSerial *qcdm_port;
+    MMIfacePortAt *at_port;
+    MMPortSerial  *qcdm_port;
 } SignalQualityContext;
 
 static void
@@ -2224,7 +2224,7 @@ signal_quality_csq (GTask *task)
 
     mm_base_modem_at_sequence_full (
         MM_BASE_MODEM (self),
-        MM_PORT_SERIAL_AT (ctx->at_port),
+        ctx->at_port,
         signal_quality_csq_sequence,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
@@ -2319,7 +2319,7 @@ signal_quality_cind (GTask *task)
     ctx = g_task_get_task_data (task);
 
     mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                   MM_PORT_SERIAL_AT (ctx->at_port),
+                                   ctx->at_port,
                                    "+CIND?",
                                    5,
                                    FALSE,
@@ -2444,7 +2444,7 @@ modem_load_signal_quality (MMIfaceModem *_self,
     g_task_set_task_data (task, ctx, (GDestroyNotify)signal_quality_context_free);
 
     /* Check whether we can get a non-connected AT port */
-    ctx->at_port = (MMPortSerial *)mm_base_modem_get_best_at_port (MM_BASE_MODEM (self), &error);
+    ctx->at_port = MM_IFACE_PORT_AT (mm_base_modem_get_best_at_port (MM_BASE_MODEM (self), &error));
     if (ctx->at_port) {
         if (!self->priv->modem_cind_disabled &&
             self->priv->modem_cind_supported &&
@@ -3646,7 +3646,7 @@ run_unsolicited_events_setup (GTask *task)
     /* Enable unsolicited events in given port */
     if (port && command) {
         mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                       port,
+                                       MM_IFACE_PORT_AT (port),
                                        command,
                                        3,
                                        FALSE,
@@ -5004,8 +5004,8 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
 /* Register in network (3GPP interface) */
 
 typedef struct {
-    gchar          *operator_id;
-    MMPortSerialAt *port;
+    gchar         *operator_id;
+    MMIfacePortAt *port;
 } RegisterInNetworkContext;
 
 static void
@@ -5101,13 +5101,13 @@ modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
 {
     RegisterInNetworkContext *ctx;
     GTask                    *task;
-    MMPortSerialAt           *port;
+    MMIfacePortAt            *port;
     GError                   *error = NULL;
     g_autofree gchar         *command = NULL;
 
     task = g_task_new (self, cancellable, callback, user_data);
 
-    port = mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), &error);
+    port = MM_IFACE_PORT_AT (mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), &error));
     if (!port) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -5697,7 +5697,7 @@ unsolicited_registration_events_sequence_ready (MMBroadbandModem *self,
         if (command) {
             mm_base_modem_at_command_full (
                 MM_BASE_MODEM (self),
-                ctx->secondary,
+                MM_IFACE_PORT_AT (ctx->secondary),
                 g_variant_get_string (command, NULL),
                 3,
                 FALSE,
@@ -5718,7 +5718,7 @@ unsolicited_registration_events_sequence_ready (MMBroadbandModem *self,
             registration_sequence = ctx->enable ? eps_registration_sequence : eps_unregistration_sequence;
         mm_base_modem_at_sequence_full (
             MM_BASE_MODEM (self),
-            ctx->secondary,
+            MM_IFACE_PORT_AT (ctx->secondary),
             registration_sequence,
             NULL,  /* response processor context */
             NULL,  /* response processor context free */
@@ -5751,7 +5751,7 @@ unsolicited_registration_events_context_step (GTask *task)
         ctx->run_cs = FALSE;
         mm_base_modem_at_sequence_full (
             MM_BASE_MODEM (self),
-            ctx->primary,
+            MM_IFACE_PORT_AT (ctx->primary),
             ctx->enable ? cs_registration_sequence : cs_unregistration_sequence,
             NULL,  /* response processor context */
             NULL,  /* response processor context free */
@@ -5766,7 +5766,7 @@ unsolicited_registration_events_context_step (GTask *task)
         ctx->run_ps = FALSE;
         mm_base_modem_at_sequence_full (
             MM_BASE_MODEM (self),
-            ctx->primary,
+            MM_IFACE_PORT_AT (ctx->primary),
             ctx->enable ? ps_registration_sequence : ps_unregistration_sequence,
             NULL,  /* response processor context */
             NULL,  /* response processor context free */
@@ -5781,7 +5781,7 @@ unsolicited_registration_events_context_step (GTask *task)
         ctx->run_eps = FALSE;
         mm_base_modem_at_sequence_full (
             MM_BASE_MODEM (self),
-            ctx->primary,
+            MM_IFACE_PORT_AT (ctx->primary),
             ctx->enable ? eps_registration_sequence : eps_unregistration_sequence,
             NULL,  /* response processor context */
             NULL,  /* response processor context free */
@@ -7435,7 +7435,7 @@ modem_messaging_enable_unsolicited_events_primary_ready (MMBaseModem  *self,
                     mm_port_get_device (MM_PORT (ctx->secondary)));
         mm_base_modem_at_sequence_full (
             MM_BASE_MODEM (self),
-            ctx->secondary,
+            MM_IFACE_PORT_AT (ctx->secondary),
             cnmi_sequence,
             NULL, /* response_processor_context */
             NULL, /* response_processor_context_free */
@@ -7478,7 +7478,7 @@ modem_messaging_enable_unsolicited_events (MMIfaceModemMessaging *self,
                 mm_port_get_device (MM_PORT (ctx->primary)));
     mm_base_modem_at_sequence_full (
         MM_BASE_MODEM (self),
-        ctx->primary,
+        MM_IFACE_PORT_AT (ctx->primary),
         cnmi_sequence,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
@@ -8379,7 +8379,7 @@ run_voice_unsolicited_events_setup (GTask *task)
     /* Enable/Disable unsolicited events in given port */
     if (port && command) {
         mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                       port,
+                                       MM_IFACE_PORT_AT (port),
                                        command,
                                        3,
                                        FALSE,
@@ -11052,7 +11052,7 @@ enabling_modem_init (MMBroadbandModem    *self,
      * So run ATZ alone.
      */
     mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                   primary,
+                                   MM_IFACE_PORT_AT (primary),
                                    "Z",
                                    6,
                                    FALSE,

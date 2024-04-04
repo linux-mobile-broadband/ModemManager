@@ -247,7 +247,7 @@ cdma_connect_context_dial (GTask *task)
     ctx = g_task_get_task_data (task);
 
     mm_base_modem_at_command_full (ctx->modem,
-                                   MM_PORT_SERIAL_AT (ctx->data),
+                                   MM_IFACE_PORT_AT (ctx->data),
                                    "DT#777",
                                    MM_BASE_BEARER_DEFAULT_CONNECTION_TIMEOUT,
                                    FALSE,
@@ -336,7 +336,7 @@ current_rm_protocol_ready (MMBaseModem *self,
         ctx = g_task_get_task_data (task);
         command = g_strdup_printf ("+CRM=%u", new_index);
         mm_base_modem_at_command_full (ctx->modem,
-                                       ctx->primary,
+                                       MM_IFACE_PORT_AT (ctx->primary),
                                        command,
                                        3,
                                        FALSE,
@@ -374,7 +374,7 @@ connect_cdma (MMBroadbandBearer *self,
 
     /* Grab dial port. This gets a reference to the dial port and OPENs it.
      * If we fail, we'll need to close it ourselves. */
-    ctx->data = (MMPort *)common_get_at_data_port (self, ctx->modem, &error);
+    ctx->data = MM_PORT (common_get_at_data_port (self, ctx->modem, &error));
     if (!ctx->data) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -388,7 +388,7 @@ connect_cdma (MMBroadbandBearer *self,
         /* Need to query current RM protocol */
         mm_obj_dbg (self, "querying current RM protocol set...");
         mm_base_modem_at_command_full (ctx->modem,
-                                       ctx->primary,
+                                       MM_IFACE_PORT_AT (ctx->primary),
                                        "+CRM?",
                                        3,
                                        FALSE,
@@ -492,7 +492,7 @@ atd_ready (MMBaseModem *modem,
     if (ctx->saved_error) {
         /* Try to get more information why it failed */
         mm_base_modem_at_command_full (ctx->modem,
-                                       ctx->primary,
+                                       MM_IFACE_PORT_AT (ctx->primary),
                                        "+CEER",
                                        3,
                                        FALSE,
@@ -564,7 +564,7 @@ dial_3gpp (MMBroadbandBearer *self,
     /* Use default *99 to connect */
     command = g_strdup_printf ("ATD*99***%d#", cid);
     mm_base_modem_at_command_full (ctx->modem,
-                                   ctx->dial_port,
+                                   MM_IFACE_PORT_AT (ctx->dial_port),
                                    command,
                                    MM_BASE_BEARER_DEFAULT_CONNECTION_TIMEOUT,
                                    FALSE,
@@ -1321,7 +1321,7 @@ data_flash_3gpp_ready (MMPortSerial *data,
         mm_obj_dbg (self, "sending PDP context deactivation in primary port again...");
 
     mm_base_modem_at_command_full (ctx->modem,
-                                   ctx->primary,
+                                   MM_IFACE_PORT_AT (ctx->primary),
                                    ctx->cgact_command,
                                    10,
                                    FALSE,
@@ -1438,7 +1438,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
     if (!mm_port_get_connected (MM_PORT (ctx->primary))) {
         mm_obj_dbg (self, "sending PDP context deactivation in primary port...");
         mm_base_modem_at_command_full (ctx->modem,
-                                       ctx->primary,
+                                       MM_IFACE_PORT_AT (ctx->primary),
                                        ctx->cgact_command,
                                        45,
                                        FALSE,
@@ -1457,7 +1457,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
     if (ctx->secondary) {
         mm_obj_dbg (self, "sending PDP context deactivation in secondary port...");
         mm_base_modem_at_command_full (ctx->modem,
-                                       ctx->secondary,
+                                       MM_IFACE_PORT_AT (ctx->secondary),
                                        ctx->cgact_command,
                                        45,
                                        FALSE,
@@ -1682,7 +1682,7 @@ load_connection_status (MMBaseBearer        *self,
 {
     GTask                  *task;
     g_autoptr(MMBaseModem)  modem = NULL;
-    MMPortSerialAt         *port;
+    MMIfacePortAt          *port;
 
     task = g_task_new (self, NULL, callback, user_data);
 
@@ -1707,7 +1707,7 @@ load_connection_status (MMBaseBearer        *self,
     }
 
     /* If no control port available, error out */
-    port = mm_base_modem_peek_best_at_port (modem, NULL);
+    port = MM_IFACE_PORT_AT (mm_base_modem_peek_best_at_port (modem, NULL));
     if (!port) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                  "Couldn't load connection status: no control port available");
@@ -1758,15 +1758,15 @@ typedef enum {
 struct _InitAsyncContext {
     MMBaseModem *modem;
     InitializationStep step;
-    MMPortSerialAt *port;
+    MMPortSerialAt *primary;
 };
 
 static void
 init_async_context_free (InitAsyncContext *ctx)
 {
-    if (ctx->port) {
-        mm_port_serial_close (MM_PORT_SERIAL (ctx->port));
-        g_object_unref (ctx->port);
+    if (ctx->primary) {
+        mm_port_serial_close (MM_PORT_SERIAL (ctx->primary));
+        g_object_unref (ctx->primary);
     }
     g_object_unref (ctx->modem);
     g_free (ctx);
@@ -1870,7 +1870,7 @@ interface_initialization_step (GTask *task)
             mm_bearer_properties_get_rm_protocol (
                 mm_base_bearer_peek_config (MM_BASE_BEARER (self))) != MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
             mm_base_modem_at_command_full (ctx->modem,
-                                           ctx->port,
+                                           MM_IFACE_PORT_AT (ctx->primary),
                                            "+CRM=?",
                                            3,
                                            TRUE, /* getting range, so reply can be cached */
@@ -1919,8 +1919,8 @@ initable_init_async (GAsyncInitable *initable,
                        user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)init_async_context_free);
 
-    ctx->port = mm_base_modem_get_port_primary (ctx->modem);
-    if (!ctx->port) {
+    ctx->primary = mm_base_modem_get_port_primary (ctx->modem);
+    if (!ctx->primary) {
         g_task_return_new_error (task,
                                  MM_CORE_ERROR,
                                  MM_CORE_ERROR_FAILED,
@@ -1929,8 +1929,8 @@ initable_init_async (GAsyncInitable *initable,
         return;
     }
 
-    if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->port), &error)) {
-        g_clear_object (&ctx->port);
+    if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->primary), &error)) {
+        g_clear_object (&ctx->primary);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;

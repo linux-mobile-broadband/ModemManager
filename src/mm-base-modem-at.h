@@ -19,7 +19,7 @@
 #include <gio/gio.h>
 
 #include "mm-base-modem.h"
-#include "mm-port-serial-at.h"
+#include "mm-iface-port-at.h"
 
 typedef enum {
     MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE,
@@ -87,7 +87,7 @@ GVariant *mm_base_modem_at_sequence_finish (MMBaseModem                 *self,
 /* Fully detailed AT sequence handling, when specific AT port and/or explicit
  * cancellations need to be used. */
 void     mm_base_modem_at_sequence_full         (MMBaseModem                 *self,
-                                                 MMPortSerialAt              *port,
+                                                 MMIfacePortAt               *port,
                                                  const MMBaseModemAtCommand  *sequence,
                                                  gpointer                     response_processor_context,
                                                  GDestroyNotify               response_processor_context_free,
@@ -193,7 +193,7 @@ const gchar *mm_base_modem_at_command_finish (MMBaseModem          *self,
 /* Fully detailed AT command handling, when specific AT port and/or explicit
  * cancellations need to be used. */
 void         mm_base_modem_at_command_full        (MMBaseModem          *self,
-                                                   MMPortSerialAt       *port,
+                                                   MMIfacePortAt        *port,
                                                    const gchar          *command,
                                                    guint                 timeout,
                                                    gboolean              allow_cached,

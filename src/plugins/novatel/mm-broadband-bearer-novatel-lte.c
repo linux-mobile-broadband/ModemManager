@@ -251,7 +251,7 @@ connect_3gpp_qmistatus (GTask *task)
 
     mm_base_modem_at_command_full (
         ctx->modem,
-        ctx->primary,
+        MM_IFACE_PORT_AT (ctx->primary),
         "$NWQMISTATUS",
         3, /* timeout */
         FALSE, /* allow_cached */
@@ -309,7 +309,7 @@ connect_3gpp_authenticate (GTask *task)
     g_free (password);
     mm_base_modem_at_command_full (
         ctx->modem,
-        ctx->primary,
+        MM_IFACE_PORT_AT (ctx->primary),
         command,
         10, /* timeout */
         FALSE, /* allow_cached */
@@ -450,7 +450,7 @@ disconnect_3gpp_qmistatus (GTask *task)
 
     mm_base_modem_at_command_full (
         ctx->modem,
-        ctx->primary,
+        MM_IFACE_PORT_AT (ctx->primary),
         "$NWQMISTATUS",
         3, /* timeout */
         FALSE, /* allow_cached */
@@ -505,7 +505,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
 
     mm_base_modem_at_command_full (
         ctx->modem,
-        ctx->primary,
+        MM_IFACE_PORT_AT (ctx->primary),
         "$NWQMIDISCONNECT",
         10, /* timeout */
         FALSE, /* allow_cached */

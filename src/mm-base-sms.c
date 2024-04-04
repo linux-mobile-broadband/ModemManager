@@ -840,7 +840,7 @@ sms_get_store_or_send_command (MMBaseSms  *self,
 
 typedef struct {
     MMBaseModem    *modem;
-    MMPortSerialAt *port;
+    MMIfacePortAt  *port;
     MMSmsStorage    storage;
     gboolean        need_unlock;
     gboolean        use_pdu_mode;
@@ -1024,13 +1024,13 @@ sms_store (MMBaseSms           *self,
 {
     SmsStoreContext *ctx;
     GTask           *task;
-    MMPortSerialAt  *port;
+    MMIfacePortAt   *port;
     GError          *error = NULL;
 
     task = g_task_new (self, NULL, callback, user_data);
 
     /* Select port for the operation */
-    port = mm_base_modem_peek_best_at_port (self->priv->modem, &error);
+    port = MM_IFACE_PORT_AT (mm_base_modem_peek_best_at_port (self->priv->modem, &error));
     if (!port) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -1063,13 +1063,13 @@ sms_store (MMBaseSms           *self,
 /* Send the SMS */
 
 typedef struct {
-    MMBaseModem    *modem;
-    MMPortSerialAt *port;
-    gboolean        need_unlock;
-    gboolean        from_storage;
-    gboolean        use_pdu_mode;
-    GList          *current;
-    gchar          *msg_data;
+    MMBaseModem   *modem;
+    MMIfacePortAt *port;
+    gboolean       need_unlock;
+    gboolean       from_storage;
+    gboolean       use_pdu_mode;
+    GList         *current;
+    gchar         *msg_data;
 } SmsSendContext;
 
 static void
@@ -1327,13 +1327,13 @@ sms_send (MMBaseSms           *self,
 {
     SmsSendContext *ctx;
     GTask          *task;
-    MMPortSerialAt *port;
+    MMIfacePortAt  *port;
     GError         *error = NULL;
 
     task = g_task_new (self, NULL, callback, user_data);
 
     /* Select port for the operation */
-    port = mm_base_modem_peek_best_at_port (self->priv->modem, &error);
+    port = MM_IFACE_PORT_AT (mm_base_modem_peek_best_at_port (self->priv->modem, &error));
     if (!port) {
         g_task_return_error (task, error);
         g_object_unref (task);
