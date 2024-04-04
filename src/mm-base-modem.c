@@ -1102,35 +1102,67 @@ mm_base_modem_peek_data_ports (MMBaseModem *self)
     return self->priv->data;
 }
 
-MMPortSerialAt *
-mm_base_modem_get_best_at_port (MMBaseModem *self,
-                                GError **error)
+MMIfacePortAt *
+mm_base_modem_get_best_at_port (MMBaseModem  *self,
+                                GError      **error)
 {
-    MMPortSerialAt *best;
+    MMIfacePortAt *best;
 
     best = mm_base_modem_peek_best_at_port (self, error);
     return (best ? g_object_ref (best) : NULL);
 }
 
-MMPortSerialAt *
-mm_base_modem_peek_best_at_port (MMBaseModem *self,
-                                 GError **error)
+MMIfacePortAt *
+mm_base_modem_peek_best_at_port (MMBaseModem  *self,
+                                 GError      **error)
 {
+    gboolean supported;
+
+#if defined WITH_MBIM
+    /* Prefer an AT-capable MBIM port instead of a serial port */
+    if (self->priv->mbim) {
+        GList *l;
+
+        for (l = self->priv->mbim; l; l = g_list_next (l)) {
+            if (MM_IS_IFACE_PORT_AT (l->data) &&
+                mm_iface_port_at_check_support (MM_IFACE_PORT_AT (l->data), &supported, NULL) &&
+                supported)
+                return MM_IFACE_PORT_AT (l->data);
+        }
+    }
+#endif
+
+#if defined WITH_QMI
+    /* Prefer an AT-capable QMI port instead of a serial port */
+    if (self->priv->qmi) {
+        GList *l;
+
+        for (l = self->priv->qmi; l; l = g_list_next (l)) {
+            if (MM_IS_IFACE_PORT_AT (l->data) &&
+                mm_iface_port_at_check_support (MM_IFACE_PORT_AT (l->data), &supported, NULL) &&
+                supported)
+                return MM_IFACE_PORT_AT (l->data);
+        }
+    }
+#endif
+
     /* Decide which port to use */
-    if (self->priv->primary &&
-        !mm_port_get_connected (MM_PORT (self->priv->primary)))
-        return self->priv->primary;
+    if (self->priv->primary && !mm_port_get_connected (MM_PORT (self->priv->primary))) {
+        g_assert (MM_IS_IFACE_PORT_AT (self->priv->primary));
+        g_assert (mm_iface_port_at_check_support (MM_IFACE_PORT_AT (self->priv->primary), &supported, NULL) && supported);
+        return MM_IFACE_PORT_AT (self->priv->primary);
+    }
 
     /* If primary port is connected, check if we can get the secondary
      * port */
-    if (self->priv->secondary &&
-        !mm_port_get_connected (MM_PORT (self->priv->secondary)))
-        return self->priv->secondary;
+    if (self->priv->secondary && !mm_port_get_connected (MM_PORT (self->priv->secondary))) {
+        g_assert (MM_IS_IFACE_PORT_AT (self->priv->secondary));
+        g_assert (mm_iface_port_at_check_support (MM_IFACE_PORT_AT (self->priv->secondary), &supported, NULL) && supported);
+        return MM_IFACE_PORT_AT (self->priv->secondary);
+    }
 
     /* Otherwise, we cannot get any port */
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_CONNECTED,
+    g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                  "No AT port available to run command");
     return NULL;
 }

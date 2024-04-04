@@ -1030,7 +1030,7 @@ sms_store (MMBaseSms           *self,
     task = g_task_new (self, NULL, callback, user_data);
 
     /* Select port for the operation */
-    port = MM_IFACE_PORT_AT (mm_base_modem_peek_best_at_port (self->priv->modem, &error));
+    port = mm_base_modem_peek_best_at_port (self->priv->modem, &error);
     if (!port) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -1333,7 +1333,7 @@ sms_send (MMBaseSms           *self,
     task = g_task_new (self, NULL, callback, user_data);
 
     /* Select port for the operation */
-    port = MM_IFACE_PORT_AT (mm_base_modem_peek_best_at_port (self->priv->modem, &error));
+    port = mm_base_modem_peek_best_at_port (self->priv->modem, &error);
     if (!port) {
         g_task_return_error (task, error);
         g_object_unref (task);

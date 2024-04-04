@@ -323,7 +323,7 @@ mm_base_modem_at_sequence (MMBaseModem                *self,
     GError        *error = NULL;
 
     /* No port given, so we'll try to guess which is best */
-    port = MM_IFACE_PORT_AT (mm_base_modem_peek_best_at_port (self, &error));
+    port = mm_base_modem_peek_best_at_port (self, &error);
     if (!port) {
         g_task_report_error (self, callback, user_data, mm_base_modem_at_sequence, error);
         return;
@@ -599,7 +599,7 @@ mm_base_modem_at_command (MMBaseModem         *self,
     GError        *error = NULL;
 
     /* No port given, so we'll try to guess which is best */
-    port = MM_IFACE_PORT_AT (mm_base_modem_peek_best_at_port (self, &error));
+    port = mm_base_modem_peek_best_at_port (self, &error);
     if (!port) {
         g_task_report_error (self, callback, user_data, mm_base_modem_at_command, error);
         return;

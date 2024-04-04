@@ -2444,7 +2444,7 @@ modem_load_signal_quality (MMIfaceModem *_self,
     g_task_set_task_data (task, ctx, (GDestroyNotify)signal_quality_context_free);
 
     /* Check whether we can get a non-connected AT port */
-    ctx->at_port = MM_IFACE_PORT_AT (mm_base_modem_get_best_at_port (MM_BASE_MODEM (self), &error));
+    ctx->at_port = mm_base_modem_get_best_at_port (MM_BASE_MODEM (self), &error);
     if (ctx->at_port) {
         if (!self->priv->modem_cind_disabled &&
             self->priv->modem_cind_supported &&
@@ -5107,7 +5107,7 @@ modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
 
     task = g_task_new (self, cancellable, callback, user_data);
 
-    port = MM_IFACE_PORT_AT (mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), &error));
+    port = mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), &error);
     if (!port) {
         g_task_return_error (task, error);
         g_object_unref (task);

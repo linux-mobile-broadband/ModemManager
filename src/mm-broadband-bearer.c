@@ -1707,7 +1707,7 @@ load_connection_status (MMBaseBearer        *self,
     }
 
     /* If no control port available, error out */
-    port = MM_IFACE_PORT_AT (mm_base_modem_peek_best_at_port (modem, NULL));
+    port = mm_base_modem_peek_best_at_port (modem, NULL);
     if (!port) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                  "Couldn't load connection status: no control port available");
