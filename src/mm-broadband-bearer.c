@@ -1675,9 +1675,9 @@ load_connection_status (MMBaseBearer        *self,
                         GAsyncReadyCallback  callback,
                         gpointer             user_data)
 {
-    GTask          *task;
-    MMBaseModem    *modem = NULL;
-    MMPortSerialAt *port;
+    GTask                  *task;
+    g_autoptr(MMBaseModem)  modem = NULL;
+    MMPortSerialAt         *port;
 
     task = g_task_new (self, NULL, callback, user_data);
 
@@ -1690,7 +1690,7 @@ load_connection_status (MMBaseBearer        *self,
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                  "Couldn't load connection status: unsupported in CDMA");
         g_object_unref (task);
-        goto out;
+        return;
     }
 
     /* If CID not defined, error out */
@@ -1698,7 +1698,7 @@ load_connection_status (MMBaseBearer        *self,
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                  "Couldn't load connection status: cid not defined");
         g_object_unref (task);
-        goto out;
+        return;
     }
 
     /* If no control port available, error out */
@@ -1707,7 +1707,7 @@ load_connection_status (MMBaseBearer        *self,
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                  "Couldn't load connection status: no control port available");
         g_object_unref (task);
-        goto out;
+        return;
     }
 
     mm_base_modem_at_command_full (MM_BASE_MODEM (modem),
@@ -1719,9 +1719,6 @@ load_connection_status (MMBaseBearer        *self,
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback) cgact_periodic_query_ready,
                                    task);
-
-out:
-    g_clear_object (&modem);
 }
 
 /*****************************************************************************/
