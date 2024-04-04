@@ -3972,9 +3972,11 @@ ifc_test_ready (MMBaseModem  *_self,
         goto out;
     flow_control_supported_str = mm_flow_control_build_string_from_mask (flow_control_supported);
 
-    port = mm_base_modem_peek_best_at_port (_self, &error);
-    if (!port)
+    port = mm_base_modem_peek_port_primary (_self);
+    if (!port) {
+        g_set_error (&error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "No primary AT port");
         goto out;
+    }
 
     flow_control_requested = mm_port_serial_get_flow_control (MM_PORT_SERIAL (port));
     if (flow_control_requested != MM_FLOW_CONTROL_UNKNOWN) {
