@@ -11003,26 +11003,28 @@ disabling_stopped (MMBroadbandModem *self,
 /*****************************************************************************/
 /* Initializing the modem (during first enabling) */
 
-static gboolean
-enabling_modem_init_finish (MMBroadbandModem *self,
-                            GAsyncResult *res,
-                            GError **error)
-{
-    return !!mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, error);
-}
-
 static void
-enabling_modem_init (MMBroadbandModem *self,
-                     GAsyncReadyCallback callback,
-                     gpointer user_data)
+enabling_modem_init (MMBroadbandModem    *self,
+                     GAsyncReadyCallback  callback,
+                     gpointer             user_data)
 {
+    MMPortSerialAt *primary;
+
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    if (!primary) {
+        g_task_report_new_error (self, callback, user_data, enabling_modem_init,
+                                 MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Failed to run init command: primary port missing");
+        return;
+    }
+
     /* Init command. ITU rec v.250 (6.1.1) says:
      *   The DTE should not include additional commands on the same command line
      *   after the Z command because such commands may be ignored.
      * So run ATZ alone.
      */
     mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                   mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+                                   primary,
                                    "Z",
                                    6,
                                    FALSE,
@@ -11030,6 +11032,17 @@ enabling_modem_init (MMBroadbandModem *self,
                                    NULL, /* cancellable */
                                    callback,
                                    user_data);
+}
+
+static gboolean
+enabling_modem_init_finish (MMBroadbandModem  *self,
+                            GAsyncResult      *res,
+                            GError           **error)
+{
+    if (g_async_result_is_tagged (res, enabling_modem_init))
+        return g_task_propagate_boolean (G_TASK (res), error);
+
+    return !!mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, error);
 }
 
 /*****************************************************************************/
