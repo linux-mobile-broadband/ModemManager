@@ -279,21 +279,31 @@ parent_setup_unsolicited_events_ready (MMIfaceModem3gpp *self,
                                        GAsyncResult *res,
                                        GTask *task)
 {
-    GError *error = NULL;
+    GError         *error = NULL;
+    MMPortSerialAt *primary;
 
-    if (!iface_modem_3gpp_parent->setup_unsolicited_events_finish (self, res, &error))
+    if (!iface_modem_3gpp_parent->setup_unsolicited_events_finish (self, res, &error)) {
         g_task_return_error (task, error);
-    else {
-        /* Our own setup now */
-        mm_port_serial_at_add_unsolicited_msg_handler (
-            mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
-            MM_BROADBAND_MODEM_HSO (self)->priv->_owancall_regex,
-            (MMPortSerialAtUnsolicitedMsgFn)hso_connection_status_changed,
-            self,
-            NULL);
-
-        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
     }
+
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    if (!primary) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Couldn't setup unsolicited events: no primary port");
+        g_object_unref (task);
+        return;
+    }
+
+    mm_port_serial_at_add_unsolicited_msg_handler (
+        primary,
+        MM_BROADBAND_MODEM_HSO (self)->priv->_owancall_regex,
+        (MMPortSerialAtUnsolicitedMsgFn)hso_connection_status_changed,
+        self,
+        NULL);
+
+    g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
 
@@ -329,9 +339,22 @@ modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *self,
                                        GAsyncReadyCallback callback,
                                        gpointer user_data)
 {
+    GTask          *task;
+    MMPortSerialAt *primary;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    if (!primary) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Couldn't setup unsolicited events: no primary port");
+        g_object_unref (task);
+        return;
+    }
+
     /* Our own cleanup first */
     mm_port_serial_at_add_unsolicited_msg_handler (
-        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+        primary,
         MM_BROADBAND_MODEM_HSO (self)->priv->_owancall_regex,
         NULL, NULL, NULL);
 
@@ -339,7 +362,7 @@ modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *self,
     iface_modem_3gpp_parent->cleanup_unsolicited_events (
         self,
         (GAsyncReadyCallback)parent_cleanup_unsolicited_events_ready,
-        g_task_new (self, NULL, callback, user_data));
+        task);
 }
 
 /*****************************************************************************/
@@ -649,19 +672,24 @@ trace_received (MMPortSerialGps      *port,
 static void
 setup_ports (MMBroadbandModem *self)
 {
+    MMPortSerialAt *primary;
     MMPortSerialAt *gps_control_port;
     MMPortSerialGps *gps_data_port;
 
     /* Call parent's setup ports first always */
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_hso_parent_class)->setup_ports (self);
 
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    if (!primary)
+        return;
+
     /* _OWANCALL unsolicited messages are only expected in the primary port. */
     mm_port_serial_at_add_unsolicited_msg_handler (
-        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+        primary,
         MM_BROADBAND_MODEM_HSO (self)->priv->_owancall_regex,
         NULL, NULL, NULL);
 
-    g_object_set (mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+    g_object_set (primary,
                   MM_PORT_SERIAL_SEND_DELAY, (guint64) 0,
                   /* built-in echo removal conflicts with unsolicited _OWANCALL
                    * messages, which are not <CR><LF> prefixed. */
