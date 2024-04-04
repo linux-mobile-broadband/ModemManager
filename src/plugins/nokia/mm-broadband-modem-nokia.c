@@ -202,8 +202,16 @@ load_supported_charsets (MMIfaceModem *self,
 /* Initializing the modem (during first enabling) */
 
 typedef struct {
-    guint retries;
+    MMPortSerialAt *primary;
+    guint           retries;
 } EnablingModemInitContext;
+
+static void
+enabling_modem_init_context_free (EnablingModemInitContext *ctx)
+{
+    g_object_unref (ctx->primary);
+    g_slice_free (EnablingModemInitContext, ctx);
+}
 
 static gboolean
 enabling_modem_init_finish (MMBroadbandModem *self,
@@ -251,12 +259,14 @@ atz_ready (MMBaseModem *self,
 static void
 retry_atz (GTask *task)
 {
-    MMBaseModem *self;
+    MMBaseModem              *self;
+    EnablingModemInitContext *ctx;
 
     self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     mm_base_modem_at_command_full (self,
-                                   mm_base_modem_peek_port_primary (self),
+                                   ctx->primary,
                                    "Z",
                                    6,
                                    FALSE,
@@ -271,19 +281,28 @@ enabling_modem_init (MMBroadbandModem *self,
                      GAsyncReadyCallback callback,
                      gpointer user_data)
 {
+    MMPortSerialAt           *primary;
     EnablingModemInitContext *ctx;
-    GTask *task;
+    GTask                    *task;
 
-    ctx = g_new (EnablingModemInitContext, 1);
+    task = g_task_new (self, NULL, callback, user_data);
 
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    if (!primary) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Failed to run init command: primary port missing");
+        g_object_unref (task);
+        return;
+    }
+
+    ctx = g_slice_new (EnablingModemInitContext);
+    ctx->primary = g_object_ref (primary);
     /* Send the init command twice; some devices (Nokia N900) appear to take a
      * few commands before responding correctly.  Instead of penalizing them for
      * being stupid the first time by failing to enable the device, just
      * try again. */
     ctx->retries = 2;
-
-    task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task, ctx, g_free);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)enabling_modem_init_context_free);
 
     retry_atz (task);
 }
@@ -317,6 +336,8 @@ setup_ports (MMBroadbandModem *self)
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_nokia_parent_class)->setup_ports (self);
 
     primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    if (!primary)
+        return;
 
     g_object_set (primary,
                   MM_PORT_SERIAL_AT_INIT_SEQUENCE, primary_init_sequence,
