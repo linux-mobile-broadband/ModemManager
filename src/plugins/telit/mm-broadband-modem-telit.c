@@ -1389,6 +1389,20 @@ load_supported_modes (MMIfaceModem *self,
 /*****************************************************************************/
 /* Enabling unsolicited events (3GPP interface) */
 
+typedef struct {
+    MMPortSerialAt *primary;
+    MMPortSerialAt *secondary;
+    gboolean        primary_done;
+} EnableUnsolicitedEventsContext;
+
+static void
+enable_unsolicited_events_context_free (EnableUnsolicitedEventsContext *ctx)
+{
+    g_clear_object (&ctx->primary);
+    g_clear_object (&ctx->secondary);
+    g_slice_free (EnableUnsolicitedEventsContext, ctx);
+}
+
 static gboolean
 modem_3gpp_enable_unsolicited_events_finish (MMIfaceModem3gpp  *self,
                                              GAsyncResult      *res,
@@ -1397,38 +1411,53 @@ modem_3gpp_enable_unsolicited_events_finish (MMIfaceModem3gpp  *self,
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
+static void own_enable_unsolicited_events (GTask *task);
+
 static void
 cind_set_ready (MMBaseModem  *self,
                 GAsyncResult *res,
                 GTask        *task)
 {
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
 
-    if (!mm_base_modem_at_command_finish (self, res, &error)) {
+    if (!mm_base_modem_at_command_full_finish (self, res, &error))
         mm_obj_warn (self, "couldn't enable custom +CIND settings: %s", error->message);
-        g_error_free (error);
-    }
 
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+    own_enable_unsolicited_events (task);
 }
 
 static void
-parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
-                                        GAsyncResult     *res,
-                                        GTask            *task)
+own_enable_unsolicited_events (GTask *task)
 {
-    GError *error = NULL;
+    MMBroadbandModemTelit          *self;
+    EnableUnsolicitedEventsContext *ctx;
+    MMPortSerialAt                 *port = NULL;
 
-    if (!iface_modem_3gpp_parent->enable_unsolicited_events_finish (self, res, &error)) {
-        mm_obj_warn (self, "couldn't enable parent 3GPP unsolicited events: %s", error->message);
-        g_error_free (error);
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    /* Select next port to use */
+    if (!ctx->primary_done) {
+        ctx->primary_done = TRUE;
+        g_assert (ctx->primary);
+        mm_obj_dbg (self, "enabling telit-specific 3GPP unsolicited events in primary port");
+        port = ctx->primary;
+    } else if (ctx->secondary) {
+        mm_obj_dbg (self, "enabling telit-specific 3GPP unsolicited events in secondary port");
+        port = ctx->secondary;
+    }
+
+    /* If no ports to setup, complete the operation */
+    if (!port) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
     }
 
     /* Our own enable now */
     mm_base_modem_at_command_full (
         MM_BASE_MODEM (self),
-        mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self)),
+        port,
         /* Enable +CIEV only for: signal, service, roam */
         "AT+CIND=0,1,1,0,0,0,1,0,0",
         5,
@@ -1440,13 +1469,40 @@ parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
 }
 
 static void
+parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
+                                        GAsyncResult     *res,
+                                        GTask            *task)
+{
+    g_autoptr(GError) error = NULL;
+
+    if (!iface_modem_3gpp_parent->enable_unsolicited_events_finish (self, res, &error))
+        mm_obj_warn (self, "couldn't enable parent 3GPP unsolicited events: %s", error->message);
+
+    own_enable_unsolicited_events (task);
+}
+
+static void
 modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp    *self,
                                       GAsyncReadyCallback  callback,
                                       gpointer             user_data)
 {
-    GTask *task;
+    GTask                          *task;
+    EnableUnsolicitedEventsContext *ctx;
 
     task = g_task_new (self, NULL, callback, user_data);
+
+    ctx = g_slice_new0 (EnableUnsolicitedEventsContext);
+    ctx->primary = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    ctx->secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+    g_task_set_task_data (task, ctx, (GDestroyNotify)enable_unsolicited_events_context_free);
+
+    /* If no primary port is found, early abort right away */
+    if (!ctx->primary) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Failed to enable 3GPP unsolicited events: no primary port found");
+        g_object_unref (task);
+        return;
+    }
 
     /* Chain up parent's enable */
     iface_modem_3gpp_parent->enable_unsolicited_events (
