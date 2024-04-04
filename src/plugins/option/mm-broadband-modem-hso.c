@@ -513,9 +513,19 @@ disable_location_gathering (MMIfaceModemLocation *self,
     }
 
     if (stop_gps) {
+        MMPortSerialAt *gps_control;
+
         /* We enable continuous GPS fixes with AT_OGPS=0 */
+        gps_control = mm_base_modem_peek_port_gps_control (MM_BASE_MODEM (self));
+        if (!gps_control) {
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                     "Cannot stop GPS: no control port");
+            g_object_unref (task);
+            return;
+        }
+
         mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                       mm_base_modem_peek_port_gps_control (MM_BASE_MODEM (self)),
+                                       gps_control,
                                        "_OGPS=0",
                                        3,
                                        FALSE,
@@ -617,9 +627,19 @@ parent_enable_location_gathering_ready (MMIfaceModemLocation *_self,
     }
 
     if (start_gps) {
+        MMPortSerialAt *gps_control;
+
         /* We enable continuous GPS fixes with AT_OGPS=2 */
+        gps_control = mm_base_modem_peek_port_gps_control (MM_BASE_MODEM (self));
+        if (!gps_control) {
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                     "Cannot start GPS: no control port");
+            g_object_unref (task);
+            return;
+        }
+
         mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                       mm_base_modem_peek_port_gps_control (MM_BASE_MODEM (self)),
+                                       gps_control,
                                        "_OGPS=2",
                                        3,
                                        FALSE,
