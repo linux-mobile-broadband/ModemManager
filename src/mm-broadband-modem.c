@@ -9544,7 +9544,6 @@ typedef struct {
 } DetailedRegistrationStateResults;
 
 typedef struct {
-    MMPortSerialAt *port;
     MMModemCdmaRegistrationState cdma1x_state;
     MMModemCdmaRegistrationState evdo_state;
 } DetailedRegistrationStateContext;
@@ -9559,13 +9558,6 @@ detailed_registration_state_result_new (DetailedRegistrationStateContext *ctx)
     results->detailed_evdo_state = ctx->evdo_state;
 
     return results;
-}
-
-static void
-detailed_registration_state_context_free (DetailedRegistrationStateContext *ctx)
-{
-    g_object_unref (ctx->port);
-    g_free (ctx);
 }
 
 static gboolean
@@ -9708,32 +9700,16 @@ modem_cdma_get_detailed_registration_state (MMIfaceModemCdma *self,
                                             GAsyncReadyCallback callback,
                                             gpointer user_data)
 {
-    MMPortSerialAt *port;
-    GError *error = NULL;
     DetailedRegistrationStateContext *ctx;
     GTask *task;
 
-    /* The default implementation to get detailed registration state
-     * requires the use of an AT port; so if we cannot get any, just
-     * return the error */
-    port = mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), &error);
-    if (!port) {
-        g_task_report_error (self,
-                             callback,
-                             user_data,
-                             modem_cdma_get_detailed_registration_state,
-                             error);
-        return;
-    }
-
     /* Setup context */
     ctx = g_new0 (DetailedRegistrationStateContext, 1);
-    ctx->port = g_object_ref (port);
     ctx->cdma1x_state = cdma1x_state;
     ctx->evdo_state = evdo_state;
 
     task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task, ctx, (GDestroyNotify)detailed_registration_state_context_free);
+    g_task_set_task_data (task, ctx, g_free);
 
     /* NOTE: If we get this generic implementation of getting detailed
      * registration state called, we DO know that we have Sprint commands
