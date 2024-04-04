@@ -568,7 +568,7 @@ modem_power_down (MMIfaceModem        *_self,
 #define MAX_POWER_OFF_WAIT_TIME_SECS 20
 
 typedef struct {
-    MMPortSerialAt *port;
+    MMPortSerialAt *primary;
     GRegex         *shutdown_regex;
     gboolean        shutdown_received;
     gboolean        smso_replied;
@@ -580,11 +580,11 @@ static void
 power_off_context_free (PowerOffContext *ctx)
 {
     if (ctx->serial_open)
-        mm_port_serial_close (MM_PORT_SERIAL (ctx->port));
+        mm_port_serial_close (MM_PORT_SERIAL (ctx->primary));
     if (ctx->timeout_id)
         g_source_remove (ctx->timeout_id);
-    mm_port_serial_at_add_unsolicited_msg_handler (ctx->port, ctx->shutdown_regex, NULL, NULL, NULL);
-    g_object_unref (ctx->port);
+    mm_port_serial_at_add_unsolicited_msg_handler (ctx->primary, ctx->shutdown_regex, NULL, NULL, NULL);
+    g_object_unref (ctx->primary);
     g_regex_unref (ctx->shutdown_regex);
     g_slice_free (PowerOffContext, ctx);
 }
@@ -638,7 +638,7 @@ smso_ready (MMBaseModem  *self,
 }
 
 static void
-shutdown_received (MMPortSerialAt *port,
+shutdown_received (MMPortSerialAt *primary,
                    GMatchInfo     *match_info,
                    GTask          *task)
 {
@@ -647,7 +647,7 @@ shutdown_received (MMPortSerialAt *port,
     ctx = g_task_get_task_data (task);
 
     /* Cleanup handler right away, we don't want it called any more */
-    mm_port_serial_at_add_unsolicited_msg_handler (port, ctx->shutdown_regex, NULL, NULL, NULL);
+    mm_port_serial_at_add_unsolicited_msg_handler (primary, ctx->shutdown_regex, NULL, NULL, NULL);
 
     /* Set as received and see if we can complete */
     ctx->shutdown_received = TRUE;
@@ -667,7 +667,7 @@ power_off_timeout_cb (GTask *task)
     g_warn_if_fail (ctx->smso_replied == TRUE);
 
     /* Cleanup handler right away, we no longer want to receive it */
-    mm_port_serial_at_add_unsolicited_msg_handler (ctx->port, ctx->shutdown_regex, NULL, NULL, NULL);
+    mm_port_serial_at_add_unsolicited_msg_handler (ctx->primary, ctx->shutdown_regex, NULL, NULL, NULL);
 
     g_task_return_new_error (task,
                              MM_CORE_ERROR,
@@ -686,11 +686,20 @@ modem_power_off (MMIfaceModem        *self,
     GTask           *task;
     PowerOffContext *ctx;
     GError          *error = NULL;
+    MMPortSerialAt  *primary;
 
     task = g_task_new (self, NULL, callback, user_data);
 
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    if (!primary) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Cannot power off: no primary port");
+        g_object_unref (task);
+        return;
+    }
+
     ctx = g_slice_new0 (PowerOffContext);
-    ctx->port = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    ctx->primary = g_object_ref (primary);
     ctx->shutdown_regex = g_regex_new ("\\r\\n\\^SHUTDOWN\\r\\n",
                                        G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     ctx->timeout_id = g_timeout_add_seconds (MAX_POWER_OFF_WAIT_TIME_SECS,
@@ -701,7 +710,7 @@ modem_power_off (MMIfaceModem        *self,
     /* We'll need to wait for a ^SHUTDOWN before returning the action, which is
      * when the modem tells us that it is ready to be shutdown */
     mm_port_serial_at_add_unsolicited_msg_handler (
-        ctx->port,
+        ctx->primary,
         ctx->shutdown_regex,
         (MMPortSerialAtUnsolicitedMsgFn)shutdown_received,
         task,
@@ -709,7 +718,7 @@ modem_power_off (MMIfaceModem        *self,
 
     /* In order to get the ^SHUTDOWN notification, we must keep the port open
      * during the wait time */
-    ctx->serial_open = mm_port_serial_open (MM_PORT_SERIAL (ctx->port), &error);
+    ctx->serial_open = mm_port_serial_open (MM_PORT_SERIAL (ctx->primary), &error);
     if (G_UNLIKELY (error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -721,7 +730,7 @@ modem_power_off (MMIfaceModem        *self,
      * fires */
     g_assert (MAX_POWER_OFF_WAIT_TIME_SECS > 5);
     mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                   ctx->port,
+                                   ctx->primary,
                                    "^SMSO",
                                    5,
                                    FALSE, /* allow_cached */
@@ -2187,14 +2196,22 @@ load_supported_bands (MMIfaceModem        *_self,
 {
     MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
     GTask          *task;
-    MMPort         *primary;
-    MMKernelDevice *port;
+    MMPortSerialAt *primary;
     const gchar    *family = NULL;
 
+    task = g_task_new (_self, NULL, callback, user_data);
+
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    if (!primary) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Cannot determine cinterion modem family: primary port missing");
+        g_object_unref (task);
+        return;
+    }
+
     /* Lookup for the tag specifying which modem family the current device belongs */
-    primary = MM_PORT (mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)));
-    port = mm_port_peek_kernel_device (primary);
-    family = mm_kernel_device_get_global_property (port, "ID_MM_CINTERION_MODEM_FAMILY");
+    family = mm_kernel_device_get_global_property (mm_port_peek_kernel_device (MM_PORT (primary)),
+                                                   "ID_MM_CINTERION_MODEM_FAMILY");
 
     /* if the property is not set, default family */
     self->priv->modem_family = MM_CINTERION_MODEM_FAMILY_DEFAULT;
@@ -2212,7 +2229,6 @@ load_supported_bands (MMIfaceModem        *_self,
 
     mm_obj_dbg (self, "Using cinterion %s modem family", family);
 
-    task = g_task_new (_self, NULL, callback, user_data);
     mm_base_modem_at_command (MM_BASE_MODEM (_self),
                               "AT^SCFG=?",
                               3,
@@ -2890,8 +2906,8 @@ cinterion_hot_swap_init_ready (MMBaseModem  *_self,
 {
     MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
     g_autoptr(GError)          error = NULL;
-    MMPortSerialAt            *primary;
-    MMPortSerialAt            *secondary;
+    MMPortSerialAt            *ports[2];
+    guint                      i;
 
     if (!mm_base_modem_at_command_finish (_self, res, &error)) {
         g_prefix_error (&error, "Could not enable SCKS: ");
@@ -2902,22 +2918,19 @@ cinterion_hot_swap_init_ready (MMBaseModem  *_self,
 
     mm_obj_dbg (self, "SIM hot swap detect successfully enabled");
 
-    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
-    mm_port_serial_at_add_unsolicited_msg_handler (
-        primary,
-        self->priv->scks_regex,
-        (MMPortSerialAtUnsolicitedMsgFn) cinterion_scks_unsolicited_handler,
-        self,
-        NULL);
+    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+    for (i = 0; i < G_N_ELEMENTS (ports); i++) {
+        if (!ports[i])
+            continue;
 
-    secondary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
-    if (secondary)
         mm_port_serial_at_add_unsolicited_msg_handler (
-            secondary,
+            ports[i],
             self->priv->scks_regex,
             (MMPortSerialAtUnsolicitedMsgFn) cinterion_scks_unsolicited_handler,
             self,
             NULL);
+    }
 
     if (!mm_broadband_modem_sim_hot_swap_ports_context_init (MM_BROADBAND_MODEM (self), &error))
         mm_obj_warn (self, "failed to initialize SIM hot swap ports context: %s", error->message);
@@ -3326,8 +3339,7 @@ cinterion_slot_availability_init_ready (MMBaseModem  *_self,
 {
     MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
     const gchar               *response;
-    MMPortSerialAt            *primary;
-    MMPortSerialAt            *secondary;
+    MMPortSerialAt            *ports[2];
     LoadSimSlotsContext       *ctx;
     g_autoptr(GArray)          available = NULL;
     g_autoptr(GError)          error = NULL;
@@ -3341,22 +3353,18 @@ cinterion_slot_availability_init_ready (MMBaseModem  *_self,
         return;
     }
 
-    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
-    mm_port_serial_at_add_unsolicited_msg_handler (
-        primary,
-        self->priv->simlocal_regex,
-        (MMPortSerialAtUnsolicitedMsgFn) cinterion_simlocal_unsolicited_handler,
-        self,
-        NULL);
-
-    secondary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
-    if (secondary)
+    ports[0] = mm_base_modem_peek_port_primary   (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+    for (i = 0; i < G_N_ELEMENTS (ports); i++) {
+        if (!ports[i])
+            continue;
         mm_port_serial_at_add_unsolicited_msg_handler (
-            secondary,
+            ports[i],
             self->priv->simlocal_regex,
             (MMPortSerialAtUnsolicitedMsgFn) cinterion_simlocal_unsolicited_handler,
             self,
             NULL);
+    }
 
     mm_obj_info (self, "SIM availability change with simlocal successfully enabled");
 
