@@ -432,7 +432,8 @@ mm_shared_quectel_firmware_load_update_settings (MMIfaceModemFirmware *self,
     ctx = g_new0 (LoadUpdateSettingsContext, 1);
     g_task_set_task_data (task, ctx, (GDestroyNotify)load_update_settings_context_free);
 
-    at_port = mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL);
+    /* We always report the primary port as the one to be used for FW upgrade */
+    at_port = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
     if (at_port) {
     	update_methods = quectel_get_firmware_update_methods (MM_BASE_MODEM (self), MM_PORT (at_port));
         ctx->update_settings = mm_firmware_update_settings_new (update_methods);
