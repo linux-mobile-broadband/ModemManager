@@ -1124,31 +1124,29 @@ ublox_setup_ciev_handler (MMIfaceModem *self,
 {
     g_autoptr(GRegex)  pattern = NULL;
     g_autofree gchar  *ciev_regex = NULL;
-    MMPortSerialAt    *primary_port;
-    MMPortSerialAt    *secondary_port;
+    MMPortSerialAt    *ports[2];
+    guint              i;
 
-    primary_port = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
     mm_obj_dbg (self, "setting up simind 'CIEV: %d' events handler", simind_idx);
     ciev_regex = g_strdup_printf ("\\r\\n\\+CIEV: %d,([0-1]{1})\\r\\n", simind_idx);
     pattern = g_regex_new (ciev_regex,
                            G_REGEX_RAW | G_REGEX_OPTIMIZE,
                            0, NULL);
     g_assert (pattern);
-    mm_port_serial_at_add_unsolicited_msg_handler (
-        primary_port,
-        pattern,
-        (MMPortSerialAtUnsolicitedMsgFn) ublox_ciev_unsolicited_handler,
-        self,
-        NULL);
 
-    secondary_port = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
-    if (secondary_port)
+    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+    for (i = 0; i < G_N_ELEMENTS (ports); i++) {
+        if (!ports[i])
+            continue;
+
         mm_port_serial_at_add_unsolicited_msg_handler (
-            secondary_port,
+            ports[i],
             pattern,
             (MMPortSerialAtUnsolicitedMsgFn) ublox_ciev_unsolicited_handler,
             self,
             NULL);
+    }
 }
 
 static void
