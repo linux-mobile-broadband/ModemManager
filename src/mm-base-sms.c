@@ -839,12 +839,13 @@ sms_get_store_or_send_command (MMBaseSms  *self,
 /* Store the SMS */
 
 typedef struct {
-    MMBaseModem  *modem;
-    MMSmsStorage  storage;
-    gboolean      need_unlock;
-    gboolean      use_pdu_mode;
-    GList        *current;
-    gchar        *msg_data;
+    MMBaseModem    *modem;
+    MMPortSerialAt *port;
+    MMSmsStorage    storage;
+    gboolean        need_unlock;
+    gboolean        use_pdu_mode;
+    GList          *current;
+    gchar          *msg_data;
 } SmsStoreContext;
 
 static void
@@ -853,6 +854,7 @@ sms_store_context_free (SmsStoreContext *ctx)
     /* Unlock mem2 storage if we had the lock */
     if (ctx->need_unlock)
         mm_broadband_modem_unlock_sms_storages (MM_BROADBAND_MODEM (ctx->modem), FALSE, TRUE);
+    g_object_unref (ctx->port);
     g_object_unref (ctx->modem);
     g_free (ctx->msg_data);
     g_slice_free (SmsStoreContext, ctx);
@@ -879,7 +881,7 @@ store_msg_data_ready (MMBaseModem  *modem,
     gint             rv;
     gint             idx;
 
-    response = mm_base_modem_at_command_finish (modem, res, &error);
+    response = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -916,7 +918,7 @@ store_ready (MMBaseModem  *modem,
     SmsStoreContext *ctx;
     GError          *error = NULL;
 
-    mm_base_modem_at_command_finish (modem, res, &error);
+    mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -930,12 +932,15 @@ store_ready (MMBaseModem  *modem,
      * be treated as an AT command (i.e. we don't want it prefixed
      * with AT+ and suffixed with <CR><LF>), plus, we want it to be
      * sent right away (not queued after other AT commands). */
-    mm_base_modem_at_command_raw (ctx->modem,
-                                  ctx->msg_data,
-                                  10,
-                                  FALSE,
-                                  (GAsyncReadyCallback)store_msg_data_ready,
-                                  task);
+    mm_base_modem_at_command_full (ctx->modem,
+                                   ctx->port,
+                                   ctx->msg_data,
+                                   10,
+                                   FALSE,
+                                   TRUE, /* raw */
+                                   NULL,
+                                   (GAsyncReadyCallback)store_msg_data_ready,
+                                   task);
 }
 
 static void
@@ -973,12 +978,15 @@ sms_store_next_part (GTask *task)
     g_assert (cmd != NULL);
     g_assert (ctx->msg_data != NULL);
 
-    mm_base_modem_at_command (ctx->modem,
-                              cmd,
-                              10,
-                              FALSE,
-                              (GAsyncReadyCallback)store_ready,
-                              task);
+    mm_base_modem_at_command_full (ctx->modem,
+                                   ctx->port,
+                                   cmd,
+                                   10,
+                                   FALSE,
+                                   FALSE,  /* raw */
+                                   NULL,
+                                   (GAsyncReadyCallback)store_ready,
+                                   task);
 }
 
 static void
@@ -1016,18 +1024,29 @@ sms_store (MMBaseSms           *self,
 {
     SmsStoreContext *ctx;
     GTask           *task;
+    MMPortSerialAt  *port;
+    GError          *error = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Select port for the operation */
+    port = mm_base_modem_peek_best_at_port (self->priv->modem, &error);
+    if (!port) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
 
     /* Setup the context */
     ctx = g_slice_new0 (SmsStoreContext);
     ctx->modem = g_object_ref (self->priv->modem);
+    ctx->port = g_object_ref (port);
     ctx->storage = storage;
 
     /* Different ways to do it if on PDU or text mode */
     g_object_get (self->priv->modem,
                   MM_IFACE_MODEM_MESSAGING_SMS_PDU_MODE, &ctx->use_pdu_mode,
                   NULL);
-
-    task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)sms_store_context_free);
 
     /* First, lock storage to use */
@@ -1044,12 +1063,13 @@ sms_store (MMBaseSms           *self,
 /* Send the SMS */
 
 typedef struct {
-    MMBaseModem *modem;
-    gboolean     need_unlock;
-    gboolean     from_storage;
-    gboolean     use_pdu_mode;
-    GList       *current;
-    gchar       *msg_data;
+    MMBaseModem    *modem;
+    MMPortSerialAt *port;
+    gboolean        need_unlock;
+    gboolean        from_storage;
+    gboolean        use_pdu_mode;
+    GList          *current;
+    gchar          *msg_data;
 } SmsSendContext;
 
 static void
@@ -1058,6 +1078,7 @@ sms_send_context_free (SmsSendContext *ctx)
     /* Unlock mem2 storage if we had the lock */
     if (ctx->need_unlock)
         mm_broadband_modem_unlock_sms_storages (MM_BROADBAND_MODEM (ctx->modem), FALSE, TRUE);
+    g_object_unref (ctx->port);
     g_object_unref (ctx->modem);
     g_free (ctx->msg_data);
     g_slice_free (SmsSendContext, ctx);
@@ -1108,7 +1129,7 @@ send_generic_msg_data_ready (MMBaseModem  *modem,
     const gchar    *response;
     gint            message_reference;
 
-    response = mm_base_modem_at_command_finish (modem, res, &error);
+    response = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -1139,7 +1160,7 @@ send_generic_ready (MMBaseModem  *modem,
     SmsSendContext *ctx;
     GError         *error = NULL;
 
-    mm_base_modem_at_command_finish (modem, res, &error);
+    mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -1153,12 +1174,15 @@ send_generic_ready (MMBaseModem  *modem,
      * be treated as an AT command (i.e. we don't want it prefixed
      * with AT+ and suffixed with <CR><LF>), plus, we want it to be
      * sent right away (not queued after other AT commands). */
-    mm_base_modem_at_command_raw (ctx->modem,
-                                  ctx->msg_data,
-                                  MM_BASE_SMS_DEFAULT_SEND_TIMEOUT,
-                                  FALSE,
-                                  (GAsyncReadyCallback)send_generic_msg_data_ready,
-                                  task);
+    mm_base_modem_at_command_full (ctx->modem,
+                                   ctx->port,
+                                   ctx->msg_data,
+                                   MM_BASE_SMS_DEFAULT_SEND_TIMEOUT,
+                                   FALSE,
+                                   TRUE, /* raw */
+                                   NULL,
+                                   (GAsyncReadyCallback)send_generic_msg_data_ready,
+                                   task);
 }
 
 static void
@@ -1175,7 +1199,7 @@ send_from_storage_ready (MMBaseModem  *modem,
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
 
-    response = mm_base_modem_at_command_finish (modem, res, &error);
+    response = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
         if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
             g_task_return_error (task, error);
@@ -1226,12 +1250,15 @@ sms_send_next_part (GTask *task)
     /* Send from storage */
     if (ctx->from_storage) {
         cmd = g_strdup_printf ("+CMSS=%d", mm_sms_part_get_index ((MMSmsPart *)ctx->current->data));
-        mm_base_modem_at_command (ctx->modem,
-                                  cmd,
-                                  MM_BASE_SMS_DEFAULT_SEND_TIMEOUT,
-                                  FALSE,
-                                  (GAsyncReadyCallback)send_from_storage_ready,
-                                  task);
+        mm_base_modem_at_command_full (ctx->modem,
+                                       ctx->port,
+                                       cmd,
+                                       MM_BASE_SMS_DEFAULT_SEND_TIMEOUT,
+                                       FALSE,
+                                       FALSE,
+                                       NULL,
+                                       (GAsyncReadyCallback)send_from_storage_ready,
+                                       task);
         return;
     }
 
@@ -1255,12 +1282,15 @@ sms_send_next_part (GTask *task)
     g_assert (ctx->msg_data != NULL);
 
     /* no network involved in this initial AT command, so lower timeout */
-    mm_base_modem_at_command (ctx->modem,
-                              cmd,
-                              10,
-                              FALSE,
-                              (GAsyncReadyCallback)send_generic_ready,
-                              task);
+    mm_base_modem_at_command_full (ctx->modem,
+                                   ctx->port,
+                                   cmd,
+                                   10,
+                                   FALSE,
+                                   FALSE, /* raw */
+                                   NULL,
+                                   (GAsyncReadyCallback)send_generic_ready,
+                                   task);
 }
 
 static void
@@ -1297,12 +1327,23 @@ sms_send (MMBaseSms           *self,
 {
     SmsSendContext *ctx;
     GTask          *task;
+    MMPortSerialAt *port;
+    GError         *error = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Select port for the operation */
+    port = mm_base_modem_peek_best_at_port (self->priv->modem, &error);
+    if (!port) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
 
     /* Setup the context */
     ctx = g_slice_new0 (SmsSendContext);
     ctx->modem = g_object_ref (self->priv->modem);
-
-    task = g_task_new (self, NULL, callback, user_data);
+    ctx->port = g_object_ref (port);
     g_task_set_task_data (task, ctx, (GDestroyNotify)sms_send_context_free);
 
     /* If the SMS is STORED, try to send from storage */
