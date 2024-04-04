@@ -5606,7 +5606,13 @@ interface_initialization_step (GTask *task)
             if (!primary)
                 primary = MM_PORT (mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)));
 
-            g_assert (primary != NULL);
+            if (!primary) {
+                g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                         "Primary port initialization failed: none found");
+                g_object_unref (task);
+                return;
+            }
+
             mm_gdbus_modem_set_primary_port (ctx->skeleton, mm_port_get_device (primary));
         }
         /* Load ports if not done before */
