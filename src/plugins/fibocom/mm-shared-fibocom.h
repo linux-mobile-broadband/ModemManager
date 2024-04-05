@@ -37,8 +37,8 @@ typedef struct _MMSharedFibocom MMSharedFibocom;
 struct _MMSharedFibocom {
     GTypeInterface g_iface;
 
-    /* Peek broadband modem class of the parent class of the object */
-    MMBroadbandModemClass * (* peek_parent_broadband_modem_class) (MMSharedFibocom *self);
+    /* Peek parent class of the object */
+    MMBaseModemClass * (* peek_parent_class) (MMSharedFibocom *self);
 
     /* Peek 3GPP interface of the parent class of the object */
     MMIfaceModem3gpp * (* peek_parent_3gpp_interface) (MMSharedFibocom *self);
