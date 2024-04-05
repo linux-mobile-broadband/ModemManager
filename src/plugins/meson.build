@@ -73,6 +73,7 @@ if plugins_shared['fibocom']
   c_args = '-DMM_MODULE_NAME="shared-fibocom"'
 
   sources = files(
+    'fibocom/mm-port-mbim-fibocom.c',
     'fibocom/mm-shared.c',
     'fibocom/mm-shared-fibocom.c',
   )

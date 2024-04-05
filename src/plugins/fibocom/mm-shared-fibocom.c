@@ -28,6 +28,7 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-shared-fibocom.h"
+#include "mm-port-mbim-fibocom.h"
 #include "mm-base-modem-at.h"
 
 /*****************************************************************************/
@@ -79,6 +80,40 @@ get_private (MMSharedFibocom *self)
     }
 
     return priv;
+}
+
+/*****************************************************************************/
+
+MMPort *
+mm_shared_fibocom_create_usbmisc_port (MMBaseModem *self,
+                                       const gchar *name,
+                                       MMPortType   ptype)
+{
+    Private *priv;
+
+    priv = get_private (MM_SHARED_FIBOCOM (self));
+    if (ptype == MM_PORT_TYPE_MBIM) {
+        mm_obj_dbg (self, "creating fibocom-specific MBIM port...");
+        return MM_PORT (mm_port_mbim_fibocom_new (name, MM_PORT_SUBSYS_USBMISC));
+    }
+
+    return priv->class_parent->create_usbmisc_port (self, name, ptype);
+}
+
+MMPort *
+mm_shared_fibocom_create_wwan_port (MMBaseModem *self,
+                                    const gchar *name,
+                                    MMPortType   ptype)
+{
+    Private *priv;
+
+    priv = get_private (MM_SHARED_FIBOCOM (self));
+    if (ptype == MM_PORT_TYPE_MBIM) {
+        mm_obj_dbg (self, "creating fibocom-specific MBIM port...");
+        return MM_PORT (mm_port_mbim_fibocom_new (name, MM_PORT_SUBSYS_WWAN));
+    }
+
+    return priv->class_parent->create_wwan_port (self, name, ptype);
 }
 
 /*****************************************************************************/

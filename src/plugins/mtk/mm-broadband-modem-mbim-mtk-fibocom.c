@@ -316,9 +316,12 @@ static void
 mm_broadband_modem_mbim_mtk_fibocom_class_init (MMBroadbandModemMbimMtkFibocomClass *klass)
 {
     GObjectClass              *object_class = G_OBJECT_CLASS (klass);
+    MMBaseModemClass          *base_modem_class = MM_BASE_MODEM_CLASS (klass);
     MMBroadbandModemMbimClass *broadband_modem_mbim_class = MM_BROADBAND_MODEM_MBIM_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandModemMbimMtkFibocomPrivate));
 
+    base_modem_class->create_usbmisc_port = mm_shared_fibocom_create_usbmisc_port;
+    base_modem_class->create_wwan_port = mm_shared_fibocom_create_wwan_port;
     broadband_modem_mbim_class->normalize_nw_error = normalize_nw_error;
 }

@@ -48,6 +48,13 @@ GType mm_shared_fibocom_get_type (void);
 
 void mm_shared_fibocom_setup_ports (MMBroadbandModem *self);
 
+MMPort *mm_shared_fibocom_create_usbmisc_port (MMBaseModem *self,
+                                               const gchar *name,
+                                               MMPortType   ptype);
+MMPort *mm_shared_fibocom_create_wwan_port    (MMBaseModem *self,
+                                               const gchar *name,
+                                               MMPortType   ptype);
+
 void     mm_shared_fibocom_set_initial_eps_bearer_settings        (MMIfaceModem3gpp    *self,
                                                                    MMBearerProperties  *config,
                                                                    GAsyncReadyCallback  callback,

@@ -110,7 +110,10 @@ shared_fibocom_init (MMSharedFibocom *iface)
 static void
 mm_broadband_modem_mbim_xmm_fibocom_class_init (MMBroadbandModemMbimXmmFibocomClass *klass)
 {
+    MMBaseModemClass      *base_modem_class = MM_BASE_MODEM_CLASS (klass);
     MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
 
+    base_modem_class->create_usbmisc_port = mm_shared_fibocom_create_usbmisc_port;
+    base_modem_class->create_wwan_port = mm_shared_fibocom_create_wwan_port;
     broadband_modem_class->setup_ports = mm_shared_fibocom_setup_ports;
 }
