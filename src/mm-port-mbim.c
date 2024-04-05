@@ -667,6 +667,7 @@ mbim_device_new_ready (GObject      *unused,
     self = g_task_get_source_object (task);
     self->priv->mbim_device = mbim_device_new_finish (res, &error);
     if (!self->priv->mbim_device) {
+        self->priv->in_progress = FALSE;
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
