@@ -80,6 +80,12 @@ gboolean mm_port_mbim_close_finish (MMPortMbim *self,
                                     GAsyncResult *res,
                                     GError **error);
 
+gboolean mm_port_mbim_supports_service (MMPortMbim  *self,
+                                        MbimService  service);
+gboolean mm_port_mbim_supports_command (MMPortMbim  *self,
+                                        MbimService  service,
+                                        guint        cid);
+
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 gboolean   mm_port_mbim_supports_qmi               (MMPortMbim           *self);
 QmiClient *mm_port_mbim_peek_qmi_client            (MMPortMbim           *self,

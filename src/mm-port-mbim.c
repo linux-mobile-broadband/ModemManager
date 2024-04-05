@@ -47,8 +47,11 @@ struct _MMPortMbimPrivate {
     gulong timeout_monitoring_id;
     gulong removed_monitoring_id;
 
+    /* supported services info */
+    MbimDeviceServiceElement **device_services;
+    guint32                    device_services_count;
+
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    gboolean    qmi_supported;
     QmiDevice  *qmi_device;
     GList      *qmi_clients;
 #endif
@@ -469,11 +472,63 @@ setup_monitoring (MMPortMbim *self,
 /*****************************************************************************/
 
 gboolean
+mm_port_mbim_supports_service (MMPortMbim  *self,
+                               MbimService  service)
+{
+    return mm_port_mbim_supports_command (self, service, 0);
+}
+
+gboolean
+mm_port_mbim_supports_command (MMPortMbim  *self,
+                               MbimService  service,
+                               guint        cid)
+{
+    guint i;
+
+    for (i = 0; i < self->priv->device_services_count; i++) {
+        if (mbim_uuid_to_service (&self->priv->device_services[i]->device_service_id) == service) {
+            guint j;
+
+            /* If not asking for a specific CID, we're asking for overall service
+             * support */
+            if (cid == 0)
+                return TRUE;
+
+            for (j = 0; j < self->priv->device_services[i]->cids_count; j++) {
+                if (self->priv->device_services[i]->cids[j] == cid)
+                    return TRUE;
+            }
+            /* service found but not matching cid */
+            return FALSE;
+        }
+    }
+    /* service not found */
+    return FALSE;
+}
+
+/*****************************************************************************/
+
+gboolean
 mm_port_mbim_open_finish (MMPortMbim    *self,
                           GAsyncResult  *res,
                           GError       **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+open_complete (GTask *task, GError *error)
+{
+    MMPortMbim *self;
+
+    self = g_task_get_source_object (task);
+    self->priv->in_progress = FALSE;
+    if (error) {
+        g_clear_object (&self->priv->mbim_device);
+        g_task_return_error (task, error);
+    } else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
@@ -483,25 +538,21 @@ qmi_device_open_ready (QmiDevice    *dev,
                        GAsyncResult *res,
                        GTask        *task)
 {
-    GError     *error = NULL;
-    MMPortMbim *self;
+    g_autoptr(GError)  error = NULL;
+    MMPortMbim        *self;
 
     self = g_task_get_source_object (task);
 
     if (!qmi_device_open_finish (dev, res, &error)) {
         mm_obj_dbg (self, "error: couldn't open QmiDevice: %s", error->message);
-        g_error_free (error);
         g_clear_object (&self->priv->qmi_device);
         /* Ignore error and complete */
         mm_obj_msg (self, "MBIM device is not QMI capable");
-        self->priv->qmi_supported = FALSE;
     } else {
         mm_obj_msg (self, "MBIM device is QMI capable");
     }
 
-    self->priv->in_progress = FALSE;
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+    open_complete (task, NULL);
 }
 
 static void
@@ -509,21 +560,17 @@ qmi_device_new_ready (GObject      *unused,
                       GAsyncResult *res,
                       GTask        *task)
 {
-    GError     *error = NULL;
-    MMPortMbim *self;
+    g_autoptr(GError)  error = NULL;
+    MMPortMbim        *self;
 
     self = g_task_get_source_object (task);
 
     self->priv->qmi_device = qmi_device_new_finish (res, &error);
     if (!self->priv->qmi_device) {
         mm_obj_dbg (self, "error: couldn't create QmiDevice: %s", error->message);
-        g_error_free (error);
         /* Ignore error and complete */
         mm_obj_msg (self, "MBIM device is not QMI capable");
-        self->priv->qmi_supported = FALSE;
-        self->priv->in_progress = FALSE;
-        g_task_return_boolean (task, TRUE);
-        g_object_unref (task);
+        open_complete (task, NULL);
         return;
     }
 
@@ -541,57 +588,23 @@ qmi_device_new_ready (GObject      *unused,
 }
 
 static void
-mbim_query_device_services_ready (MbimDevice   *device,
-                                  GAsyncResult *res,
-                                  GTask        *task)
+check_qmi_support (GTask *task)
 {
-    MMPortMbim                *self;
-    MbimMessage               *response;
-    GError                    *error = NULL;
-    MbimDeviceServiceElement **device_services;
-    guint32                    device_services_count;
-    GFile                     *file;
+    MMPortMbim *self;
+    GFile      *file;
 
     self = g_task_get_source_object (task);
-
-    response = mbim_device_command_finish (device, res, &error);
-    if (response &&
-        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
-        mbim_message_device_services_response_parse (
-            response,
-            &device_services_count,
-            NULL, /* max_dss_sessions */
-            &device_services,
-            &error)) {
-        guint32 i;
-
-        /* Look for the QMI service */
-        for (i = 0; i < device_services_count; i++) {
-            if (mbim_uuid_to_service (&device_services[i]->device_service_id) == MBIM_SERVICE_QMI)
-                break;
-        }
-        /* If we were able to successfully list device services and none of them
-         * is the QMI service, we'll skip trying to check QMI support. */
-        if (i == device_services_count)
-            self->priv->qmi_supported = FALSE;
-        mbim_device_service_element_array_free (device_services);
-    } else {
-        /* Ignore error */
-        mm_obj_dbg (self, "Couldn't query device services, will attempt QMI open anyway: %s", error->message);
-        g_error_free (error);
-    }
-
-    if (response)
-        mbim_message_unref (response);
-
-    /* File path of the device */
     file = G_FILE (g_task_get_task_data (task));
 
-    if (!file || !self->priv->qmi_supported) {
+    if (!file) {
+        mm_obj_msg (self, "Skipping QMI support check in MBIM device");
+        open_complete (task, NULL);
+        return;
+    }
+
+    if (!mm_port_mbim_supports_service (self, MBIM_SERVICE_QMI)) {
         mm_obj_msg (self, "MBIM device is not QMI capable");
-        self->priv->in_progress = FALSE;
-        g_task_return_boolean (task, TRUE);
-        g_object_unref (task);
+        open_complete (task, NULL);
         return;
     }
 
@@ -603,11 +616,47 @@ mbim_query_device_services_ready (MbimDevice   *device,
                     task);
 }
 
+#endif
+
+static void
+mbim_query_device_services_ready (MbimDevice   *device,
+                                  GAsyncResult *res,
+                                  GTask        *task)
+{
+    g_autoptr(MbimMessage)  response = NULL;
+    g_autoptr(GError)       error = NULL;
+    MMPortMbim             *self;
+
+    self = g_task_get_source_object (task);
+
+    /* reset any before reloading */
+    self->priv->device_services_count = 0;
+    g_clear_pointer (&self->priv->device_services, (GDestroyNotify)mbim_device_service_element_array_free);
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response ||
+        !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
+        !mbim_message_device_services_response_parse (
+            response,
+            &self->priv->device_services_count,
+            NULL, /* max_dss_sessions */
+            &self->priv->device_services,
+            &error)) {
+        mm_obj_warn (self, "couldn't query device services: %s", error->message);
+    }
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    check_qmi_support (task);
+#else
+    open_complete (task, NULL);
+#endif
+}
+
 static void
 mbim_query_device_services (GTask *task)
 {
-    MbimMessage *message;
-    MMPortMbim  *self;
+    g_autoptr(MbimMessage)  message = NULL;
+    MMPortMbim             *self;
 
     self = g_task_get_source_object (task);
 
@@ -618,10 +667,7 @@ mbim_query_device_services (GTask *task)
                          NULL,
                          (GAsyncReadyCallback)mbim_query_device_services_ready,
                          task);
-    mbim_message_unref (message);
 }
-
-#endif
 
 static void
 mbim_device_open_ready (MbimDevice   *mbim_device,
@@ -634,26 +680,14 @@ mbim_device_open_ready (MbimDevice   *mbim_device,
     self = g_task_get_source_object (task);
 
     if (!mbim_device_open_full_finish (mbim_device, res, &error)) {
-        g_clear_object (&self->priv->mbim_device);
-        self->priv->in_progress = FALSE;
-        g_task_return_error (task, error);
-        g_object_unref (task);
+        open_complete (task, error);
         return;
     }
 
     mm_obj_dbg (self, "MBIM device is now open");
     setup_monitoring (self, mbim_device);
 
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    if (self->priv->qmi_supported) {
-        mbim_query_device_services (task);
-        return;
-    }
-#endif
-
-    self->priv->in_progress = FALSE;
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+    mbim_query_device_services (task);
 }
 
 static void
@@ -667,9 +701,7 @@ mbim_device_new_ready (GObject      *unused,
     self = g_task_get_source_object (task);
     self->priv->mbim_device = mbim_device_new_finish (res, &error);
     if (!self->priv->mbim_device) {
-        self->priv->in_progress = FALSE;
-        g_task_return_error (task, error);
-        g_object_unref (task);
+        open_complete (task, error);
         return;
     }
 
@@ -691,9 +723,9 @@ mm_port_mbim_open (MMPortMbim          *self,
                    GAsyncReadyCallback  callback,
                    gpointer             user_data)
 {
-    GFile *file;
-    gchar *fullpath;
-    GTask *task;
+    g_autoptr(GFile)  file = NULL;
+    g_autofree gchar *fullpath = NULL;
+    GTask            *task;
 
     g_return_if_fail (MM_IS_PORT_MBIM (self));
 
@@ -728,9 +760,6 @@ mm_port_mbim_open (MMPortMbim          *self,
                      cancellable,
                      (GAsyncReadyCallback)mbim_device_new_ready,
                      task);
-
-    g_free (fullpath);
-    g_object_unref (file);
 }
 
 /*****************************************************************************/
@@ -919,18 +948,15 @@ static void
 mm_port_mbim_init (MMPortMbim *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_PORT_MBIM, MMPortMbimPrivate);
-
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    /* By default, always assume that QMI is supported, we'll later check if
-     * that's true or not. */
-    self->priv->qmi_supported = TRUE;
-#endif
 }
 
 static void
 dispose (GObject *object)
 {
     MMPortMbim *self = MM_PORT_MBIM (object);
+
+    self->priv->device_services_count = 0;
+    g_clear_pointer (&self->priv->device_services, (GDestroyNotify)mbim_device_service_element_array_free);
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     g_list_free_full (self->priv->qmi_clients, g_object_unref);
