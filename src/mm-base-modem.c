@@ -198,10 +198,10 @@ base_modem_create_net_port (MMBaseModem *self,
 }
 
 static MMPort *
-base_modem_create_tty_port (MMBaseModem        *self,
-                            const gchar        *name,
-                            MMKernelDevice     *kernel_device,
-                            MMPortType          ptype)
+base_modem_create_tty_port (MMBaseModem    *self,
+                            const gchar    *name,
+                            MMKernelDevice *kernel_device,
+                            MMPortType      ptype)
 {
     MMPort      *port = NULL;
     const gchar *flow_control_tag;
@@ -356,6 +356,10 @@ base_modem_internal_grab_port (MMBaseModem         *self,
         return NULL;
     }
 
+    g_assert (MM_BASE_MODEM_GET_CLASS (self)->create_tty_port);
+    g_assert (MM_BASE_MODEM_GET_CLASS (self)->create_usbmisc_port);
+    g_assert (MM_BASE_MODEM_GET_CLASS (self)->create_wwan_port);
+
     /* Explicitly ignored ports, grab them but explicitly flag them as ignored
      * right away, all the same way (i.e. regardless of subsystem). */
     if (ptype == MM_PORT_TYPE_IGNORED)
@@ -363,9 +367,9 @@ base_modem_internal_grab_port (MMBaseModem         *self,
     else if (g_str_equal (subsys, "net"))
         port = base_modem_create_net_port (self, name);
     else if (g_str_equal (subsys, "tty"))
-        port = base_modem_create_tty_port (self, name, kernel_device, ptype);
+        port = MM_BASE_MODEM_GET_CLASS (self)->create_tty_port (self, name, kernel_device, ptype);
     else if (g_str_equal (subsys, "usbmisc"))
-        port = base_modem_create_usbmisc_port (self, name, ptype);
+        port = MM_BASE_MODEM_GET_CLASS (self)->create_usbmisc_port (self, name, ptype);
     else if (g_str_equal (subsys, "rpmsg"))
         port = base_modem_create_rpmsg_port (self, name, ptype);
 #if defined WITH_QRTR
@@ -375,7 +379,7 @@ base_modem_internal_grab_port (MMBaseModem         *self,
     else if (g_str_equal (subsys, "virtual"))
         port = base_modem_create_virtual_port (self, name);
     else if (g_str_equal (subsys, "wwan"))
-        port = base_modem_create_wwan_port (self, name, ptype);
+        port = MM_BASE_MODEM_GET_CLASS (self)->create_wwan_port (self, name, ptype);
 
     if (!port) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
@@ -2063,7 +2067,10 @@ mm_base_modem_class_init (MMBaseModemClass *klass)
 
     g_type_class_add_private (object_class, sizeof (MMBaseModemPrivate));
 
-    /* Virtual methods */
+    klass->create_tty_port = base_modem_create_tty_port;
+    klass->create_usbmisc_port = base_modem_create_usbmisc_port;
+    klass->create_wwan_port = base_modem_create_wwan_port;
+
     object_class->get_property = get_property;
     object_class->set_property = set_property;
     object_class->finalize = finalize;

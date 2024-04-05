@@ -123,6 +123,18 @@ struct _MMBaseModemClass {
                               GError **error);
 #endif
 
+    /* Allow plugins to subclass port object creation as needed */
+    MMPort * (* create_tty_port)     (MMBaseModem    *self,
+                                      const gchar    *name,
+                                      MMKernelDevice *kernel_device,
+                                      MMPortType      ptype);
+    MMPort * (* create_usbmisc_port) (MMBaseModem    *self,
+                                      const gchar    *name,
+                                      MMPortType      ptype);
+    MMPort * (* create_wwan_port)    (MMBaseModem    *self,
+                                      const gchar    *name,
+                                      MMPortType      ptype);
+
     /* signals */
     void (* link_port_grabbed)  (MMBaseModem *self,
                                  MMPort      *link_port);
