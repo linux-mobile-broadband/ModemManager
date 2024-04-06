@@ -1429,15 +1429,20 @@ setup_ports (MMBroadbandModem *_self)
     /* NMEA GPS monitoring */
     gps_data_port = mm_base_modem_peek_port_gps (MM_BASE_MODEM (self));
     if (gps_data_port) {
-        /* make sure GPS is stopped incase it was left enabled */
-        mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                       mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
-                                       "AT*E2GPSCTL=0",
-                                       3, FALSE, FALSE, NULL, NULL, NULL);
-        /* Add handler for the NMEA traces */
-        mm_port_serial_gps_add_trace_handler (gps_data_port,
-                                              (MMPortSerialGpsTraceFn)gps_trace_received,
-                                              self, NULL);
+        /* make sure GPS is stopped if it should be in case it was left enabled */
+        if (!(self->priv->enabled_sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                                             MM_MODEM_LOCATION_SOURCE_GPS_RAW |
+                                             MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED))) {
+            mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                           mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+                                           "AT*E2GPSCTL=0",
+                                           3, FALSE, FALSE, NULL, NULL, NULL);
+
+            /* Add handler for the NMEA traces */
+            mm_port_serial_gps_add_trace_handler (gps_data_port,
+                                                  (MMPortSerialGpsTraceFn)gps_trace_received,
+                                                  self, NULL);
+        }
     }
 }
 
