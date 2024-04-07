@@ -89,6 +89,8 @@ const MMHuaweiPrefmodeCombination *mm_huawei_parse_prefmode_response (const gcha
 /* This is the default string we use as fallback when the modem gives
  * an empty response to AT^SYSCFG=? */
 #define MM_HUAWEI_DEFAULT_SYSCFG_FMT "^SYSCFG:(2,13,14,16),(0-3),,,"
+#define MM_HUAWEI_SYSCFG_BAND_ANY       0x3FFFFFFF
+#define MM_HUAWEI_SYSCFG_BAND_NO_CHANGE 0x40000000
 
 typedef struct {
     guint mode;
@@ -97,19 +99,23 @@ typedef struct {
     MMModemMode preferred;
 } MMHuaweiSyscfgCombination;
 
-GArray *mm_huawei_parse_syscfg_test (const gchar  *response,
-                                     gpointer      log_object,
-                                     GError      **error);
+gboolean mm_huawei_parse_syscfg_test (const gchar *response,
+                                      GArray     **supported_modes_out,
+                                      guint64     *supported_gsm_umts_bands_out,
+                                      GError     **error);
 
 /*****************************************************************************/
 /* ^SYSCFG response parser */
 
-const MMHuaweiSyscfgCombination *mm_huawei_parse_syscfg_response (const gchar *response,
-                                                                  const GArray *supported_mode_combinations,
-                                                                  GError **error);
+gboolean mm_huawei_parse_syscfg_response (const gchar            *response,
+                                          MMModemModeCombination *current_mode_out,
+                                          guint64                *current_gsm_umts_bands_out,
+                                          GError                **error);
 
 /*****************************************************************************/
 /* ^SYSCFGEX test parser */
+
+#define MM_HUAWEI_SYSCFGEX_BAND_ANY_LTE G_GUINT64_CONSTANT (0x7FFFFFFFFFFFFFFF)
 
 typedef struct {
     gchar *mode_str;
@@ -117,15 +123,20 @@ typedef struct {
     MMModemMode preferred;
 } MMHuaweiSyscfgexCombination;
 
-GArray *mm_huawei_parse_syscfgex_test (const gchar *response,
-                                       GError **error);
+gboolean mm_huawei_parse_syscfgex_test (const gchar *response,
+                                        GArray     **supported_modes_out,
+                                        guint64     *supported_gsm_umts_bands_out,
+                                        guint64     *supported_lte_bands_out,
+                                        GError     **error);
 
 /*****************************************************************************/
 /* ^SYSCFGEX response parser */
 
-const MMHuaweiSyscfgexCombination *mm_huawei_parse_syscfgex_response (const gchar *response,
-                                                                      const GArray *supported_mode_combinations,
-                                                                      GError **error);
+gboolean mm_huawei_parse_syscfgex_response (const gchar            *response,
+                                            MMModemModeCombination *current_mode_out,
+                                            guint64                *current_gsm_umts_bands_out,
+                                            guint64                *current_lte_bands_out,
+                                            GError                **error);
 
 /*****************************************************************************/
 /* ^NWTIME response parser */

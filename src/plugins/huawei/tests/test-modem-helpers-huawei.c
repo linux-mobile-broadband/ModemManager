@@ -490,6 +490,7 @@ test_prefmode_response (void)
 typedef struct {
     const gchar *str;
     MMHuaweiSyscfgCombination expected_modes[MAX_SYSCFG_COMBINATIONS];
+    guint64 expected_bands;
 } SyscfgTest;
 
 static const SyscfgTest syscfg_tests[] = {
@@ -526,7 +527,8 @@ static const SyscfgTest syscfg_tests[] = {
                 .allowed = MM_MODEM_MODE_3G,
                 .preferred = MM_MODEM_MODE_NONE
             }
-        }
+        },
+        .expected_bands = 0x0,
     },
     {
         "^SYSCFG:(2,13,14,16),(0-3),((400000,\"WCDMA2100\")),(0-2),(0-4)\r\n",
@@ -561,10 +563,13 @@ static const SyscfgTest syscfg_tests[] = {
                 .allowed = MM_MODEM_MODE_3G,
                 .preferred = MM_MODEM_MODE_NONE
             }
-        }
+        },
+        .expected_bands = 0x400000,
     },
     {
-        "^SYSCFG:(2,13,14,16),(0),((400000,\"WCDMA2100\")),(0-2),(0-4)\r\n",
+        .str = "^SYSCFG:(2,13,14,16),(0),"
+               "((2000000400380,\"GSM900/GSM1800/WCDMA900/WCDMA2100\"),(280000,\"GSM850/GSM1900\"),(3fffffff,\"All bands\")),"
+               "(0-2),(0-4)\r\n",
         {
             {
                 .mode = 2,
@@ -585,10 +590,13 @@ static const SyscfgTest syscfg_tests[] = {
                 .preferred = MM_MODEM_MODE_NONE
             },
             { 0, 0, 0, 0 }
-        }
+        },
+        .expected_bands = 0x2000000680380,
     },
     {
-        "^SYSCFG:(13),(0),((400000,\"WCDMA2100\")),(0-2),(0-4)\r\n",
+        .str = "^SYSCFG:(13),(0),"
+               "((2000000400380,\"GSM900/GSM1800/WCDMA900/WCDMA2100\"),(280000,\"GSM850/GSM1900\"),(3fffffff,\"All bands\")),"
+               "(0-2),(0-4)\r\n",
         {
             {
                 .mode = 13,
@@ -597,7 +605,8 @@ static const SyscfgTest syscfg_tests[] = {
                 .preferred = MM_MODEM_MODE_NONE
             },
             { 0, 0, 0, 0 }
-        }
+        },
+        .expected_bands = 0x2000000680380,
     }
 };
 
@@ -608,7 +617,9 @@ test_syscfg (void)
 
     for (i = 0; i < G_N_ELEMENTS (syscfg_tests); i++) {
         GError *error = NULL;
+        gboolean result;
         GArray *combinations = NULL;
+        guint64 bands;
         guint j;
         guint n_expected_combinations = 0;
 
@@ -617,10 +628,12 @@ test_syscfg (void)
                 n_expected_combinations++;
         }
 
-        combinations = mm_huawei_parse_syscfg_test (syscfg_tests[i].str, NULL, &error);
+        result = mm_huawei_parse_syscfg_test (syscfg_tests[i].str, &combinations, &bands, &error);
+        g_assert_true (result);
         g_assert_no_error (error);
         g_assert (combinations != NULL);
         g_assert_cmpuint (combinations->len, ==, n_expected_combinations);
+        g_assert_cmpuint (bands, ==, syscfg_tests[i].expected_bands);
 
         for (j = 0; j < combinations->len; j++) {
             MMHuaweiSyscfgCombination *single;
@@ -665,6 +678,7 @@ typedef struct {
     const gchar *format;
     MMModemMode allowed;
     MMModemMode preferred;
+    guint64 bands;
 } SyscfgResponseTest;
 
 static const SyscfgResponseTest syscfg_response_tests[] = {
@@ -672,45 +686,60 @@ static const SyscfgResponseTest syscfg_response_tests[] = {
         .str = "^SYSCFG: 2,0,400000,0,3\r\n",
         .format = "^SYSCFG:(2,13,14,16),(0-3),((400000,\"WCDMA2100\")),(0-2),(0-4)\r\n",
         .allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
-        .preferred = MM_MODEM_MODE_NONE
+        .preferred = MM_MODEM_MODE_NONE,
+        .bands = 0x400000,
     },
     {
         .str = "^SYSCFG: 2,1,400000,0,3\r\n",
         .format = "^SYSCFG:(2,13,14,16),(0-3),((400000,\"WCDMA2100\")),(0-2),(0-4)\r\n",
         .allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
-        .preferred = MM_MODEM_MODE_2G
+        .preferred = MM_MODEM_MODE_2G,
+        .bands = 0x400000,
     },
     {
         .str = "^SYSCFG: 2,2,400000,0,3\r\n",
         .format = "^SYSCFG:(2,13,14,16),(0-3),((400000,\"WCDMA2100\")),(0-2),(0-4)\r\n",
         .allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
-        .preferred = MM_MODEM_MODE_3G
+        .preferred = MM_MODEM_MODE_3G,
+        .bands = 0x400000,
     },
     {
         .str = "^SYSCFG: 13,0,400000,0,3\r\n",
         .format = "^SYSCFG:(2,13,14,16),(0-3),((400000,\"WCDMA2100\")),(0-2),(0-4)\r\n",
         .allowed = MM_MODEM_MODE_2G,
-        .preferred = MM_MODEM_MODE_NONE
+        .preferred = MM_MODEM_MODE_NONE,
+        .bands = 0x400000,
     },
     {
         .str = "^SYSCFG: 14,0,400000,0,3\r\n",
         .format = "^SYSCFG:(2,13,14,16),(0-3),((400000,\"WCDMA2100\")),(0-2),(0-4)\r\n",
         .allowed = MM_MODEM_MODE_3G,
-        .preferred = MM_MODEM_MODE_NONE
+        .preferred = MM_MODEM_MODE_NONE,
+        .bands = 0x400000,
+    },
+    {
+        /* mode: 3G > 2G, band: ANY */
+        .str = "^SYSCFG:2,2,3FFFFFFF,1,2\r\n",
+        .format = "^SYSCFG:(2,13,14,16),(0-3),((400000,\"WCDMA2100\")),(0-2),(0-4)\r\n",
+        .allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
+        .preferred = MM_MODEM_MODE_3G,
+        .bands = MM_HUAWEI_SYSCFG_BAND_ANY,
     },
     {
         /* Non-sensical acquisition order (WCDMA-only but acquire WCDMA-then-GSM */
         .str = "^SYSCFG: 14,2,400000,0,3\r\n",
         .format = "^SYSCFG:(2,13,14,16),(0-3),((400000,\"WCDMA2100\")),(0-2),(0-4)\r\n",
         .allowed = MM_MODEM_MODE_3G,
-        .preferred = MM_MODEM_MODE_NONE
+        .preferred = MM_MODEM_MODE_NONE,
+        .bands = 0x400000,
     },
     {
         /* Non-sensical acquisition order (GSM-only but acquire GSM-then-WCDMA */
         .str = "^SYSCFG: 13,1,400000,0,3\r\n",
         .format = "^SYSCFG:(2,13,14,16),(0-3),((400000,\"WCDMA2100\")),(0-2),(0-4)\r\n",
         .allowed = MM_MODEM_MODE_2G,
-        .preferred = MM_MODEM_MODE_NONE
+        .preferred = MM_MODEM_MODE_NONE,
+        .bands = 0x400000,
     }
 };
 
@@ -720,21 +749,26 @@ test_syscfg_response (void)
     guint i;
 
     for (i = 0; i < G_N_ELEMENTS (syscfg_response_tests); i++) {
+        gboolean result;
         GArray *combinations = NULL;
-        const MMHuaweiSyscfgCombination *found;
+        guint64 supported_bands;
+        guint64 current_bands;
+        MMModemModeCombination current_mode;
         GError *error = NULL;
 
-        combinations = mm_huawei_parse_syscfg_test (syscfg_response_tests[i].format, NULL, NULL);
+        result = mm_huawei_parse_syscfg_test (syscfg_response_tests[i].format, &combinations, &supported_bands, NULL);
+        g_assert_true (result);
         g_assert (combinations != NULL);
 
-        found = mm_huawei_parse_syscfg_response (syscfg_response_tests[i].str,
-                                                 combinations,
-                                                 &error);
+        result = mm_huawei_parse_syscfg_response (syscfg_response_tests[i].str,
+                                                  &current_mode,
+                                                  &current_bands,
+                                                  &error);
 
         g_assert_no_error (error);
-        g_assert (found != NULL);
-        g_assert_cmpuint (found->allowed, ==, syscfg_response_tests[i].allowed);
-        g_assert_cmpuint (found->preferred, ==, syscfg_response_tests[i].preferred);
+        g_assert_cmpuint (current_mode.allowed, ==, syscfg_response_tests[i].allowed);
+        g_assert_cmpuint (current_mode.preferred, ==, syscfg_response_tests[i].preferred);
+        g_assert_cmpuint (current_bands, ==, syscfg_response_tests[i].bands);
 
         g_array_unref (combinations);
     }
@@ -748,6 +782,8 @@ test_syscfg_response (void)
 typedef struct {
     const gchar *str;
     MMHuaweiSyscfgexCombination expected_modes[MAX_SYSCFGEX_COMBINATIONS];
+    guint64 gsm_umts_bands;
+    guint64 lte_bands;
 } SyscfgexTest;
 
 static const SyscfgexTest syscfgex_tests[] = {
@@ -780,7 +816,9 @@ static const SyscfgexTest syscfgex_tests[] = {
                 .preferred = MM_MODEM_MODE_NONE
             },
             { NULL, 0, 0 }
-        }
+        },
+        .gsm_umts_bands = 0x2000004e80380,
+        .lte_bands = 0x800c5,
     },
     {
         "^SYSCFGEX: (\"030201\",\"0302\",\"03\",\"99\"),"
@@ -806,7 +844,9 @@ static const SyscfgexTest syscfgex_tests[] = {
                 .preferred = MM_MODEM_MODE_NONE
             },
             { NULL, 0, 0 }
-        }
+        },
+        .gsm_umts_bands = 0x2000004e80380,
+        .lte_bands = 0x800c5,
     },
     {
         "^SYSCFGEX: (\"03\"),"
@@ -822,7 +862,9 @@ static const SyscfgexTest syscfgex_tests[] = {
                 .preferred = MM_MODEM_MODE_NONE
             },
             { NULL, 0, 0 }
-        }
+        },
+        .gsm_umts_bands = 0x2000004e80380,
+        .lte_bands = 0x800c5,
     },
     {
         "^SYSCFGEX: (\"00\",\"01\",\"02\",\"0102\",\"0201\"),"
@@ -857,7 +899,9 @@ static const SyscfgexTest syscfgex_tests[] = {
                 .allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G),
                 .preferred = MM_MODEM_MODE_3G
             }
-        }
+        },
+        .gsm_umts_bands = 0x2000006e80180,
+        .lte_bands = 0x0,
     }
 };
 
@@ -868,7 +912,10 @@ test_syscfgex (void)
 
     for (i = 0; i < G_N_ELEMENTS (syscfgex_tests); i++) {
         GError *error = NULL;
+        gboolean result;
         GArray *combinations = NULL;
+        guint64 gsm_umts_bands;
+        guint64 lte_bands;
         guint j;
         guint n_expected_combinations = 0;
 
@@ -877,10 +924,17 @@ test_syscfgex (void)
                 n_expected_combinations++;
         }
 
-        combinations = mm_huawei_parse_syscfgex_test (syscfgex_tests[i].str, &error);
+        result = mm_huawei_parse_syscfgex_test (syscfgex_tests[i].str,
+                                                &combinations,
+                                                &gsm_umts_bands,
+                                                &lte_bands,
+                                                &error);
+        g_assert_true (result);
         g_assert_no_error (error);
         g_assert (combinations != NULL);
         g_assert_cmpuint (combinations->len, ==, n_expected_combinations);
+        g_assert_cmpuint(gsm_umts_bands, ==, syscfgex_tests[i].gsm_umts_bands);
+        g_assert_cmpuint(lte_bands, ==, syscfgex_tests[i].lte_bands);
 
         for (j = 0; j < combinations->len; j++) {
             MMHuaweiSyscfgexCombination *single;
@@ -924,6 +978,9 @@ typedef struct {
     const gchar *format;
     MMModemMode allowed;
     MMModemMode preferred;
+    guint64 gsm_umts_bands;
+    guint64 lte_bands;
+
 } SyscfgexResponseTest;
 
 static const SyscfgexResponseTest syscfgex_response_tests[] = {
@@ -936,7 +993,9 @@ static const SyscfgexResponseTest syscfgex_response_tests[] = {
                   "((800c5,\"LTE2100/LTE1800/LTE2600/LTE900/LTE800\"),(7fffffffffffffff,\"All bands\"))"
                   "\r\n",
         .allowed = (MM_MODEM_MODE_4G | MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
-        .preferred = MM_MODEM_MODE_NONE
+        .preferred = MM_MODEM_MODE_NONE,
+        .gsm_umts_bands = 0x2000004e80380,
+        .lte_bands = 0x800c5,
     },
     {
         .str = "^SYSCFGEX: \"03\",3FFFFFFF,1,2,7FFFFFFFFFFFFFFF",
@@ -947,7 +1006,9 @@ static const SyscfgexResponseTest syscfgex_response_tests[] = {
                   "((800c5,\"LTE2100/LTE1800/LTE2600/LTE900/LTE800\"),(7fffffffffffffff,\"All bands\"))"
                   "\r\n",
         .allowed = MM_MODEM_MODE_4G,
-        .preferred = MM_MODEM_MODE_NONE
+        .preferred = MM_MODEM_MODE_NONE,
+        .gsm_umts_bands = 0x2000004e80380,
+        .lte_bands = 0x800c5,
     },
     {
         .str = "^SYSCFGEX: \"02\",3FFFFFFF,1,2,7FFFFFFFFFFFFFFF",
@@ -958,7 +1019,9 @@ static const SyscfgexResponseTest syscfgex_response_tests[] = {
                   "((800c5,\"LTE2100/LTE1800/LTE2600/LTE900/LTE800\"),(7fffffffffffffff,\"All bands\"))"
                   "\r\n",
         .allowed = MM_MODEM_MODE_3G,
-        .preferred = MM_MODEM_MODE_NONE
+        .preferred = MM_MODEM_MODE_NONE,
+        .gsm_umts_bands = 0x2000004e80380,
+        .lte_bands = 0x800c5,
     },
     {
         .str = "^SYSCFGEX: \"01\",3FFFFFFF,1,2,7FFFFFFFFFFFFFFF",
@@ -969,7 +1032,9 @@ static const SyscfgexResponseTest syscfgex_response_tests[] = {
                   "((800c5,\"LTE2100/LTE1800/LTE2600/LTE900/LTE800\"),(7fffffffffffffff,\"All bands\"))"
                   "\r\n",
         .allowed = MM_MODEM_MODE_2G,
-        .preferred = MM_MODEM_MODE_NONE
+        .preferred = MM_MODEM_MODE_NONE,
+        .gsm_umts_bands = 0x2000004e80380,
+        .lte_bands = 0x800c5,
     },
     {
         .str = "^SYSCFGEX: \"00\",3fffffff,1,2,",
@@ -980,7 +1045,9 @@ static const SyscfgexResponseTest syscfgex_response_tests[] = {
                   "," /* NOTE: Non-LTE modem, LTE Bands EMPTY */
                   "\r\n",
         .allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G),
-        .preferred = MM_MODEM_MODE_NONE
+        .preferred = MM_MODEM_MODE_NONE,
+        .gsm_umts_bands = 0x2000006e80180,
+        .lte_bands = 0x0,
     },
     {
         .str = "^SYSCFGEX: \"01\",3fffffff,1,2,",
@@ -991,7 +1058,9 @@ static const SyscfgexResponseTest syscfgex_response_tests[] = {
                   "," /* NOTE: Non-LTE modem, LTE Bands EMPTY */
                   "\r\n",
         .allowed = MM_MODEM_MODE_2G,
-        .preferred = MM_MODEM_MODE_NONE
+        .preferred = MM_MODEM_MODE_NONE,
+        .gsm_umts_bands = 0x2000006e80180,
+        .lte_bands = 0x0,
     },
     {
         .str = "^SYSCFGEX: \"02\",3fffffff,1,2,",
@@ -1002,7 +1071,9 @@ static const SyscfgexResponseTest syscfgex_response_tests[] = {
                   "," /* NOTE: Non-LTE modem, LTE Bands EMPTY */
                   "\r\n",
         .allowed = MM_MODEM_MODE_3G,
-        .preferred = MM_MODEM_MODE_NONE
+        .preferred = MM_MODEM_MODE_NONE,
+        .gsm_umts_bands = 0x2000006e80180,
+        .lte_bands = 0x0,
     },
     {
         .str = "^SYSCFGEX: \"0102\",3fffffff,1,2,",
@@ -1013,7 +1084,9 @@ static const SyscfgexResponseTest syscfgex_response_tests[] = {
                   "," /* NOTE: Non-LTE modem, LTE Bands EMPTY */
                   "\r\n",
         .allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G),
-        .preferred = MM_MODEM_MODE_2G
+        .preferred = MM_MODEM_MODE_2G,
+        .gsm_umts_bands = 0x2000006e80180,
+        .lte_bands = 0x0,
     },
     {
         .str = "^SYSCFGEX: \"0201\",3fffffff,1,2,",
@@ -1024,7 +1097,9 @@ static const SyscfgexResponseTest syscfgex_response_tests[] = {
                   "," /* NOTE: Non-LTE modem, LTE Bands EMPTY */
                   "\r\n",
         .allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G),
-        .preferred = MM_MODEM_MODE_3G
+        .preferred = MM_MODEM_MODE_3G,
+        .gsm_umts_bands = 0x2000006e80180,
+        .lte_bands = 0x0,
     }
 };
 
@@ -1034,21 +1109,50 @@ test_syscfgex_response (void)
     guint i;
 
     for (i = 0; i < G_N_ELEMENTS (syscfgex_response_tests); i++) {
+        gboolean result;
         GArray *combinations = NULL;
-        const MMHuaweiSyscfgexCombination *found;
+        guint64 supported_gsm_umts_bands;
+        guint64 supported_lte_bands;
+        MMModemModeCombination current_combination;
+        guint64 current_gsm_umts_bands;
+        guint64 current_lte_bands;
         GError *error = NULL;
 
-        combinations = mm_huawei_parse_syscfgex_test (syscfgex_response_tests[i].format, NULL);
+        result = mm_huawei_parse_syscfgex_test (syscfgex_response_tests[i].format,
+                                                &combinations,
+                                                &supported_gsm_umts_bands,
+                                                &supported_lte_bands,
+                                                NULL);
+        g_assert_true (result);
         g_assert (combinations != NULL);
 
-        found = mm_huawei_parse_syscfgex_response (syscfgex_response_tests[i].str,
-                                                   combinations,
-                                                   &error);
+        result = mm_huawei_parse_syscfgex_response (syscfgex_response_tests[i].str,
+                                                    &current_combination,
+                                                    &current_gsm_umts_bands,
+                                                    &current_lte_bands,
+                                                    &error);
 
+        if (current_combination.allowed == MM_MODEM_MODE_ANY) {
+            /* current mode: any -> all supported */
+            guint j;
+            current_combination.allowed = MM_MODEM_MODE_NONE;
+
+            for (j = 0; j < combinations->len; j++) {
+                current_combination.allowed |= g_array_index (combinations, MMHuaweiSyscfgexCombination, j).allowed;
+            }
+        }
+
+        if (current_gsm_umts_bands == MM_HUAWEI_SYSCFG_BAND_ANY)
+            current_gsm_umts_bands = supported_gsm_umts_bands;
+        if (current_lte_bands == MM_HUAWEI_SYSCFGEX_BAND_ANY_LTE)
+            current_lte_bands = supported_lte_bands;
+        
+        g_assert_true (result);
         g_assert_no_error (error);
-        g_assert (found != NULL);
-        g_assert_cmpuint (found->allowed, ==, syscfgex_response_tests[i].allowed);
-        g_assert_cmpuint (found->preferred, ==, syscfgex_response_tests[i].preferred);
+        g_assert_cmpuint (current_combination.allowed, ==, syscfgex_response_tests[i].allowed);
+        g_assert_cmpuint (current_combination.preferred, ==, syscfgex_response_tests[i].preferred);
+        g_assert_cmpuint (current_gsm_umts_bands, ==, syscfgex_response_tests[i].gsm_umts_bands);
+        g_assert_cmpuint (current_lte_bands, ==, syscfgex_response_tests[i].lte_bands);
 
         g_array_unref (combinations);
     }

@@ -801,77 +801,142 @@ parse_syscfg_modes (const gchar  *modes_str,
     return out;
 }
 
-GArray *
-mm_huawei_parse_syscfg_test (const gchar  *response,
-                             gpointer      log_object,
-                             GError      **error)
+/* code shared for SYSCFG and SYSCFGEX */
+static gboolean
+parse_syscfg_bands (const gchar *bands_str,
+                    guint64     *bands_out,
+                    GError     **error)
 {
-    gchar **split;
+    g_auto (GStrv) groups = NULL;
+    guint i;
+
+    g_assert (bands_str);
+    g_assert (bands_out);
+
+    /* Input format examples:
+     *
+     * Example GSM/UMTS:
+     *   (2000000400380,"GSM900/GSM1800/WCDMA BCVIII/WCDMA BCI"),(280000,"GSM850/GSM1900"),(3fffffff,"All bands")
+     *
+     * Example LTE:
+     *   (800c5,"LTE2100/LTE1800/LTE2600/LTE900/LTE800"),(7fffffffffffffff,"All bands")
+     *
+     * The bands might be split in multiple groups.
+     * Also, there's always a special "All bands" mask in one group.
+     * The number and order of the groups might differ between modems.
+     */
+    *bands_out = 0;
+
+    groups = mm_split_string_groups (bands_str);
+    if (!groups) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Failed to parse ^SYSCFG bands string");
+        return FALSE;
+    }
+
+    for (i = 0; groups[i] != NULL; i++) {
+        g_auto (GStrv) split = NULL;
+        guint64 band_mask;
+
+        split = g_strsplit (groups[i], ",", -1);
+        g_assert (split);
+
+        /* special case: empty bands string, e.g. ^SYSCFGEX LTE bands string from 3G modem */
+        if (split[0] == NULL)
+            continue;
+
+        if (!mm_get_u64_from_hex_str (split[0], &band_mask)) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Could not parse band mask from string: '%s'", split[0]);
+            return FALSE;
+        }
+
+        if (band_mask == MM_HUAWEI_SYSCFG_BAND_ANY || band_mask == MM_HUAWEI_SYSCFGEX_BAND_ANY_LTE)
+            continue; /* skip "All bands" mask */
+
+        *bands_out |= band_mask;
+    }
+
+    return TRUE;
+}
+
+gboolean
+mm_huawei_parse_syscfg_test (const gchar *response,
+                             GArray     **supported_modes_out,
+                             guint64     *supported_gsm_umts_bands_out,
+                             GError     **error)
+{
+    g_auto(GStrv) split = NULL;
     GError *inner_error = NULL;
-    GArray *out;
 
     if (!response || !g_str_has_prefix (response, "^SYSCFG:")) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
                      "Missing ^SYSCFG prefix");
-        return NULL;
+        return FALSE;
     }
 
     /* Examples:
      *
      * ^SYSCFG:(2,13,14,16),
      *         (0-3),
-     *         ((400000,"WCDMA2100")),
+     *         ((2000000400380,"GSM900/GSM1800/WCDMA900/WCDMA2100"),(280000,"GSM850/GSM1900"),(3fffffff,"All bands")),
      *         (0-2),
      *         (0-4)
+     * 
+     * Note that "all bands" bit mask doesn't include all bands.
      */
     split = split_groups (mm_strip_tag (response, "^SYSCFG:"), error);
-    if (!split)
-        return NULL;
 
     /* We expect 5 string chunks */
-    if (g_strv_length (split) < 5) {
+    if (!split || g_strv_length (split) < 5) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
                      "Unexpected ^SYSCFG format");
-        g_strfreev (split);
         return FALSE;
     }
 
-    /* Parse supported mode combinations */
-    out = parse_syscfg_modes (split[0], split[1], log_object, &inner_error);
+    /* Parse supported mode combinations, if requested */
+    if (supported_modes_out) {
+        *supported_modes_out = parse_syscfg_modes (split[0], split[1], NULL, &inner_error);
 
-    g_strfreev (split);
-
-    if (inner_error) {
-        g_propagate_error (error, inner_error);
-        return NULL;
+        if (inner_error) {
+            g_propagate_error (error, inner_error);
+            return FALSE;
+        }
     }
 
-    return out;
+    /* Parse supported bands, if requested */
+    if (supported_gsm_umts_bands_out) {
+        if (!parse_syscfg_bands (split[2], supported_gsm_umts_bands_out, &inner_error)) {
+            g_propagate_error (error, inner_error);
+            return FALSE;
+        }
+    }
+
+    return TRUE;
 }
 
 /*****************************************************************************/
 /* ^SYSCFG response parser */
 
-const MMHuaweiSyscfgCombination *
-mm_huawei_parse_syscfg_response (const gchar *response,
-                                 const GArray *supported_mode_combinations,
-                                 GError **error)
+gboolean
+mm_huawei_parse_syscfg_response (const gchar            *response,
+                                 MMModemModeCombination *current_mode_out,
+                                 guint64                *current_gsm_umts_bands_out,
+                                 GError                **error)
 {
-    gchar **split;
+    g_auto(GStrv) split = NULL;
     guint mode;
     guint acqorder;
-    guint i;
+    guint64 bands;
 
     if (!response || !g_str_has_prefix (response, "^SYSCFG:")) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
                      "Missing ^SYSCFG prefix");
-        return NULL;
+        return FALSE;
     }
 
     /* Format:
@@ -885,44 +950,53 @@ mm_huawei_parse_syscfg_response (const gchar *response,
     /* We expect 5 string chunks */
     if (g_strv_length (split) < 5 ||
         !mm_get_uint_from_str (split[0], &mode) ||
-        !mm_get_uint_from_str (split[1], &acqorder)) {
+        !mm_get_uint_from_str (split[1], &acqorder) ||
+        !mm_get_u64_from_hex_str (split[2], &bands)) {
         /* Dump error to upper layer */
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
                      "Unexpected ^SYSCFG response: '%s'",
                      response);
-        g_strfreev (split);
-        return NULL;
+        return FALSE;
     }
 
-    /* Fix invalid modes with non-sensical acquisition orders */
-    if (mode == 14 && acqorder != 0)  /* WCDMA only but acqorder != "Automatic" */
-        acqorder = 0;
-    else if (mode == 13 && acqorder != 0)  /* GSM only but acqorder != "Automatic" */
-        acqorder = 0;
+    if (current_mode_out) {
+        /* Fix invalid modes with non-sensical acquisition orders */
+        if (mode == 14 && acqorder != 0)  /* WCDMA only but acqorder != "Automatic" */
+            acqorder = 0;
+        else if (mode == 13 && acqorder != 0)  /* GSM only but acqorder != "Automatic" */
+            acqorder = 0;
 
-    /* Look for current modes among the supported ones */
-    for (i = 0; i < supported_mode_combinations->len; i++) {
-        const MMHuaweiSyscfgCombination *combination;
-
-        combination = &g_array_index (supported_mode_combinations,
-                                      MMHuaweiSyscfgCombination,
-                                      i);
-        if (mode == combination->mode && acqorder == combination->acqorder) {
-            g_strfreev (split);
-            return combination;
+        if (mode == 2) { /* auto */
+            current_mode_out->allowed = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G;
+            if (acqorder == 1)
+                current_mode_out->preferred = MM_MODEM_MODE_2G;
+            else if (acqorder == 2)
+                current_mode_out->preferred = MM_MODEM_MODE_3G;
+            else
+                current_mode_out->preferred = MM_MODEM_MODE_NONE;
+        } else if (mode == 13) { /* GSM only */
+            current_mode_out->allowed = MM_MODEM_MODE_2G;
+            current_mode_out->preferred = MM_MODEM_MODE_NONE;
+        } else if (mode == 14) { /* WCDMA only */
+            current_mode_out->allowed = MM_MODEM_MODE_3G;
+            current_mode_out->preferred = MM_MODEM_MODE_NONE;
+        } else {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Unhandled SYSCFG combination (%d,%d)",
+                         mode,
+                         acqorder);
+            return FALSE;
         }
     }
 
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_FAILED,
-                 "No SYSCFG combination found matching the current one (%d,%d)",
-                 mode,
-                 acqorder);
-    g_strfreev (split);
-    return NULL;
+    if (current_gsm_umts_bands_out)
+        *current_gsm_umts_bands_out = bands;
+
+    return TRUE;
 }
 
 /*****************************************************************************/
@@ -933,6 +1007,32 @@ huawei_syscfgex_combination_free (MMHuaweiSyscfgexCombination *item)
 {
     /* Just the contents, not the item itself! */
     g_free (item->mode_str);
+}
+
+static gboolean
+syscfgex_mode_to_mm_modem_mode (const gchar *mode_str,
+                                MMModemMode *mm_mode_out)
+{
+    g_assert (mode_str);
+    g_assert (mm_mode_out);
+
+    if (g_str_has_prefix (mode_str, "00"))
+        /* auto */
+        *mm_mode_out = MM_MODEM_MODE_ANY;
+    else if (g_str_has_prefix (mode_str, "01"))
+        /* GSM */
+        *mm_mode_out = MM_MODEM_MODE_2G;
+    else if (g_str_has_prefix (mode_str, "02"))
+        /* WCDMA */
+        *mm_mode_out = MM_MODEM_MODE_3G;
+    else if (g_str_has_prefix (mode_str, "03"))
+        /* LTE */
+        *mm_mode_out = MM_MODEM_MODE_4G;
+    else
+        /* 04 -> CDMA1x, 06 -> WiMAX, 07 -> EV-DO, 99 -> no change */
+        return FALSE;
+
+    return TRUE;
 }
 
 static gboolean
@@ -954,22 +1054,7 @@ parse_mode_combination_string (const gchar *mode_str,
     for (n = 0; n < strlen (mode_str); n+=2) {
         MMModemMode mode;
 
-        if (g_ascii_strncasecmp (&mode_str[n], "01", 2) == 0)
-            /* GSM */
-            mode = MM_MODEM_MODE_2G;
-        else if (g_ascii_strncasecmp (&mode_str[n], "02", 2) == 0)
-            /* WCDMA */
-            mode = MM_MODEM_MODE_3G;
-        else if (g_ascii_strncasecmp (&mode_str[n], "03", 2) == 0)
-            /* LTE */
-            mode = MM_MODEM_MODE_4G;
-        else if (g_ascii_strncasecmp (&mode_str[n], "04", 2) == 0)
-            /* CDMA Note: no EV-DO, just return single value, so assume CDMA1x*/
-            mode = MM_MODEM_MODE_2G;
-        else
-            mode = MM_MODEM_MODE_NONE;
-
-        if (mode != MM_MODEM_MODE_NONE) {
+        if (syscfgex_mode_to_mm_modem_mode (&mode_str[n], &mode)) {
             /* The first one in the list is the preferred combination */
             if (n == 0)
                 *preferred |= mode;
@@ -1055,20 +1140,23 @@ parse_mode_combination_string_list (const gchar *modes_str,
     return supported_mode_combinations;
 }
 
-GArray *
+gboolean
 mm_huawei_parse_syscfgex_test (const gchar *response,
-                               GError **error)
+                               GArray     **supported_modes_out,
+                               guint64     *supported_gsm_umts_bands_out,
+                               guint64     *supported_lte_bands_out,
+                               GError     **error)
 {
-    gchar **split;
+    g_auto(GStrv) split = NULL;
     GError *inner_error = NULL;
-    GArray *out;
+    GArray *modes;
 
     if (!response || !g_str_has_prefix (response, "^SYSCFGEX:")) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
                      "Missing ^SYSCFGEX prefix");
-        return NULL;
+        return FALSE;
     }
 
     /* Examples:
@@ -1082,50 +1170,63 @@ mm_huawei_parse_syscfgex_test (const gchar *response,
      *             (7fffffffffffffff,"All bands"))
      */
     split = split_groups (mm_strip_tag (response, "^SYSCFGEX:"), error);
-    if (!split)
-        return NULL;
 
     /* We expect 5 string chunks */
-    if (g_strv_length (split) < 5) {
+    if (!split || g_strv_length (split) < 5) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
                      "Unexpected ^SYSCFGEX format");
-        g_strfreev (split);
-        return NULL;
+        return FALSE;
     }
 
-    out = parse_mode_combination_string_list (split[0], &inner_error);
+    if (supported_modes_out != NULL) {
+        modes = parse_mode_combination_string_list (split[0], &inner_error);
 
-    g_strfreev (split);
+        if (inner_error) {
+            g_propagate_error (error, inner_error);
+            return FALSE;
+        }
 
-    if (inner_error) {
+        *supported_modes_out = modes;
+    }
+
+    if (supported_gsm_umts_bands_out != NULL &&
+        !parse_syscfg_bands (split[1], supported_gsm_umts_bands_out, &inner_error)) {
         g_propagate_error (error, inner_error);
-        return NULL;
+        return FALSE;
     }
 
-    return out;
+    if (supported_lte_bands_out != NULL &&
+        !parse_syscfg_bands (split[4], supported_lte_bands_out, &inner_error)) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    return TRUE;
 }
 
 /*****************************************************************************/
 /* ^SYSCFGEX response parser */
 
-const MMHuaweiSyscfgexCombination *
-mm_huawei_parse_syscfgex_response (const gchar *response,
-                                   const GArray *supported_mode_combinations,
-                                   GError **error)
+gboolean
+mm_huawei_parse_syscfgex_response (const gchar            *response,
+                                   MMModemModeCombination *current_mode_out,
+                                   guint64                *current_gsm_umts_bands_out,
+                                   guint64                *current_lte_bands_out,
+                                   GError                **error)
 {
-    gchar **split;
-    guint i;
-    gsize len;
-    gchar *str;
+    g_auto(GStrv) split = NULL;
+    guint   i;
+    gsize   len;
+    gchar  *str;
 
     if (!response || !g_str_has_prefix (response, "^SYSCFGEX:")) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
                      "Missing ^SYSCFGEX prefix");
-        return NULL;
+        return FALSE;
     }
 
     /* Format:
@@ -1143,39 +1244,70 @@ mm_huawei_parse_syscfgex_response (const gchar *response,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
                      "Unexpected ^SYSCFGEX response format");
-        g_strfreev (split);
-        return NULL;
+        return FALSE;
     }
 
-    /* Unquote */
-    str = split[0];
-    len = strlen (str);
-    if ((len >= 2) && (str[0] == '"') && (str[len - 1] == '"')) {
-        str[0] = ' ';
-        str[len - 1] = ' ';
-        str = g_strstrip (str);
-    }
+    if (current_mode_out != NULL) {
+        /* current modes is a string without delimiters, but modes have two chars each.
+         * The preference is given by the order from left to right.
+         *
+         * Ex: "00"     -> automatic
+         *     "030102" -> LTE > GSM > WCDMA
+         */
+        MMModemMode first_mode;
+        current_mode_out->allowed = MM_MODEM_MODE_NONE;
+        current_mode_out->preferred = MM_MODEM_MODE_NONE;
 
-    /* Look for current modes among the supported ones */
-    for (i = 0; i < supported_mode_combinations->len; i++) {
-        const MMHuaweiSyscfgexCombination *combination;
+        str = mm_strip_quotes (split[0]);
+        len = strlen(str);
 
-        combination = &g_array_index (supported_mode_combinations,
-                                      MMHuaweiSyscfgexCombination,
-                                      i);
-        if (g_str_equal (str, combination->mode_str)) {
-            g_strfreev (split);
-            return combination;
+        if (!len || len % 2 != 0) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                         "Unexpected ^SYSCFGEX mode string length: %" G_GSIZE_FORMAT, len);
+            return FALSE;
+        }
+
+        for (i = 0; i < len; i += 2) {
+            MMModemMode mode;
+
+            if (syscfgex_mode_to_mm_modem_mode (&str[i], &mode)) {
+                if (mode == MM_MODEM_MODE_ANY) {
+                    current_mode_out->allowed = MM_MODEM_MODE_ANY;
+                    current_mode_out->preferred = MM_MODEM_MODE_NONE;
+                    break;
+                }
+
+                /* if only one mode, keep NONE as preferred mode */
+                if (i == 0)
+                    first_mode = mode;
+                /* ... but if multiple modes are listed, the first is preferred */
+                else if (i == 2)
+                    current_mode_out->preferred = first_mode;
+
+                current_mode_out->allowed |= mode;
+            }
         }
     }
 
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_FAILED,
-                 "No SYSCFGEX combination found matching the current one (%s)",
-                 str);
-    g_strfreev (split);
-    return NULL;
+    if (current_gsm_umts_bands_out != NULL) {
+        *current_gsm_umts_bands_out = 0;
+
+        if (*split[1] != '\0' && !mm_get_u64_from_hex_str (split[1], current_gsm_umts_bands_out)) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Could not parse band mask from string: '%s'", split[1]);
+            return FALSE;
+        }
+    }
+
+    if (current_lte_bands_out != NULL) {
+        *current_lte_bands_out = 0;
+
+        if (*split[4] != '\0' && !mm_get_u64_from_hex_str (split[4], current_lte_bands_out)) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Could not parse band mask from string: '%s'", split[1]);
+            return FALSE;
+        }
+    }
+
+    return TRUE;
 }
 
 /*****************************************************************************/
