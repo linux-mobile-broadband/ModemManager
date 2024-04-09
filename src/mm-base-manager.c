@@ -451,7 +451,10 @@ first_port (MMBaseManager  *self,
     }
 
     /* Store the device */
-    g_hash_table_insert (self->priv->devices, g_strdup (uid), g_steal_pointer (&device));
+    g_hash_table_insert (self->priv->devices, g_strdup (uid), g_object_ref (device));
+
+    /* And start device support check */
+    device_support_check_add_single_port (self, device, port);
 }
 
 static void
