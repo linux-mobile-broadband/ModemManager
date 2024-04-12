@@ -186,13 +186,6 @@ void mm_base_modem_at_command                (MMBaseModem *self,
                                               gboolean allow_cached,
                                               GAsyncReadyCallback callback,
                                               gpointer user_data);
-/* Like mm_base_modem_at_command() except does not prefix with AT */
-void mm_base_modem_at_command_raw            (MMBaseModem *self,
-                                              const gchar *command,
-                                              guint timeout,
-                                              gboolean allow_cached,
-                                              GAsyncReadyCallback callback,
-                                              gpointer user_data);
 const gchar *mm_base_modem_at_command_finish (MMBaseModem *self,
                                               GAsyncResult *res,
                                               GError **error);

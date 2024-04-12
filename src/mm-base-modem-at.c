@@ -680,17 +680,6 @@ mm_base_modem_at_command (MMBaseModem *self,
 }
 
 void
-mm_base_modem_at_command_raw (MMBaseModem *self,
-                              const gchar *command,
-                              guint timeout,
-                              gboolean allow_cached,
-                              GAsyncReadyCallback callback,
-                              gpointer user_data)
-{
-    _at_command (self, command, timeout, allow_cached, TRUE, callback, user_data);
-}
-
-void
 mm_base_modem_at_command_alloc_clear (MMBaseModemAtCommandAlloc *command)
 {
     g_free (command->command);
