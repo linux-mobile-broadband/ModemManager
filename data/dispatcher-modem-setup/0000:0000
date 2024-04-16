@@ -2,24 +2,45 @@
 
 # SPDX-License-Identifier: CC0-1.0
 # 2024 Nero Sinaro <xu.zhang@fibocom.com>
+# 2024 Google, Inc.
 #
-# modem setup test script
+# This is a test script given as reference.
 #
-# This is the test script:
-# Parameter list: vid pid device_path port_name
-# device_path: Path of the device on the sys file system, it's a string
-# port_name: Port name of the device enumeration, It's an array of strings
+# Enabling this modem setup script may be done by renaming it with the
+# exact vid:pid of the modem, and placing it in the 'modem-setup.d'
+# directory:
+#    - User-provided modem setup scripts are expected in the package system
+#      configuration directory, e.g. /etc/ModemManager/modem-setup.d
+#    - Package-provided modem setup scripts are expected in the package library
+#      directory, e.g. /lib/ModemManager/modem-setup.d
+# Please note that these directories may vary in your system.
+#
+# E.g. setting up this test script for a Fibocom L850 modem could look like:
+#  $ sudo cp /usr/share/ModemManager/modem-setup.available.d/0000\:0000 \
+#            /etc/ModemManager/modem-setup.d/2cb7\:0007
+#
+# And the output in syslog from the logger calls may look like this:
+#    [modem setup test] sysfs path: /sys/devices/pci0000:00/0000:00:14.0/usb1/1-4/1-4.2/1-4.2.1
+#    [modem setup test]   port: cdc-wdm1
+#    [modem setup test]   port: ttyACM0
+#    [modem setup test]   port: ttyACM2
 #
 
-logger "[Test] ARGV:$@, ARG count:$#"
+# require program name and at least 2 arguments
+[ $# -lt 2 ] && exit 1
 
-count=1
-while [ $count -lt 10 ]; do
-    # will print logger to syslog
-    logger "[Test] (attempt #${i})"
+# first argument is sysfs path
+SYSFS_PATH=$1
+shift
 
-    sleep 0.5
-    count=$((count + 1))
+logger "[modem setup test] sysfs path: ${SYSFS_PATH}"
+
+# second and next arguments are control port names
+for PORT in "$@"; do
+    logger "[modem setup test]   port: ${PORT}"
 done
 
-exit $?
+# now some setup being done
+sleep 2
+
+exit 0
