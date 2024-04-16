@@ -190,9 +190,51 @@ find_device_by_physdev_uid (MMBaseManager *self,
 
 /*****************************************************************************/
 
+static void
+initialize_ready (MMBaseModem   *modem,
+                  GAsyncResult  *res)
+{
+    g_autoptr(GError) error = NULL;
+
+    if (!mm_base_modem_initialize_finish (modem, res, &error)) {
+        if (g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED)) {
+            /* FATAL error, won't even be exported in DBus */
+            mm_obj_err (modem, "fatal error initializing: %s", error->message);
+        } else {
+            /* non-fatal error */
+            mm_obj_warn (modem, "error initializing: %s", error->message);
+            mm_base_modem_set_valid (modem, TRUE);
+        }
+    } else {
+        mm_obj_dbg (modem, "modem initialized");
+        mm_base_modem_set_valid (modem, TRUE);
+    }
+}
+
+static void
+modem_initialize (MMBaseManager *self,
+                  MMDevice      *device)
+{
+    MMBaseModem *modem;
+
+    modem = mm_device_peek_modem (device);
+    if (!modem) {
+        mm_obj_warn (self, "cannot initialize modem at device '%s': not found",
+                     mm_device_get_uid (device));
+        return;
+    }
+
+    mm_obj_dbg (modem, "modem initializing...");
+    mm_base_modem_initialize (modem,
+                              (GAsyncReadyCallback)initialize_ready,
+                              NULL);
+}
+
+/*****************************************************************************/
+
 typedef struct {
     MMBaseManager *self;
-    MMDevice *device;
+    MMDevice      *device;
 } FindDeviceSupportContext;
 
 static void
@@ -203,53 +245,26 @@ find_device_support_context_free (FindDeviceSupportContext *ctx)
     g_slice_free (FindDeviceSupportContext, ctx);
 }
 
-/*****************************************************************************/
-static void
-initialize_ready (MMBaseModem *self,
-                  GAsyncResult *res)
-{
-    g_autoptr(GError) error = NULL;
-
-    if (!mm_base_modem_initialize_finish (self, res, &error)) {
-        if (g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED)) {
-            /* FATAL error, won't even be exported in DBus */
-            mm_obj_err (self, "fatal error initializing: %s", error->message);
-        } else {
-            /* non-fatal error */
-            mm_obj_warn (self, "error initializing: %s", error->message);
-            mm_base_modem_set_valid (self, TRUE);
-        }
-    } else {
-        mm_obj_dbg (self, "modem initialized");
-        mm_base_modem_set_valid (self, TRUE);
-    }
-}
-
 static void
 dispatcher_modem_setup_ready (MMDispatcherModemSetup    *dispatcher,
                               GAsyncResult              *res,
                               FindDeviceSupportContext  *ctx)
 {
-    g_autoptr(GError)   error = NULL;
-    MMBaseModem        *modem;
+    g_autoptr(GError) error = NULL;
 
     if (!mm_dispatcher_modem_setup_run_finish (dispatcher, res, &error)) {
-        if (!g_error_matches(error, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND)) {
-            mm_obj_err (ctx->self, "couldn't run modem setup: %s", error->message);
-        } else {
-            mm_obj_dbg (ctx->self, "no need to run modem setup");
-        }
-    }
+        if (!g_error_matches(error, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND))
+            mm_obj_warn (ctx->self, "couldn't run setup for device '%s': %s",
+                         mm_device_get_uid (ctx->device), error->message);
+        else
+            mm_obj_dbg (ctx->self, "no need to run setup for device '%s'",
+                        mm_device_get_uid (ctx->device));
+    } else
+        mm_obj_dbg (ctx->self, "setup for device '%s' finished",
+                    mm_device_get_uid (ctx->device));
 
-    modem = mm_device_peek_modem (ctx->device);
-    if (modem) {
-        /* As soon as we get the ports organized, we initialize the modem */
-        mm_base_modem_initialize (modem,
-                                  (GAsyncReadyCallback)initialize_ready,
-                                  NULL);
-    } else {
-        mm_obj_warn(modem, "no modem found");
-    }
+    /* launch async modem initialization */
+    modem_initialize (ctx->self, ctx->device);
 
     find_device_support_context_free (ctx);
 }
@@ -293,6 +308,8 @@ modem_setup (FindDeviceSupportContext *ctx)
     g_ptr_array_add (aux, NULL);
     modem_ports = (GStrv) g_ptr_array_free (aux, FALSE);
 
+    mm_obj_msg (ctx->self, "running setup for device '%s'...",
+                mm_device_get_uid (ctx->device));
     mm_dispatcher_modem_setup_run (dispatcher,
                                    mm_base_modem_get_vendor_id (modem),
                                    mm_base_modem_get_product_id (modem),
@@ -1722,6 +1739,9 @@ handle_set_profile (MmGdbusTest *skeleton,
 
     mm_obj_msg (self, "modem for virtual device '%s' successfully created",
                 mm_device_get_uid (device));
+
+    /* launch async modem initialization */
+    modem_initialize (self, device);
 
 out:
 
