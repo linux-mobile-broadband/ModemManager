@@ -41,7 +41,7 @@ struct _MMSharedCinterion {
     GTypeInterface g_iface;
 
     /* Peek modem interface of the parent class of the object */
-    MMIfaceModem *  (* peek_parent_interface) (MMSharedCinterion *self);
+    MMIfaceModemInterface *  (* peek_parent_interface) (MMSharedCinterion *self);
 
     /* Peek location interface of the parent class of the object */
     MMIfaceModemLocation *  (* peek_parent_location_interface) (MMSharedCinterion *self);

@@ -24,7 +24,7 @@
 #include "mm-modem-helpers.h"
 #include "mm-sim-sierra.h"
 
-static MMIfaceModem *iface_modem_parent;
+static MMIfaceModemInterface *iface_modem_parent;
 
 /*****************************************************************************/
 /* Custom init and port type hints */
@@ -510,7 +510,7 @@ mm_common_sierra_setup_ports (MMBroadbandModem *self)
 /*****************************************************************************/
 
 void
-mm_common_sierra_peek_parent_interfaces (MMIfaceModem *iface)
+mm_common_sierra_peek_parent_interfaces (MMIfaceModemInterface *iface)
 {
     iface_modem_parent = g_type_interface_peek_parent (iface);
 }

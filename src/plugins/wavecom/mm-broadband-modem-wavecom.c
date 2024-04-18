@@ -35,8 +35,8 @@
 #include "mm-base-modem-at.h"
 #include "mm-broadband-modem-wavecom.h"
 
-static void iface_modem_init (MMIfaceModem *iface);
-static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void iface_modem_init      (MMIfaceModemInterface *iface);
+static void iface_modem_3gpp_init (MMIfaceModem3gpp      *iface);
 
 static MMIfaceModem3gpp *iface_modem_3gpp_parent;
 
@@ -1278,7 +1278,7 @@ mm_broadband_modem_wavecom_init (MMBroadbandModemWavecom *self)
 }
 
 static void
-iface_modem_init (MMIfaceModem *iface)
+iface_modem_init (MMIfaceModemInterface *iface)
 {
     iface->load_supported_modes = load_supported_modes;
     iface->load_supported_modes_finish = load_supported_modes_finish;

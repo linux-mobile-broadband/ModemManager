@@ -24,15 +24,14 @@
 #include <libmm-glib.h>
 
 #include "mm-charsets.h"
+#include "mm-base-modem.h"
 #include "mm-port-serial-at.h"
 #include "mm-base-bearer.h"
 #include "mm-base-sim.h"
 #include "mm-bearer-list.h"
 
-#define MM_TYPE_IFACE_MODEM            (mm_iface_modem_get_type ())
-#define MM_IFACE_MODEM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM, MMIfaceModem))
-#define MM_IS_IFACE_MODEM(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM))
-#define MM_IFACE_MODEM_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM, MMIfaceModem))
+#define MM_TYPE_IFACE_MODEM mm_iface_modem_get_type ()
+G_DECLARE_INTERFACE (MMIfaceModem, mm_iface_modem, MM, IFACE_MODEM, MMBaseModem)
 
 #define MM_IFACE_MODEM_DBUS_SKELETON           "iface-modem-dbus-skeleton"
 #define MM_IFACE_MODEM_STATE                   "iface-modem-state"
@@ -44,9 +43,7 @@
 #define MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED      "iface-modem-periodic-signal-check-disabled"
 #define MM_IFACE_MODEM_PERIODIC_ACCESS_TECH_CHECK_DISABLED "iface-modem-periodic-access-tech-check-disabled"
 
-typedef struct _MMIfaceModem MMIfaceModem;
-
-struct _MMIfaceModem {
+struct _MMIfaceModemInterface {
     GTypeInterface g_iface;
 
     /* Loading of the SupportedCapabilities property */
@@ -424,9 +421,6 @@ struct _MMIfaceModem {
                                       GAsyncResult         *res,
                                       GError              **error);
 };
-
-GType mm_iface_modem_get_type (void);
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModem, g_object_unref)
 
 /* Helpers to query access technologies */
 MMModemAccessTechnology mm_iface_modem_get_access_technologies (MMIfaceModem *self);

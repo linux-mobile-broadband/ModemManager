@@ -27,11 +27,10 @@
 #include "mm-broadband-modem-xmm.h"
 #include "mm-shared-xmm.h"
 
-
-static void iface_modem_init (MMIfaceModem *iface);
-static void shared_xmm_init  (MMSharedXmm  *iface);
-static void iface_modem_signal_init (MMIfaceModemSignal *iface);
-static void iface_modem_location_init (MMIfaceModemLocation *iface);
+static void iface_modem_init          (MMIfaceModemInterface *iface);
+static void shared_xmm_init           (MMSharedXmm           *iface);
+static void iface_modem_signal_init   (MMIfaceModemSignal    *iface);
+static void iface_modem_location_init (MMIfaceModemLocation  *iface);
 
 static MMIfaceModemLocation *iface_modem_location_parent;
 
@@ -70,7 +69,7 @@ mm_broadband_modem_xmm_init (MMBroadbandModemXmm *self)
 }
 
 static void
-iface_modem_init (MMIfaceModem *iface)
+iface_modem_init (MMIfaceModemInterface *iface)
 {
     iface->load_supported_modes        = mm_shared_xmm_load_supported_modes;
     iface->load_supported_modes_finish = mm_shared_xmm_load_supported_modes_finish;

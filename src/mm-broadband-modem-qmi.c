@@ -53,19 +53,19 @@
 #include "mm-call-qmi.h"
 #include "mm-call-list.h"
 
-static void iface_modem_init (MMIfaceModem *iface);
-static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void iface_modem_init                      (MMIfaceModemInterface          *iface);
+static void iface_modem_3gpp_init                 (MMIfaceModem3gpp               *iface);
 static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface);
-static void iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface);
-static void iface_modem_voice_init (MMIfaceModemVoice *iface);
-static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
-static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
-static void iface_modem_location_init (MMIfaceModemLocation *iface);
-static void iface_modem_oma_init (MMIfaceModemOma *iface);
-static void iface_modem_firmware_init (MMIfaceModemFirmware *iface);
-static void iface_modem_sar_init (MMIfaceModemSar *iface);
-static void iface_modem_signal_init (MMIfaceModemSignal *iface);
-static void shared_qmi_init (MMSharedQmi *iface);
+static void iface_modem_3gpp_ussd_init            (MMIfaceModem3gppUssd           *iface);
+static void iface_modem_voice_init                (MMIfaceModemVoice              *iface);
+static void iface_modem_cdma_init                 (MMIfaceModemCdma               *iface);
+static void iface_modem_messaging_init            (MMIfaceModemMessaging          *iface);
+static void iface_modem_location_init             (MMIfaceModemLocation           *iface);
+static void iface_modem_oma_init                  (MMIfaceModemOma                *iface);
+static void iface_modem_firmware_init             (MMIfaceModemFirmware           *iface);
+static void iface_modem_sar_init                  (MMIfaceModemSar                *iface);
+static void iface_modem_signal_init               (MMIfaceModemSignal             *iface);
+static void shared_qmi_init                       (MMSharedQmi                    *iface);
 
 static MMIfaceModemLocation  *iface_modem_location_parent;
 static MMIfaceModemMessaging *iface_modem_messaging_parent;
@@ -13805,7 +13805,7 @@ dispose (GObject *object)
 }
 
 static void
-iface_modem_init (MMIfaceModem *iface)
+iface_modem_init (MMIfaceModemInterface *iface)
 {
     /* Initialization steps */
     iface->load_current_capabilities = mm_shared_qmi_load_current_capabilities;

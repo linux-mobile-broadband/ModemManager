@@ -61,20 +61,20 @@
 #include "libqcdm/src/log-items.h"
 #include "mm-helper-enums-types.h"
 
-static void iface_modem_init (MMIfaceModem *iface);
-static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void iface_modem_init                      (MMIfaceModemInterface          *iface);
+static void iface_modem_3gpp_init                 (MMIfaceModem3gpp               *iface);
 static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface);
-static void iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface);
-static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
-static void iface_modem_simple_init (MMIfaceModemSimple *iface);
-static void iface_modem_location_init (MMIfaceModemLocation *iface);
-static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
-static void iface_modem_voice_init (MMIfaceModemVoice *iface);
-static void iface_modem_time_init (MMIfaceModemTime *iface);
-static void iface_modem_signal_init (MMIfaceModemSignal *iface);
-static void iface_modem_oma_init (MMIfaceModemOma *iface);
-static void iface_modem_firmware_init (MMIfaceModemFirmware *iface);
-static void iface_modem_sar_init (MMIfaceModemSar *iface);
+static void iface_modem_3gpp_ussd_init            (MMIfaceModem3gppUssd           *iface);
+static void iface_modem_cdma_init                 (MMIfaceModemCdma               *iface);
+static void iface_modem_simple_init               (MMIfaceModemSimple             *iface);
+static void iface_modem_location_init             (MMIfaceModemLocation           *iface);
+static void iface_modem_messaging_init            (MMIfaceModemMessaging          *iface);
+static void iface_modem_voice_init                (MMIfaceModemVoice              *iface);
+static void iface_modem_time_init                 (MMIfaceModemTime               *iface);
+static void iface_modem_signal_init               (MMIfaceModemSignal             *iface);
+static void iface_modem_oma_init                  (MMIfaceModemOma                *iface);
+static void iface_modem_firmware_init             (MMIfaceModemFirmware           *iface);
+static void iface_modem_sar_init                  (MMIfaceModemSar                *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModem, mm_broadband_modem, MM_TYPE_BASE_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -4876,8 +4876,8 @@ registration_state_changed (MMPortSerialAt *port,
      * we fight with the custom commands.  Plus CREG/CGREG access technologies
      * don't have fine-grained distinction between HSxPA or GPRS/EDGE, etc.
      */
-    if (MM_IFACE_MODEM_GET_INTERFACE (self)->load_access_technologies == modem_load_access_technologies ||
-        MM_IFACE_MODEM_GET_INTERFACE (self)->load_access_technologies == NULL)
+    if (MM_IFACE_MODEM_GET_IFACE (self)->load_access_technologies == modem_load_access_technologies ||
+        MM_IFACE_MODEM_GET_IFACE (self)->load_access_technologies == NULL)
         mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), act);
 
     mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, tac, cell_id);
@@ -13478,7 +13478,7 @@ dispose (GObject *object)
 }
 
 static void
-iface_modem_init (MMIfaceModem *iface)
+iface_modem_init (MMIfaceModemInterface *iface)
 {
     /* Initialization steps */
     iface->load_current_capabilities = modem_load_current_capabilities;

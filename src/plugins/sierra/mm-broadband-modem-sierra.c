@@ -37,12 +37,12 @@
 #include "mm-common-sierra.h"
 #include "mm-broadband-bearer-sierra.h"
 
-static void iface_modem_init (MMIfaceModem *iface);
-static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
-static void iface_modem_time_init (MMIfaceModemTime *iface);
+static void iface_modem_init      (MMIfaceModemInterface *iface);
+static void iface_modem_cdma_init (MMIfaceModemCdma      *iface);
+static void iface_modem_time_init (MMIfaceModemTime      *iface);
 
-static MMIfaceModem *iface_modem_parent;
-static MMIfaceModemCdma *iface_modem_cdma_parent;
+static MMIfaceModemInterface *iface_modem_parent;
+static MMIfaceModemCdma      *iface_modem_cdma_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemSierra, mm_broadband_modem_sierra, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -1869,7 +1869,7 @@ mm_broadband_modem_sierra_init (MMBroadbandModemSierra *self)
 }
 
 static void
-iface_modem_init (MMIfaceModem *iface)
+iface_modem_init (MMIfaceModemInterface *iface)
 {
     iface_modem_parent = g_type_interface_peek_parent (iface);
 

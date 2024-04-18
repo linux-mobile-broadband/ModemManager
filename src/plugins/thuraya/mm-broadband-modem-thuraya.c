@@ -34,8 +34,8 @@
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-thuraya.h"
 
-static void iface_modem_init (MMIfaceModem *iface);
-static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void iface_modem_init           (MMIfaceModemInterface *iface);
+static void iface_modem_3gpp_init      (MMIfaceModem3gpp      *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemThuraya, mm_broadband_modem_thuraya, MM_TYPE_BROADBAND_MODEM, 0,
@@ -239,7 +239,7 @@ mm_broadband_modem_thuraya_init (MMBroadbandModemThuraya *self)
 }
 
 static void
-iface_modem_init (MMIfaceModem *iface)
+iface_modem_init (MMIfaceModemInterface *iface)
 {
     /* No need to power-up/power-down the modem */
     iface->load_power_state = NULL;

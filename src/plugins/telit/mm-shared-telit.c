@@ -40,12 +40,12 @@
 static GQuark private_quark;
 
 typedef struct {
-    MMIfaceModem *iface_modem_parent;
-    gboolean      alternate_3g_bands;
-    gboolean      ext_4g_bands;
-    GArray       *supported_bands;
-    GArray       *supported_modes;
-    gchar        *software_package_version;
+    MMIfaceModemInterface *iface_modem_parent;
+    gboolean               alternate_3g_bands;
+    gboolean               ext_4g_bands;
+    GArray                *supported_bands;
+    GArray                *supported_modes;
+    gchar                 *software_package_version;
 } Private;
 
 static void
@@ -814,4 +814,3 @@ mm_shared_telit_get_type (void)
 
     return shared_telit_type;
 }
-

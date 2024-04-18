@@ -36,12 +36,12 @@
 #include "mm-bearer-list.h"
 #include "mm-shared-option.h"
 
-static void shared_option_init (MMSharedOption *iface);
-static void iface_modem_init (MMIfaceModem *iface);
-static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
-static void iface_modem_location_init (MMIfaceModemLocation *iface);
+static void shared_option_init        (MMSharedOption        *iface);
+static void iface_modem_init          (MMIfaceModemInterface *iface);
+static void iface_modem_3gpp_init     (MMIfaceModem3gpp      *iface);
+static void iface_modem_location_init (MMIfaceModemLocation  *iface);
 
-static MMIfaceModem3gpp *iface_modem_3gpp_parent;
+static MMIfaceModem3gpp     *iface_modem_3gpp_parent;
 static MMIfaceModemLocation *iface_modem_location_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemHso, mm_broadband_modem_hso, MM_TYPE_BROADBAND_MODEM_OPTION, 0,
@@ -787,7 +787,7 @@ shared_option_init (MMSharedOption *iface)
 }
 
 static void
-iface_modem_init (MMIfaceModem *iface)
+iface_modem_init (MMIfaceModemInterface *iface)
 {
     iface->create_sim = mm_shared_option_create_sim;
     iface->create_sim_finish = mm_shared_option_create_sim_finish;

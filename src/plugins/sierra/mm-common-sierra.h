@@ -62,6 +62,6 @@ MMBaseSim *mm_common_sierra_create_sim_finish (MMIfaceModem *self,
 
 void mm_common_sierra_setup_ports (MMBroadbandModem *self);
 
-void mm_common_sierra_peek_parent_interfaces (MMIfaceModem *iface);
+void mm_common_sierra_peek_parent_interfaces (MMIfaceModemInterface *iface);
 
 #endif /* MM_COMMON_SIERRA_H */

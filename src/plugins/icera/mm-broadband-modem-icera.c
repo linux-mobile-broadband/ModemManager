@@ -39,7 +39,7 @@
 #include "mm-broadband-modem-icera.h"
 #include "mm-modem-helpers-icera.h"
 
-static void iface_modem_init                      (MMIfaceModem                   *iface);
+static void iface_modem_init                      (MMIfaceModemInterface          *iface);
 static void iface_modem_3gpp_init                 (MMIfaceModem3gpp               *iface);
 static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface);
 static void iface_modem_time_init                 (MMIfaceModemTime               *iface);
@@ -2277,7 +2277,7 @@ finalize (GObject *object)
 }
 
 static void
-iface_modem_init (MMIfaceModem *iface)
+iface_modem_init (MMIfaceModemInterface *iface)
 {
     iface_modem_parent = g_type_interface_peek_parent (iface);
 

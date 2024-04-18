@@ -31,9 +31,9 @@
 #include "mm-iface-modem.h"
 #include "mm-broadband-modem-x22x.h"
 
-static void iface_modem_init (MMIfaceModem *iface);
+static void iface_modem_init (MMIfaceModemInterface *iface);
 
-static MMIfaceModem *iface_modem_parent;
+static MMIfaceModemInterface *iface_modem_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemX22x, mm_broadband_modem_x22x, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init))
@@ -402,7 +402,7 @@ finalize (GObject *object)
 }
 
 static void
-iface_modem_init (MMIfaceModem *iface)
+iface_modem_init (MMIfaceModemInterface *iface)
 {
     iface_modem_parent = g_type_interface_peek_parent (iface);
 

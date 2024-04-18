@@ -28,7 +28,7 @@
 #include "mm-iface-modem-3gpp.h"
 #include "mm-broadband-modem-motorola.h"
 
-static void iface_modem_init (MMIfaceModem *iface);
+static void iface_modem_init      (MMIfaceModemInterface *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMotorola, mm_broadband_modem_motorola, MM_TYPE_BROADBAND_MODEM, 0,
@@ -72,7 +72,7 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 }
 
 static void
-iface_modem_init (MMIfaceModem *iface)
+iface_modem_init (MMIfaceModemInterface *iface)
 {
     /* Loading IMEI with +CGSN is not supported, just assume we cannot load
      * equipment ID */

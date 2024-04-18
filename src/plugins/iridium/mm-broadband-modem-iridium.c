@@ -34,8 +34,8 @@
 #include "mm-bearer-iridium.h"
 #include "mm-modem-helpers.h"
 
-static void iface_modem_init (MMIfaceModem *iface);
-static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void iface_modem_init           (MMIfaceModemInterface *iface);
+static void iface_modem_3gpp_init      (MMIfaceModem3gpp      *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemIridium, mm_broadband_modem_iridium, MM_TYPE_BROADBAND_MODEM, 0,
@@ -369,7 +369,7 @@ mm_broadband_modem_iridium_init (MMBroadbandModemIridium *self)
 }
 
 static void
-iface_modem_init (MMIfaceModem *iface)
+iface_modem_init (MMIfaceModemInterface *iface)
 {
     /* Create Iridium-specific SIM and bearer*/
     iface->create_sim = create_sim;

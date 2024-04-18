@@ -45,7 +45,7 @@ typedef enum {
 
 typedef struct {
     /* modem */
-    MMIfaceModem          *iface_modem_parent;
+    MMIfaceModemInterface *iface_modem_parent;
     /* location */
     MMIfaceModemLocation  *iface_modem_location_parent;
     MMModemLocationSource  supported_sources;

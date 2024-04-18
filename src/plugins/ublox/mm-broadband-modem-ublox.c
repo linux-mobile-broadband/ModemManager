@@ -34,8 +34,8 @@
 #include "mm-modem-helpers-ublox.h"
 #include "mm-ublox-enums-types.h"
 
-static void iface_modem_init (MMIfaceModem *iface);
-static void iface_modem_voice_init (MMIfaceModemVoice *iface);
+static void iface_modem_init       (MMIfaceModemInterface *iface);
+static void iface_modem_voice_init (MMIfaceModemVoice     *iface);
 
 static MMIfaceModemVoice *iface_modem_voice_parent;
 
@@ -2010,7 +2010,7 @@ mm_broadband_modem_ublox_init (MMBroadbandModemUblox *self)
 }
 
 static void
-iface_modem_init (MMIfaceModem *iface)
+iface_modem_init (MMIfaceModemInterface *iface)
 {
     iface->create_sim = modem_create_sim;
     iface->create_sim_finish = modem_create_sim_finish;

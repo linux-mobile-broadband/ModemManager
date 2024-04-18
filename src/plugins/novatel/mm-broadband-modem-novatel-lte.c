@@ -35,8 +35,8 @@
 #include "mm-modem-helpers.h"
 #include "mm-serial-parsers.h"
 
-static void iface_modem_init (MMIfaceModem *iface);
-static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void iface_modem_init      (MMIfaceModemInterface *iface);
+static void iface_modem_3gpp_init (MMIfaceModem3gpp      *iface);
 
 static MMIfaceModem3gpp *iface_modem_3gpp_parent;
 
@@ -663,7 +663,7 @@ mm_broadband_modem_novatel_lte_init (MMBroadbandModemNovatelLte *self)
 }
 
 static void
-iface_modem_init (MMIfaceModem *iface)
+iface_modem_init (MMIfaceModemInterface *iface)
 {
     iface->modem_power_down = modem_power_down;
     iface->modem_power_down_finish = modem_power_down_finish;

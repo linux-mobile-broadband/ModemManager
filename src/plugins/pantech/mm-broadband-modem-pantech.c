@@ -28,7 +28,7 @@
 #include "mm-broadband-modem-pantech.h"
 #include "mm-sim-pantech.h"
 
-static void iface_modem_init (MMIfaceModem *iface);
+static void iface_modem_init           (MMIfaceModemInterface *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
 
 static MMIfaceModemMessaging *iface_modem_messaging_parent;
@@ -164,7 +164,7 @@ mm_broadband_modem_pantech_init (MMBroadbandModemPantech *self)
 }
 
 static void
-iface_modem_init (MMIfaceModem *iface)
+iface_modem_init (MMIfaceModemInterface *iface)
 {
     /* Create Pantech-specific SIM */
     iface->create_sim = create_sim;

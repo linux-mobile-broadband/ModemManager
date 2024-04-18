@@ -51,7 +51,7 @@
 # include "mm-shared-qmi.h"
 #endif
 
-static void iface_modem_init                      (MMIfaceModem                   *iface);
+static void iface_modem_init                      (MMIfaceModemInterface          *iface);
 static void iface_modem_3gpp_init                 (MMIfaceModem3gpp               *iface);
 static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface);
 static void iface_modem_3gpp_ussd_init            (MMIfaceModem3gppUssd           *iface);
@@ -67,7 +67,7 @@ static void shared_qmi_init                       (MMSharedQmi                  
 static MMIfaceModemLocation *iface_modem_location_parent;
 #endif
 static MMIfaceModemSignal *iface_modem_signal_parent;
-static MMIfaceModem       *iface_modem_parent;
+static MMIfaceModemInterface *iface_modem_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbim, mm_broadband_modem_mbim, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -10048,7 +10048,7 @@ finalize (GObject *object)
 }
 
 static void
-iface_modem_init (MMIfaceModem *iface)
+iface_modem_init (MMIfaceModemInterface *iface)
 {
     iface_modem_parent = g_type_interface_peek_parent (iface);
     /* Initialization steps */

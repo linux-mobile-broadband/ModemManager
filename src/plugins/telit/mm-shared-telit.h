@@ -38,7 +38,7 @@ struct _MMSharedTelit {
     GTypeInterface g_iface;
 
     /* Peek modem interface of the parent class of the object */
-    MMIfaceModem * (* peek_parent_modem_interface) (MMSharedTelit *self);
+    MMIfaceModemInterface * (* peek_parent_modem_interface) (MMSharedTelit *self);
 };
 
 GType mm_shared_telit_get_type (void);

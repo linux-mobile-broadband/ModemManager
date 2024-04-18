@@ -38,12 +38,12 @@
 #include "libqcdm/src/result.h"
 #include "mm-log-object.h"
 
-static void iface_modem_init (MMIfaceModem *iface);
+static void iface_modem_init           (MMIfaceModemInterface *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
-static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
-static void iface_modem_time_init (MMIfaceModemTime *iface);
+static void iface_modem_cdma_init      (MMIfaceModemCdma      *iface);
+static void iface_modem_time_init      (MMIfaceModemTime      *iface);
 
-static MMIfaceModem *iface_modem_parent;
+static MMIfaceModemInterface *iface_modem_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemNovatel, mm_broadband_modem_novatel, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -1560,7 +1560,7 @@ mm_broadband_modem_novatel_init (MMBroadbandModemNovatel *self)
 }
 
 static void
-iface_modem_init (MMIfaceModem *iface)
+iface_modem_init (MMIfaceModemInterface *iface)
 {
     iface_modem_parent = g_type_interface_peek_parent (iface);
 

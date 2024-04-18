@@ -49,7 +49,7 @@ typedef enum {
 
 typedef struct {
     MMBroadbandModemClass *broadband_modem_class_parent;
-    MMIfaceModem          *iface_modem_parent;
+    MMIfaceModemInterface *iface_modem_parent;
     MMIfaceModemLocation  *iface_modem_location_parent;
     MMModemLocationSource  provided_sources;
     MMModemLocationSource  enabled_sources;
@@ -502,7 +502,7 @@ quectel_qusim_check_for_sim_swap_ready (MMIfaceModem *self,
 {
     g_autoptr(GError) error = NULL;
 
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap_finish (self, res, &error))
+    if (!MM_IFACE_MODEM_GET_IFACE (self)->check_for_sim_swap_finish (self, res, &error))
         mm_obj_warn (self, "couldn't check SIM swap: %s", error->message);
     else
         mm_obj_dbg (self, "check SIM swap completed");
@@ -513,12 +513,12 @@ quectel_qusim_unsolicited_handler (MMPortSerialAt *port,
                                    GMatchInfo     *match_info,
                                    MMIfaceModem   *self)
 {
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap ||
-        !MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap_finish)
+    if (!MM_IFACE_MODEM_GET_IFACE (self)->check_for_sim_swap ||
+        !MM_IFACE_MODEM_GET_IFACE (self)->check_for_sim_swap_finish)
         return;
 
     mm_obj_dbg (self, "checking SIM swap");
-    MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap (
+    MM_IFACE_MODEM_GET_IFACE (self)->check_for_sim_swap (
         self,
         (GAsyncReadyCallback)quectel_qusim_check_for_sim_swap_ready,
         NULL);
