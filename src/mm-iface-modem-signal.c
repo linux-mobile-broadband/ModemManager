@@ -29,6 +29,8 @@
 static GQuark support_checked_quark;
 static GQuark supported_quark;
 
+G_DEFINE_INTERFACE (MMIfaceModemSignal, mm_iface_modem_signal, MM_TYPE_IFACE_MODEM)
+
 /*****************************************************************************/
 /* Private data context */
 
@@ -232,7 +234,7 @@ load_values_ready (MMIfaceModemSignal *self,
     g_autoptr(MMSignal) lte = NULL;
     g_autoptr(MMSignal) nr5g = NULL;
 
-    if (!MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->load_values_finish (
+    if (!MM_IFACE_MODEM_SIGNAL_GET_IFACE (self)->load_values_finish (
             self,
             res,
             &cdma,
@@ -252,7 +254,7 @@ load_values_ready (MMIfaceModemSignal *self,
 static gboolean
 query_signal_values (MMIfaceModemSignal *self)
 {
-    MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->load_values (
+    MM_IFACE_MODEM_SIGNAL_GET_IFACE (self)->load_values (
         self,
         NULL,
         (GAsyncReadyCallback)load_values_ready,
@@ -310,7 +312,7 @@ setup_thresholds_ready (MMIfaceModemSignal *self,
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->setup_thresholds_finish (self, res, &error))
+    if (!MM_IFACE_MODEM_SIGNAL_GET_IFACE (self)->setup_thresholds_finish (self, res, &error))
         g_task_return_error (task, error);
     else {
         /* launch a query right away */
@@ -331,8 +333,8 @@ thresholds_restart (MMIfaceModemSignal  *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    if (!MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->setup_thresholds ||
-        !MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->setup_thresholds_finish) {
+    if (!MM_IFACE_MODEM_SIGNAL_GET_IFACE (self)->setup_thresholds ||
+        !MM_IFACE_MODEM_SIGNAL_GET_IFACE (self)->setup_thresholds_finish) {
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
@@ -347,7 +349,7 @@ thresholds_restart (MMIfaceModemSignal  *self,
                 priv->rssi_threshold,
                 priv->error_rate_threshold ? "enabled" : "disabled");
 
-    MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->setup_thresholds (
+    MM_IFACE_MODEM_SIGNAL_GET_IFACE (self)->setup_thresholds (
         self,
         priv->rssi_threshold,
         priv->error_rate_threshold,
@@ -488,8 +490,8 @@ handle_setup_thresholds_auth_ready (MMBaseModem                  *_self,
         return;
     }
 
-    if (!MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->setup_thresholds ||
-        !MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->setup_thresholds_finish) {
+    if (!MM_IFACE_MODEM_SIGNAL_GET_IFACE (self)->setup_thresholds ||
+        !MM_IFACE_MODEM_SIGNAL_GET_IFACE (self)->setup_thresholds_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Cannot setup thresholds: operation not supported");
         handle_setup_thresholds_context_free (ctx);
@@ -677,7 +679,7 @@ check_support_ready (MMIfaceModemSignal *self,
     InitializationContext *ctx;
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->check_support_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_SIGNAL_GET_IFACE (self)->check_support_finish (self, res, &error)) {
         if (error) {
             /* This error shouldn't be treated as critical */
             mm_obj_dbg (self, "extended signal support check failed: %s", error->message);
@@ -736,9 +738,9 @@ interface_initialization_step (GTask *task)
                                 supported_quark,
                                 GUINT_TO_POINTER (FALSE));
 
-            if (MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->check_support &&
-                MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->check_support_finish) {
-                MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->check_support (
+            if (MM_IFACE_MODEM_SIGNAL_GET_IFACE (self)->check_support &&
+                MM_IFACE_MODEM_SIGNAL_GET_IFACE (self)->check_support_finish) {
+                MM_IFACE_MODEM_SIGNAL_GET_IFACE (self)->check_support (
                     self,
                     (GAsyncReadyCallback)check_support_ready,
                     task);
@@ -837,44 +839,21 @@ mm_iface_modem_signal_shutdown (MMIfaceModemSignal *self)
 /*****************************************************************************/
 
 static void
-iface_modem_signal_init (gpointer g_iface)
+mm_iface_modem_signal_default_init (MMIfaceModemSignalInterface *iface)
 {
-    static gboolean initialized = FALSE;
+    static gsize initialized = 0;
 
-    if (initialized)
+    if (!g_once_init_enter (&initialized))
         return;
 
     /* Properties */
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_object (MM_IFACE_MODEM_SIGNAL_DBUS_SKELETON,
-                              "Signal DBus skeleton",
-                              "DBus skeleton for the Signal interface",
-                              MM_GDBUS_TYPE_MODEM_SIGNAL_SKELETON,
-                              G_PARAM_READWRITE));
+    g_object_interface_install_property (
+        iface,
+        g_param_spec_object (MM_IFACE_MODEM_SIGNAL_DBUS_SKELETON,
+                             "Signal DBus skeleton",
+                             "DBus skeleton for the Signal interface",
+                             MM_GDBUS_TYPE_MODEM_SIGNAL_SKELETON,
+                             G_PARAM_READWRITE));
 
-    initialized = TRUE;
-}
-
-GType
-mm_iface_modem_signal_get_type (void)
-{
-    static GType iface_modem_signal_type = 0;
-
-    if (!G_UNLIKELY (iface_modem_signal_type)) {
-        static const GTypeInfo info = {
-            sizeof (MMIfaceModemSignal), /* class_size */
-            iface_modem_signal_init,     /* base_init */
-            NULL,                      /* base_finalize */
-        };
-
-        iface_modem_signal_type = g_type_register_static (G_TYPE_INTERFACE,
-                                                          "MMIfaceModemSignal",
-                                                          &info,
-                                                          0);
-
-        g_type_interface_add_prerequisite (iface_modem_signal_type, MM_TYPE_IFACE_MODEM);
-    }
-
-    return iface_modem_signal_type;
+    g_once_init_leave (&initialized, 1);
 }

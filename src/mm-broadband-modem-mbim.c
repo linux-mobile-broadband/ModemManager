@@ -57,7 +57,7 @@ static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManage
 static void iface_modem_3gpp_ussd_init            (MMIfaceModem3gppUssdInterface           *iface);
 static void iface_modem_location_init             (MMIfaceModemLocationInterface           *iface);
 static void iface_modem_messaging_init            (MMIfaceModemMessagingInterface          *iface);
-static void iface_modem_signal_init               (MMIfaceModemSignal                      *iface);
+static void iface_modem_signal_init               (MMIfaceModemSignalInterface             *iface);
 static void iface_modem_sar_init                  (MMIfaceModemSarInterface                *iface);
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 static void shared_qmi_init                       (MMSharedQmi                             *iface);
@@ -66,7 +66,7 @@ static void shared_qmi_init                       (MMSharedQmi                  
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 static MMIfaceModemLocationInterface  *iface_modem_location_parent;
 #endif
-static MMIfaceModemSignal             *iface_modem_signal_parent;
+static MMIfaceModemSignalInterface    *iface_modem_signal_parent;
 static MMIfaceModemInterface          *iface_modem_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbim, mm_broadband_modem_mbim, MM_TYPE_BROADBAND_MODEM, 0,
@@ -10321,7 +10321,7 @@ iface_modem_messaging_init (MMIfaceModemMessagingInterface *iface)
 }
 
 static void
-iface_modem_signal_init (MMIfaceModemSignal *iface)
+iface_modem_signal_init (MMIfaceModemSignalInterface *iface)
 {
     iface_modem_signal_parent = g_type_interface_peek_parent (iface);
 

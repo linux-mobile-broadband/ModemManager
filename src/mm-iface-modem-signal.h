@@ -23,16 +23,14 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#define MM_TYPE_IFACE_MODEM_SIGNAL               (mm_iface_modem_signal_get_type ())
-#define MM_IFACE_MODEM_SIGNAL(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM_SIGNAL, MMIfaceModemSignal))
-#define MM_IS_IFACE_MODEM_SIGNAL(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_SIGNAL))
-#define MM_IFACE_MODEM_SIGNAL_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_SIGNAL, MMIfaceModemSignal))
+#include "mm-iface-modem.h"
+
+#define MM_TYPE_IFACE_MODEM_SIGNAL mm_iface_modem_signal_get_type ()
+G_DECLARE_INTERFACE (MMIfaceModemSignal, mm_iface_modem_signal, MM, IFACE_MODEM_SIGNAL, MMIfaceModem)
 
 #define MM_IFACE_MODEM_SIGNAL_DBUS_SKELETON "iface-modem-signal-dbus-skeleton"
 
-typedef struct _MMIfaceModemSignal MMIfaceModemSignal;
-
-struct _MMIfaceModemSignal {
+struct _MMIfaceModemSignalInterface {
     GTypeInterface g_iface;
 
     /* Check for Messaging support (async) */
@@ -69,9 +67,6 @@ struct _MMIfaceModemSignal {
                                           GError              **error);
 
 };
-
-GType mm_iface_modem_signal_get_type (void);
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModemSignal, g_object_unref)
 
 /* Initialize Signal interface (async) */
 void     mm_iface_modem_signal_initialize        (MMIfaceModemSignal *self,

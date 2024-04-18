@@ -48,7 +48,7 @@ static void iface_modem_messaging_init (MMIfaceModemMessagingInterface *iface);
 static void iface_modem_location_init  (MMIfaceModemLocationInterface  *iface);
 static void iface_modem_voice_init     (MMIfaceModemVoice              *iface);
 static void iface_modem_time_init      (MMIfaceModemTime               *iface);
-static void iface_modem_signal_init    (MMIfaceModemSignal             *iface);
+static void iface_modem_signal_init    (MMIfaceModemSignalInterface    *iface);
 static void shared_cinterion_init      (MMSharedCinterion              *iface);
 
 static MMIfaceModemInterface         *iface_modem_parent;
@@ -56,7 +56,7 @@ static MMIfaceModem3gppInterface     *iface_modem_3gpp_parent;
 static MMIfaceModemLocationInterface *iface_modem_location_parent;
 static MMIfaceModemVoice             *iface_modem_voice_parent;
 static MMIfaceModemTime              *iface_modem_time_parent;
-static MMIfaceModemSignal            *iface_modem_signal_parent;
+static MMIfaceModemSignalInterface   *iface_modem_signal_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemCinterion, mm_broadband_modem_cinterion, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -3605,7 +3605,7 @@ shared_cinterion_init (MMSharedCinterion *iface)
 }
 
 static void
-iface_modem_signal_init (MMIfaceModemSignal *iface)
+iface_modem_signal_init (MMIfaceModemSignalInterface *iface)
 {
     iface_modem_signal_parent   = g_type_interface_peek_parent (iface);
 
