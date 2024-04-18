@@ -34,8 +34,8 @@
 #include "mm-broadband-modem-nokia.h"
 #include "mm-sim-nokia.h"
 
-static void iface_modem_init           (MMIfaceModemInterface *iface);
-static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
+static void iface_modem_init           (MMIfaceModemInterface          *iface);
+static void iface_modem_messaging_init (MMIfaceModemMessagingInterface *iface);
 
 static MMIfaceModemInterface *iface_modem_parent;
 
@@ -373,7 +373,7 @@ mm_broadband_modem_nokia_init (MMBroadbandModemNokia *self)
 }
 
 static void
-iface_modem_messaging_init (MMIfaceModemMessaging *iface)
+iface_modem_messaging_init (MMIfaceModemMessagingInterface *iface)
 {
     /* Don't even try to check messaging support */
     iface->check_support = NULL;

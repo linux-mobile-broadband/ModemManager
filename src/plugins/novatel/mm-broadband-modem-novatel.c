@@ -38,10 +38,10 @@
 #include "libqcdm/src/result.h"
 #include "mm-log-object.h"
 
-static void iface_modem_init           (MMIfaceModemInterface *iface);
-static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
-static void iface_modem_cdma_init      (MMIfaceModemCdma      *iface);
-static void iface_modem_time_init      (MMIfaceModemTime      *iface);
+static void iface_modem_init           (MMIfaceModemInterface          *iface);
+static void iface_modem_messaging_init (MMIfaceModemMessagingInterface *iface);
+static void iface_modem_cdma_init      (MMIfaceModemCdma               *iface);
+static void iface_modem_time_init      (MMIfaceModemTime               *iface);
 
 static MMIfaceModemInterface *iface_modem_parent;
 
@@ -1577,7 +1577,7 @@ iface_modem_init (MMIfaceModemInterface *iface)
 }
 
 static void
-iface_modem_messaging_init (MMIfaceModemMessaging *iface)
+iface_modem_messaging_init (MMIfaceModemMessagingInterface *iface)
 {
     iface->enable_unsolicited_events = messaging_enable_unsolicited_events;
     iface->enable_unsolicited_events_finish = messaging_enable_unsolicited_events_finish;

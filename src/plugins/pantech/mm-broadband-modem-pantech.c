@@ -28,10 +28,10 @@
 #include "mm-broadband-modem-pantech.h"
 #include "mm-sim-pantech.h"
 
-static void iface_modem_init           (MMIfaceModemInterface *iface);
-static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
+static void iface_modem_init           (MMIfaceModemInterface          *iface);
+static void iface_modem_messaging_init (MMIfaceModemMessagingInterface *iface);
 
-static MMIfaceModemMessaging *iface_modem_messaging_parent;
+static MMIfaceModemMessagingInterface *iface_modem_messaging_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemPantech, mm_broadband_modem_pantech, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -175,7 +175,7 @@ iface_modem_init (MMIfaceModemInterface *iface)
 }
 
 static void
-iface_modem_messaging_init (MMIfaceModemMessaging *iface)
+iface_modem_messaging_init (MMIfaceModemMessagingInterface *iface)
 {
     iface_modem_messaging_parent = g_type_interface_peek_parent (iface);
 

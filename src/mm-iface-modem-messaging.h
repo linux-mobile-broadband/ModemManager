@@ -25,19 +25,17 @@
 #include "mm-sms-part.h"
 #include "mm-base-sms.h"
 
-#define MM_TYPE_IFACE_MODEM_MESSAGING               (mm_iface_modem_messaging_get_type ())
-#define MM_IFACE_MODEM_MESSAGING(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM_MESSAGING, MMIfaceModemMessaging))
-#define MM_IS_IFACE_MODEM_MESSAGING(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_MESSAGING))
-#define MM_IFACE_MODEM_MESSAGING_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_MESSAGING, MMIfaceModemMessaging))
+#include "mm-iface-modem.h"
+
+#define MM_TYPE_IFACE_MODEM_MESSAGING mm_iface_modem_messaging_get_type ()
+G_DECLARE_INTERFACE (MMIfaceModemMessaging, mm_iface_modem_messaging, MM, IFACE_MODEM_MESSAGING, MMIfaceModem)
 
 #define MM_IFACE_MODEM_MESSAGING_DBUS_SKELETON       "iface-modem-messaging-dbus-skeleton"
 #define MM_IFACE_MODEM_MESSAGING_SMS_LIST            "iface-modem-messaging-sms-list"
 #define MM_IFACE_MODEM_MESSAGING_SMS_PDU_MODE        "iface-modem-messaging-sms-pdu-mode"
 #define MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE "iface-modem-messaging-sms-default-storage"
 
-typedef struct _MMIfaceModemMessaging MMIfaceModemMessaging;
-
-struct _MMIfaceModemMessaging {
+struct _MMIfaceModemMessagingInterface {
     GTypeInterface g_iface;
 
     /* Check for Messaging support (async) */
@@ -132,9 +130,6 @@ struct _MMIfaceModemMessaging {
     /* Create SMS objects */
     MMBaseSms * (* create_sms) (MMIfaceModemMessaging *self);
 };
-
-GType mm_iface_modem_messaging_get_type (void);
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModemMessaging, g_object_unref)
 
 /* Initialize Messaging interface (async) */
 void     mm_iface_modem_messaging_initialize        (MMIfaceModemMessaging *self,

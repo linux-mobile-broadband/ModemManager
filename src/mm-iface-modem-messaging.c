@@ -31,6 +31,8 @@ static GQuark support_checked_quark;
 static GQuark supported_quark;
 static GQuark storage_context_quark;
 
+G_DEFINE_INTERFACE (MMIfaceModemMessaging, mm_iface_modem_messaging, MM_TYPE_IFACE_MODEM)
+
 /*****************************************************************************/
 
 guint8
@@ -92,9 +94,9 @@ mm_iface_modem_messaging_bind_simple_status (MMIfaceModemMessaging *self,
 MMBaseSms *
 mm_iface_modem_messaging_create_sms (MMIfaceModemMessaging *self)
 {
-    g_assert (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->create_sms != NULL);
+    g_assert (MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->create_sms != NULL);
 
-    return MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->create_sms (self);
+    return MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->create_sms (self);
 }
 
 /*****************************************************************************/
@@ -527,7 +529,7 @@ disable_unsolicited_events_ready (MMIfaceModemMessaging *self,
     DisablingContext *ctx;
     GError *error = NULL;
 
-    MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->disable_unsolicited_events_finish (self, res, &error);
+    MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->disable_unsolicited_events_finish (self, res, &error);
     if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -548,7 +550,7 @@ cleanup_unsolicited_events_ready (MMIfaceModemMessaging *self,
     DisablingContext *ctx;
     GError *error = NULL;
 
-    MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->cleanup_unsolicited_events_finish (self, res, &error);
+    MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->cleanup_unsolicited_events_finish (self, res, &error);
     if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -577,9 +579,9 @@ interface_disabling_step (GTask *task)
 
     case DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS:
         /* Allow cleaning up unsolicited events */
-        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->disable_unsolicited_events &&
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->disable_unsolicited_events_finish) {
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->disable_unsolicited_events (
+        if (MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->disable_unsolicited_events &&
+            MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->disable_unsolicited_events_finish) {
+            MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->disable_unsolicited_events (
                 self,
                 (GAsyncReadyCallback)disable_unsolicited_events_ready,
                 task);
@@ -590,9 +592,9 @@ interface_disabling_step (GTask *task)
 
     case DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS:
         /* Allow cleaning up unsolicited events */
-        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->cleanup_unsolicited_events &&
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->cleanup_unsolicited_events_finish) {
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->cleanup_unsolicited_events (
+        if (MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->cleanup_unsolicited_events &&
+            MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->cleanup_unsolicited_events_finish) {
+            MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->cleanup_unsolicited_events (
                 self,
                 (GAsyncReadyCallback)cleanup_unsolicited_events_ready,
                 task);
@@ -693,7 +695,7 @@ setup_sms_format_ready (MMIfaceModemMessaging *self,
     EnablingContext *ctx;
     GError *error = NULL;
 
-    MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->setup_sms_format_finish (self, res, &error);
+    MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->setup_sms_format_finish (self, res, &error);
     if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -718,7 +720,7 @@ load_initial_sms_parts_ready (MMIfaceModemMessaging *self,
 
     ctx = g_task_get_task_data (task);
 
-    MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->load_initial_sms_parts_finish (self, res, &error);
+    MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->load_initial_sms_parts_finish (self, res, &error);
     if (error) {
         StorageContext *storage_ctx;
 
@@ -744,7 +746,7 @@ set_default_storage_ready (MMIfaceModemMessaging *self,
     EnablingContext *ctx;
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_default_storage_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->set_default_storage_finish (self, res, &error)) {
         mm_obj_warn (self, "could not set default storage: %s", error->message);
         g_error_free (error);
     }
@@ -787,7 +789,7 @@ load_initial_sms_parts_from_storages (GTask *task)
         return;
     }
 
-    MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->load_initial_sms_parts (
+    MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->load_initial_sms_parts (
         self,
         g_array_index (storage_ctx->supported_mem1,
                        MMSmsStorage,
@@ -804,7 +806,7 @@ setup_unsolicited_events_ready (MMIfaceModemMessaging *self,
     EnablingContext *ctx;
     GError *error = NULL;
 
-    MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->setup_unsolicited_events_finish (self, res, &error);
+    MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->setup_unsolicited_events_finish (self, res, &error);
     if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -826,7 +828,7 @@ enable_unsolicited_events_ready (MMIfaceModemMessaging *self,
     GError *error = NULL;
 
     /* Not critical! */
-    if (!MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->enable_unsolicited_events_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->enable_unsolicited_events_finish (self, res, &error)) {
         mm_obj_dbg (self, "couldn't enable unsolicited events: %s", error->message);
         g_error_free (error);
     }
@@ -924,9 +926,9 @@ interface_enabling_step (GTask *task)
 
     case ENABLING_STEP_SETUP_SMS_FORMAT:
         /* Allow setting SMS format to use */
-        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->setup_sms_format &&
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->setup_sms_format_finish) {
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->setup_sms_format (
+        if (MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->setup_sms_format &&
+            MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->setup_sms_format_finish) {
+            MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->setup_sms_format (
                 self,
                 (GAsyncReadyCallback)setup_sms_format_ready,
                 task);
@@ -951,9 +953,9 @@ interface_enabling_step (GTask *task)
 
         if (default_storage == MM_SMS_STORAGE_UNKNOWN)
             mm_obj_warn (self, "cannot set default storage, none of the suggested ones supported");
-        else if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_default_storage &&
-                 MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_default_storage_finish) {
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_default_storage (
+        else if (MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->set_default_storage &&
+                 MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->set_default_storage_finish) {
+            MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->set_default_storage (
                 self,
                 default_storage,
                 (GAsyncReadyCallback)set_default_storage_ready,
@@ -966,8 +968,8 @@ interface_enabling_step (GTask *task)
 
     case ENABLING_STEP_LOAD_INITIAL_SMS_PARTS:
         /* Allow loading the initial list of SMS parts */
-        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->load_initial_sms_parts &&
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->load_initial_sms_parts_finish) {
+        if (MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->load_initial_sms_parts &&
+            MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->load_initial_sms_parts_finish) {
             load_initial_sms_parts_from_storages (task);
             return;
         }
@@ -976,9 +978,9 @@ interface_enabling_step (GTask *task)
 
     case ENABLING_STEP_SETUP_UNSOLICITED_EVENTS:
         /* Allow setting up unsolicited events */
-        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->setup_unsolicited_events &&
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->setup_unsolicited_events_finish) {
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->setup_unsolicited_events (
+        if (MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->setup_unsolicited_events &&
+            MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->setup_unsolicited_events_finish) {
+            MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->setup_unsolicited_events (
                 self,
                 (GAsyncReadyCallback)setup_unsolicited_events_ready,
                 task);
@@ -989,9 +991,9 @@ interface_enabling_step (GTask *task)
 
     case ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS:
         /* Allow setting up unsolicited events */
-        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->enable_unsolicited_events &&
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->enable_unsolicited_events_finish) {
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->enable_unsolicited_events (
+        if (MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->enable_unsolicited_events &&
+            MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->enable_unsolicited_events_finish) {
+            MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->enable_unsolicited_events (
                 self,
                 (GAsyncReadyCallback)enable_unsolicited_events_ready,
                 task);
@@ -1095,7 +1097,7 @@ load_supported_storages_ready (MMIfaceModemMessaging *self,
 
     ctx = g_task_get_task_data (task);
     storage_ctx = get_storage_context (self);
-    if (!MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->load_supported_storages_finish (
+    if (!MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->load_supported_storages_finish (
             self,
             res,
             &storage_ctx->supported_mem1,
@@ -1171,9 +1173,7 @@ check_support_ready (MMIfaceModemMessaging *self,
     InitializationContext *ctx;
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->check_support_finish (self,
-                                                                              res,
-                                                                              &error)) {
+    if (!MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->check_support_finish (self, res, &error)) {
         if (error) {
             /* This error shouldn't be treated as critical */
             mm_obj_dbg (self, "messaging support check failed: %s", error->message);
@@ -1200,7 +1200,7 @@ init_current_storages_ready (MMIfaceModemMessaging *self,
     InitializationContext *ctx;
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->init_current_storages_finish (
+    if (!MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->init_current_storages_finish (
             self,
             res,
             &error)) {
@@ -1255,9 +1255,9 @@ interface_initialization_step (GTask *task)
                                 supported_quark,
                                 GUINT_TO_POINTER (FALSE));
 
-            if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->check_support &&
-                MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->check_support_finish) {
-                MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->check_support (
+            if (MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->check_support &&
+                MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->check_support_finish) {
+                MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->check_support (
                     self,
                     (GAsyncReadyCallback)check_support_ready,
                     task);
@@ -1284,9 +1284,9 @@ interface_initialization_step (GTask *task)
         /* fall through */
 
     case INITIALIZATION_STEP_LOAD_SUPPORTED_STORAGES:
-        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->load_supported_storages &&
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->load_supported_storages_finish) {
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->load_supported_storages (
+        if (MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->load_supported_storages &&
+            MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->load_supported_storages_finish) {
+            MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->load_supported_storages (
                 self,
                 (GAsyncReadyCallback)load_supported_storages_ready,
                 task);
@@ -1296,9 +1296,9 @@ interface_initialization_step (GTask *task)
         /* fall through */
 
     case INITIALIZATION_STEP_INIT_CURRENT_STORAGES:
-        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->init_current_storages &&
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->init_current_storages_finish) {
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->init_current_storages (
+        if (MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->init_current_storages &&
+            MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->init_current_storages_finish) {
+            MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->init_current_storages (
                 self,
                 (GAsyncReadyCallback)init_current_storages_ready,
                 task);
@@ -1400,69 +1400,46 @@ mm_iface_modem_messaging_shutdown (MMIfaceModemMessaging *self)
 /*****************************************************************************/
 
 static void
-iface_modem_messaging_init (gpointer g_iface)
+mm_iface_modem_messaging_default_init (MMIfaceModemMessagingInterface *iface)
 {
-    static gboolean initialized = FALSE;
+    static gsize initialized = 0;
 
-    if (initialized)
+    if (!g_once_init_enter (&initialized))
         return;
 
     /* Properties */
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_object (MM_IFACE_MODEM_MESSAGING_DBUS_SKELETON,
-                              "Messaging DBus skeleton",
-                              "DBus skeleton for the Messaging interface",
-                              MM_GDBUS_TYPE_MODEM_MESSAGING_SKELETON,
+    g_object_interface_install_property (
+        iface,
+        g_param_spec_object (MM_IFACE_MODEM_MESSAGING_DBUS_SKELETON,
+                             "Messaging DBus skeleton",
+                             "DBus skeleton for the Messaging interface",
+                             MM_GDBUS_TYPE_MODEM_MESSAGING_SKELETON,
+                             G_PARAM_READWRITE));
+
+    g_object_interface_install_property (
+        iface,
+        g_param_spec_object (MM_IFACE_MODEM_MESSAGING_SMS_LIST,
+                             "SMS list",
+                             "List of SMS objects managed in the interface",
+                             MM_TYPE_SMS_LIST,
+                             G_PARAM_READWRITE));
+
+    g_object_interface_install_property (
+        iface,
+        g_param_spec_boolean (MM_IFACE_MODEM_MESSAGING_SMS_PDU_MODE,
+                              "PDU mode",
+                              "Whether PDU mode should be used",
+                              FALSE,
                               G_PARAM_READWRITE));
 
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_object (MM_IFACE_MODEM_MESSAGING_SMS_LIST,
-                              "SMS list",
-                              "List of SMS objects managed in the interface",
-                              MM_TYPE_SMS_LIST,
-                              G_PARAM_READWRITE));
+    g_object_interface_install_property (
+        iface,
+        g_param_spec_enum (MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE,
+                           "SMS default storage",
+                           "Default storage to be used when storing/receiving SMS messages",
+                           MM_TYPE_SMS_STORAGE,
+                           MM_SMS_STORAGE_ME,
+                           G_PARAM_READWRITE));
 
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_boolean (MM_IFACE_MODEM_MESSAGING_SMS_PDU_MODE,
-                               "PDU mode",
-                               "Whether PDU mode should be used",
-                               FALSE,
-                               G_PARAM_READWRITE));
-
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_enum (MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE,
-                            "SMS default storage",
-                            "Default storage to be used when storing/receiving SMS messages",
-                            MM_TYPE_SMS_STORAGE,
-                            MM_SMS_STORAGE_ME,
-                            G_PARAM_READWRITE));
-
-    initialized = TRUE;
-}
-
-GType
-mm_iface_modem_messaging_get_type (void)
-{
-    static GType iface_modem_messaging_type = 0;
-
-    if (!G_UNLIKELY (iface_modem_messaging_type)) {
-        static const GTypeInfo info = {
-            sizeof (MMIfaceModemMessaging), /* class_size */
-            iface_modem_messaging_init,     /* base_init */
-            NULL,                           /* base_finalize */
-        };
-
-        iface_modem_messaging_type = g_type_register_static (G_TYPE_INTERFACE,
-                                                             "MMIfaceModemMessaging",
-                                                             &info,
-                                                             0);
-
-        g_type_interface_add_prerequisite (iface_modem_messaging_type, MM_TYPE_IFACE_MODEM);
-    }
-
-    return iface_modem_messaging_type;
+    g_once_init_leave (&initialized, 1);
 }

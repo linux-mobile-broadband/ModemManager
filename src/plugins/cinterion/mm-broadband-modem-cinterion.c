@@ -42,14 +42,14 @@
 #include "mm-broadband-bearer-cinterion.h"
 #include "mm-iface-modem-signal.h"
 
-static void iface_modem_init           (MMIfaceModemInterface         *iface);
-static void iface_modem_3gpp_init      (MMIfaceModem3gppInterface     *iface);
-static void iface_modem_messaging_init (MMIfaceModemMessaging         *iface);
-static void iface_modem_location_init  (MMIfaceModemLocationInterface *iface);
-static void iface_modem_voice_init     (MMIfaceModemVoice             *iface);
-static void iface_modem_time_init      (MMIfaceModemTime              *iface);
-static void iface_modem_signal_init    (MMIfaceModemSignal            *iface);
-static void shared_cinterion_init      (MMSharedCinterion             *iface);
+static void iface_modem_init           (MMIfaceModemInterface          *iface);
+static void iface_modem_3gpp_init      (MMIfaceModem3gppInterface      *iface);
+static void iface_modem_messaging_init (MMIfaceModemMessagingInterface *iface);
+static void iface_modem_location_init  (MMIfaceModemLocationInterface  *iface);
+static void iface_modem_voice_init     (MMIfaceModemVoice              *iface);
+static void iface_modem_time_init      (MMIfaceModemTime               *iface);
+static void iface_modem_signal_init    (MMIfaceModemSignal             *iface);
+static void shared_cinterion_init      (MMSharedCinterion              *iface);
 
 static MMIfaceModemInterface         *iface_modem_parent;
 static MMIfaceModem3gppInterface     *iface_modem_3gpp_parent;
@@ -3526,7 +3526,7 @@ iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
 }
 
 static void
-iface_modem_messaging_init (MMIfaceModemMessaging *iface)
+iface_modem_messaging_init (MMIfaceModemMessagingInterface *iface)
 {
     iface->check_support = messaging_check_support;
     iface->check_support_finish = messaging_check_support_finish;

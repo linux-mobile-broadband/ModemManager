@@ -34,9 +34,9 @@
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-thuraya.h"
 
-static void iface_modem_init           (MMIfaceModemInterface     *iface);
-static void iface_modem_3gpp_init      (MMIfaceModem3gppInterface *iface);
-static void iface_modem_messaging_init (MMIfaceModemMessaging     *iface);
+static void iface_modem_init           (MMIfaceModemInterface          *iface);
+static void iface_modem_3gpp_init      (MMIfaceModem3gppInterface      *iface);
+static void iface_modem_messaging_init (MMIfaceModemMessagingInterface *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemThuraya, mm_broadband_modem_thuraya, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -274,7 +274,7 @@ iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
 }
 
 static void
-iface_modem_messaging_init (MMIfaceModemMessaging *iface)
+iface_modem_messaging_init (MMIfaceModemMessagingInterface *iface)
 {
     iface->load_supported_storages = modem_messaging_load_supported_storages;
     iface->load_supported_storages_finish = modem_messaging_load_supported_storages_finish;
