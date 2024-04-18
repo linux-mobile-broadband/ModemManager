@@ -73,7 +73,7 @@ static void iface_modem_voice_init                (MMIfaceModemVoice            
 static void iface_modem_time_init                 (MMIfaceModemTime                        *iface);
 static void iface_modem_signal_init               (MMIfaceModemSignal                      *iface);
 static void iface_modem_oma_init                  (MMIfaceModemOma                         *iface);
-static void iface_modem_firmware_init             (MMIfaceModemFirmware                    *iface);
+static void iface_modem_firmware_init             (MMIfaceModemFirmwareInterface           *iface);
 static void iface_modem_sar_init                  (MMIfaceModemSar                         *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModem, mm_broadband_modem, MM_TYPE_BASE_MODEM, 0,
@@ -13768,7 +13768,7 @@ iface_modem_oma_init (MMIfaceModemOma *iface)
 }
 
 static void
-iface_modem_firmware_init (MMIfaceModemFirmware *iface)
+iface_modem_firmware_init (MMIfaceModemFirmwareInterface *iface)
 {
 }
 

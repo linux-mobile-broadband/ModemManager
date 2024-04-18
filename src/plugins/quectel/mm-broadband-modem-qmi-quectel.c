@@ -26,7 +26,7 @@
 #include "mm-shared-quectel.h"
 
 static void iface_modem_init                      (MMIfaceModemInterface                   *iface);
-static void iface_modem_firmware_init             (MMIfaceModemFirmware                    *iface);
+static void iface_modem_firmware_init             (MMIfaceModemFirmwareInterface           *iface);
 static void iface_modem_location_init             (MMIfaceModemLocation                    *iface);
 static void iface_modem_time_init                 (MMIfaceModemTime                        *iface);
 static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManagerInterface *iface);
@@ -163,7 +163,7 @@ iface_modem_init (MMIfaceModemInterface *iface)
 }
 
 static void
-iface_modem_firmware_init (MMIfaceModemFirmware *iface)
+iface_modem_firmware_init (MMIfaceModemFirmwareInterface *iface)
 {
     iface->load_update_settings = mm_shared_quectel_firmware_load_update_settings;
     iface->load_update_settings_finish = mm_shared_quectel_firmware_load_update_settings_finish;

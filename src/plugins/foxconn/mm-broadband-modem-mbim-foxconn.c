@@ -39,10 +39,9 @@
 # include "mm-log.h"
 #endif
 
-static void iface_modem_location_init (MMIfaceModemLocation *iface);
-
+static void iface_modem_location_init (MMIfaceModemLocation          *iface);
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-static void iface_modem_firmware_init (MMIfaceModemFirmware *iface);
+static void iface_modem_firmware_init (MMIfaceModemFirmwareInterface *iface);
 #endif
 
 static MMIfaceModemLocation *iface_modem_location_parent;
@@ -597,7 +596,7 @@ iface_modem_location_init (MMIfaceModemLocation *iface)
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 
 static void
-iface_modem_firmware_init (MMIfaceModemFirmware *iface)
+iface_modem_firmware_init (MMIfaceModemFirmwareInterface *iface)
 {
     iface->load_update_settings = firmware_load_update_settings;
     iface->load_update_settings_finish = firmware_load_update_settings_finish;
