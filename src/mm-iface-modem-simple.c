@@ -30,6 +30,8 @@
 #include "mm-log-object.h"
 #include "mm-log-helpers.h"
 
+G_DEFINE_INTERFACE (MMIfaceModemSimple, mm_iface_modem_simple, MM_TYPE_IFACE_MODEM)
+
 /*****************************************************************************/
 /* Private data context */
 
@@ -1166,52 +1168,29 @@ mm_iface_modem_simple_shutdown (MMIfaceModemSimple *self)
 /*****************************************************************************/
 
 static void
-iface_modem_simple_init (gpointer g_iface)
+mm_iface_modem_simple_default_init (MMIfaceModemSimpleInterface *iface)
 {
-    static gboolean initialized = FALSE;
+    static gsize initialized = 0;
 
-    if (initialized)
+    if (!g_once_init_enter (&initialized))
         return;
 
     /* Properties */
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_object (MM_IFACE_MODEM_SIMPLE_DBUS_SKELETON,
-                              "Simple DBus skeleton",
-                              "DBus skeleton for the Simple interface",
-                              MM_GDBUS_TYPE_MODEM_SIMPLE_SKELETON,
-                              G_PARAM_READWRITE));
+    g_object_interface_install_property (
+        iface,
+        g_param_spec_object (MM_IFACE_MODEM_SIMPLE_DBUS_SKELETON,
+                             "Simple DBus skeleton",
+                             "DBus skeleton for the Simple interface",
+                             MM_GDBUS_TYPE_MODEM_SIMPLE_SKELETON,
+                             G_PARAM_READWRITE));
 
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_object (MM_IFACE_MODEM_SIMPLE_STATUS,
-                              "Simple status",
-                              "Compilation of status values",
-                              MM_TYPE_SIMPLE_STATUS,
-                              G_PARAM_READWRITE));
+    g_object_interface_install_property (
+        iface,
+        g_param_spec_object (MM_IFACE_MODEM_SIMPLE_STATUS,
+                             "Simple status",
+                             "Compilation of status values",
+                             MM_TYPE_SIMPLE_STATUS,
+                             G_PARAM_READWRITE));
 
-    initialized = TRUE;
-}
-
-GType
-mm_iface_modem_simple_get_type (void)
-{
-    static GType iface_modem_simple_type = 0;
-
-    if (!G_UNLIKELY (iface_modem_simple_type)) {
-        static const GTypeInfo info = {
-            sizeof (MMIfaceModemSimple), /* class_size */
-            iface_modem_simple_init,      /* base_init */
-            NULL,                  /* base_finalize */
-        };
-
-        iface_modem_simple_type = g_type_register_static (G_TYPE_INTERFACE,
-                                                          "MMIfaceModemSimple",
-                                                          &info,
-                                                          0);
-
-        g_type_interface_add_prerequisite (iface_modem_simple_type, MM_TYPE_IFACE_MODEM);
-    }
-
-    return iface_modem_simple_type;
+    g_once_init_leave (&initialized, 1);
 }

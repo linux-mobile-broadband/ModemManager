@@ -19,22 +19,17 @@
 #include <glib-object.h>
 #include <gio/gio.h>
 
-#define MM_TYPE_IFACE_MODEM_SIMPLE               (mm_iface_modem_simple_get_type ())
-#define MM_IFACE_MODEM_SIMPLE(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM_SIMPLE, MMIfaceModemSimple))
-#define MM_IS_IFACE_MODEM_SIMPLE(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_SIMPLE))
-#define MM_IFACE_MODEM_SIMPLE_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_SIMPLE, MMIfaceModemSimple))
+#include "mm-iface-modem.h"
+
+#define MM_TYPE_IFACE_MODEM_SIMPLE mm_iface_modem_simple_get_type ()
+G_DECLARE_INTERFACE (MMIfaceModemSimple, mm_iface_modem_simple, MM, IFACE_MODEM_SIMPLE, MMIfaceModem)
 
 #define MM_IFACE_MODEM_SIMPLE_DBUS_SKELETON "iface-modem-simple-dbus-skeleton"
 #define MM_IFACE_MODEM_SIMPLE_STATUS        "iface-modem-simple-status"
 
-typedef struct _MMIfaceModemSimple MMIfaceModemSimple;
-
-struct _MMIfaceModemSimple {
+struct _MMIfaceModemSimpleInterface {
     GTypeInterface g_iface;
 };
-
-GType mm_iface_modem_simple_get_type (void);
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModemSimple, g_object_unref)
 
 /* Initialize Modem Simple interface */
 void mm_iface_modem_simple_initialize (MMIfaceModemSimple *self);
