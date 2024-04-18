@@ -58,7 +58,7 @@ static void iface_modem_3gpp_ussd_init            (MMIfaceModem3gppUssdInterface
 static void iface_modem_location_init             (MMIfaceModemLocationInterface           *iface);
 static void iface_modem_messaging_init            (MMIfaceModemMessagingInterface          *iface);
 static void iface_modem_signal_init               (MMIfaceModemSignal                      *iface);
-static void iface_modem_sar_init                  (MMIfaceModemSar                         *iface);
+static void iface_modem_sar_init                  (MMIfaceModemSarInterface                *iface);
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 static void shared_qmi_init                       (MMSharedQmi                             *iface);
 #endif
@@ -10334,7 +10334,7 @@ iface_modem_signal_init (MMIfaceModemSignal *iface)
 }
 
 static void
-iface_modem_sar_init (MMIfaceModemSar *iface)
+iface_modem_sar_init (MMIfaceModemSarInterface *iface)
 {
     iface->check_support = sar_check_support;
     iface->check_support_finish  = sar_check_support_finish;

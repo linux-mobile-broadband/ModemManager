@@ -22,16 +22,14 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#define MM_TYPE_IFACE_MODEM_SAR               (mm_iface_modem_sar_get_type ())
-#define MM_IFACE_MODEM_SAR(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM_SAR, MMIfaceModemSar))
-#define MM_IS_IFACE_MODEM_SAR(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_SAR))
-#define MM_IFACE_MODEM_SAR_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_SAR, MMIfaceModemSar))
+#include "mm-iface-modem.h"
+
+#define MM_TYPE_IFACE_MODEM_SAR mm_iface_modem_sar_get_type ()
+G_DECLARE_INTERFACE (MMIfaceModemSar, mm_iface_modem_sar, MM, IFACE_MODEM_SAR, MMIfaceModem)
 
 #define MM_IFACE_MODEM_SAR_DBUS_SKELETON  "iface-modem-sar-dbus-skeleton"
 
-typedef struct _MMIfaceModemSar MMIfaceModemSar;
-
-struct _MMIfaceModemSar {
+struct _MMIfaceModemSarInterface {
     GTypeInterface g_iface;
 
     /* Check for SAR support (async) */
@@ -77,9 +75,6 @@ struct _MMIfaceModemSar {
                                          GAsyncResult    *res,
                                          GError         **error);
 };
-
-GType mm_iface_modem_sar_get_type (void);
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModemSar, g_object_unref)
 
 /* Initialize Sar interface (async) */
 void     mm_iface_modem_sar_initialize        (MMIfaceModemSar    *self,

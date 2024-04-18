@@ -63,7 +63,7 @@ static void iface_modem_messaging_init            (MMIfaceModemMessagingInterfac
 static void iface_modem_location_init             (MMIfaceModemLocationInterface           *iface);
 static void iface_modem_oma_init                  (MMIfaceModemOma                         *iface);
 static void iface_modem_firmware_init             (MMIfaceModemFirmwareInterface           *iface);
-static void iface_modem_sar_init                  (MMIfaceModemSar                         *iface);
+static void iface_modem_sar_init                  (MMIfaceModemSarInterface                *iface);
 static void iface_modem_signal_init               (MMIfaceModemSignal                      *iface);
 static void shared_qmi_init                       (MMSharedQmi                             *iface);
 
@@ -14126,7 +14126,7 @@ iface_modem_location_init (MMIfaceModemLocationInterface *iface)
 }
 
 static void
-iface_modem_sar_init (MMIfaceModemSar *iface)
+iface_modem_sar_init (MMIfaceModemSarInterface *iface)
 {
     iface->check_support = sar_check_support;
     iface->check_support_finish  = sar_check_support_finish;

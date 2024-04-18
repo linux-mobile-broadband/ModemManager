@@ -28,6 +28,8 @@
 static GQuark support_checked_quark;
 static GQuark supported_quark;
 
+G_DEFINE_INTERFACE (MMIfaceModemSar, mm_iface_modem_sar, MM_TYPE_IFACE_MODEM)
+
 /*****************************************************************************/
 
 void
@@ -81,7 +83,7 @@ enable_ready (MMIfaceModemSar     *self,
     GError *error = NULL;
     guint   power_level = 0;
 
-    if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->enable_finish (self, res, &power_level, &error)) {
+    if (!MM_IFACE_MODEM_SAR_GET_IFACE (ctx->self)->enable_finish (self, res, &power_level, &error)) {
         mm_obj_warn (self, "failed %s SAR: %s", ctx->enable ? "enabling" : "disabling", error->message);
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
@@ -108,8 +110,8 @@ handle_enable_auth_ready (MMBaseModem         *self,
         return;
     }
 
-    if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->enable ||
-        !MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->enable_finish) {
+    if (!MM_IFACE_MODEM_SAR_GET_IFACE (ctx->self)->enable ||
+        !MM_IFACE_MODEM_SAR_GET_IFACE (ctx->self)->enable_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Cannot setup SAR: operation not supported");
         handle_enable_context_free (ctx);
@@ -123,10 +125,11 @@ handle_enable_auth_ready (MMBaseModem         *self,
     }
 
     mm_obj_info (self, "processing user request to %s SAR...", ctx->enable ? "enable" : "disable");
-    MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->enable (ctx->self,
-                                                          ctx->enable,
-                                                          (GAsyncReadyCallback)enable_ready,
-                                                          ctx);
+    MM_IFACE_MODEM_SAR_GET_IFACE (ctx->self)->enable (
+        ctx->self,
+        ctx->enable,
+        (GAsyncReadyCallback)enable_ready,
+        ctx);
 }
 
 static gboolean
@@ -177,7 +180,7 @@ set_power_level_ready (MMIfaceModemSar            *self,
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->set_power_level_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_SAR_GET_IFACE (ctx->self)->set_power_level_finish (self, res, &error)) {
         mm_obj_warn (self, "failed setting SAR power level to %u: %s", ctx->power_level, error->message);
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
@@ -202,8 +205,8 @@ handle_set_power_level_auth_ready (MMBaseModem                *self,
         return;
     }
 
-    if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->set_power_level ||
-        !MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->set_power_level_finish) {
+    if (!MM_IFACE_MODEM_SAR_GET_IFACE (ctx->self)->set_power_level ||
+        !MM_IFACE_MODEM_SAR_GET_IFACE (ctx->self)->set_power_level_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Cannot set SAR power level: operation not supported");
         handle_set_power_level_context_free (ctx);
@@ -224,7 +227,7 @@ handle_set_power_level_auth_ready (MMBaseModem                *self,
     }
 
     mm_obj_info (self, "processing user request to set SAR power level to %u...", ctx->power_level);
-    MM_IFACE_MODEM_SAR_GET_INTERFACE (ctx->self)->set_power_level (
+    MM_IFACE_MODEM_SAR_GET_IFACE (ctx->self)->set_power_level (
         ctx->self,
         ctx->power_level,
         (GAsyncReadyCallback)set_power_level_ready,
@@ -297,7 +300,7 @@ load_power_level_ready (MMIfaceModemSar *self,
     GError                *error = NULL;
     guint                  level;
 
-    if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (self)->load_power_level_finish (self, res, &level, &error)) {
+    if (!MM_IFACE_MODEM_SAR_GET_IFACE (self)->load_power_level_finish (self, res, &level, &error)) {
         mm_obj_warn (self, "loading SAR power level failed: %s", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -321,7 +324,7 @@ load_state_ready (MMIfaceModemSar *self,
     gboolean               state;
     GError                *error = NULL;
 
-    if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (self)->load_state_finish (self, res, &state, &error)) {
+    if (!MM_IFACE_MODEM_SAR_GET_IFACE (self)->load_state_finish (self, res, &state, &error)) {
         mm_obj_warn (self, "loading SAR state failed: %s", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -344,7 +347,7 @@ check_support_ready (MMIfaceModemSar *self,
     InitializationContext *ctx;
     g_autoptr(GError) error = NULL;
 
-    if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (self)->check_support_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_SAR_GET_IFACE (self)->check_support_finish (self, res, &error)) {
         if (error) {
             /* This error shouldn't be treated as critical */
             mm_obj_dbg (self, "SAR support check failed: %s", error->message);
@@ -401,9 +404,9 @@ interface_initialization_step (GTask *task)
                                 supported_quark,
                                 GUINT_TO_POINTER (FALSE));
 
-            if (MM_IFACE_MODEM_SAR_GET_INTERFACE (self)->check_support &&
-                MM_IFACE_MODEM_SAR_GET_INTERFACE (self)->check_support_finish) {
-                MM_IFACE_MODEM_SAR_GET_INTERFACE (self)->check_support (
+            if (MM_IFACE_MODEM_SAR_GET_IFACE (self)->check_support &&
+                MM_IFACE_MODEM_SAR_GET_IFACE (self)->check_support_finish) {
+                MM_IFACE_MODEM_SAR_GET_IFACE (self)->check_support (
                     self,
                     (GAsyncReadyCallback)check_support_ready,
                     task);
@@ -430,9 +433,9 @@ interface_initialization_step (GTask *task)
         /* fall through */
 
      case INITIALIZATION_STEP_LOAD_STATE:
-        if (MM_IFACE_MODEM_SAR_GET_INTERFACE (self)->load_state &&
-            MM_IFACE_MODEM_SAR_GET_INTERFACE (self)->load_state_finish) {
-            MM_IFACE_MODEM_SAR_GET_INTERFACE (self)->load_state (
+        if (MM_IFACE_MODEM_SAR_GET_IFACE (self)->load_state &&
+            MM_IFACE_MODEM_SAR_GET_IFACE (self)->load_state_finish) {
+            MM_IFACE_MODEM_SAR_GET_IFACE (self)->load_state (
                 self,
                 (GAsyncReadyCallback)load_state_ready,
                 task);
@@ -442,9 +445,9 @@ interface_initialization_step (GTask *task)
         /* fall through */
 
     case INITIALIZATION_STEP_LOAD_POWER_LEVEL:
-        if (MM_IFACE_MODEM_SAR_GET_INTERFACE (self)->load_power_level &&
-            MM_IFACE_MODEM_SAR_GET_INTERFACE (self)->load_power_level_finish) {
-            MM_IFACE_MODEM_SAR_GET_INTERFACE (self)->load_power_level (
+        if (MM_IFACE_MODEM_SAR_GET_IFACE (self)->load_power_level &&
+            MM_IFACE_MODEM_SAR_GET_IFACE (self)->load_power_level_finish) {
+            MM_IFACE_MODEM_SAR_GET_IFACE (self)->load_power_level (
                 self,
                 (GAsyncReadyCallback)load_power_level_ready,
                 task);
@@ -528,43 +531,21 @@ mm_iface_modem_sar_shutdown (MMIfaceModemSar *self)
 /*****************************************************************************/
 
 static void
-iface_modem_sar_init (gpointer g_iface)
+mm_iface_modem_sar_default_init (MMIfaceModemSarInterface *iface)
 {
-    static gboolean initialized = FALSE;
+    static gsize initialized = 0;
 
-    if (initialized)
+    if (!g_once_init_enter (&initialized))
         return;
 
     /* Properties */
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_object (MM_IFACE_MODEM_SAR_DBUS_SKELETON,
-                              "SAR DBus skeleton",
-                              "DBus skeleton for the SAR interface",
-                              MM_GDBUS_TYPE_MODEM_SAR_SKELETON,
-                              G_PARAM_READWRITE));
-    initialized = TRUE;
-}
+    g_object_interface_install_property (
+        iface,
+        g_param_spec_object (MM_IFACE_MODEM_SAR_DBUS_SKELETON,
+                             "SAR DBus skeleton",
+                             "DBus skeleton for the SAR interface",
+                             MM_GDBUS_TYPE_MODEM_SAR_SKELETON,
+                             G_PARAM_READWRITE));
 
-GType
-mm_iface_modem_sar_get_type (void)
-{
-    static GType iface_modem_sar_type = 0;
-
-    if (!G_UNLIKELY (iface_modem_sar_type)) {
-        static const GTypeInfo info = {
-            sizeof (MMIfaceModemSar), /* class_size */
-            iface_modem_sar_init,     /* base_init */
-            NULL,                     /* base_finalize */
-        };
-
-        iface_modem_sar_type = g_type_register_static (G_TYPE_INTERFACE,
-                                                       "MMIfaceModemSar",
-                                                       &info,
-                                                       0);
-
-        g_type_interface_add_prerequisite (iface_modem_sar_type, MM_TYPE_IFACE_MODEM);
-    }
-
-    return iface_modem_sar_type;
+    g_once_init_leave (&initialized, 1);
 }
