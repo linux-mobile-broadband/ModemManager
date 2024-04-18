@@ -50,14 +50,14 @@
 #include "mm-bearer-list.h"
 #include "mm-sim-huawei.h"
 
-static void iface_modem_init           (MMIfaceModemInterface     *iface);
-static void iface_modem_3gpp_init      (MMIfaceModem3gppInterface *iface);
-static void iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd      *iface);
-static void iface_modem_location_init  (MMIfaceModemLocation      *iface);
-static void iface_modem_cdma_init      (MMIfaceModemCdma          *iface);
-static void iface_modem_time_init      (MMIfaceModemTime          *iface);
-static void iface_modem_voice_init     (MMIfaceModemVoice         *iface);
-static void iface_modem_signal_init    (MMIfaceModemSignal        *iface);
+static void iface_modem_init           (MMIfaceModemInterface         *iface);
+static void iface_modem_3gpp_init      (MMIfaceModem3gppInterface     *iface);
+static void iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssdInterface *iface);
+static void iface_modem_location_init  (MMIfaceModemLocation          *iface);
+static void iface_modem_cdma_init      (MMIfaceModemCdma              *iface);
+static void iface_modem_time_init      (MMIfaceModemTime              *iface);
+static void iface_modem_voice_init     (MMIfaceModemVoice             *iface);
+static void iface_modem_signal_init    (MMIfaceModemSignal            *iface);
 
 static MMIfaceModemInterface     *iface_modem_parent;
 static MMIfaceModem3gppInterface *iface_modem_3gpp_parent;
@@ -5039,7 +5039,7 @@ iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
 }
 
 static void
-iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface)
+iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssdInterface *iface)
 {
     iface->encode = encode;
     iface->decode = decode;

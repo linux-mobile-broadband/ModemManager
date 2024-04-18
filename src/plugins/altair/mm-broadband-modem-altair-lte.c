@@ -41,10 +41,10 @@
 #include "mm-serial-parsers.h"
 #include "mm-bearer-list.h"
 
-static void iface_modem_init           (MMIfaceModemInterface     *iface);
-static void iface_modem_3gpp_init      (MMIfaceModem3gppInterface *iface);
-static void iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd      *iface);
-static void iface_modem_messaging_init (MMIfaceModemMessaging     *iface);
+static void iface_modem_init           (MMIfaceModemInterface         *iface);
+static void iface_modem_3gpp_init      (MMIfaceModem3gppInterface     *iface);
+static void iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssdInterface *iface);
+static void iface_modem_messaging_init (MMIfaceModemMessaging         *iface);
 
 static MMIfaceModem3gppInterface *iface_modem_3gpp_parent;
 
@@ -1249,7 +1249,7 @@ iface_modem_init (MMIfaceModemInterface *iface)
 }
 
 static void
-iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface)
+iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssdInterface *iface)
 {
     /* we don't have USSD support */
     iface->check_support = NULL;

@@ -23,10 +23,10 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#define MM_TYPE_IFACE_MODEM_3GPP_USSD               (mm_iface_modem_3gpp_ussd_get_type ())
-#define MM_IFACE_MODEM_3GPP_USSD(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM_3GPP_USSD, MMIfaceModem3gppUssd))
-#define MM_IS_IFACE_MODEM_3GPP_USSD(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_3GPP_USSD))
-#define MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_3GPP_USSD, MMIfaceModem3gppUssd))
+#include "mm-iface-modem-3gpp.h"
+
+#define MM_TYPE_IFACE_MODEM_3GPP_USSD mm_iface_modem_3gpp_ussd_get_type ()
+G_DECLARE_INTERFACE (MMIfaceModem3gppUssd, mm_iface_modem_3gpp_ussd, MM, IFACE_MODEM_3GPP_USSD, MMIfaceModem3gpp)
 
 /* CBS data coding scheme - 3GPP TS 23.038 */
 #define MM_MODEM_GSM_USSD_SCHEME_7BIT 0b00001111
@@ -34,9 +34,7 @@
 
 #define MM_IFACE_MODEM_3GPP_USSD_DBUS_SKELETON "iface-modem-3gpp-ussd-dbus-skeleton"
 
-typedef struct _MMIfaceModem3gppUssd MMIfaceModem3gppUssd;
-
-struct _MMIfaceModem3gppUssd {
+struct _MMIfaceModem3gppUssdInterface {
     GTypeInterface g_iface;
 
     /* Check for USSD support (async) */
@@ -105,9 +103,6 @@ struct _MMIfaceModem3gppUssd {
                                 GAsyncResult *res,
                                 GError **error);
 };
-
-GType mm_iface_modem_3gpp_ussd_get_type (void);
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModem3gppUssd, g_object_unref)
 
 /* Initialize USSD interface (async) */
 void     mm_iface_modem_3gpp_ussd_initialize        (MMIfaceModem3gppUssd *self,
