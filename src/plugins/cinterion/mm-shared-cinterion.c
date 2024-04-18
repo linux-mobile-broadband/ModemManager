@@ -47,11 +47,11 @@ typedef struct {
     /* modem */
     MMIfaceModemInterface *iface_modem_parent;
     /* location */
-    MMIfaceModemLocation  *iface_modem_location_parent;
-    MMModemLocationSource  supported_sources;
-    MMModemLocationSource  enabled_sources;
-    FeatureSupport         sgpss_support;
-    FeatureSupport         sgpsc_support;
+    MMIfaceModemLocationInterface  *iface_modem_location_parent;
+    MMModemLocationSource           supported_sources;
+    MMModemLocationSource           enabled_sources;
+    FeatureSupport                  sgpss_support;
+    FeatureSupport                  sgpsc_support;
     /* voice */
     MMIfaceModemVoice     *iface_modem_voice_parent;
     FeatureSupport         slcc_support;

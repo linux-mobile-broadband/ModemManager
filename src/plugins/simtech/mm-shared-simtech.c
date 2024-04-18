@@ -44,10 +44,10 @@ typedef enum {
 
 typedef struct {
     /* location */
-    MMIfaceModemLocation  *iface_modem_location_parent;
-    MMModemLocationSource  supported_sources;
-    MMModemLocationSource  enabled_sources;
-    FeatureSupport         cgps_support;
+    MMIfaceModemLocationInterface *iface_modem_location_parent;
+    MMModemLocationSource          supported_sources;
+    MMModemLocationSource          enabled_sources;
+    FeatureSupport                 cgps_support;
     /* voice */
     MMIfaceModemVoice     *iface_modem_voice_parent;
     FeatureSupport         cpcmreg_support;

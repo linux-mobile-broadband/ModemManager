@@ -55,7 +55,7 @@ static void iface_modem_init                      (MMIfaceModemInterface        
 static void iface_modem_3gpp_init                 (MMIfaceModem3gppInterface               *iface);
 static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManagerInterface *iface);
 static void iface_modem_3gpp_ussd_init            (MMIfaceModem3gppUssdInterface           *iface);
-static void iface_modem_location_init             (MMIfaceModemLocation                    *iface);
+static void iface_modem_location_init             (MMIfaceModemLocationInterface           *iface);
 static void iface_modem_messaging_init            (MMIfaceModemMessaging                   *iface);
 static void iface_modem_signal_init               (MMIfaceModemSignal                      *iface);
 static void iface_modem_sar_init                  (MMIfaceModemSar                         *iface);
@@ -64,10 +64,10 @@ static void shared_qmi_init                       (MMSharedQmi                  
 #endif
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-static MMIfaceModemLocation  *iface_modem_location_parent;
+static MMIfaceModemLocationInterface  *iface_modem_location_parent;
 #endif
-static MMIfaceModemSignal    *iface_modem_signal_parent;
-static MMIfaceModemInterface *iface_modem_parent;
+static MMIfaceModemSignal             *iface_modem_signal_parent;
+static MMIfaceModemInterface          *iface_modem_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbim, mm_broadband_modem_mbim, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -10265,7 +10265,7 @@ iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssdInterface *iface)
 }
 
 static void
-iface_modem_location_init (MMIfaceModemLocation *iface)
+iface_modem_location_init (MMIfaceModemLocationInterface *iface)
 {
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     iface_modem_location_parent = g_type_interface_peek_parent (iface);
@@ -10350,7 +10350,7 @@ iface_modem_sar_init (MMIfaceModemSar *iface)
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 
-static MMIfaceModemLocation *
+static MMIfaceModemLocationInterface *
 peek_parent_location_interface (MMSharedQmi *self)
 {
     return iface_modem_location_parent;

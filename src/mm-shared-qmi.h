@@ -46,7 +46,7 @@ struct _MMSharedQmi {
                                  GError        **error);
 
     /* Peek location interface of the parent class of the object */
-    MMIfaceModemLocation * (* peek_parent_location_interface) (MMSharedQmi *self);
+    MMIfaceModemLocationInterface * (* peek_parent_location_interface) (MMSharedQmi *self);
 };
 
 GType mm_shared_qmi_get_type (void);

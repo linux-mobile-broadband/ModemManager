@@ -22,17 +22,15 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#define MM_TYPE_IFACE_MODEM_LOCATION               (mm_iface_modem_location_get_type ())
-#define MM_IFACE_MODEM_LOCATION(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM_LOCATION, MMIfaceModemLocation))
-#define MM_IS_IFACE_MODEM_LOCATION(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_LOCATION))
-#define MM_IFACE_MODEM_LOCATION_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_LOCATION, MMIfaceModemLocation))
+#include "mm-iface-modem.h"
+
+#define MM_TYPE_IFACE_MODEM_LOCATION mm_iface_modem_location_get_type ()
+G_DECLARE_INTERFACE (MMIfaceModemLocation, mm_iface_modem_location, MM, IFACE_MODEM_LOCATION, MMIfaceModem)
 
 #define MM_IFACE_MODEM_LOCATION_DBUS_SKELETON              "iface-modem-location-dbus-skeleton"
 #define MM_IFACE_MODEM_LOCATION_ALLOW_GPS_UNMANAGED_ALWAYS "iface-modem-location-allow-gps-unmanaged-always"
 
-typedef struct _MMIfaceModemLocation MMIfaceModemLocation;
-
-struct _MMIfaceModemLocation {
+struct _MMIfaceModemLocationInterface {
     GTypeInterface g_iface;
 
     /* Loading of the Capabilities property */
@@ -104,9 +102,6 @@ struct _MMIfaceModemLocation {
                                                GAsyncResult          *res,
                                                GError               **error);
 };
-
-GType mm_iface_modem_location_get_type (void);
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModemLocation, g_object_unref)
 
 /* Initialize Location interface (async) */
 void     mm_iface_modem_location_initialize        (MMIfaceModemLocation *self,

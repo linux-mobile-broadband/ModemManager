@@ -31,6 +31,8 @@
 
 static GQuark location_context_quark;
 
+G_DEFINE_INTERFACE (MMIfaceModemLocation, mm_iface_modem_location, MM_TYPE_IFACE_MODEM)
+
 /*****************************************************************************/
 
 void
@@ -644,7 +646,7 @@ enable_location_gathering_ready (MMIfaceModemLocation *self,
 
     ctx = g_task_get_task_data (task);
 
-    if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->enable_location_gathering_finish (self, res, &error)) {
         gchar *str;
 
         update_location_source_status (self, ctx->current, FALSE);
@@ -674,7 +676,7 @@ disable_location_gathering_ready (MMIfaceModemLocation *self,
 
     ctx = g_task_get_task_data (task);
 
-    if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->disable_location_gathering_finish (self, res, &error)) {
         gchar *str;
 
         /* Back to enabled then */
@@ -726,9 +728,9 @@ setup_gathering_step (GTask *task)
             update_location_source_status (self, ctx->current, TRUE);
 
             /* Plugins can run custom actions to enable location gathering */
-            if (MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering &&
-                MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering_finish) {
-                MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering (
+            if (MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->enable_location_gathering &&
+                MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->enable_location_gathering_finish) {
+                MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->enable_location_gathering (
                     MM_IFACE_MODEM_LOCATION (self),
                     ctx->current,
                     (GAsyncReadyCallback)enable_location_gathering_ready,
@@ -746,9 +748,9 @@ setup_gathering_step (GTask *task)
             update_location_source_status (self, ctx->current, FALSE);
 
             /* Plugins can run custom actions to disable location gathering */
-            if (MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering &&
-                MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering_finish) {
-                MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering (
+            if (MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->disable_location_gathering &&
+                MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->disable_location_gathering_finish) {
+                MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->disable_location_gathering (
                     MM_IFACE_MODEM_LOCATION (self),
                     ctx->current,
                     (GAsyncReadyCallback)disable_location_gathering_ready,
@@ -1050,7 +1052,7 @@ set_supl_server_ready (MMIfaceModemLocation       *self,
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->set_supl_server_finish (self, res, &error))
+    if (!MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->set_supl_server_finish (self, res, &error))
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         mm_gdbus_modem_location_set_supl_server (ctx->skeleton, ctx->supl);
@@ -1089,8 +1091,8 @@ handle_set_supl_server_auth_ready (MMBaseModem                *self,
     }
 
     /* Check if plugin implements it */
-    if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->set_supl_server ||
-        !MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->set_supl_server_finish) {
+    if (!MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->set_supl_server ||
+        !MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->set_supl_server_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Cannot set SUPL server: not implemented");
         handle_set_supl_server_context_free (ctx);
@@ -1099,10 +1101,11 @@ handle_set_supl_server_auth_ready (MMBaseModem                *self,
 
     /* Request to change SUPL server */
     mm_obj_info (self, "processing user request to set SUPL server...");
-    MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->set_supl_server (ctx->self,
-                                                                   ctx->supl,
-                                                                   (GAsyncReadyCallback)set_supl_server_ready,
-                                                                   ctx);
+    MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->set_supl_server (
+        ctx->self,
+        ctx->supl,
+        (GAsyncReadyCallback)set_supl_server_ready,
+        ctx);
 }
 
 static gboolean
@@ -1153,7 +1156,7 @@ inject_assistance_data_ready (MMIfaceModemLocation              *self,
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->inject_assistance_data_finish (self, res, &error))
+    if (!MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->inject_assistance_data_finish (self, res, &error))
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem_location_complete_inject_assistance_data (ctx->skeleton, ctx->invocation);
@@ -1184,8 +1187,8 @@ handle_inject_assistance_data_auth_ready (MMBaseModem                       *sel
     }
 
     /* Check if plugin implements it */
-    if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->inject_assistance_data ||
-        !MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->inject_assistance_data_finish) {
+    if (!MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->inject_assistance_data ||
+        !MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->inject_assistance_data_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Cannot inject assistance data: not implemented");
         handle_inject_assistance_data_context_free (ctx);
@@ -1196,11 +1199,12 @@ handle_inject_assistance_data_auth_ready (MMBaseModem                       *sel
 
     /* Request to inject assistance data */
     mm_obj_info (self, "processing user request to inject assistance data...");
-    MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->inject_assistance_data (ctx->self,
-                                                                          data,
-                                                                          data_size,
-                                                                          (GAsyncReadyCallback)inject_assistance_data_ready,
-                                                                          ctx);
+    MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->inject_assistance_data (
+        ctx->self,
+        data,
+        data_size,
+        (GAsyncReadyCallback)inject_assistance_data_ready,
+        ctx);
 }
 
 static gboolean
@@ -1655,7 +1659,7 @@ load_assistance_data_servers_ready (MMIfaceModemLocation *self,
 
     ctx = g_task_get_task_data (task);
 
-    servers = MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_assistance_data_servers_finish (self, res, &error);
+    servers = MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->load_assistance_data_servers_finish (self, res, &error);
     if (error) {
         mm_obj_warn (self, "couldn't load assistance data servers: %s", error->message);
         g_error_free (error);
@@ -1680,7 +1684,7 @@ load_supported_assistance_data_ready (MMIfaceModemLocation *self,
 
     ctx = g_task_get_task_data (task);
 
-    mask = MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_supported_assistance_data_finish (self, res, &error);
+    mask = MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->load_supported_assistance_data_finish (self, res, &error);
     if (error) {
         mm_obj_warn (self, "couldn't load supported assistance data types: %s", error->message);
         g_error_free (error);
@@ -1704,7 +1708,7 @@ load_supl_server_ready (MMIfaceModemLocation *self,
 
     ctx = g_task_get_task_data (task);
 
-    supl = MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_supl_server_finish (self, res, &error);
+    supl = MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->load_supl_server_finish (self, res, &error);
     if (error) {
         mm_obj_warn (self, "couldn't load SUPL server: %s", error->message);
         g_error_free (error);
@@ -1728,7 +1732,7 @@ load_capabilities_ready (MMIfaceModemLocation *self,
 
     ctx = g_task_get_task_data (task);
 
-    ctx->capabilities = MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_capabilities_finish (self, res, &error);
+    ctx->capabilities = MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->load_capabilities_finish (self, res, &error);
     if (error) {
         mm_obj_warn (self, "couldn't load location capabilities: %s", error->message);
         g_error_free (error);
@@ -1769,9 +1773,9 @@ interface_initialization_step (GTask *task)
         existing_capabilities = mm_gdbus_modem_location_get_capabilities (ctx->skeleton);
         if (existing_capabilities != MM_MODEM_LOCATION_SOURCE_NONE) {
             ctx->capabilities = existing_capabilities;
-        } else if (MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_capabilities &&
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_capabilities_finish) {
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_capabilities (
+        } else if (MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->load_capabilities &&
+            MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->load_capabilities_finish) {
+            MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->load_capabilities (
                 self,
                 (GAsyncReadyCallback)load_capabilities_ready,
                 task);
@@ -1798,9 +1802,9 @@ interface_initialization_step (GTask *task)
         /* If the modem supports A-GPS, load SUPL server */
         if ((ctx->capabilities & (MM_MODEM_LOCATION_SOURCE_AGPS_MSA |
                                   MM_MODEM_LOCATION_SOURCE_AGPS_MSB)) &&
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_supl_server &&
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_supl_server_finish) {
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_supl_server (
+            MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->load_supl_server &&
+            MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->load_supl_server_finish) {
+            MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->load_supl_server (
                 self,
                 (GAsyncReadyCallback)load_supl_server_ready,
                 task);
@@ -1815,9 +1819,9 @@ interface_initialization_step (GTask *task)
                                   MM_MODEM_LOCATION_SOURCE_AGPS_MSB |
                                   MM_MODEM_LOCATION_SOURCE_GPS_RAW |
                                   MM_MODEM_LOCATION_SOURCE_GPS_NMEA)) &&
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_supported_assistance_data &&
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_supported_assistance_data_finish) {
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_supported_assistance_data (
+            MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->load_supported_assistance_data &&
+            MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->load_supported_assistance_data_finish) {
+            MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->load_supported_assistance_data (
                 self,
                 (GAsyncReadyCallback)load_supported_assistance_data_ready,
                 task);
@@ -1829,9 +1833,9 @@ interface_initialization_step (GTask *task)
     case INITIALIZATION_STEP_ASSISTANCE_DATA_SERVERS:
         /* If any assistance data supported, load servers */
         if ((mm_gdbus_modem_location_get_supported_assistance_data (ctx->skeleton) != MM_MODEM_LOCATION_ASSISTANCE_DATA_TYPE_NONE) &&
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_assistance_data_servers &&
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_assistance_data_servers_finish) {
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_assistance_data_servers (
+            MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->load_assistance_data_servers &&
+            MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->load_assistance_data_servers_finish) {
+            MM_IFACE_MODEM_LOCATION_GET_IFACE (self)->load_assistance_data_servers (
                 self,
                 (GAsyncReadyCallback)load_assistance_data_servers_ready,
                 task);
@@ -1954,52 +1958,29 @@ mm_iface_modem_location_shutdown (MMIfaceModemLocation *self)
 /*****************************************************************************/
 
 static void
-iface_modem_location_init (gpointer g_iface)
+mm_iface_modem_location_default_init (MMIfaceModemLocationInterface *iface)
 {
-    static gboolean initialized = FALSE;
+    static gsize initialized = 0;
 
-    if (initialized)
+    if (!g_once_init_enter (&initialized))
         return;
 
     /* Properties */
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_object (MM_IFACE_MODEM_LOCATION_DBUS_SKELETON,
-                              "Location DBus skeleton",
-                              "DBus skeleton for the Location interface",
-                              MM_GDBUS_TYPE_MODEM_LOCATION_SKELETON,
-                              G_PARAM_READWRITE));
+    g_object_interface_install_property (
+        iface,
+        g_param_spec_object (MM_IFACE_MODEM_LOCATION_DBUS_SKELETON,
+                             "Location DBus skeleton",
+                             "DBus skeleton for the Location interface",
+                             MM_GDBUS_TYPE_MODEM_LOCATION_SKELETON,
+                             G_PARAM_READWRITE));
 
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_boolean (MM_IFACE_MODEM_LOCATION_ALLOW_GPS_UNMANAGED_ALWAYS,
-                               "Allow unmanaged GPS always",
-                               "Whether to always allow GPS unmanaged, even when raw/nmea GPS sources are enabled",
-                               FALSE,
-                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+    g_object_interface_install_property (
+        iface,
+        g_param_spec_boolean (MM_IFACE_MODEM_LOCATION_ALLOW_GPS_UNMANAGED_ALWAYS,
+                              "Allow unmanaged GPS always",
+                              "Whether to always allow GPS unmanaged, even when raw/nmea GPS sources are enabled",
+                              FALSE,
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
-    initialized = TRUE;
-}
-
-GType
-mm_iface_modem_location_get_type (void)
-{
-    static GType iface_modem_location_type = 0;
-
-    if (!G_UNLIKELY (iface_modem_location_type)) {
-        static const GTypeInfo info = {
-            sizeof (MMIfaceModemLocation), /* class_size */
-            iface_modem_location_init,     /* base_init */
-            NULL,                          /* base_finalize */
-        };
-
-        iface_modem_location_type = g_type_register_static (G_TYPE_INTERFACE,
-                                                            "MMIfaceModemLocation",
-                                                            &info,
-                                                            0);
-
-        g_type_interface_add_prerequisite (iface_modem_location_type, MM_TYPE_IFACE_MODEM);
-    }
-
-    return iface_modem_location_type;
+    g_once_init_leave (&initialized, 1);
 }

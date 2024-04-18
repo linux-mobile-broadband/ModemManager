@@ -28,12 +28,12 @@
 #include "mm-broadband-modem-qmi-simtech.h"
 #include "mm-shared-simtech.h"
 
-static void iface_modem_location_init (MMIfaceModemLocation *iface);
-static void iface_modem_voice_init    (MMIfaceModemVoice    *iface);
-static void shared_simtech_init       (MMSharedSimtech      *iface);
+static void iface_modem_location_init (MMIfaceModemLocationInterface *iface);
+static void iface_modem_voice_init    (MMIfaceModemVoice             *iface);
+static void shared_simtech_init       (MMSharedSimtech               *iface);
 
-static MMIfaceModemLocation *iface_modem_location_parent;
-static MMIfaceModemVoice    *iface_modem_voice_parent;
+static MMIfaceModemLocationInterface *iface_modem_location_parent;
+static MMIfaceModemVoice             *iface_modem_voice_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmiSimtech, mm_broadband_modem_qmi_simtech, MM_TYPE_BROADBAND_MODEM_QMI, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
@@ -71,7 +71,7 @@ mm_broadband_modem_qmi_simtech_init (MMBroadbandModemQmiSimtech *self)
 }
 
 static void
-iface_modem_location_init (MMIfaceModemLocation *iface)
+iface_modem_location_init (MMIfaceModemLocationInterface *iface)
 {
     iface_modem_location_parent = g_type_interface_peek_parent (iface);
 
@@ -83,7 +83,7 @@ iface_modem_location_init (MMIfaceModemLocation *iface)
     iface->disable_location_gathering_finish = mm_shared_simtech_disable_location_gathering_finish;
 }
 
-static MMIfaceModemLocation *
+static MMIfaceModemLocationInterface *
 peek_parent_location_interface (MMSharedSimtech *self)
 {
     return iface_modem_location_parent;

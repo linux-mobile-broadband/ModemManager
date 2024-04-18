@@ -81,15 +81,15 @@ typedef struct {
     GArray            *supported_bands;
 
     /* Location helpers */
-    MMIfaceModemLocation   *iface_modem_location_parent;
-    MMModemLocationSource   enabled_sources;
-    QmiClient              *pds_client;
-    gulong                  pds_location_event_report_indication_id;
-    QmiClient              *loc_client;
-    gulong                  loc_location_nmea_indication_id;
-    gchar                 **loc_assistance_data_servers;
-    guint32                 loc_assistance_data_max_file_size;
-    guint32                 loc_assistance_data_max_part_size;
+    MMIfaceModemLocationInterface  *iface_modem_location_parent;
+    MMModemLocationSource           enabled_sources;
+    QmiClient                      *pds_client;
+    gulong                          pds_location_event_report_indication_id;
+    QmiClient                      *loc_client;
+    gulong                          loc_location_nmea_indication_id;
+    gchar                         **loc_assistance_data_servers;
+    guint32                         loc_assistance_data_max_file_size;
+    guint32                         loc_assistance_data_max_part_size;
 
     /* Carrier config helpers */
     gboolean  config_active_default;

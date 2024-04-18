@@ -57,13 +57,13 @@ typedef struct {
     MMModemMode  allowed_modes;
 
     /* Location interface support */
-    MMIfaceModemLocation  *iface_modem_location_parent;
-    MMModemLocationSource  supported_sources;
-    MMModemLocationSource  enabled_sources;
-    GpsEngineState         gps_engine_state;
-    MMPortSerialAt        *gps_port;
-    GRegex                *xlsrstop_regex;
-    GRegex                *nmea_regex;
+    MMIfaceModemLocationInterface *iface_modem_location_parent;
+    MMModemLocationSource          supported_sources;
+    MMModemLocationSource          enabled_sources;
+    GpsEngineState                 gps_engine_state;
+    MMPortSerialAt                *gps_port;
+    GRegex                        *xlsrstop_regex;
+    GRegex                        *nmea_regex;
 
     /* Asynchronous GPS engine stop task completion */
     GTask *pending_gps_engine_stop_task;

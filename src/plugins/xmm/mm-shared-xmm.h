@@ -41,7 +41,7 @@ struct _MMSharedXmm {
     MMBroadbandModemClass * (* peek_parent_broadband_modem_class) (MMSharedXmm *self);
 
     /* Peek location interface of the parent class of the object */
-    MMIfaceModemLocation *  (* peek_parent_location_interface)    (MMSharedXmm *self);
+    MMIfaceModemLocationInterface *  (* peek_parent_location_interface) (MMSharedXmm *self);
 };
 
 GType mm_shared_xmm_get_type (void);

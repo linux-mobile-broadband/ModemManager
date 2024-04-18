@@ -30,16 +30,16 @@
 #include "mm-broadband-modem-mbim-cinterion.h"
 #include "mm-shared-cinterion.h"
 
-static void iface_modem_init          (MMIfaceModemInterface *iface);
-static void iface_modem_location_init (MMIfaceModemLocation  *iface);
-static void iface_modem_voice_init    (MMIfaceModemVoice     *iface);
-static void iface_modem_time_init     (MMIfaceModemTime      *iface);
-static void shared_cinterion_init     (MMSharedCinterion     *iface);
+static void iface_modem_init          (MMIfaceModemInterface         *iface);
+static void iface_modem_location_init (MMIfaceModemLocationInterface *iface);
+static void iface_modem_voice_init    (MMIfaceModemVoice             *iface);
+static void iface_modem_time_init     (MMIfaceModemTime              *iface);
+static void shared_cinterion_init     (MMSharedCinterion             *iface);
 
-static MMIfaceModemInterface *iface_modem_parent;
-static MMIfaceModemLocation  *iface_modem_location_parent;
-static MMIfaceModemVoice     *iface_modem_voice_parent;
-static MMIfaceModemTime      *iface_modem_time_parent;
+static MMIfaceModemInterface         *iface_modem_parent;
+static MMIfaceModemLocationInterface *iface_modem_location_parent;
+static MMIfaceModemVoice             *iface_modem_voice_parent;
+static MMIfaceModemTime              *iface_modem_time_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbimCinterion, mm_broadband_modem_mbim_cinterion, MM_TYPE_BROADBAND_MODEM_MBIM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -95,7 +95,7 @@ peek_parent_interface (MMSharedCinterion *self)
 }
 
 static void
-iface_modem_location_init (MMIfaceModemLocation *iface)
+iface_modem_location_init (MMIfaceModemLocationInterface *iface)
 {
     iface_modem_location_parent = g_type_interface_peek_parent (iface);
 
@@ -107,7 +107,7 @@ iface_modem_location_init (MMIfaceModemLocation *iface)
     iface->disable_location_gathering_finish = mm_shared_cinterion_disable_location_gathering_finish;
 }
 
-static MMIfaceModemLocation *
+static MMIfaceModemLocationInterface *
 peek_parent_location_interface (MMSharedCinterion *self)
 {
     return iface_modem_location_parent;

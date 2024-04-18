@@ -38,7 +38,7 @@ struct _MMSharedSimtech {
     GTypeInterface g_iface;
 
     /* Peek location interface of the parent class of the object */
-    MMIfaceModemLocation *  (* peek_parent_location_interface) (MMSharedSimtech *self);
+    MMIfaceModemLocationInterface *  (* peek_parent_location_interface) (MMSharedSimtech *self);
 
     /* Peek voice interface of the parent class of the object */
     MMIfaceModemVoice *  (* peek_parent_voice_interface) (MMSharedSimtech *self);

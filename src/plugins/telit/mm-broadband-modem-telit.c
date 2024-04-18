@@ -36,14 +36,14 @@
 #include "mm-telit-enums-types.h"
 #include "mm-shared-telit.h"
 
-static void iface_modem_init          (MMIfaceModemInterface     *iface);
-static void iface_modem_3gpp_init     (MMIfaceModem3gppInterface *iface);
-static void shared_telit_init         (MMSharedTelit             *iface);
-static void iface_modem_location_init (MMIfaceModemLocation      *iface);
+static void iface_modem_init          (MMIfaceModemInterface         *iface);
+static void iface_modem_3gpp_init     (MMIfaceModem3gppInterface     *iface);
+static void shared_telit_init         (MMSharedTelit                 *iface);
+static void iface_modem_location_init (MMIfaceModemLocationInterface *iface);
 
-static MMIfaceModemInterface     *iface_modem_parent;
-static MMIfaceModem3gppInterface *iface_modem_3gpp_parent;
-static MMIfaceModemLocation      *iface_modem_location_parent;
+static MMIfaceModemInterface         *iface_modem_parent;
+static MMIfaceModem3gppInterface     *iface_modem_3gpp_parent;
+static MMIfaceModemLocationInterface *iface_modem_location_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemTelit, mm_broadband_modem_telit, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -1597,7 +1597,7 @@ shared_telit_init (MMSharedTelit *iface)
 }
 
 static void
-iface_modem_location_init (MMIfaceModemLocation *iface)
+iface_modem_location_init (MMIfaceModemLocationInterface *iface)
 {
     iface_modem_location_parent = g_type_interface_peek_parent (iface);
 

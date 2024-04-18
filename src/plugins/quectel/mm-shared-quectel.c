@@ -48,15 +48,15 @@ typedef enum {
 } FeatureSupport;
 
 typedef struct {
-    MMBroadbandModemClass *broadband_modem_class_parent;
-    MMIfaceModemInterface *iface_modem_parent;
-    MMIfaceModemLocation  *iface_modem_location_parent;
-    MMModemLocationSource  provided_sources;
-    MMModemLocationSource  enabled_sources;
-    FeatureSupport         qgps_supported;
-    GRegex                *qgpsurc_regex;
-    GRegex                *qlwurc_regex;
-    GRegex                *rdy_regex;
+    MMBroadbandModemClass         *broadband_modem_class_parent;
+    MMIfaceModemInterface         *iface_modem_parent;
+    MMIfaceModemLocationInterface *iface_modem_location_parent;
+    MMModemLocationSource          provided_sources;
+    MMModemLocationSource          enabled_sources;
+    FeatureSupport                 qgps_supported;
+    GRegex                        *qgpsurc_regex;
+    GRegex                        *qlwurc_regex;
+    GRegex                        *rdy_regex;
 } Private;
 
 static void

@@ -60,16 +60,16 @@ static void iface_modem_3gpp_ussd_init            (MMIfaceModem3gppUssdInterface
 static void iface_modem_voice_init                (MMIfaceModemVoice                       *iface);
 static void iface_modem_cdma_init                 (MMIfaceModemCdma                        *iface);
 static void iface_modem_messaging_init            (MMIfaceModemMessaging                   *iface);
-static void iface_modem_location_init             (MMIfaceModemLocation                    *iface);
+static void iface_modem_location_init             (MMIfaceModemLocationInterface           *iface);
 static void iface_modem_oma_init                  (MMIfaceModemOma                         *iface);
 static void iface_modem_firmware_init             (MMIfaceModemFirmwareInterface           *iface);
 static void iface_modem_sar_init                  (MMIfaceModemSar                         *iface);
 static void iface_modem_signal_init               (MMIfaceModemSignal                      *iface);
 static void shared_qmi_init                       (MMSharedQmi                             *iface);
 
-static MMIfaceModemLocation  *iface_modem_location_parent;
-static MMIfaceModemMessaging *iface_modem_messaging_parent;
-static MMIfaceModemVoice     *iface_modem_voice_parent;
+static MMIfaceModemLocationInterface *iface_modem_location_parent;
+static MMIfaceModemMessaging         *iface_modem_messaging_parent;
+static MMIfaceModemVoice             *iface_modem_voice_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmi, mm_broadband_modem_qmi, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -14102,7 +14102,7 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
 }
 
 static void
-iface_modem_location_init (MMIfaceModemLocation *iface)
+iface_modem_location_init (MMIfaceModemLocationInterface *iface)
 {
     iface_modem_location_parent = g_type_interface_peek_parent (iface);
 
@@ -14187,7 +14187,7 @@ iface_modem_firmware_init (MMIfaceModemFirmwareInterface *iface)
     iface->change_current_finish = firmware_change_current_finish;
 }
 
-static MMIfaceModemLocation *
+static MMIfaceModemLocationInterface *
 peek_parent_location_interface (MMSharedQmi *self)
 {
     return iface_modem_location_parent;
