@@ -32,11 +32,11 @@
 #include "mm-iface-modem-3gpp.h"
 #include "mm-broadband-modem-mtk-legacy.h"
 
-static void iface_modem_init      (MMIfaceModemInterface *iface);
-static void iface_modem_3gpp_init (MMIfaceModem3gpp      *iface);
+static void iface_modem_init      (MMIfaceModemInterface     *iface);
+static void iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface);
 
-static MMIfaceModemInterface *iface_modem_parent;
-static MMIfaceModem3gpp      *iface_modem_3gpp_parent;
+static MMIfaceModemInterface     *iface_modem_parent;
+static MMIfaceModem3gppInterface *iface_modem_3gpp_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMtkLegacy, mm_broadband_modem_mtk_legacy, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -930,7 +930,7 @@ iface_modem_init (MMIfaceModemInterface *iface)
 }
 
 static void
-iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
+iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
 {
     iface_modem_3gpp_parent = g_type_interface_peek_parent (iface);
 

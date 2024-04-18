@@ -41,10 +41,12 @@
 #include "mm-serial-parsers.h"
 #include "mm-bearer-list.h"
 
-static void iface_modem_init           (MMIfaceModemInterface *iface);
-static void iface_modem_3gpp_init      (MMIfaceModem3gpp      *iface);
-static void iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd  *iface);
-static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
+static void iface_modem_init           (MMIfaceModemInterface     *iface);
+static void iface_modem_3gpp_init      (MMIfaceModem3gppInterface *iface);
+static void iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd      *iface);
+static void iface_modem_messaging_init (MMIfaceModemMessaging     *iface);
+
+static MMIfaceModem3gppInterface *iface_modem_3gpp_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemAltairLte, mm_broadband_modem_altair_lte, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -70,9 +72,6 @@ struct _MMBroadbandModemAltairLtePrivate {
 
     GList *pco_list;
 };
-
-static MMIfaceModem3gpp *iface_modem_3gpp_parent;
-
 
 /*****************************************************************************/
 /* Modem power down (Modem interface) */
@@ -1258,7 +1257,7 @@ iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface)
 }
 
 static void
-iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
+iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
 {
     iface_modem_3gpp_parent = g_type_interface_peek_parent (iface);
 

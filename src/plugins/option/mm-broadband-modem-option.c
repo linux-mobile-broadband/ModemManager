@@ -33,12 +33,12 @@
 #include "mm-broadband-modem-option.h"
 #include "mm-shared-option.h"
 
-static void shared_option_init    (MMSharedOption        *iface);
-static void iface_modem_init      (MMIfaceModemInterface *iface);
-static void iface_modem_3gpp_init (MMIfaceModem3gpp      *iface);
+static void shared_option_init    (MMSharedOption            *iface);
+static void iface_modem_init      (MMIfaceModemInterface     *iface);
+static void iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface);
 
-static MMIfaceModemInterface *iface_modem_parent;
-static MMIfaceModem3gpp      *iface_modem_3gpp_parent;
+static MMIfaceModemInterface     *iface_modem_parent;
+static MMIfaceModem3gppInterface *iface_modem_3gpp_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemOption, mm_broadband_modem_option, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_OPTION, shared_option_init)
@@ -1224,7 +1224,7 @@ iface_modem_init (MMIfaceModemInterface *iface)
 }
 
 static void
-iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
+iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
 {
     iface_modem_3gpp_parent = g_type_interface_peek_parent (iface);
 

@@ -41,7 +41,7 @@ typedef struct {
     /* Parent class */
     MMBaseModemClass *class_parent;
     /* 3GPP interface support */
-    MMIfaceModem3gpp *iface_modem_3gpp_parent;
+    MMIfaceModem3gppInterface *iface_modem_3gpp_parent;
     /* URCs to ignore */
     GRegex *sim_ready_regex;
 } Private;

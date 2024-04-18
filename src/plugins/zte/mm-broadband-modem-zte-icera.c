@@ -30,9 +30,9 @@
 #include "mm-broadband-modem-zte-icera.h"
 #include "mm-modem-helpers.h"
 
-static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface);
 
-static MMIfaceModem3gpp *iface_modem_3gpp_parent;
+static MMIfaceModem3gppInterface *iface_modem_3gpp_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemZteIcera, mm_broadband_modem_zte_icera, MM_TYPE_BROADBAND_MODEM_ICERA, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
@@ -183,7 +183,7 @@ finalize (GObject *object)
 
 
 static void
-iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
+iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
 {
     iface_modem_3gpp_parent = g_type_interface_peek_parent (iface);
 

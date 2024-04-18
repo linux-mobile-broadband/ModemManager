@@ -28,8 +28,8 @@
 #include "mm-iface-modem-3gpp.h"
 #include "mm-broadband-modem-motorola.h"
 
-static void iface_modem_init      (MMIfaceModemInterface *iface);
-static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void iface_modem_init      (MMIfaceModemInterface     *iface);
+static void iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMotorola, mm_broadband_modem_motorola, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -64,7 +64,7 @@ mm_broadband_modem_motorola_init (MMBroadbandModemMotorola *self)
 }
 
 static void
-iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
+iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
 {
     /* Loading IMEI not supported */
     iface->load_imei = NULL;

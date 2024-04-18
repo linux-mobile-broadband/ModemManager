@@ -22,13 +22,12 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include "mm-iface-modem.h"
 #include "mm-base-bearer.h"
 #include "mm-port-serial-at.h"
 
-#define MM_TYPE_IFACE_MODEM_3GPP               (mm_iface_modem_3gpp_get_type ())
-#define MM_IFACE_MODEM_3GPP(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM_3GPP, MMIfaceModem3gpp))
-#define MM_IS_IFACE_MODEM_3GPP(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_3GPP))
-#define MM_IFACE_MODEM_3GPP_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_3GPP, MMIfaceModem3gpp))
+#define MM_TYPE_IFACE_MODEM_3GPP mm_iface_modem_3gpp_get_type ()
+G_DECLARE_INTERFACE (MMIfaceModem3gpp, mm_iface_modem_3gpp, MM, IFACE_MODEM_3GPP, MMIfaceModem)
 
 #define MM_IFACE_MODEM_3GPP_DBUS_SKELETON           "iface-modem-3gpp-dbus-skeleton"
 #define MM_IFACE_MODEM_3GPP_REGISTRATION_STATE      "iface-modem-3gpp-registration-state"
@@ -53,9 +52,7 @@
      MM_MODEM_ACCESS_TECHNOLOGY_LTE |                       \
      MM_MODEM_ACCESS_TECHNOLOGY_5GNR)
 
-typedef struct _MMIfaceModem3gpp MMIfaceModem3gpp;
-
-struct _MMIfaceModem3gpp {
+struct _MMIfaceModem3gppInterface {
     GTypeInterface g_iface;
 
     /* Loading of the IMEI property */
@@ -284,9 +281,6 @@ struct _MMIfaceModem3gpp {
                                          GAsyncResult        *res,
                                          GError             **error);
 };
-
-GType mm_iface_modem_3gpp_get_type (void);
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModem3gpp, g_object_unref)
 
 /* Initialize Modem 3GPP interface (async) */
 void     mm_iface_modem_3gpp_initialize        (MMIfaceModem3gpp *self,

@@ -41,7 +41,7 @@ struct _MMSharedFibocom {
     MMBaseModemClass * (* peek_parent_class) (MMSharedFibocom *self);
 
     /* Peek 3GPP interface of the parent class of the object */
-    MMIfaceModem3gpp * (* peek_parent_3gpp_interface) (MMSharedFibocom *self);
+    MMIfaceModem3gppInterface * (* peek_parent_3gpp_interface) (MMSharedFibocom *self);
 };
 
 GType mm_shared_fibocom_get_type (void);

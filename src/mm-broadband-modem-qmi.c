@@ -54,7 +54,7 @@
 #include "mm-call-list.h"
 
 static void iface_modem_init                      (MMIfaceModemInterface          *iface);
-static void iface_modem_3gpp_init                 (MMIfaceModem3gpp               *iface);
+static void iface_modem_3gpp_init                 (MMIfaceModem3gppInterface      *iface);
 static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface);
 static void iface_modem_3gpp_ussd_init            (MMIfaceModem3gppUssd           *iface);
 static void iface_modem_voice_init                (MMIfaceModemVoice              *iface);
@@ -13902,7 +13902,7 @@ iface_modem_init (MMIfaceModemInterface *iface)
 }
 
 static void
-iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
+iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
 {
     /* Initialization steps */
     iface->load_imei = modem_3gpp_load_imei;

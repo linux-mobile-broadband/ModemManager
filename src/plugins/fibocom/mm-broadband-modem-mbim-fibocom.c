@@ -28,11 +28,11 @@
 #include "mm-broadband-modem-mbim-fibocom.h"
 #include "mm-shared-fibocom.h"
 
-static void iface_modem_3gpp_init     (MMIfaceModem3gpp     *iface);
-static void shared_fibocom_init       (MMSharedFibocom      *iface);
-static void iface_modem_firmware_init (MMIfaceModemFirmware *iface);
+static void iface_modem_3gpp_init     (MMIfaceModem3gppInterface *iface);
+static void shared_fibocom_init       (MMSharedFibocom           *iface);
+static void iface_modem_firmware_init (MMIfaceModemFirmware     *iface);
 
-static MMIfaceModem3gpp *iface_modem_3gpp_parent;
+static MMIfaceModem3gppInterface *iface_modem_3gpp_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbimFibocom, mm_broadband_modem_mbim_fibocom, MM_TYPE_BROADBAND_MODEM_MBIM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
@@ -70,7 +70,7 @@ mm_broadband_modem_mbim_fibocom_init (MMBroadbandModemMbimFibocom *self)
 }
 
 static void
-iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
+iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
 {
     iface_modem_3gpp_parent = g_type_interface_peek_parent (iface);
 
@@ -91,7 +91,7 @@ peek_parent_class (MMSharedFibocom *self)
     return MM_BASE_MODEM_CLASS (mm_broadband_modem_mbim_fibocom_parent_class);
 }
 
-static MMIfaceModem3gpp *
+static MMIfaceModem3gppInterface *
 peek_parent_3gpp_interface (MMSharedFibocom *self)
 {
     return iface_modem_3gpp_parent;

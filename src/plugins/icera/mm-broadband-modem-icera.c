@@ -40,12 +40,12 @@
 #include "mm-modem-helpers-icera.h"
 
 static void iface_modem_init                      (MMIfaceModemInterface          *iface);
-static void iface_modem_3gpp_init                 (MMIfaceModem3gpp               *iface);
+static void iface_modem_3gpp_init                 (MMIfaceModem3gppInterface      *iface);
 static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface);
 static void iface_modem_time_init                 (MMIfaceModemTime               *iface);
 
 static MMIfaceModem                   *iface_modem_parent;
-static MMIfaceModem3gpp               *iface_modem_3gpp_parent;
+static MMIfaceModem3gppInterface      *iface_modem_3gpp_parent;
 static MMIfaceModem3gppProfileManager *iface_modem_3gpp_profile_manager_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemIcera, mm_broadband_modem_icera, MM_TYPE_BROADBAND_MODEM, 0,
@@ -2310,7 +2310,7 @@ iface_modem_init (MMIfaceModemInterface *iface)
 }
 
 static void
-iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
+iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
 {
     iface_modem_3gpp_parent = g_type_interface_peek_parent (iface);
 
