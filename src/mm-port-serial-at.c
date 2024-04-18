@@ -25,7 +25,7 @@
 #include "mm-port-serial-at.h"
 #include "mm-log-object.h"
 
-static void iface_port_at_init (MMIfacePortAt *iface);
+static void iface_port_at_init (MMIfacePortAtInterface *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMPortSerialAt, mm_port_serial_at, MM_TYPE_PORT_SERIAL, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_PORT_AT, iface_port_at_init))
@@ -625,7 +625,7 @@ finalize (GObject *object)
 }
 
 static void
-iface_port_at_init (MMIfacePortAt *iface)
+iface_port_at_init (MMIfacePortAtInterface *iface)
 {
     iface->check_support = NULL;
     iface->command = iface_port_at_command;

@@ -22,14 +22,12 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#define MM_TYPE_IFACE_PORT_AT               (mm_iface_port_at_get_type ())
-#define MM_IFACE_PORT_AT(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_PORT_AT, MMIfacePortAt))
-#define MM_IS_IFACE_PORT_AT(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_PORT_AT))
-#define MM_IFACE_PORT_AT_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_PORT_AT, MMIfacePortAt))
+#include "mm-port.h"
 
-typedef struct _MMIfacePortAt MMIfacePortAt;
+#define MM_TYPE_IFACE_PORT_AT mm_iface_port_at_get_type ()
+G_DECLARE_INTERFACE (MMIfacePortAt, mm_iface_port_at, MM, IFACE_PORT_AT, MMPort)
 
-struct _MMIfacePortAt {
+struct _MMIfacePortAtInterface {
     GTypeInterface g_iface;
 
     gboolean (* check_support) (MMIfacePortAt        *self,
@@ -48,9 +46,6 @@ struct _MMIfacePortAt {
                                 GAsyncResult         *res,
                                 GError              **error);
 };
-
-GType mm_iface_port_at_get_type (void);
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfacePortAt, g_object_unref)
 
 gboolean  mm_iface_port_at_check_support  (MMIfacePortAt        *self,
                                            gboolean             *out_supported,

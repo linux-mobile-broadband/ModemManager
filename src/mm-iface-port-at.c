@@ -17,9 +17,10 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-port.h"
 #include "mm-iface-port-at.h"
 #include "mm-log-object.h"
+
+G_DEFINE_INTERFACE (MMIfacePortAt, mm_iface_port_at, MM_TYPE_PORT)
 
 /*****************************************************************************/
 
@@ -32,12 +33,12 @@ mm_iface_port_at_check_support (MMIfacePortAt  *self,
 
     /* If the object implementing the interface doesn't provide a check_support() method,
      * we assume the feature is unconditionally supported. */
-    if (!MM_IFACE_PORT_AT_GET_INTERFACE (self)->check_support) {
+    if (!MM_IFACE_PORT_AT_GET_IFACE (self)->check_support) {
         *out_supported = TRUE;
         return TRUE;
     }
 
-    return MM_IFACE_PORT_AT_GET_INTERFACE (self)->check_support (self, out_supported, error);
+    return MM_IFACE_PORT_AT_GET_IFACE (self)->check_support (self, out_supported, error);
 }
 
 /*****************************************************************************/
@@ -47,7 +48,7 @@ mm_iface_port_at_command_finish (MMIfacePortAt  *self,
                                  GAsyncResult   *res,
                                  GError        **error)
 {
-    return MM_IFACE_PORT_AT_GET_INTERFACE (self)->command_finish (self, res, error);
+    return MM_IFACE_PORT_AT_GET_IFACE (self)->command_finish (self, res, error);
 }
 
 void
@@ -60,45 +61,22 @@ mm_iface_port_at_command (MMIfacePortAt        *self,
                           GAsyncReadyCallback   callback,
                           gpointer              user_data)
 {
-    g_assert (MM_IFACE_PORT_AT_GET_INTERFACE (self)->command);
-    g_assert (MM_IFACE_PORT_AT_GET_INTERFACE (self)->command_finish);
+    g_assert (MM_IFACE_PORT_AT_GET_IFACE (self)->command);
+    g_assert (MM_IFACE_PORT_AT_GET_IFACE (self)->command_finish);
 
-    MM_IFACE_PORT_AT_GET_INTERFACE (self)->command (self,
-                                                    command,
-                                                    timeout_seconds,
-                                                    is_raw,
-                                                    allow_cached,
-                                                    cancellable,
-                                                    callback,
-                                                    user_data);
+    MM_IFACE_PORT_AT_GET_IFACE (self)->command (self,
+                                                command,
+                                                timeout_seconds,
+                                                is_raw,
+                                                allow_cached,
+                                                cancellable,
+                                                callback,
+                                                user_data);
 }
 
 /*****************************************************************************/
 
 static void
-iface_port_at_init (gpointer g_iface)
+mm_iface_port_at_default_init (MMIfacePortAtInterface *iface)
 {
-}
-
-GType
-mm_iface_port_at_get_type (void)
-{
-    static GType iface_port_at_type = 0;
-
-    if (!G_UNLIKELY (iface_port_at_type)) {
-        static const GTypeInfo info = {
-            sizeof (MMIfacePortAt), /* class_size */
-            iface_port_at_init,     /* base_init */
-            NULL,                   /* base_finalize */
-        };
-
-        iface_port_at_type = g_type_register_static (G_TYPE_INTERFACE,
-                                                     "MMIfacePortAt",
-                                                     &info,
-                                                     0);
-
-        g_type_interface_add_prerequisite (iface_port_at_type, MM_TYPE_PORT);
-    }
-
-    return iface_port_at_type;
 }
