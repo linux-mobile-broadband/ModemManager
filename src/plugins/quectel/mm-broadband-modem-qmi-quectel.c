@@ -25,16 +25,16 @@
 #include "mm-modem-helpers-quectel.h"
 #include "mm-shared-quectel.h"
 
-static void iface_modem_init                      (MMIfaceModemInterface          *iface);
-static void iface_modem_firmware_init             (MMIfaceModemFirmware           *iface);
-static void iface_modem_location_init             (MMIfaceModemLocation           *iface);
-static void iface_modem_time_init                 (MMIfaceModemTime               *iface);
-static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface);
-static void shared_quectel_init                   (MMSharedQuectel                *iface);
+static void iface_modem_init                      (MMIfaceModemInterface                   *iface);
+static void iface_modem_firmware_init             (MMIfaceModemFirmware                    *iface);
+static void iface_modem_location_init             (MMIfaceModemLocation                    *iface);
+static void iface_modem_time_init                 (MMIfaceModemTime                        *iface);
+static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManagerInterface *iface);
+static void shared_quectel_init                   (MMSharedQuectel                         *iface);
 
-static MMIfaceModemInterface          *iface_modem_parent;
-static MMIfaceModemLocation           *iface_modem_location_parent;
-static MMIfaceModem3gppProfileManager *iface_modem_3gpp_profile_manager_parent;
+static MMIfaceModemInterface                   *iface_modem_parent;
+static MMIfaceModemLocation                    *iface_modem_location_parent;
+static MMIfaceModem3gppProfileManagerInterface *iface_modem_3gpp_profile_manager_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmiQuectel, mm_broadband_modem_qmi_quectel, MM_TYPE_BROADBAND_MODEM_QMI, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -208,7 +208,7 @@ peek_parent_modem_location_interface (MMSharedQuectel *self)
 }
 
 static void
-iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface)
+iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManagerInterface *iface)
 {
     iface_modem_3gpp_profile_manager_parent = g_type_interface_peek_parent (iface);
 

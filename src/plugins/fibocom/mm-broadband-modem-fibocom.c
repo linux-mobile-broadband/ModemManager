@@ -25,14 +25,14 @@
 #include "mm-log.h"
 #include "mm-shared-fibocom.h"
 
-static void iface_modem_init                      (MMIfaceModemInterface          *iface);
-static void iface_modem_3gpp_init                 (MMIfaceModem3gppInterface      *iface);
-static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface);
-static void iface_modem_firmware_init             (MMIfaceModemFirmware           *iface);
-static void shared_fibocom_init                   (MMSharedFibocom                *iface);
+static void iface_modem_init                      (MMIfaceModemInterface                   *iface);
+static void iface_modem_3gpp_init                 (MMIfaceModem3gppInterface               *iface);
+static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManagerInterface *iface);
+static void iface_modem_firmware_init             (MMIfaceModemFirmware                    *iface);
+static void shared_fibocom_init                   (MMSharedFibocom                         *iface);
 
-static MMIfaceModem3gppInterface      *iface_modem_3gpp_parent;
-static MMIfaceModem3gppProfileManager *iface_modem_3gpp_profile_manager_parent;
+static MMIfaceModem3gppInterface               *iface_modem_3gpp_parent;
+static MMIfaceModem3gppProfileManagerInterface *iface_modem_3gpp_profile_manager_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemFibocom, mm_broadband_modem_fibocom, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -720,7 +720,7 @@ iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
 }
 
 static void
-iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface)
+iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManagerInterface *iface)
 {
     iface_modem_3gpp_profile_manager_parent = g_type_interface_peek_parent (iface);
 

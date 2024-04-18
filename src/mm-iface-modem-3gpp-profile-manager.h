@@ -23,16 +23,14 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#define MM_TYPE_IFACE_MODEM_3GPP_PROFILE_MANAGER               (mm_iface_modem_3gpp_profile_manager_get_type ())
-#define MM_IFACE_MODEM_3GPP_PROFILE_MANAGER(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM_3GPP_PROFILE_MANAGER, MMIfaceModem3gppProfileManager))
-#define MM_IS_IFACE_MODEM_3GPP_PROFILE_MANAGER(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_3GPP_PROFILE_MANAGER))
-#define MM_IFACE_MODEM_3GPP_PROFILE_MANAGER_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_3GPP_PROFILE_MANAGER, MMIfaceModem3gppProfileManager))
+#include "mm-iface-modem-3gpp.h"
+
+#define MM_TYPE_IFACE_MODEM_3GPP_PROFILE_MANAGER mm_iface_modem_3gpp_profile_manager_get_type ()
+G_DECLARE_INTERFACE (MMIfaceModem3gppProfileManager, mm_iface_modem_3gpp_profile_manager, MM, IFACE_MODEM_3GPP_PROFILE_MANAGER, MMIfaceModem3gpp)
 
 #define MM_IFACE_MODEM_3GPP_PROFILE_MANAGER_DBUS_SKELETON "iface-modem-3gpp-profile-manager-dbus-skeleton"
 
-typedef struct _MMIfaceModem3gppProfileManager MMIfaceModem3gppProfileManager;
-
-struct _MMIfaceModem3gppProfileManager {
+struct _MMIfaceModem3gppProfileManagerInterface {
     GTypeInterface g_iface;
 
     /* Check for profile management support (async) */
@@ -187,9 +185,6 @@ struct _MMIfaceModem3gppProfileManager {
                                        MMBearerApnType                 *out_apn_type,
                                        GError                         **error);
 };
-
-GType mm_iface_modem_3gpp_profile_manager_get_type (void);
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModem3gppProfileManager, g_object_unref)
 
 /* Initialize profile manager interface (async) */
 void     mm_iface_modem_3gpp_profile_manager_initialize        (MMIfaceModem3gppProfileManager  *self,

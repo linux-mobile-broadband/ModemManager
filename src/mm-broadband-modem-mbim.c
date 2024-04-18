@@ -51,16 +51,16 @@
 # include "mm-shared-qmi.h"
 #endif
 
-static void iface_modem_init                      (MMIfaceModemInterface          *iface);
-static void iface_modem_3gpp_init                 (MMIfaceModem3gppInterface      *iface);
-static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface);
-static void iface_modem_3gpp_ussd_init            (MMIfaceModem3gppUssd           *iface);
-static void iface_modem_location_init             (MMIfaceModemLocation           *iface);
-static void iface_modem_messaging_init            (MMIfaceModemMessaging          *iface);
-static void iface_modem_signal_init               (MMIfaceModemSignal             *iface);
-static void iface_modem_sar_init                  (MMIfaceModemSar                *iface);
+static void iface_modem_init                      (MMIfaceModemInterface                   *iface);
+static void iface_modem_3gpp_init                 (MMIfaceModem3gppInterface               *iface);
+static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManagerInterface *iface);
+static void iface_modem_3gpp_ussd_init            (MMIfaceModem3gppUssd                    *iface);
+static void iface_modem_location_init             (MMIfaceModemLocation                    *iface);
+static void iface_modem_messaging_init            (MMIfaceModemMessaging                   *iface);
+static void iface_modem_signal_init               (MMIfaceModemSignal                      *iface);
+static void iface_modem_sar_init                  (MMIfaceModemSar                         *iface);
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-static void shared_qmi_init                       (MMSharedQmi                    *iface);
+static void shared_qmi_init                       (MMSharedQmi                             *iface);
 #endif
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
@@ -10205,7 +10205,7 @@ iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
 }
 
 static void
-iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface)
+iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManagerInterface *iface)
 {
     /* Initialization steps */
     iface->check_support = modem_3gpp_profile_manager_check_support;
