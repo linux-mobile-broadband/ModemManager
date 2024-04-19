@@ -22,16 +22,14 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#define MM_TYPE_IFACE_MODEM_TIME               (mm_iface_modem_time_get_type ())
-#define MM_IFACE_MODEM_TIME(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM_TIME, MMIfaceModemTime))
-#define MM_IS_IFACE_MODEM_TIME(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_TIME))
-#define MM_IFACE_MODEM_TIME_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_TIME, MMIfaceModemTime))
+#include "mm-iface-modem.h"
+
+#define MM_TYPE_IFACE_MODEM_TIME mm_iface_modem_time_get_type ()
+G_DECLARE_INTERFACE (MMIfaceModemTime, mm_iface_modem_time, MM, IFACE_MODEM_TIME, MMIfaceModem)
 
 #define MM_IFACE_MODEM_TIME_DBUS_SKELETON "iface-modem-time-dbus-skeleton"
 
-typedef struct _MMIfaceModemTime MMIfaceModemTime;
-
-struct _MMIfaceModemTime {
+struct _MMIfaceModemTimeInterface {
     GTypeInterface g_iface;
 
     /* Check for Time support (async) */
@@ -92,9 +90,6 @@ struct _MMIfaceModemTime {
                                                     GAsyncResult *res,
                                                     GError **error);
 };
-
-GType mm_iface_modem_time_get_type (void);
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModemTime, g_object_unref)
 
 /* Initialize Time interface (async) */
 void     mm_iface_modem_time_initialize        (MMIfaceModemTime *self,

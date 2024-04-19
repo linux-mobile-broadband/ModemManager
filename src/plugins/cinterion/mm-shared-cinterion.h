@@ -50,7 +50,7 @@ struct _MMSharedCinterion {
     MMIfaceModemVoice *  (* peek_parent_voice_interface) (MMSharedCinterion *self);
 
     /* Peek time interface of the parent class of the object */
-    MMIfaceModemTime *  (* peek_parent_time_interface) (MMSharedCinterion *self);
+    MMIfaceModemTimeInterface *  (* peek_parent_time_interface) (MMSharedCinterion *self);
 };
 
 GType mm_shared_cinterion_get_type (void);

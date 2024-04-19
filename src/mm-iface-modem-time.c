@@ -30,6 +30,8 @@ static GQuark support_checked_quark;
 static GQuark supported_quark;
 static GQuark network_timezone_context_quark;
 
+G_DEFINE_INTERFACE (MMIfaceModemTime, mm_iface_modem_time, MM_TYPE_IFACE_MODEM)
+
 /*****************************************************************************/
 
 void
@@ -63,7 +65,7 @@ load_network_time_ready (MMIfaceModemTime            *self,
     gchar *time_str;
     GError *error = NULL;
 
-    time_str = MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_time_finish (self, res, &error);
+    time_str = MM_IFACE_MODEM_TIME_GET_IFACE (self)->load_network_time_finish (self, res, &error);
     if (error)
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else
@@ -98,8 +100,8 @@ handle_get_network_time_auth_ready (MMBaseModem                 *self,
         return;
     }
 
-    if (!MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_time ||
-        !MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_time_finish) {
+    if (!MM_IFACE_MODEM_TIME_GET_IFACE (self)->load_network_time ||
+        !MM_IFACE_MODEM_TIME_GET_IFACE (self)->load_network_time_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Cannot load network time: operation not supported");
         handle_get_network_time_context_free (ctx);
@@ -107,7 +109,7 @@ handle_get_network_time_auth_ready (MMBaseModem                 *self,
     }
 
     mm_obj_info (self, "processing user request to load network time...");
-    MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_time (
+    MM_IFACE_MODEM_TIME_GET_IFACE (self)->load_network_time (
         ctx->self,
         (GAsyncReadyCallback)load_network_time_ready,
         ctx);
@@ -194,7 +196,7 @@ load_network_timezone_ready (MMIfaceModemTime *self,
     MMNetworkTimezone *tz;
 
     /* Finish the async operation */
-    tz = MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_timezone_finish (self, res, &error);
+    tz = MM_IFACE_MODEM_TIME_GET_IFACE (self)->load_network_timezone_finish (self, res, &error);
     if (!tz) {
         NetworkTimezoneContext *ctx;
 
@@ -235,7 +237,7 @@ network_timezone_poll_cb (MMIfaceModemTime *self)
     ctx = (NetworkTimezoneContext *) g_object_get_qdata (G_OBJECT (self), network_timezone_context_quark);
     ctx->network_timezone_poll_id = 0;
 
-    MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_timezone (
+    MM_IFACE_MODEM_TIME_GET_IFACE (self)->load_network_timezone (
         self,
         (GAsyncReadyCallback)load_network_timezone_ready,
         NULL);
@@ -315,8 +317,8 @@ start_network_timezone (MMIfaceModemTime *self)
     NetworkTimezoneContext *ctx;
 
     /* If loading network timezone not supported, just finish here */
-    if (!MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_timezone ||
-        !MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_timezone_finish) {
+    if (!MM_IFACE_MODEM_TIME_GET_IFACE (self)->load_network_timezone ||
+        !MM_IFACE_MODEM_TIME_GET_IFACE (self)->load_network_timezone_finish) {
         mm_obj_dbg (self, "loading network timezone is not supported");
         return;
     }
@@ -430,7 +432,7 @@ disable_unsolicited_events_ready (MMIfaceModemTime *self,
     DisablingContext *ctx;
     GError *error = NULL;
 
-    MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->disable_unsolicited_events_finish (self, res, &error);
+    MM_IFACE_MODEM_TIME_GET_IFACE (self)->disable_unsolicited_events_finish (self, res, &error);
     if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -451,7 +453,7 @@ cleanup_unsolicited_events_ready (MMIfaceModemTime *self,
     DisablingContext *ctx;
     GError *error = NULL;
 
-    MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->cleanup_unsolicited_events_finish (self, res, &error);
+    MM_IFACE_MODEM_TIME_GET_IFACE (self)->cleanup_unsolicited_events_finish (self, res, &error);
     if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -486,9 +488,9 @@ interface_disabling_step (GTask *task)
 
     case DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS:
         /* Allow cleaning up unsolicited events */
-        if (MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->disable_unsolicited_events &&
-            MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->disable_unsolicited_events_finish) {
-            MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->disable_unsolicited_events (
+        if (MM_IFACE_MODEM_TIME_GET_IFACE (self)->disable_unsolicited_events &&
+            MM_IFACE_MODEM_TIME_GET_IFACE (self)->disable_unsolicited_events_finish) {
+            MM_IFACE_MODEM_TIME_GET_IFACE (self)->disable_unsolicited_events (
                 self,
                 (GAsyncReadyCallback)disable_unsolicited_events_ready,
                 task);
@@ -499,9 +501,9 @@ interface_disabling_step (GTask *task)
 
     case DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS:
         /* Allow cleaning up unsolicited events */
-        if (MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->cleanup_unsolicited_events &&
-            MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->cleanup_unsolicited_events_finish) {
-            MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->cleanup_unsolicited_events (
+        if (MM_IFACE_MODEM_TIME_GET_IFACE (self)->cleanup_unsolicited_events &&
+            MM_IFACE_MODEM_TIME_GET_IFACE (self)->cleanup_unsolicited_events_finish) {
+            MM_IFACE_MODEM_TIME_GET_IFACE (self)->cleanup_unsolicited_events (
                 self,
                 (GAsyncReadyCallback)cleanup_unsolicited_events_ready,
                 task);
@@ -594,7 +596,7 @@ setup_unsolicited_events_ready (MMIfaceModemTime *self,
     EnablingContext *ctx;
     GError *error = NULL;
 
-    MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->setup_unsolicited_events_finish (self, res, &error);
+    MM_IFACE_MODEM_TIME_GET_IFACE (self)->setup_unsolicited_events_finish (self, res, &error);
     if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -616,7 +618,7 @@ enable_unsolicited_events_ready (MMIfaceModemTime *self,
     GError *error = NULL;
 
     /* Not critical! */
-    if (!MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->enable_unsolicited_events_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_TIME_GET_IFACE (self)->enable_unsolicited_events_finish (self, res, &error)) {
         mm_obj_dbg (self, "couldn't enable unsolicited events: %s", error->message);
         g_error_free (error);
     }
@@ -655,9 +657,9 @@ interface_enabling_step (GTask *task)
 
     case ENABLING_STEP_SETUP_UNSOLICITED_EVENTS:
         /* Allow setting up unsolicited events */
-        if (MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->setup_unsolicited_events &&
-            MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->setup_unsolicited_events_finish) {
-            MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->setup_unsolicited_events (
+        if (MM_IFACE_MODEM_TIME_GET_IFACE (self)->setup_unsolicited_events &&
+            MM_IFACE_MODEM_TIME_GET_IFACE (self)->setup_unsolicited_events_finish) {
+            MM_IFACE_MODEM_TIME_GET_IFACE (self)->setup_unsolicited_events (
                 self,
                 (GAsyncReadyCallback)setup_unsolicited_events_ready,
                 task);
@@ -668,9 +670,9 @@ interface_enabling_step (GTask *task)
 
     case ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS:
         /* Allow setting up unsolicited events */
-        if (MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->enable_unsolicited_events &&
-            MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->enable_unsolicited_events_finish) {
-            MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->enable_unsolicited_events (
+        if (MM_IFACE_MODEM_TIME_GET_IFACE (self)->enable_unsolicited_events &&
+            MM_IFACE_MODEM_TIME_GET_IFACE (self)->enable_unsolicited_events_finish) {
+            MM_IFACE_MODEM_TIME_GET_IFACE (self)->enable_unsolicited_events (
                 self,
                 (GAsyncReadyCallback)enable_unsolicited_events_ready,
                 task);
@@ -832,9 +834,7 @@ check_support_ready (MMIfaceModemTime *self,
     InitializationContext *ctx;
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->check_support_finish (self,
-                                                                         res,
-                                                                         &error)) {
+    if (!MM_IFACE_MODEM_TIME_GET_IFACE (self)->check_support_finish (self, res, &error)) {
         if (error) {
             /* This error shouldn't be treated as critical */
             mm_obj_dbg (self, "time support check failed: %s", error->message);
@@ -893,9 +893,9 @@ interface_initialization_step (GTask *task)
                                 supported_quark,
                                 GUINT_TO_POINTER (FALSE));
 
-            if (MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->check_support &&
-                MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->check_support_finish) {
-                MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->check_support (
+            if (MM_IFACE_MODEM_TIME_GET_IFACE (self)->check_support &&
+                MM_IFACE_MODEM_TIME_GET_IFACE (self)->check_support_finish) {
+                MM_IFACE_MODEM_TIME_GET_IFACE (self)->check_support (
                     self,
                     (GAsyncReadyCallback)check_support_ready,
                     task);
@@ -999,44 +999,21 @@ mm_iface_modem_time_shutdown (MMIfaceModemTime *self)
 /*****************************************************************************/
 
 static void
-iface_modem_time_init (gpointer g_iface)
+mm_iface_modem_time_default_init (MMIfaceModemTimeInterface *iface)
 {
-    static gboolean initialized = FALSE;
+    static gsize initialized = 0;
 
-    if (initialized)
+    if (!g_once_init_enter (&initialized))
         return;
 
     /* Properties */
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_object (MM_IFACE_MODEM_TIME_DBUS_SKELETON,
-                              "Time DBus skeleton",
-                              "DBus skeleton for the Time interface",
-                              MM_GDBUS_TYPE_MODEM_TIME_SKELETON,
-                              G_PARAM_READWRITE));
+    g_object_interface_install_property (
+        iface,
+        g_param_spec_object (MM_IFACE_MODEM_TIME_DBUS_SKELETON,
+                             "Time DBus skeleton",
+                             "DBus skeleton for the Time interface",
+                             MM_GDBUS_TYPE_MODEM_TIME_SKELETON,
+                             G_PARAM_READWRITE));
 
-    initialized = TRUE;
-}
-
-GType
-mm_iface_modem_time_get_type (void)
-{
-    static GType iface_modem_time_type = 0;
-
-    if (!G_UNLIKELY (iface_modem_time_type)) {
-        static const GTypeInfo info = {
-            sizeof (MMIfaceModemTime), /* class_size */
-            iface_modem_time_init,     /* base_init */
-            NULL,                      /* base_finalize */
-        };
-
-        iface_modem_time_type = g_type_register_static (G_TYPE_INTERFACE,
-                                                        "MMIfaceModemTime",
-                                                        &info,
-                                                        0);
-
-        g_type_interface_add_prerequisite (iface_modem_time_type, MM_TYPE_IFACE_MODEM);
-    }
-
-    return iface_modem_time_type;
+    g_once_init_leave (&initialized, 1);
 }

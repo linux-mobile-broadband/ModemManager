@@ -57,8 +57,8 @@ typedef struct {
     FeatureSupport         slcc_support;
     GRegex                *slcc_regex;
     /* time */
-    MMIfaceModemTime      *iface_modem_time_parent;
-    GRegex                *ctzu_regex;
+    MMIfaceModemTimeInterface *iface_modem_time_parent;
+    GRegex                    *ctzu_regex;
 } Private;
 
 static void

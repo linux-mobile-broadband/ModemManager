@@ -42,7 +42,7 @@
 static void iface_modem_init                      (MMIfaceModemInterface                   *iface);
 static void iface_modem_3gpp_init                 (MMIfaceModem3gppInterface               *iface);
 static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManagerInterface *iface);
-static void iface_modem_time_init                 (MMIfaceModemTime                        *iface);
+static void iface_modem_time_init                 (MMIfaceModemTimeInterface               *iface);
 
 static MMIfaceModem                            *iface_modem_parent;
 static MMIfaceModem3gppInterface               *iface_modem_3gpp_parent;
@@ -2342,7 +2342,7 @@ iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManagerInterface *
 }
 
 static void
-iface_modem_time_init (MMIfaceModemTime *iface)
+iface_modem_time_init (MMIfaceModemTimeInterface *iface)
 {
     iface->check_support = modem_time_check_support;
     iface->check_support_finish = modem_time_check_support_finish;

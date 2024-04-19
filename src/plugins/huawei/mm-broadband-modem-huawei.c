@@ -55,7 +55,7 @@ static void iface_modem_3gpp_init      (MMIfaceModem3gppInterface     *iface);
 static void iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssdInterface *iface);
 static void iface_modem_location_init  (MMIfaceModemLocationInterface *iface);
 static void iface_modem_cdma_init      (MMIfaceModemCdma              *iface);
-static void iface_modem_time_init      (MMIfaceModemTime              *iface);
+static void iface_modem_time_init      (MMIfaceModemTimeInterface     *iface);
 static void iface_modem_voice_init     (MMIfaceModemVoice             *iface);
 static void iface_modem_signal_init    (MMIfaceModemSignalInterface   *iface);
 
@@ -5074,7 +5074,7 @@ iface_modem_location_init (MMIfaceModemLocationInterface *iface)
 }
 
 static void
-iface_modem_time_init (MMIfaceModemTime *iface)
+iface_modem_time_init (MMIfaceModemTimeInterface *iface)
 {
     iface->check_support = modem_time_check_support;
     iface->check_support_finish = modem_time_check_support_finish;

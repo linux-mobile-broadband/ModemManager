@@ -37,9 +37,9 @@
 #include "mm-common-sierra.h"
 #include "mm-broadband-bearer-sierra.h"
 
-static void iface_modem_init      (MMIfaceModemInterface *iface);
-static void iface_modem_cdma_init (MMIfaceModemCdma      *iface);
-static void iface_modem_time_init (MMIfaceModemTime      *iface);
+static void iface_modem_init      (MMIfaceModemInterface     *iface);
+static void iface_modem_cdma_init (MMIfaceModemCdma          *iface);
+static void iface_modem_time_init (MMIfaceModemTimeInterface *iface);
 
 static MMIfaceModemInterface *iface_modem_parent;
 static MMIfaceModemCdma      *iface_modem_cdma_parent;
@@ -1919,7 +1919,7 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
 }
 
 static void
-iface_modem_time_init (MMIfaceModemTime *iface)
+iface_modem_time_init (MMIfaceModemTimeInterface *iface)
 {
     iface->check_support = modem_time_check_support;
     iface->check_support_finish = modem_time_check_support_finish;

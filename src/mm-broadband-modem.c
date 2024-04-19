@@ -70,7 +70,7 @@ static void iface_modem_simple_init               (MMIfaceModemSimpleInterface  
 static void iface_modem_location_init             (MMIfaceModemLocationInterface           *iface);
 static void iface_modem_messaging_init            (MMIfaceModemMessagingInterface          *iface);
 static void iface_modem_voice_init                (MMIfaceModemVoice                       *iface);
-static void iface_modem_time_init                 (MMIfaceModemTime                        *iface);
+static void iface_modem_time_init                 (MMIfaceModemTimeInterface               *iface);
 static void iface_modem_signal_init               (MMIfaceModemSignalInterface             *iface);
 static void iface_modem_oma_init                  (MMIfaceModemOma                         *iface);
 static void iface_modem_firmware_init             (MMIfaceModemFirmwareInterface           *iface);
@@ -13743,7 +13743,7 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
 }
 
 static void
-iface_modem_time_init (MMIfaceModemTime *iface)
+iface_modem_time_init (MMIfaceModemTimeInterface *iface)
 {
     iface->check_support = modem_time_check_support;
     iface->check_support_finish = modem_time_check_support_finish;

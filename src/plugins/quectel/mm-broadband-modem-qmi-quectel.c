@@ -28,7 +28,7 @@
 static void iface_modem_init                      (MMIfaceModemInterface                   *iface);
 static void iface_modem_firmware_init             (MMIfaceModemFirmwareInterface           *iface);
 static void iface_modem_location_init             (MMIfaceModemLocationInterface           *iface);
-static void iface_modem_time_init                 (MMIfaceModemTime                        *iface);
+static void iface_modem_time_init                 (MMIfaceModemTimeInterface               *iface);
 static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManagerInterface *iface);
 static void shared_quectel_init                   (MMSharedQuectel                         *iface);
 
@@ -183,7 +183,7 @@ iface_modem_location_init (MMIfaceModemLocationInterface *iface)
 }
 
 static void
-iface_modem_time_init (MMIfaceModemTime *iface)
+iface_modem_time_init (MMIfaceModemTimeInterface *iface)
 {
     iface->check_support        = mm_shared_quectel_time_check_support;
     iface->check_support_finish = mm_shared_quectel_time_check_support_finish;
