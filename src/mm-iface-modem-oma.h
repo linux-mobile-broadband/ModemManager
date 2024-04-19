@@ -22,16 +22,14 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#define MM_TYPE_IFACE_MODEM_OMA               (mm_iface_modem_oma_get_type ())
-#define MM_IFACE_MODEM_OMA(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM_OMA, MMIfaceModemOma))
-#define MM_IS_IFACE_MODEM_OMA(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_OMA))
-#define MM_IFACE_MODEM_OMA_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_OMA, MMIfaceModemOma))
+#include "mm-iface-modem.h"
+
+#define MM_TYPE_IFACE_MODEM_OMA mm_iface_modem_oma_get_type ()
+G_DECLARE_INTERFACE (MMIfaceModemOma, mm_iface_modem_oma, MM, IFACE_MODEM_OMA, MMIfaceModem)
 
 #define MM_IFACE_MODEM_OMA_DBUS_SKELETON "iface-modem-oma-dbus-skeleton"
 
-typedef struct _MMIfaceModemOma MMIfaceModemOma;
-
-struct _MMIfaceModemOma {
+struct _MMIfaceModemOmaInterface {
     GTypeInterface g_iface;
 
     /* Check for Oma support (async) */
@@ -118,9 +116,6 @@ struct _MMIfaceModemOma {
                                         GAsyncResult *res,
                                         GError **error);
 };
-
-GType mm_iface_modem_oma_get_type (void);
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModemOma, g_object_unref)
 
 /* Initialize Oma interface (async) */
 void     mm_iface_modem_oma_initialize        (MMIfaceModemOma *self,

@@ -28,6 +28,8 @@
 static GQuark support_checked_quark;
 static GQuark supported_quark;
 
+G_DEFINE_INTERFACE (MMIfaceModemOma, mm_iface_modem_oma, MM_TYPE_IFACE_MODEM)
+
 /*****************************************************************************/
 
 void
@@ -168,7 +170,7 @@ setup_ready (MMIfaceModemOma *self,
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->setup_finish (self, res, &error))
+    if (!MM_IFACE_MODEM_OMA_GET_IFACE (ctx->self)->setup_finish (self, res, &error))
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         /* Update current features in the interface */
@@ -205,8 +207,8 @@ handle_setup_auth_ready (MMBaseModem *self,
         return;
     }
 
-    if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->setup ||
-        !MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->setup_finish) {
+    if (!MM_IFACE_MODEM_OMA_GET_IFACE (ctx->self)->setup ||
+        !MM_IFACE_MODEM_OMA_GET_IFACE (ctx->self)->setup_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Cannot setup OMA: operation not supported");
         handle_setup_context_free (ctx);
@@ -217,7 +219,7 @@ handle_setup_auth_ready (MMBaseModem *self,
     mm_obj_dbg (self, "setting up OMA features: '%s'", str);
     g_free (str);
 
-    MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->setup (
+    MM_IFACE_MODEM_OMA_GET_IFACE (ctx->self)->setup (
         ctx->self,
         ctx->features,
         (GAsyncReadyCallback)setup_ready,
@@ -272,7 +274,7 @@ start_client_initiated_session_ready (MMIfaceModemOma *self,
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->start_client_initiated_session_finish (self, res, &error))
+    if (!MM_IFACE_MODEM_OMA_GET_IFACE (ctx->self)->start_client_initiated_session_finish (self, res, &error))
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         /* Update interface info */
@@ -310,8 +312,8 @@ handle_start_client_initiated_session_auth_ready (MMBaseModem *self,
         return;
     }
 
-    if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->start_client_initiated_session ||
-        !MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->start_client_initiated_session_finish) {
+    if (!MM_IFACE_MODEM_OMA_GET_IFACE (ctx->self)->start_client_initiated_session ||
+        !MM_IFACE_MODEM_OMA_GET_IFACE (ctx->self)->start_client_initiated_session_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Cannot start client-initiated OMA session: "
                                                         "operation not supported");
@@ -332,7 +334,7 @@ handle_start_client_initiated_session_auth_ready (MMBaseModem *self,
 
     mm_obj_dbg (self, "starting client-initiated OMA session (%s)",
                 mm_oma_session_type_get_string (ctx->session_type));
-    MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->start_client_initiated_session (
+    MM_IFACE_MODEM_OMA_GET_IFACE (ctx->self)->start_client_initiated_session (
         ctx->self,
         ctx->session_type,
         (GAsyncReadyCallback)start_client_initiated_session_ready,
@@ -389,7 +391,7 @@ accept_network_initiated_session_ready (MMIfaceModemOma *self,
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->accept_network_initiated_session_finish (self, res, &error))
+    if (!MM_IFACE_MODEM_OMA_GET_IFACE (ctx->self)->accept_network_initiated_session_finish (self, res, &error))
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         /* If accepted or rejected, remove from pending */
@@ -464,8 +466,8 @@ handle_accept_network_initiated_session_auth_ready (MMBaseModem *self,
         return;
     }
 
-    if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->accept_network_initiated_session ||
-        !MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->accept_network_initiated_session_finish) {
+    if (!MM_IFACE_MODEM_OMA_GET_IFACE (ctx->self)->accept_network_initiated_session ||
+        !MM_IFACE_MODEM_OMA_GET_IFACE (ctx->self)->accept_network_initiated_session_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Cannot accept network-initiated OMA session: "
                                                         "operation not supported");
@@ -487,7 +489,7 @@ handle_accept_network_initiated_session_auth_ready (MMBaseModem *self,
                 ctx->accept ? "accepting" : "rejecting",
                 mm_oma_session_type_get_string (ctx->session_type),
                 ctx->session_id);
-    MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->accept_network_initiated_session (
+    MM_IFACE_MODEM_OMA_GET_IFACE (ctx->self)->accept_network_initiated_session (
         ctx->self,
         ctx->session_id,
         ctx->accept,
@@ -545,7 +547,7 @@ cancel_session_ready (MMIfaceModemOma *self,
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->cancel_session_finish (self, res, &error))
+    if (!MM_IFACE_MODEM_OMA_GET_IFACE (ctx->self)->cancel_session_finish (self, res, &error))
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         /* Clear interface info when cancelled */
@@ -583,8 +585,8 @@ handle_cancel_session_auth_ready (MMBaseModem *self,
         return;
     }
 
-    if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->cancel_session ||
-        !MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->cancel_session_finish) {
+    if (!MM_IFACE_MODEM_OMA_GET_IFACE (ctx->self)->cancel_session ||
+        !MM_IFACE_MODEM_OMA_GET_IFACE (ctx->self)->cancel_session_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Cannot cancel OMA session: operation not supported");
         handle_cancel_session_context_free (ctx);
@@ -592,7 +594,7 @@ handle_cancel_session_auth_ready (MMBaseModem *self,
     }
 
     mm_obj_dbg (self, "cancelling OMA session");
-    MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->cancel_session (
+    MM_IFACE_MODEM_OMA_GET_IFACE (ctx->self)->cancel_session (
         ctx->self,
         (GAsyncReadyCallback)cancel_session_ready,
         ctx);
@@ -659,7 +661,7 @@ disable_unsolicited_events_ready (MMIfaceModemOma *self,
     DisablingContext *ctx;
     GError *error = NULL;
 
-    MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->disable_unsolicited_events_finish (self, res, &error);
+    MM_IFACE_MODEM_OMA_GET_IFACE (self)->disable_unsolicited_events_finish (self, res, &error);
     if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -680,7 +682,7 @@ cleanup_unsolicited_events_ready (MMIfaceModemOma *self,
     DisablingContext *ctx;
     GError *error = NULL;
 
-    MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->cleanup_unsolicited_events_finish (self, res, &error);
+    MM_IFACE_MODEM_OMA_GET_IFACE (self)->cleanup_unsolicited_events_finish (self, res, &error);
     if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -709,9 +711,9 @@ interface_disabling_step (GTask *task)
 
     case DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS:
         /* Allow cleaning up unsolicited events */
-        if (MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->disable_unsolicited_events &&
-            MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->disable_unsolicited_events_finish) {
-            MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->disable_unsolicited_events (
+        if (MM_IFACE_MODEM_OMA_GET_IFACE (self)->disable_unsolicited_events &&
+            MM_IFACE_MODEM_OMA_GET_IFACE (self)->disable_unsolicited_events_finish) {
+            MM_IFACE_MODEM_OMA_GET_IFACE (self)->disable_unsolicited_events (
                 self,
                 (GAsyncReadyCallback)disable_unsolicited_events_ready,
                 task);
@@ -722,9 +724,9 @@ interface_disabling_step (GTask *task)
 
     case DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS:
         /* Allow cleaning up unsolicited events */
-        if (MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->cleanup_unsolicited_events &&
-            MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->cleanup_unsolicited_events_finish) {
-            MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->cleanup_unsolicited_events (
+        if (MM_IFACE_MODEM_OMA_GET_IFACE (self)->cleanup_unsolicited_events &&
+            MM_IFACE_MODEM_OMA_GET_IFACE (self)->cleanup_unsolicited_events_finish) {
+            MM_IFACE_MODEM_OMA_GET_IFACE (self)->cleanup_unsolicited_events (
                 self,
                 (GAsyncReadyCallback)cleanup_unsolicited_events_ready,
                 task);
@@ -818,7 +820,7 @@ load_features_ready (MMIfaceModemOma *self,
     GError *error = NULL;
     MMOmaFeature features;
 
-    features = MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->load_features_finish (self, res, &error);
+    features = MM_IFACE_MODEM_OMA_GET_IFACE (self)->load_features_finish (self, res, &error);
     if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -843,7 +845,7 @@ setup_unsolicited_events_ready (MMIfaceModemOma *self,
     EnablingContext *ctx;
     GError *error = NULL;
 
-    MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->setup_unsolicited_events_finish (self, res, &error);
+    MM_IFACE_MODEM_OMA_GET_IFACE (self)->setup_unsolicited_events_finish (self, res, &error);
     if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -865,7 +867,7 @@ enable_unsolicited_events_ready (MMIfaceModemOma *self,
     GError *error = NULL;
 
     /* Not critical! */
-    if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->enable_unsolicited_events_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_OMA_GET_IFACE (self)->enable_unsolicited_events_finish (self, res, &error)) {
         mm_obj_dbg (self, "couldn't enable unsolicited events: %s", error->message);
         g_error_free (error);
     }
@@ -897,9 +899,9 @@ interface_enabling_step (GTask *task)
         /* fall through */
 
     case ENABLING_STEP_LOAD_FEATURES:
-        if (MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->load_features &&
-            MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->load_features_finish) {
-            MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->load_features (
+        if (MM_IFACE_MODEM_OMA_GET_IFACE (self)->load_features &&
+            MM_IFACE_MODEM_OMA_GET_IFACE (self)->load_features_finish) {
+            MM_IFACE_MODEM_OMA_GET_IFACE (self)->load_features (
                 self,
                 (GAsyncReadyCallback)load_features_ready,
                 task);
@@ -910,9 +912,9 @@ interface_enabling_step (GTask *task)
 
     case ENABLING_STEP_SETUP_UNSOLICITED_EVENTS:
         /* Allow setting up unsolicited events */
-        if (MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->setup_unsolicited_events &&
-            MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->setup_unsolicited_events_finish) {
-            MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->setup_unsolicited_events (
+        if (MM_IFACE_MODEM_OMA_GET_IFACE (self)->setup_unsolicited_events &&
+            MM_IFACE_MODEM_OMA_GET_IFACE (self)->setup_unsolicited_events_finish) {
+            MM_IFACE_MODEM_OMA_GET_IFACE (self)->setup_unsolicited_events (
                 self,
                 (GAsyncReadyCallback)setup_unsolicited_events_ready,
                 task);
@@ -923,9 +925,9 @@ interface_enabling_step (GTask *task)
 
     case ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS:
         /* Allow setting up unsolicited events */
-        if (MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->enable_unsolicited_events &&
-            MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->enable_unsolicited_events_finish) {
-            MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->enable_unsolicited_events (
+        if (MM_IFACE_MODEM_OMA_GET_IFACE (self)->enable_unsolicited_events &&
+            MM_IFACE_MODEM_OMA_GET_IFACE (self)->enable_unsolicited_events_finish) {
+            MM_IFACE_MODEM_OMA_GET_IFACE (self)->enable_unsolicited_events (
                 self,
                 (GAsyncReadyCallback)enable_unsolicited_events_ready,
                 task);
@@ -1009,7 +1011,7 @@ check_support_ready (MMIfaceModemOma *self,
     InitializationContext *ctx;
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->check_support_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_OMA_GET_IFACE (self)->check_support_finish (self, res, &error)) {
         if (error) {
             /* This error shouldn't be treated as critical */
             mm_obj_dbg (self, "OMA support check failed: %s", error->message);
@@ -1068,9 +1070,9 @@ interface_initialization_step (GTask *task)
                                 supported_quark,
                                 GUINT_TO_POINTER (FALSE));
 
-            if (MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->check_support &&
-                MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->check_support_finish) {
-                MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->check_support (
+            if (MM_IFACE_MODEM_OMA_GET_IFACE (self)->check_support &&
+                MM_IFACE_MODEM_OMA_GET_IFACE (self)->check_support_finish) {
+                MM_IFACE_MODEM_OMA_GET_IFACE (self)->check_support (
                     self,
                     (GAsyncReadyCallback)check_support_ready,
                     task);
@@ -1192,44 +1194,21 @@ mm_iface_modem_oma_shutdown (MMIfaceModemOma *self)
 /*****************************************************************************/
 
 static void
-iface_modem_oma_init (gpointer g_iface)
+mm_iface_modem_oma_default_init (MMIfaceModemOmaInterface *iface)
 {
-    static gboolean initialized = FALSE;
+    static gsize initialized = 0;
 
-    if (initialized)
+    if (!g_once_init_enter (&initialized))
         return;
 
     /* Properties */
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_object (MM_IFACE_MODEM_OMA_DBUS_SKELETON,
-                              "OMA DBus skeleton",
-                              "DBus skeleton for the OMA interface",
-                              MM_GDBUS_TYPE_MODEM_OMA_SKELETON,
-                              G_PARAM_READWRITE));
+    g_object_interface_install_property (
+        iface,
+        g_param_spec_object (MM_IFACE_MODEM_OMA_DBUS_SKELETON,
+                             "OMA DBus skeleton",
+                             "DBus skeleton for the OMA interface",
+                             MM_GDBUS_TYPE_MODEM_OMA_SKELETON,
+                             G_PARAM_READWRITE));
 
-    initialized = TRUE;
-}
-
-GType
-mm_iface_modem_oma_get_type (void)
-{
-    static GType iface_modem_oma_type = 0;
-
-    if (!G_UNLIKELY (iface_modem_oma_type)) {
-        static const GTypeInfo info = {
-            sizeof (MMIfaceModemOma), /* class_size */
-            iface_modem_oma_init,     /* base_init */
-            NULL,                      /* base_finalize */
-        };
-
-        iface_modem_oma_type = g_type_register_static (G_TYPE_INTERFACE,
-                                                       "MMIfaceModemOma",
-                                                       &info,
-                                                       0);
-
-        g_type_interface_add_prerequisite (iface_modem_oma_type, MM_TYPE_IFACE_MODEM);
-    }
-
-    return iface_modem_oma_type;
+    g_once_init_leave (&initialized, 1);
 }

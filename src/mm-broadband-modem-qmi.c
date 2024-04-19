@@ -61,7 +61,7 @@ static void iface_modem_voice_init                (MMIfaceModemVoiceInterface   
 static void iface_modem_cdma_init                 (MMIfaceModemCdma                        *iface);
 static void iface_modem_messaging_init            (MMIfaceModemMessagingInterface          *iface);
 static void iface_modem_location_init             (MMIfaceModemLocationInterface           *iface);
-static void iface_modem_oma_init                  (MMIfaceModemOma                         *iface);
+static void iface_modem_oma_init                  (MMIfaceModemOmaInterface                *iface);
 static void iface_modem_firmware_init             (MMIfaceModemFirmwareInterface           *iface);
 static void iface_modem_sar_init                  (MMIfaceModemSarInterface                *iface);
 static void iface_modem_signal_init               (MMIfaceModemSignalInterface             *iface);
@@ -14152,7 +14152,7 @@ iface_modem_signal_init (MMIfaceModemSignalInterface *iface)
 }
 
 static void
-iface_modem_oma_init (MMIfaceModemOma *iface)
+iface_modem_oma_init (MMIfaceModemOmaInterface *iface)
 {
     iface->check_support = oma_check_support;
     iface->check_support_finish = oma_check_support_finish;
