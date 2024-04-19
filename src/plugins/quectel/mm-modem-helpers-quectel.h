@@ -31,4 +31,13 @@ gboolean mm_quectel_parse_ctzu_test_response (const gchar  *response,
 
 gboolean mm_quectel_check_standard_firmware_version_valid (const gchar *std_str);
 
+gboolean mm_quectel_get_version_from_revision (const gchar  *revision,
+                                               guint        *release,
+                                               guint        *minor,
+                                               GError      **error);
+
+gboolean mm_quectel_is_profile_manager_supported (const gchar *revision,
+                                                  guint        release,
+                                                  guint        minor);
+
 #endif  /* MM_MODEM_HELPERS_QUECTEL_H */

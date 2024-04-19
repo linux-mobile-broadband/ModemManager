@@ -20,25 +20,107 @@
 #include "mm-iface-modem-firmware.h"
 #include "mm-iface-modem-location.h"
 #include "mm-iface-modem-time.h"
+#include "mm-iface-modem-3gpp-profile-manager.h"
+#include "mm-log-object.h"
+#include "mm-modem-helpers-quectel.h"
 #include "mm-shared-quectel.h"
 
-static void iface_modem_init          (MMIfaceModem         *iface);
-static void iface_modem_firmware_init (MMIfaceModemFirmware *iface);
-static void iface_modem_location_init (MMIfaceModemLocation *iface);
-static void iface_modem_time_init     (MMIfaceModemTime     *iface);
-static void shared_quectel_init       (MMSharedQuectel      *iface);
+static void iface_modem_init                      (MMIfaceModem                   *iface);
+static void iface_modem_firmware_init             (MMIfaceModemFirmware           *iface);
+static void iface_modem_location_init             (MMIfaceModemLocation           *iface);
+static void iface_modem_time_init                 (MMIfaceModemTime               *iface);
+static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface);
+static void shared_quectel_init                   (MMSharedQuectel                *iface);
 
-static MMIfaceModem         *iface_modem_parent;
-static MMIfaceModemLocation *iface_modem_location_parent;
+static MMIfaceModem                   *iface_modem_parent;
+static MMIfaceModemLocation           *iface_modem_location_parent;
+static MMIfaceModem3gppProfileManager *iface_modem_3gpp_profile_manager_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmiQuectel, mm_broadband_modem_qmi_quectel, MM_TYPE_BROADBAND_MODEM_QMI, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP_PROFILE_MANAGER, iface_modem_3gpp_profile_manager_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_QUECTEL, shared_quectel_init))
 
 /*****************************************************************************/
+
+static gboolean
+profile_manager_check_unsolicited_support (MMBroadbandModemQmiQuectel *self)
+{
+    GError      *error = NULL;
+    const gchar *revision = NULL;
+    guint        release_version;
+    guint        minor_version;
+
+    revision = mm_iface_modem_get_revision (MM_IFACE_MODEM (self));
+    if (!mm_quectel_get_version_from_revision (revision,
+                                               &release_version,
+                                               &minor_version,
+                                               &error)) {
+        mm_obj_warn (self, "parsing revision failed: %s", error->message);
+        g_error_free (error);
+
+        /* assume profile manager supported if version not parseable */
+        return TRUE;
+    }
+
+    if (!mm_quectel_is_profile_manager_supported (revision,
+                                                  release_version,
+                                                  minor_version)) {
+        mm_obj_dbg (self, "profile management not supported by revision %s", revision);
+        return FALSE;
+    }
+
+    /* profile management seems supported */
+    return TRUE;
+}
+
+static gboolean
+profile_manager_enable_unsolicited_events_finish (MMIfaceModem3gppProfileManager  *self,
+                                                  GAsyncResult                    *res,
+                                                  GError                         **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+parent_enable_unsolicited_events_ready (MMIfaceModem3gppProfileManager *self,
+                                        GAsyncResult                   *res,
+                                        GTask                          *task)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_3gpp_profile_manager_parent->enable_unsolicited_events_finish (self,
+                                                                                    res,
+                                                                                    &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+profile_manager_enable_unsolicited_events (MMIfaceModem3gppProfileManager *self,
+                                           GAsyncReadyCallback             callback,
+                                           gpointer                        user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!profile_manager_check_unsolicited_support (MM_BROADBAND_MODEM_QMI_QUECTEL (self))) {
+        mm_obj_warn (self, "continuing without enabling profile manager events");
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+    }
+
+    iface_modem_3gpp_profile_manager_parent->enable_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_enable_unsolicited_events_ready,
+        task);
+}
 
 MMBroadbandModemQmiQuectel *
 mm_broadband_modem_qmi_quectel_new (const gchar  *device,
@@ -122,6 +204,15 @@ static MMIfaceModemLocation *
 peek_parent_modem_location_interface (MMSharedQuectel *self)
 {
     return iface_modem_location_parent;
+}
+
+static void
+iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface)
+{
+    iface_modem_3gpp_profile_manager_parent = g_type_interface_peek_parent (iface);
+
+    iface->enable_unsolicited_events        = profile_manager_enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = profile_manager_enable_unsolicited_events_finish;
 }
 
 static void

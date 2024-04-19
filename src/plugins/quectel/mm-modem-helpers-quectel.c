@@ -138,3 +138,63 @@ mm_quectel_check_standard_firmware_version_valid (const gchar *std_str)
     }
     return valid;
 }
+
+gboolean
+mm_quectel_get_version_from_revision (const gchar  *revision,
+                                      guint        *release,
+                                      guint        *minor,
+                                      GError      **error)
+{
+    g_autoptr(GRegex) version_regex = NULL;
+    g_autoptr(GMatchInfo) match_info = NULL;
+
+    version_regex = g_regex_new ("R(\\d+)A(\\d+)",
+                                 G_REGEX_RAW | G_REGEX_OPTIMIZE,
+                                 0,
+                                 NULL);
+
+    if (!g_regex_match (version_regex, revision, 0, &match_info)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Cannot parse revision version %s", revision);
+        return FALSE;
+    }
+    if (!mm_get_uint_from_match_info (match_info, 1, release)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Couldn't get release version from revision %s", revision);
+        return FALSE;
+    }
+    if (!mm_get_uint_from_match_info (match_info, 2, minor)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Couldn't get minor version from revision %s", revision);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+gboolean
+mm_quectel_is_profile_manager_supported (const gchar *revision,
+                                         guint        release,
+                                         guint        minor)
+{
+    guint i;
+    static const struct {
+        const gchar *revision_prefix;
+        guint minimum_release;
+        guint minimum_minor;
+    } profile_support_map [] = {
+        {"EC25", 6, 10},
+    };
+
+    for (i = 0; i < G_N_ELEMENTS (profile_support_map); ++i) {
+        if (g_str_has_prefix (revision, profile_support_map[i].revision_prefix)) {
+            guint minimum_release = profile_support_map[i].minimum_release;
+            guint minimum_minor = profile_support_map[i].minimum_minor;
+
+            return ((release > minimum_release) ||
+                    (release == minimum_release && minor >= minimum_minor));
+        }
+    }
+
+    return TRUE;
+}
