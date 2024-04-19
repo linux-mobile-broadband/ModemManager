@@ -49,14 +49,14 @@ typedef struct {
     MMModemLocationSource          enabled_sources;
     FeatureSupport                 cgps_support;
     /* voice */
-    MMIfaceModemVoice     *iface_modem_voice_parent;
-    FeatureSupport         cpcmreg_support;
-    FeatureSupport         clcc_urc_support;
-    GRegex                *clcc_urc_regex;
-    GRegex                *voice_call_regex;
-    GRegex                *missed_call_regex;
-    GRegex                *cring_regex;
-    GRegex                *rxdtmf_regex;
+    MMIfaceModemVoiceInterface *iface_modem_voice_parent;
+    FeatureSupport              cpcmreg_support;
+    FeatureSupport              clcc_urc_support;
+    GRegex                     *clcc_urc_regex;
+    GRegex                     *voice_call_regex;
+    GRegex                     *missed_call_regex;
+    GRegex                     *cring_regex;
+    GRegex                     *rxdtmf_regex;
 } Private;
 
 static void

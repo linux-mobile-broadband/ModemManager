@@ -23,21 +23,18 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include "mm-iface-modem.h"
 #include "mm-base-call.h"
 
-#define MM_TYPE_IFACE_MODEM_VOICE               (mm_iface_modem_voice_get_type ())
-#define MM_IFACE_MODEM_VOICE(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM_VOICE, MMIfaceModemVoice))
-#define MM_IS_IFACE_MODEM_VOICE(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_VOICE))
-#define MM_IFACE_MODEM_VOICE_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_VOICE, MMIfaceModemVoice))
+#define MM_TYPE_IFACE_MODEM_VOICE mm_iface_modem_voice_get_type ()
+G_DECLARE_INTERFACE (MMIfaceModemVoice, mm_iface_modem_voice, MM, IFACE_MODEM_VOICE, MMIfaceModem)
 
 #define MM_IFACE_MODEM_VOICE_DBUS_SKELETON                       "iface-modem-voice-dbus-skeleton"
 #define MM_IFACE_MODEM_VOICE_CALL_LIST                           "iface-modem-voice-call-list"
 #define MM_IFACE_MODEM_VOICE_PERIODIC_CALL_LIST_CHECK_DISABLED   "iface-modem-voice-periodic-call-list-check-disabled"
 #define MM_IFACE_MODEM_VOICE_INDICATION_CALL_LIST_RELOAD_ENABLED "iface-modem-voice-indication-call-list-reload-enabled"
 
-typedef struct _MMIfaceModemVoice MMIfaceModemVoice;
-
-struct _MMIfaceModemVoice {
+struct _MMIfaceModemVoiceInterface {
     GTypeInterface g_iface;
 
     /* Check for Voice support (async) */
@@ -195,9 +192,6 @@ struct _MMIfaceModemVoice {
                                             gboolean             *status,
                                             GError              **error);
 };
-
-GType mm_iface_modem_voice_get_type (void);
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModemVoice, g_object_unref)
 
 /* Initialize Voice interface (async) */
 void     mm_iface_modem_voice_initialize        (MMIfaceModemVoice *self,

@@ -47,7 +47,7 @@ struct _MMSharedCinterion {
     MMIfaceModemLocationInterface *  (* peek_parent_location_interface) (MMSharedCinterion *self);
 
     /* Peek voice interface of the parent class of the object */
-    MMIfaceModemVoice *  (* peek_parent_voice_interface) (MMSharedCinterion *self);
+    MMIfaceModemVoiceInterface *  (* peek_parent_voice_interface) (MMSharedCinterion *self);
 
     /* Peek time interface of the parent class of the object */
     MMIfaceModemTimeInterface *  (* peek_parent_time_interface) (MMSharedCinterion *self);

@@ -56,14 +56,14 @@ static void iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssdInterface *iface);
 static void iface_modem_location_init  (MMIfaceModemLocationInterface *iface);
 static void iface_modem_cdma_init      (MMIfaceModemCdma              *iface);
 static void iface_modem_time_init      (MMIfaceModemTimeInterface     *iface);
-static void iface_modem_voice_init     (MMIfaceModemVoice             *iface);
+static void iface_modem_voice_init     (MMIfaceModemVoiceInterface    *iface);
 static void iface_modem_signal_init    (MMIfaceModemSignalInterface   *iface);
 
 static MMIfaceModemInterface         *iface_modem_parent;
 static MMIfaceModem3gppInterface     *iface_modem_3gpp_parent;
 static MMIfaceModemLocationInterface *iface_modem_location_parent;
 static MMIfaceModemCdma              *iface_modem_cdma_parent;
-static MMIfaceModemVoice             *iface_modem_voice_parent;
+static MMIfaceModemVoiceInterface    *iface_modem_voice_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemHuawei, mm_broadband_modem_huawei, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -5085,7 +5085,7 @@ iface_modem_time_init (MMIfaceModemTimeInterface *iface)
 }
 
 static void
-iface_modem_voice_init (MMIfaceModemVoice *iface)
+iface_modem_voice_init (MMIfaceModemVoiceInterface *iface)
 {
     iface_modem_voice_parent = g_type_interface_peek_parent (iface);
 

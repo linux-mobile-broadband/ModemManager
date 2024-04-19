@@ -34,10 +34,10 @@
 #include "mm-modem-helpers-ublox.h"
 #include "mm-ublox-enums-types.h"
 
-static void iface_modem_init       (MMIfaceModemInterface *iface);
-static void iface_modem_voice_init (MMIfaceModemVoice     *iface);
+static void iface_modem_init       (MMIfaceModemInterface      *iface);
+static void iface_modem_voice_init (MMIfaceModemVoiceInterface *iface);
 
-static MMIfaceModemVoice *iface_modem_voice_parent;
+static MMIfaceModemVoiceInterface *iface_modem_voice_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemUblox, mm_broadband_modem_ublox, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -2046,7 +2046,7 @@ iface_modem_init (MMIfaceModemInterface *iface)
 }
 
 static void
-iface_modem_voice_init (MMIfaceModemVoice *iface)
+iface_modem_voice_init (MMIfaceModemVoiceInterface *iface)
 {
     iface_modem_voice_parent = g_type_interface_peek_parent (iface);
 

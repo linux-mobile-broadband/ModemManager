@@ -30,6 +30,8 @@
 static GQuark call_list_polling_context_quark;
 static GQuark in_call_event_context_quark;
 
+G_DEFINE_INTERFACE (MMIfaceModemVoice, mm_iface_modem_voice, MM_TYPE_IFACE_MODEM)
+
 /*****************************************************************************/
 
 void
@@ -153,9 +155,9 @@ create_incoming_call (MMIfaceModemVoice *self,
 {
     MMBaseCall *call;
 
-    g_assert (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->create_call != NULL);
+    g_assert (MM_IFACE_MODEM_VOICE_GET_IFACE (self)->create_call != NULL);
 
-    call = MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->create_call (self, MM_CALL_DIRECTION_INCOMING, number);
+    call = MM_IFACE_MODEM_VOICE_GET_IFACE (self)->create_call (self, MM_CALL_DIRECTION_INCOMING, number);
     update_audio_settings_in_call (self, call);
     return call;
 }
@@ -179,8 +181,8 @@ create_outgoing_call_from_properties (MMIfaceModemVoice  *self,
     }
 
     /* Create a call object as defined by the interface */
-    g_assert (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->create_call != NULL);
-    call = MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->create_call (self, MM_CALL_DIRECTION_OUTGOING, number);
+    g_assert (MM_IFACE_MODEM_VOICE_GET_IFACE (self)->create_call != NULL);
+    call = MM_IFACE_MODEM_VOICE_GET_IFACE (self)->create_call (self, MM_CALL_DIRECTION_OUTGOING, number);
     update_audio_settings_in_call (self, call);
     return call;
 }
@@ -807,7 +809,7 @@ hold_and_accept_ready (MMIfaceModemVoice          *self,
     GError *error = NULL;
     GList  *l;
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hold_and_accept_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->hold_and_accept_finish (self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_hold_and_accept_context_free (ctx);
         return;
@@ -862,8 +864,8 @@ handle_hold_and_accept_auth_ready (MMBaseModem                *self,
         return;
     }
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hold_and_accept ||
-        !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hold_and_accept_finish) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->hold_and_accept ||
+        !MM_IFACE_MODEM_VOICE_GET_IFACE (self)->hold_and_accept_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Cannot hold and accept: unsupported");
         handle_hold_and_accept_context_free (ctx);
@@ -883,9 +885,10 @@ handle_hold_and_accept_auth_ready (MMBaseModem                *self,
     g_object_unref (list);
 
     mm_obj_info (self, "processing user request to hold and accept voice call...");
-    MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hold_and_accept (MM_IFACE_MODEM_VOICE (self),
-                                                                (GAsyncReadyCallback)hold_and_accept_ready,
-                                                                ctx);
+    MM_IFACE_MODEM_VOICE_GET_IFACE (self)->hold_and_accept (
+        MM_IFACE_MODEM_VOICE (self),
+        (GAsyncReadyCallback)hold_and_accept_ready,
+        ctx);
 }
 
 static gboolean
@@ -937,7 +940,7 @@ hangup_and_accept_ready (MMIfaceModemVoice            *self,
     GError *error = NULL;
     GList  *l;
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_and_accept_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->hangup_and_accept_finish (self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_hangup_and_accept_context_free (ctx);
         return;
@@ -992,8 +995,8 @@ handle_hangup_and_accept_auth_ready (MMBaseModem                  *self,
         return;
     }
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_and_accept ||
-        !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_and_accept_finish) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->hangup_and_accept ||
+        !MM_IFACE_MODEM_VOICE_GET_IFACE (self)->hangup_and_accept_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Cannot hangup and accept: unsupported");
         handle_hangup_and_accept_context_free (ctx);
@@ -1013,9 +1016,10 @@ handle_hangup_and_accept_auth_ready (MMBaseModem                  *self,
     g_object_unref (list);
 
     mm_obj_info (self, "processing user request to hangup and accept voice call...");
-    MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_and_accept (MM_IFACE_MODEM_VOICE (self),
-                                                                  (GAsyncReadyCallback)hangup_and_accept_ready,
-                                                                  ctx);
+    MM_IFACE_MODEM_VOICE_GET_IFACE (self)->hangup_and_accept (
+        MM_IFACE_MODEM_VOICE (self),
+        (GAsyncReadyCallback)hangup_and_accept_ready,
+        ctx);
 }
 
 static gboolean
@@ -1065,7 +1069,7 @@ hangup_all_ready (MMIfaceModemVoice      *self,
     GError *error = NULL;
     GList  *l;
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_all_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->hangup_all_finish (self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_hangup_all_context_free (ctx);
         return;
@@ -1132,8 +1136,8 @@ handle_hangup_all_auth_ready (MMBaseModem            *self,
         return;
     }
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_all ||
-        !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_all_finish) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->hangup_all ||
+        !MM_IFACE_MODEM_VOICE_GET_IFACE (self)->hangup_all_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Cannot hangup all: unsupported");
         handle_hangup_all_context_free (ctx);
@@ -1153,9 +1157,10 @@ handle_hangup_all_auth_ready (MMBaseModem            *self,
     g_object_unref (list);
 
     mm_obj_info (self, "processing user request to hangup all voice calls...");
-    MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_all (MM_IFACE_MODEM_VOICE (self),
-                                                           (GAsyncReadyCallback)hangup_all_ready,
-                                                           ctx);
+    MM_IFACE_MODEM_VOICE_GET_IFACE (self)->hangup_all (
+        MM_IFACE_MODEM_VOICE (self),
+        (GAsyncReadyCallback)hangup_all_ready,
+        ctx);
 }
 
 static gboolean
@@ -1205,7 +1210,7 @@ transfer_ready (MMIfaceModemVoice     *self,
     GError *error = NULL;
     GList  *l;
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->transfer_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->transfer_finish (self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_transfer_context_free (ctx);
         return;
@@ -1252,8 +1257,8 @@ handle_transfer_auth_ready (MMBaseModem           *self,
         return;
     }
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->transfer ||
-        !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->transfer_finish) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->transfer ||
+        !MM_IFACE_MODEM_VOICE_GET_IFACE (self)->transfer_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Cannot transfer: unsupported");
         handle_transfer_context_free (ctx);
@@ -1273,9 +1278,10 @@ handle_transfer_auth_ready (MMBaseModem           *self,
     g_object_unref (list);
 
     mm_obj_info (self, "processing user request to transfer voice call...");
-    MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->transfer (MM_IFACE_MODEM_VOICE (self),
-                                                         (GAsyncReadyCallback)transfer_ready,
-                                                         ctx);
+    MM_IFACE_MODEM_VOICE_GET_IFACE (self)->transfer (
+        MM_IFACE_MODEM_VOICE (self),
+        (GAsyncReadyCallback)transfer_ready,
+        ctx);
 }
 
 static gboolean
@@ -1323,7 +1329,7 @@ call_waiting_setup_ready (MMIfaceModemVoice             *self,
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_setup_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->call_waiting_setup_finish (self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_call_waiting_setup_context_free (ctx);
         return;
@@ -1346,8 +1352,8 @@ handle_call_waiting_setup_auth_ready (MMBaseModem                   *self,
         return;
     }
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_setup ||
-        !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_setup_finish) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->call_waiting_setup ||
+        !MM_IFACE_MODEM_VOICE_GET_IFACE (self)->call_waiting_setup_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Cannot setup call waiting: unsupported");
         handle_call_waiting_setup_context_free (ctx);
@@ -1355,10 +1361,11 @@ handle_call_waiting_setup_auth_ready (MMBaseModem                   *self,
     }
 
     mm_obj_info (self, "processing user request to setup voice call waiting...");
-    MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_setup (MM_IFACE_MODEM_VOICE (self),
-                                                                   ctx->enable,
-                                                                   (GAsyncReadyCallback)call_waiting_setup_ready,
-                                                                   ctx);
+    MM_IFACE_MODEM_VOICE_GET_IFACE (self)->call_waiting_setup (
+        MM_IFACE_MODEM_VOICE (self),
+        ctx->enable,
+        (GAsyncReadyCallback)call_waiting_setup_ready,
+        ctx);
 }
 
 static gboolean
@@ -1409,7 +1416,7 @@ call_waiting_query_ready (MMIfaceModemVoice             *self,
     GError   *error = NULL;
     gboolean  status = FALSE;
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_query_finish (self, res, &status, &error)) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->call_waiting_query_finish (self, res, &status, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_call_waiting_query_context_free (ctx);
         return;
@@ -1432,8 +1439,8 @@ handle_call_waiting_query_auth_ready (MMBaseModem                   *self,
         return;
     }
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_query ||
-        !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_query_finish) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->call_waiting_query ||
+        !MM_IFACE_MODEM_VOICE_GET_IFACE (self)->call_waiting_query_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Cannot query call waiting: unsupported");
         handle_call_waiting_query_context_free (ctx);
@@ -1441,9 +1448,10 @@ handle_call_waiting_query_auth_ready (MMBaseModem                   *self,
     }
 
     mm_obj_info (self, "processing user request to query voice call waiting state...");
-    MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_query (MM_IFACE_MODEM_VOICE (self),
-                                                                   (GAsyncReadyCallback)call_waiting_query_ready,
-                                                                   ctx);
+    MM_IFACE_MODEM_VOICE_GET_IFACE (self)->call_waiting_query (
+        MM_IFACE_MODEM_VOICE (self),
+        (GAsyncReadyCallback)call_waiting_query_ready,
+        ctx);
 }
 
 static gboolean
@@ -1529,7 +1537,7 @@ leave_multiparty_ready (MMIfaceModemVoice *self,
 
     ctx = g_task_get_task_data (task);
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->leave_multiparty_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->leave_multiparty_finish (self, res, &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -1588,8 +1596,8 @@ mm_iface_modem_voice_leave_multiparty (MMIfaceModemVoice   *self,
         return;
     }
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->leave_multiparty ||
-        !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->leave_multiparty_finish) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->leave_multiparty ||
+        !MM_IFACE_MODEM_VOICE_GET_IFACE (self)->leave_multiparty_finish) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                  "Cannot leave multiparty: unsupported");
         g_object_unref (task);
@@ -1613,10 +1621,11 @@ mm_iface_modem_voice_leave_multiparty (MMIfaceModemVoice   *self,
     mm_call_list_foreach (list, (MMCallListForeachFunc)prepare_leave_multiparty_foreach, ctx);
     g_object_unref (list);
 
-    MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->leave_multiparty (self,
-                                                                 call,
-                                                                 (GAsyncReadyCallback)leave_multiparty_ready,
-                                                                 task);
+    MM_IFACE_MODEM_VOICE_GET_IFACE (self)->leave_multiparty (
+        self,
+        call,
+        (GAsyncReadyCallback)leave_multiparty_ready,
+        task);
 }
 
 /*****************************************************************************/
@@ -1680,7 +1689,7 @@ join_multiparty_ready (MMIfaceModemVoice *self,
 
     ctx = g_task_get_task_data (task);
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->join_multiparty_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->join_multiparty_finish (self, res, &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -1725,8 +1734,8 @@ mm_iface_modem_voice_join_multiparty (MMIfaceModemVoice   *self,
         return;
     }
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->join_multiparty ||
-        !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->join_multiparty_finish) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->join_multiparty ||
+        !MM_IFACE_MODEM_VOICE_GET_IFACE (self)->join_multiparty_finish) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                  "Cannot join multiparty: unsupported");
         g_object_unref (task);
@@ -1755,9 +1764,10 @@ mm_iface_modem_voice_join_multiparty (MMIfaceModemVoice   *self,
 
     /* NOTE: we do not give the call we want to join, because the join operation acts on all
      * active/held calls. */
-    MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->join_multiparty (self,
-                                                                (GAsyncReadyCallback)join_multiparty_ready,
-                                                                task);
+    MM_IFACE_MODEM_VOICE_GET_IFACE (self)->join_multiparty (
+        self,
+        (GAsyncReadyCallback)join_multiparty_ready,
+        task);
 }
 
 /*****************************************************************************/
@@ -1825,11 +1835,12 @@ setup_in_call_audio_channel_ready (MMIfaceModemVoice *self,
 
     ctx = g_task_get_task_data (task);
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->setup_in_call_audio_channel_finish (self,
-                                                                                        res,
-                                                                                        &ctx->audio_port,
-                                                                                        &ctx->audio_format,
-                                                                                        &error)) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->setup_in_call_audio_channel_finish (
+            self,
+            res,
+            &ctx->audio_port,
+            &ctx->audio_format,
+            &error)) {
         mm_obj_warn (self, "couldn't setup in-call audio channel: %s", error->message);
         g_clear_error (&error);
     }
@@ -1848,7 +1859,7 @@ setup_in_call_unsolicited_events_ready (MMIfaceModemVoice *self,
 
     ctx = g_task_get_task_data (task);
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->setup_in_call_unsolicited_events_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->setup_in_call_unsolicited_events_finish (self, res, &error)) {
         mm_obj_warn (self, "couldn't setup in-call unsolicited events: %s", error->message);
         g_clear_error (&error);
     }
@@ -1876,9 +1887,9 @@ in_call_setup_context_step (GTask *task)
         ctx->step++;
         /* fall-through */
     case IN_CALL_SETUP_STEP_UNSOLICITED_EVENTS:
-        if (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->setup_in_call_unsolicited_events &&
-            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->setup_in_call_unsolicited_events_finish) {
-            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->setup_in_call_unsolicited_events (
+        if (MM_IFACE_MODEM_VOICE_GET_IFACE (self)->setup_in_call_unsolicited_events &&
+            MM_IFACE_MODEM_VOICE_GET_IFACE (self)->setup_in_call_unsolicited_events_finish) {
+            MM_IFACE_MODEM_VOICE_GET_IFACE (self)->setup_in_call_unsolicited_events (
                 self,
                 (GAsyncReadyCallback) setup_in_call_unsolicited_events_ready,
                 task);
@@ -1887,9 +1898,9 @@ in_call_setup_context_step (GTask *task)
         ctx->step++;
         /* fall-through */
     case IN_CALL_SETUP_STEP_AUDIO_CHANNEL:
-        if (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->setup_in_call_audio_channel &&
-            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->setup_in_call_audio_channel_finish) {
-            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->setup_in_call_audio_channel (
+        if (MM_IFACE_MODEM_VOICE_GET_IFACE (self)->setup_in_call_audio_channel &&
+            MM_IFACE_MODEM_VOICE_GET_IFACE (self)->setup_in_call_audio_channel_finish) {
+            MM_IFACE_MODEM_VOICE_GET_IFACE (self)->setup_in_call_audio_channel (
                 self,
                 (GAsyncReadyCallback) setup_in_call_audio_channel_ready,
                 task);
@@ -1964,7 +1975,7 @@ cleanup_in_call_unsolicited_events_ready (MMIfaceModemVoice *self,
 
     ctx = g_task_get_task_data (task);
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->cleanup_in_call_unsolicited_events_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->cleanup_in_call_unsolicited_events_finish (self, res, &error)) {
         mm_obj_warn (self, "couldn't cleanup in-call unsolicited events: %s", error->message);
         g_clear_error (&error);
     }
@@ -1983,7 +1994,7 @@ cleanup_in_call_audio_channel_ready (MMIfaceModemVoice *self,
 
     ctx = g_task_get_task_data (task);
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->cleanup_in_call_audio_channel_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->cleanup_in_call_audio_channel_finish (self, res, &error)) {
         mm_obj_warn (self, "couldn't cleanup in-call audio channel: %s", error->message);
         g_clear_error (&error);
     }
@@ -2011,9 +2022,9 @@ in_call_cleanup_context_step (GTask *task)
         ctx->step++;
         /* fall-through */
     case IN_CALL_CLEANUP_STEP_AUDIO_CHANNEL:
-        if (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->cleanup_in_call_audio_channel &&
-            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->cleanup_in_call_audio_channel_finish) {
-            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->cleanup_in_call_audio_channel (
+        if (MM_IFACE_MODEM_VOICE_GET_IFACE (self)->cleanup_in_call_audio_channel &&
+            MM_IFACE_MODEM_VOICE_GET_IFACE (self)->cleanup_in_call_audio_channel_finish) {
+            MM_IFACE_MODEM_VOICE_GET_IFACE (self)->cleanup_in_call_audio_channel (
                 self,
                 (GAsyncReadyCallback) cleanup_in_call_audio_channel_ready,
                 task);
@@ -2022,9 +2033,9 @@ in_call_cleanup_context_step (GTask *task)
         ctx->step++;
         /* fall-through */
     case IN_CALL_CLEANUP_STEP_UNSOLICITED_EVENTS:
-        if (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->cleanup_in_call_unsolicited_events &&
-            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->cleanup_in_call_unsolicited_events_finish) {
-            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->cleanup_in_call_unsolicited_events (
+        if (MM_IFACE_MODEM_VOICE_GET_IFACE (self)->cleanup_in_call_unsolicited_events &&
+            MM_IFACE_MODEM_VOICE_GET_IFACE (self)->cleanup_in_call_unsolicited_events_finish) {
+            MM_IFACE_MODEM_VOICE_GET_IFACE (self)->cleanup_in_call_unsolicited_events (
                 self,
                 (GAsyncReadyCallback) cleanup_in_call_unsolicited_events_ready,
                 task);
@@ -2395,8 +2406,8 @@ load_call_list_ready (MMIfaceModemVoice *self,
     ctx = get_call_list_polling_context (self);
     ctx->polling_ongoing = FALSE;
 
-    g_assert (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list_finish);
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list_finish (self, res, &call_info_list, &error)) {
+    g_assert (MM_IFACE_MODEM_VOICE_GET_IFACE (self)->load_call_list_finish);
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->load_call_list_finish (self, res, &call_info_list, &error)) {
         mm_obj_warn (self, "couldn't load call list: %s", error->message);
         g_error_free (error);
     } else {
@@ -2461,10 +2472,10 @@ call_list_poll (MMIfaceModemVoice *self)
     if (n_calls_establishing > 0) {
         mm_obj_dbg (self, "%u calls being established: call list polling required", n_calls_establishing);
         ctx->polling_ongoing = TRUE;
-        g_assert (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list);
-        MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list (self,
-                                                                   (GAsyncReadyCallback)load_call_list_ready,
-                                                                   NULL);
+        g_assert (MM_IFACE_MODEM_VOICE_GET_IFACE (self)->load_call_list);
+        MM_IFACE_MODEM_VOICE_GET_IFACE (self)->load_call_list (self,
+                                                               (GAsyncReadyCallback)load_call_list_ready,
+                                                               NULL);
     } else
         mm_obj_dbg (self, "no calls being established: call list polling stopped");
 
@@ -2507,8 +2518,8 @@ reload_all_calls_ready (MMIfaceModemVoice *self,
     GList  *call_info_list = NULL;
     GError *error = NULL;
 
-    g_assert (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list_finish);
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list_finish (self, res, &call_info_list, &error)) {
+    g_assert (MM_IFACE_MODEM_VOICE_GET_IFACE (self)->load_call_list_finish);
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->load_call_list_finish (self, res, &call_info_list, &error)) {
         mm_obj_warn (self, "couldn't reload call list: %s", error->message);
 
         g_task_return_error (task, error);
@@ -2531,9 +2542,9 @@ mm_iface_modem_voice_reload_all_calls (MMIfaceModemVoice   *self,
     GTask *task;
 
     task = g_task_new (self, NULL, callback, user_data);
-    MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list (self,
-                                                               (GAsyncReadyCallback)reload_all_calls_ready,
-                                                               task);
+    MM_IFACE_MODEM_VOICE_GET_IFACE (self)->load_call_list (self,
+                                                           (GAsyncReadyCallback)reload_all_calls_ready,
+                                                           task);
 }
 
 /*****************************************************************************/
@@ -2610,7 +2621,7 @@ disable_unsolicited_events_ready (MMIfaceModemVoice *self,
     DisablingContext *ctx;
     GError *error = NULL;
 
-    MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->disable_unsolicited_events_finish (self, res, &error);
+    MM_IFACE_MODEM_VOICE_GET_IFACE (self)->disable_unsolicited_events_finish (self, res, &error);
     if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -2631,7 +2642,7 @@ cleanup_unsolicited_events_ready (MMIfaceModemVoice *self,
     DisablingContext *ctx;
     GError *error = NULL;
 
-    MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->cleanup_unsolicited_events_finish (self, res, &error);
+    MM_IFACE_MODEM_VOICE_GET_IFACE (self)->cleanup_unsolicited_events_finish (self, res, &error);
     if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -2660,9 +2671,9 @@ interface_disabling_step (GTask *task)
 
     case DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS:
         /* Allow cleaning up unsolicited events */
-        if (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->disable_unsolicited_events &&
-            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->disable_unsolicited_events_finish) {
-            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->disable_unsolicited_events (
+        if (MM_IFACE_MODEM_VOICE_GET_IFACE (self)->disable_unsolicited_events &&
+            MM_IFACE_MODEM_VOICE_GET_IFACE (self)->disable_unsolicited_events_finish) {
+            MM_IFACE_MODEM_VOICE_GET_IFACE (self)->disable_unsolicited_events (
                 self,
                 (GAsyncReadyCallback)disable_unsolicited_events_ready,
                 task);
@@ -2673,9 +2684,9 @@ interface_disabling_step (GTask *task)
 
     case DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS:
         /* Allow cleaning up unsolicited events */
-        if (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->cleanup_unsolicited_events &&
-            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->cleanup_unsolicited_events_finish) {
-            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->cleanup_unsolicited_events (
+        if (MM_IFACE_MODEM_VOICE_GET_IFACE (self)->cleanup_unsolicited_events &&
+            MM_IFACE_MODEM_VOICE_GET_IFACE (self)->cleanup_unsolicited_events_finish) {
+            MM_IFACE_MODEM_VOICE_GET_IFACE (self)->cleanup_unsolicited_events (
                 self,
                 (GAsyncReadyCallback)cleanup_unsolicited_events_ready,
                 task);
@@ -2768,7 +2779,7 @@ setup_unsolicited_events_ready (MMIfaceModemVoice *self,
     EnablingContext *ctx;
     GError *error = NULL;
 
-    MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->setup_unsolicited_events_finish (self, res, &error);
+    MM_IFACE_MODEM_VOICE_GET_IFACE (self)->setup_unsolicited_events_finish (self, res, &error);
     if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -2790,7 +2801,7 @@ enable_unsolicited_events_ready (MMIfaceModemVoice *self,
     GError *error = NULL;
 
     /* Not critical! */
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->enable_unsolicited_events_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->enable_unsolicited_events_finish (self, res, &error)) {
         mm_obj_dbg (self, "couldn't enable unsolicited events: %s", error->message);
         g_error_free (error);
     }
@@ -2823,9 +2834,9 @@ interface_enabling_step (GTask *task)
 
     case ENABLING_STEP_SETUP_UNSOLICITED_EVENTS:
         /* Allow setting up unsolicited events to get notified of incoming calls */
-        if (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->setup_unsolicited_events &&
-            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->setup_unsolicited_events_finish) {
-            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->setup_unsolicited_events (
+        if (MM_IFACE_MODEM_VOICE_GET_IFACE (self)->setup_unsolicited_events &&
+            MM_IFACE_MODEM_VOICE_GET_IFACE (self)->setup_unsolicited_events_finish) {
+            MM_IFACE_MODEM_VOICE_GET_IFACE (self)->setup_unsolicited_events (
                 self,
                 (GAsyncReadyCallback)setup_unsolicited_events_ready,
                 task);
@@ -2836,9 +2847,9 @@ interface_enabling_step (GTask *task)
 
     case ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS:
         /* Allow setting up unsolicited events to get notified of incoming calls */
-        if (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->enable_unsolicited_events &&
-            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->enable_unsolicited_events_finish) {
-            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->enable_unsolicited_events (
+        if (MM_IFACE_MODEM_VOICE_GET_IFACE (self)->enable_unsolicited_events &&
+            MM_IFACE_MODEM_VOICE_GET_IFACE (self)->enable_unsolicited_events_finish) {
+            MM_IFACE_MODEM_VOICE_GET_IFACE (self)->enable_unsolicited_events (
                 self,
                 (GAsyncReadyCallback)enable_unsolicited_events_ready,
                 task);
@@ -2922,7 +2933,7 @@ check_support_ready (MMIfaceModemVoice *self,
     InitializationContext *ctx;
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->check_support_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_VOICE_GET_IFACE (self)->check_support_finish (self, res, &error)) {
         if (error) {
             mm_obj_dbg (self, "voice support check failed: %s", error->message);
             g_error_free (error);
@@ -2961,9 +2972,9 @@ interface_initialization_step (GTask *task)
     case INITIALIZATION_STEP_CHECK_SUPPORT:
         /* Always check voice support when we run initialization, because
          * the support may be different before and after SIM-PIN unlock. */
-        if (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->check_support &&
-            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->check_support_finish) {
-            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->check_support (
+        if (MM_IFACE_MODEM_VOICE_GET_IFACE (self)->check_support &&
+            MM_IFACE_MODEM_VOICE_GET_IFACE (self)->check_support_finish) {
+            MM_IFACE_MODEM_VOICE_GET_IFACE (self)->check_support (
                 self,
                 (GAsyncReadyCallback)check_support_ready,
                 task);
@@ -3007,8 +3018,8 @@ interface_initialization_step (GTask *task)
         }
 
         /* Unless we're told not to, setup call list polling logic */
-        if (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list &&
-            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list_finish) {
+        if (MM_IFACE_MODEM_VOICE_GET_IFACE (self)->load_call_list &&
+            MM_IFACE_MODEM_VOICE_GET_IFACE (self)->load_call_list_finish) {
             gboolean periodic_call_list_check_disabled = FALSE;
 
             /* Cleanup any previously configured handler, before checking if we need to
@@ -3136,68 +3147,45 @@ mm_iface_modem_voice_shutdown (MMIfaceModemVoice *self)
 /*****************************************************************************/
 
 static void
-iface_modem_voice_init (gpointer g_iface)
+mm_iface_modem_voice_default_init (MMIfaceModemVoiceInterface *iface)
 {
-    static gboolean initialized = FALSE;
+    static gsize initialized = 0;
 
-    if (initialized)
+    if (!g_once_init_enter (&initialized))
         return;
 
     /* Properties */
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_object (MM_IFACE_MODEM_VOICE_DBUS_SKELETON,
-                              "Voice DBus skeleton",
-                              "DBus skeleton for the Voice interface",
-                              MM_GDBUS_TYPE_MODEM_VOICE_SKELETON,
+    g_object_interface_install_property (
+        iface,
+        g_param_spec_object (MM_IFACE_MODEM_VOICE_DBUS_SKELETON,
+                             "Voice DBus skeleton",
+                             "DBus skeleton for the Voice interface",
+                             MM_GDBUS_TYPE_MODEM_VOICE_SKELETON,
+                             G_PARAM_READWRITE));
+
+    g_object_interface_install_property (
+        iface,
+        g_param_spec_object (MM_IFACE_MODEM_VOICE_CALL_LIST,
+                             "CALL list",
+                             "List of CALL objects managed in the interface",
+                             MM_TYPE_CALL_LIST,
+                             G_PARAM_READWRITE));
+
+    g_object_interface_install_property (
+        iface,
+        g_param_spec_boolean (MM_IFACE_MODEM_VOICE_PERIODIC_CALL_LIST_CHECK_DISABLED,
+                              "Periodic call list checks disabled",
+                              "Whether periodic call list check are disabled.",
+                              FALSE,
                               G_PARAM_READWRITE));
 
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_object (MM_IFACE_MODEM_VOICE_CALL_LIST,
-                              "CALL list",
-                              "List of CALL objects managed in the interface",
-                              MM_TYPE_CALL_LIST,
+    g_object_interface_install_property (
+        iface,
+        g_param_spec_boolean (MM_IFACE_MODEM_VOICE_INDICATION_CALL_LIST_RELOAD_ENABLED,
+                              "Reload call list on call update",
+                              "Ignore call updates and forcefully reload all calls.",
+                              FALSE,
                               G_PARAM_READWRITE));
 
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_boolean (MM_IFACE_MODEM_VOICE_PERIODIC_CALL_LIST_CHECK_DISABLED,
-                               "Periodic call list checks disabled",
-                               "Whether periodic call list check are disabled.",
-                               FALSE,
-                               G_PARAM_READWRITE));
-
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_boolean (MM_IFACE_MODEM_VOICE_INDICATION_CALL_LIST_RELOAD_ENABLED,
-                               "Reload call list on call update",
-                               "Ignore call updates and forcefully reload all calls.",
-                               FALSE,
-                               G_PARAM_READWRITE));
-
-    initialized = TRUE;
-}
-
-GType
-mm_iface_modem_voice_get_type (void)
-{
-    static GType iface_modem_voice_type = 0;
-
-    if (!G_UNLIKELY (iface_modem_voice_type)) {
-        static const GTypeInfo info = {
-            sizeof (MMIfaceModemVoice), /* class_size */
-            iface_modem_voice_init,     /* base_init */
-            NULL,                           /* base_finalize */
-        };
-
-        iface_modem_voice_type = g_type_register_static (G_TYPE_INTERFACE,
-                                                         "MMIfaceModemVoice",
-                                                         &info,
-                                                         0);
-
-        g_type_interface_add_prerequisite (iface_modem_voice_type, MM_TYPE_IFACE_MODEM);
-    }
-
-    return iface_modem_voice_type;
+    g_once_init_leave (&initialized, 1);
 }

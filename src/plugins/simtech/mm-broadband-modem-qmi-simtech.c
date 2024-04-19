@@ -29,11 +29,11 @@
 #include "mm-shared-simtech.h"
 
 static void iface_modem_location_init (MMIfaceModemLocationInterface *iface);
-static void iface_modem_voice_init    (MMIfaceModemVoice             *iface);
+static void iface_modem_voice_init    (MMIfaceModemVoiceInterface    *iface);
 static void shared_simtech_init       (MMSharedSimtech               *iface);
 
 static MMIfaceModemLocationInterface *iface_modem_location_parent;
-static MMIfaceModemVoice             *iface_modem_voice_parent;
+static MMIfaceModemVoiceInterface    *iface_modem_voice_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmiSimtech, mm_broadband_modem_qmi_simtech, MM_TYPE_BROADBAND_MODEM_QMI, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
@@ -90,7 +90,7 @@ peek_parent_location_interface (MMSharedSimtech *self)
 }
 
 static void
-iface_modem_voice_init (MMIfaceModemVoice *iface)
+iface_modem_voice_init (MMIfaceModemVoiceInterface *iface)
 {
     iface_modem_voice_parent = g_type_interface_peek_parent (iface);
 
@@ -110,7 +110,7 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
     iface->cleanup_in_call_audio_channel_finish = mm_shared_simtech_voice_cleanup_in_call_audio_channel_finish;
 }
 
-static MMIfaceModemVoice *
+static MMIfaceModemVoiceInterface *
 peek_parent_voice_interface (MMSharedSimtech *self)
 {
     return iface_modem_voice_parent;

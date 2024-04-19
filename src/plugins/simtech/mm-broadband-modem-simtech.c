@@ -40,13 +40,13 @@
 static void iface_modem_init          (MMIfaceModemInterface         *iface);
 static void iface_modem_3gpp_init     (MMIfaceModem3gppInterface     *iface);
 static void iface_modem_location_init (MMIfaceModemLocationInterface *iface);
-static void iface_modem_voice_init    (MMIfaceModemVoice             *iface);
+static void iface_modem_voice_init    (MMIfaceModemVoiceInterface    *iface);
 static void shared_simtech_init       (MMSharedSimtech               *iface);
 
 static MMIfaceModemInterface         *iface_modem_parent;
 static MMIfaceModem3gppInterface     *iface_modem_3gpp_parent;
 static MMIfaceModemLocationInterface *iface_modem_location_parent;
-static MMIfaceModemVoice             *iface_modem_voice_parent;
+static MMIfaceModemVoiceInterface    *iface_modem_voice_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemSimtech, mm_broadband_modem_simtech, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -1495,7 +1495,7 @@ peek_parent_location_interface (MMSharedSimtech *self)
 }
 
 static void
-iface_modem_voice_init (MMIfaceModemVoice *iface)
+iface_modem_voice_init (MMIfaceModemVoiceInterface *iface)
 {
     iface_modem_voice_parent = g_type_interface_peek_parent (iface);
 
@@ -1516,7 +1516,7 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
 
 }
 
-static MMIfaceModemVoice *
+static MMIfaceModemVoiceInterface *
 peek_parent_voice_interface (MMSharedSimtech *self)
 {
     return iface_modem_voice_parent;

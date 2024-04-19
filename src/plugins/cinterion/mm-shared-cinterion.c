@@ -53,9 +53,9 @@ typedef struct {
     FeatureSupport                  sgpss_support;
     FeatureSupport                  sgpsc_support;
     /* voice */
-    MMIfaceModemVoice     *iface_modem_voice_parent;
-    FeatureSupport         slcc_support;
-    GRegex                *slcc_regex;
+    MMIfaceModemVoiceInterface *iface_modem_voice_parent;
+    FeatureSupport              slcc_support;
+    GRegex                     *slcc_regex;
     /* time */
     MMIfaceModemTimeInterface *iface_modem_time_parent;
     GRegex                    *ctzu_regex;
