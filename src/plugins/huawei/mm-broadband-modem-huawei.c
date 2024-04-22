@@ -865,7 +865,7 @@ huawei_to_bands_array (BandTable *band_table,
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
-                     "Couldn't build bands array from '%lu'",
+                     "Couldn't build bands array from '%" G_GUINT64_FORMAT "'",
                      huawei);
         return FALSE;
     }
@@ -1720,7 +1720,7 @@ syscfgex_set_current_modes (MMBroadbandModemHuawei *self,
         return FALSE;
     }
 
-    command = g_strdup_printf ("^SYSCFGEX=\"%s\",%x,2,4,%lx,,",
+    command = g_strdup_printf ("^SYSCFGEX=\"%s\",%x,2,4,%" G_GINT64_MODIFIER "x,,",
                                found->mode_str,
                                MM_HUAWEI_SYSCFG_BAND_ANY,
                                MM_HUAWEI_SYSCFGEX_BAND_ANY_LTE);
