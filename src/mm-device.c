@@ -402,6 +402,48 @@ export_modem (MMDevice *self)
 /*****************************************************************************/
 
 static void
+initialize_ready (MMBaseModem   *modem,
+                  GAsyncResult  *res,
+                  MMDevice      *_self) /* full reference */
+{
+    g_autoptr(MMDevice) self = _self;
+    g_autoptr(GError)   error = NULL;
+
+    if (!mm_base_modem_initialize_finish (modem, res, &error)) {
+        if (g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED)) {
+            /* FATAL error, won't even be exported in DBus */
+            mm_obj_err (self, "fatal error initializing: %s", error->message);
+        } else {
+            /* non-fatal error */
+            mm_obj_warn (self, "error initializing: %s", error->message);
+            mm_base_modem_set_valid (modem, TRUE);
+        }
+    } else {
+        mm_obj_dbg (self, "modem initialized");
+        mm_base_modem_set_valid (modem, TRUE);
+    }
+}
+
+void
+mm_device_initialize_modem (MMDevice *self)
+{
+    MMBaseModem *modem;
+
+    modem = mm_device_peek_modem (self);
+    if (!modem) {
+        mm_obj_warn (self, "cannot initialize modem: not found");
+        return;
+    }
+
+    mm_obj_dbg (self, "modem initializing...");
+    mm_base_modem_initialize (modem,
+                              (GAsyncReadyCallback)initialize_ready,
+                              g_object_ref (self));
+}
+
+/*****************************************************************************/
+
+static void
 clear_modem (MMDevice *self)
 {
     if (self->priv->modem_valid_id) {
@@ -434,16 +476,17 @@ mm_device_remove_modem (MMDevice  *self)
 static gboolean
 reprobe (MMDevice *self)
 {
-    GError *error = NULL;
+    g_autoptr (GError) error = NULL;
 
     self->priv->reprobe_id = 0;
 
     mm_obj_dbg (self, "Reprobing modem...");
     if (!mm_device_create_modem (self, &error)) {
         mm_obj_warn (self, "could not recreate modem: %s", error->message);
-        g_error_free (error);
-    } else
+    } else {
         mm_obj_dbg (self, "modem recreated");
+        mm_device_initialize_modem (self);
+    }
 
     return G_SOURCE_REMOVE;
 }

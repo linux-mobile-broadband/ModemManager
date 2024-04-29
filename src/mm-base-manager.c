@@ -190,48 +190,6 @@ find_device_by_physdev_uid (MMBaseManager *self,
 
 /*****************************************************************************/
 
-static void
-initialize_ready (MMBaseModem   *modem,
-                  GAsyncResult  *res)
-{
-    g_autoptr(GError) error = NULL;
-
-    if (!mm_base_modem_initialize_finish (modem, res, &error)) {
-        if (g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED)) {
-            /* FATAL error, won't even be exported in DBus */
-            mm_obj_err (modem, "fatal error initializing: %s", error->message);
-        } else {
-            /* non-fatal error */
-            mm_obj_warn (modem, "error initializing: %s", error->message);
-            mm_base_modem_set_valid (modem, TRUE);
-        }
-    } else {
-        mm_obj_dbg (modem, "modem initialized");
-        mm_base_modem_set_valid (modem, TRUE);
-    }
-}
-
-static void
-modem_initialize (MMBaseManager *self,
-                  MMDevice      *device)
-{
-    MMBaseModem *modem;
-
-    modem = mm_device_peek_modem (device);
-    if (!modem) {
-        mm_obj_warn (self, "cannot initialize modem at device '%s': not found",
-                     mm_device_get_uid (device));
-        return;
-    }
-
-    mm_obj_dbg (modem, "modem initializing...");
-    mm_base_modem_initialize (modem,
-                              (GAsyncReadyCallback)initialize_ready,
-                              NULL);
-}
-
-/*****************************************************************************/
-
 typedef struct {
     MMBaseManager *self;
     MMDevice      *device;
@@ -264,7 +222,7 @@ dispatcher_modem_setup_ready (MMDispatcherModemSetup    *dispatcher,
                     mm_device_get_uid (ctx->device));
 
     /* launch async modem initialization */
-    modem_initialize (ctx->self, ctx->device);
+    mm_device_initialize_modem (ctx->device);
 
     find_device_support_context_free (ctx);
 }
@@ -1741,7 +1699,7 @@ handle_set_profile (MmGdbusTest *skeleton,
                 mm_device_get_uid (device));
 
     /* launch async modem initialization */
-    modem_initialize (self, device);
+    mm_device_initialize_modem (device);
 
 out:
 

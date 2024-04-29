@@ -80,9 +80,10 @@ void     mm_device_release_port_name (MMDevice       *self,
                                       const gchar    *subsystem,
                                       const gchar    *name);
 
-gboolean mm_device_create_modem (MMDevice  *self,
-                                 GError   **error);
-void     mm_device_remove_modem (MMDevice  *self);
+gboolean mm_device_create_modem     (MMDevice  *self,
+                                     GError   **error);
+void     mm_device_remove_modem     (MMDevice  *self);
+void     mm_device_initialize_modem (MMDevice *self);
 
 void     mm_device_inhibit        (MMDevice                  *self,
                                    GAsyncReadyCallback        callback,
