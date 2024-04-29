@@ -759,7 +759,12 @@ mm_device_uninhibit (MMDevice  *self,
 {
     g_assert (self->priv->inhibited);
     self->priv->inhibited = FALSE;
-    return mm_device_create_modem (self, error);
+
+    if (!mm_device_create_modem (self, error))
+        return FALSE;
+
+    mm_device_initialize_modem (self);
+    return TRUE;
 }
 
 /*****************************************************************************/
