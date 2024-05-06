@@ -30,14 +30,10 @@
 #include "mm-iface-modem-voice.h"
 #include "mm-iface-modem-time.h"
 
-#define MM_TYPE_SHARED_CINTERION               (mm_shared_cinterion_get_type ())
-#define MM_SHARED_CINTERION(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SHARED_CINTERION, MMSharedCinterion))
-#define MM_IS_SHARED_CINTERION(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_SHARED_CINTERION))
-#define MM_SHARED_CINTERION_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_SHARED_CINTERION, MMSharedCinterion))
+#define MM_TYPE_SHARED_CINTERION mm_shared_cinterion_get_type ()
+G_DECLARE_INTERFACE (MMSharedCinterion, mm_shared_cinterion, MM, SHARED_CINTERION, MMIfaceModem)
 
-typedef struct _MMSharedCinterion MMSharedCinterion;
-
-struct _MMSharedCinterion {
+struct _MMSharedCinterionInterface {
     GTypeInterface g_iface;
 
     /* Peek modem interface of the parent class of the object */
@@ -52,8 +48,6 @@ struct _MMSharedCinterion {
     /* Peek time interface of the parent class of the object */
     MMIfaceModemTimeInterface *  (* peek_parent_time_interface) (MMSharedCinterion *self);
 };
-
-GType mm_shared_cinterion_get_type (void);
 
 /*****************************************************************************/
 /* Modem interface */

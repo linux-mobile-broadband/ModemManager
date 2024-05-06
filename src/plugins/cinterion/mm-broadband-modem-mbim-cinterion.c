@@ -34,7 +34,7 @@ static void iface_modem_init          (MMIfaceModemInterface         *iface);
 static void iface_modem_location_init (MMIfaceModemLocationInterface *iface);
 static void iface_modem_voice_init    (MMIfaceModemVoiceInterface    *iface);
 static void iface_modem_time_init     (MMIfaceModemTimeInterface     *iface);
-static void shared_cinterion_init     (MMSharedCinterion             *iface);
+static void shared_cinterion_init     (MMSharedCinterionInterface    *iface);
 
 static MMIfaceModemInterface         *iface_modem_parent;
 static MMIfaceModemLocationInterface *iface_modem_location_parent;
@@ -156,7 +156,7 @@ peek_parent_time_interface (MMSharedCinterion *self)
 }
 
 static void
-shared_cinterion_init (MMSharedCinterion *iface)
+shared_cinterion_init (MMSharedCinterionInterface *iface)
 {
     iface->peek_parent_interface          = peek_parent_interface;
     iface->peek_parent_location_interface = peek_parent_location_interface;
