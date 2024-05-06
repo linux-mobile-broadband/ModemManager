@@ -65,7 +65,7 @@ static void iface_modem_init                      (MMIfaceModemInterface        
 static void iface_modem_3gpp_init                 (MMIfaceModem3gppInterface               *iface);
 static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManagerInterface *iface);
 static void iface_modem_3gpp_ussd_init            (MMIfaceModem3gppUssdInterface           *iface);
-static void iface_modem_cdma_init                 (MMIfaceModemCdma                        *iface);
+static void iface_modem_cdma_init                 (MMIfaceModemCdmaInterface               *iface);
 static void iface_modem_simple_init               (MMIfaceModemSimpleInterface             *iface);
 static void iface_modem_location_init             (MMIfaceModemLocationInterface           *iface);
 static void iface_modem_messaging_init            (MMIfaceModemMessagingInterface          *iface);
@@ -9781,7 +9781,7 @@ setup_registration_checks_results_new (MMBroadbandModem *self,
         results->skip_qcdm_hdr_step = TRUE;
     }
 
-    if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_detailed_registration_state ==
+    if (MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_detailed_registration_state ==
         modem_cdma_get_detailed_registration_state) {
         /* Skip CDMA1x Serving System check if we have Sprint specific
          * commands AND if the default detailed registration checker
@@ -13633,7 +13633,7 @@ iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssdInterface *iface)
 }
 
 static void
-iface_modem_cdma_init (MMIfaceModemCdma *iface)
+iface_modem_cdma_init (MMIfaceModemCdmaInterface *iface)
 {
     /* Initialization steps */
     iface->load_esn = modem_cdma_load_esn;

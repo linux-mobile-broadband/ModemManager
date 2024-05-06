@@ -58,7 +58,7 @@ static void iface_modem_3gpp_init                 (MMIfaceModem3gppInterface    
 static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManagerInterface *iface);
 static void iface_modem_3gpp_ussd_init            (MMIfaceModem3gppUssdInterface           *iface);
 static void iface_modem_voice_init                (MMIfaceModemVoiceInterface              *iface);
-static void iface_modem_cdma_init                 (MMIfaceModemCdma                        *iface);
+static void iface_modem_cdma_init                 (MMIfaceModemCdmaInterface               *iface);
 static void iface_modem_messaging_init            (MMIfaceModemMessagingInterface          *iface);
 static void iface_modem_location_init             (MMIfaceModemLocationInterface           *iface);
 static void iface_modem_oma_init                  (MMIfaceModemOmaInterface                *iface);
@@ -14047,7 +14047,7 @@ iface_modem_voice_init (MMIfaceModemVoiceInterface *iface)
 }
 
 static void
-iface_modem_cdma_init (MMIfaceModemCdma *iface)
+iface_modem_cdma_init (MMIfaceModemCdmaInterface *iface)
 {
     iface->load_meid = modem_cdma_load_meid;
     iface->load_meid_finish = modem_cdma_load_meid_finish;

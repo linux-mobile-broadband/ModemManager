@@ -29,6 +29,8 @@
 #define SUBSYSTEM_CDMA1X "cdma1x"
 #define SUBSYSTEM_EVDO "evdo"
 
+G_DEFINE_INTERFACE (MMIfaceModemCdma, mm_iface_modem_cdma, MM_TYPE_IFACE_MODEM)
+
 /*****************************************************************************/
 /* Private data context */
 
@@ -125,7 +127,7 @@ handle_activate_ready (MMIfaceModemCdma *self,
     priv = get_private (self);
     priv->activation_ongoing = FALSE;
 
-    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_finish (self, res,&error))
+    if (!MM_IFACE_MODEM_CDMA_GET_IFACE (self)->activate_finish (self, res,&error))
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem_cdma_complete_activate (ctx->skeleton, ctx->invocation);
@@ -167,8 +169,8 @@ handle_activate_auth_ready (MMBaseModem *self,
     }
 
     /* If activating OTA is not implemented, report an error */
-    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate ||
-        !MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_finish) {
+    if (!MM_IFACE_MODEM_CDMA_GET_IFACE (self)->activate ||
+        !MM_IFACE_MODEM_CDMA_GET_IFACE (self)->activate_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Cannot perform OTA activation: operation not supported");
         handle_activate_context_free (ctx);
@@ -206,7 +208,7 @@ handle_activate_auth_ready (MMBaseModem *self,
     case MM_MODEM_STATE_SEARCHING:
     case MM_MODEM_STATE_REGISTERED:
         priv->activation_ongoing = TRUE;
-        MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate (
+        MM_IFACE_MODEM_CDMA_GET_IFACE (self)->activate (
             MM_IFACE_MODEM_CDMA (self),
             ctx->carrier,
             (GAsyncReadyCallback)handle_activate_ready,
@@ -291,7 +293,7 @@ handle_activate_manual_ready (MMIfaceModemCdma *self,
     priv = get_private (self);
     priv->activation_ongoing = FALSE;
 
-    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual_finish (self, res,&error))
+    if (!MM_IFACE_MODEM_CDMA_GET_IFACE (self)->activate_manual_finish (self, res,&error))
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem_cdma_complete_activate_manual (ctx->skeleton, ctx->invocation);
@@ -334,8 +336,8 @@ handle_activate_manual_auth_ready (MMBaseModem *self,
     }
 
     /* If manual activation is not implemented, report an error */
-    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual ||
-        !MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual_finish) {
+    if (!MM_IFACE_MODEM_CDMA_GET_IFACE (self)->activate_manual ||
+        !MM_IFACE_MODEM_CDMA_GET_IFACE (self)->activate_manual_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Cannot perform manual activation: operation not supported");
         handle_activate_manual_context_free (ctx);
@@ -372,7 +374,7 @@ handle_activate_manual_auth_ready (MMBaseModem *self,
     case MM_MODEM_STATE_SEARCHING:
     case MM_MODEM_STATE_REGISTERED:
         priv->activation_ongoing = TRUE;
-        MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual (
+        MM_IFACE_MODEM_CDMA_GET_IFACE (self)->activate_manual (
             MM_IFACE_MODEM_CDMA (self),
             properties,
             (GAsyncReadyCallback)handle_activate_manual_ready,
@@ -450,7 +452,7 @@ register_in_network_ready (MMIfaceModemCdma *self,
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->register_in_network_finish (self, res, &error))
+    if (!MM_IFACE_MODEM_CDMA_GET_IFACE (self)->register_in_network_finish (self, res, &error))
         g_task_return_error (task, error);
     else
         g_task_return_boolean (task, TRUE);
@@ -467,7 +469,7 @@ mm_iface_modem_cdma_register_in_network (MMIfaceModemCdma *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->register_in_network (
+    MM_IFACE_MODEM_CDMA_GET_IFACE (self)->register_in_network (
         self,
         max_registration_time,
         (GAsyncReadyCallback)register_in_network_ready,
@@ -545,7 +547,7 @@ setup_registration_checks_ready (MMIfaceModemCdma *self,
 
     ctx = g_task_get_task_data (task);
 
-    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->setup_registration_checks_finish (
+    if (!MM_IFACE_MODEM_CDMA_GET_IFACE (self)->setup_registration_checks_finish (
             self,
             res,
             &ctx->skip_qcdm_call_manager_step,
@@ -575,7 +577,7 @@ get_call_manager_state_ready (MMIfaceModemCdma *self,
 
     ctx = g_task_get_task_data (task);
 
-    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_call_manager_state_finish (
+    if (!MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_call_manager_state_finish (
             self,
             res,
             &ctx->call_manager_system_mode,
@@ -611,7 +613,7 @@ get_hdr_state_ready (MMIfaceModemCdma *self,
 
     ctx = g_task_get_task_data (task);
 
-    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_hdr_state_finish (
+    if (!MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_hdr_state_finish (
             self,
             res,
             &ctx->hdr_hybrid_mode,
@@ -687,10 +689,11 @@ get_service_status_ready (MMIfaceModemCdma *self,
 
     ctx = g_task_get_task_data (task);
 
-    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_service_status_finish (self,
-                                                                              res,
-                                                                              &has_service,
-                                                                              &error)) {
+    if (!MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_service_status_finish (
+            self,
+            res,
+            &has_service,
+            &error)) {
         mm_obj_warn (self, "could not get service status: %s", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -720,7 +723,7 @@ get_cdma1x_serving_system_ready (MMIfaceModemCdma *self,
 
     /* Note: used for *both* AT and QCDM serving system checks */
 
-    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_cdma1x_serving_system_finish (
+    if (!MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_cdma1x_serving_system_finish (
             self,
             res,
             &ctx->cdma1x_class,
@@ -786,7 +789,7 @@ get_detailed_registration_state_ready (MMIfaceModemCdma *self,
 
     ctx = g_task_get_task_data (task);
 
-    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_detailed_registration_state_finish (
+    if (!MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_detailed_registration_state_finish (
             self,
             res,
             &detailed_cdma1x_state,
@@ -824,9 +827,9 @@ registration_check_step (GTask *task)
          * to specify which of the next steps will be completely skipped. Useful
          * when implementations have a best get_detailed_registration_state()
          * so that they just need that to be run. */
-        if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->setup_registration_checks &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->setup_registration_checks_finish) {
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->setup_registration_checks (
+        if (MM_IFACE_MODEM_CDMA_GET_IFACE (self)->setup_registration_checks &&
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->setup_registration_checks_finish) {
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->setup_registration_checks (
                 self,
                 (GAsyncReadyCallback)setup_registration_checks_ready,
                 task);
@@ -838,10 +841,10 @@ registration_check_step (GTask *task)
     case REGISTRATION_CHECK_STEP_QCDM_CALL_MANAGER_STATE:
         mm_obj_dbg (self, "starting QCDM-based registration checks...");
         if (!ctx->skip_qcdm_call_manager_step &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_call_manager_state &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_call_manager_state_finish) {
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_call_manager_state &&
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_call_manager_state_finish) {
             /* Start by trying to get the call manager state. */
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_call_manager_state (
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_call_manager_state (
                 self,
                 (GAsyncReadyCallback)get_call_manager_state_ready,
                 task);
@@ -856,10 +859,10 @@ registration_check_step (GTask *task)
     case REGISTRATION_CHECK_STEP_QCDM_HDR_STATE:
         if (ctx->evdo_supported &&
             !ctx->skip_qcdm_hdr_step &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_hdr_state &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_hdr_state_finish) {
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_hdr_state &&
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_hdr_state_finish) {
             /* Get HDR (EVDO) state. */
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_hdr_state (
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_hdr_state (
                 self,
                 (GAsyncReadyCallback)get_hdr_state_ready,
                 task);
@@ -873,9 +876,9 @@ registration_check_step (GTask *task)
         /* We only care about SID/NID here; nothing to do with registration
          * state.
          */
-        if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_cdma1x_serving_system &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_cdma1x_serving_system_finish) {
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_cdma1x_serving_system (
+        if (MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_cdma1x_serving_system &&
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_cdma1x_serving_system_finish) {
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_cdma1x_serving_system (
                 self,
                 (GAsyncReadyCallback)get_cdma1x_serving_system_ready,
                 task);
@@ -895,9 +898,9 @@ registration_check_step (GTask *task)
         /* If we don't have means to get service status, just assume we do have
          * CDMA service and keep on */
         if (!ctx->skip_at_cdma_service_status_step &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_service_status &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_service_status_finish) {
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_service_status (
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_service_status &&
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_service_status_finish) {
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_service_status (
                 self,
                 (GAsyncReadyCallback)get_service_status_ready,
                 task);
@@ -919,9 +922,9 @@ registration_check_step (GTask *task)
          * themselves; if they do, they'll set these callbacks to NULL..
          */
         if (!ctx->skip_at_cdma1x_serving_system_step &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_cdma1x_serving_system &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_cdma1x_serving_system_finish) {
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_cdma1x_serving_system (
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_cdma1x_serving_system &&
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_cdma1x_serving_system_finish) {
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_cdma1x_serving_system (
                 self,
                 (GAsyncReadyCallback)get_cdma1x_serving_system_ready,
                 task);
@@ -941,13 +944,13 @@ registration_check_step (GTask *task)
         /* We let classes implementing this interface to look for more detailed
          * registration info. */
         if (!ctx->skip_detailed_registration_state &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_detailed_registration_state &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_detailed_registration_state_finish) {
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_detailed_registration_state &&
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_detailed_registration_state_finish) {
             /* We pass the CDMA1x/EVDO registration states we got up to now.
              * If the implementation can't improve the detail, it must either
              * return the values it already got as input, or issue an error,
              * and we'll assume it couldn't get any better value. */
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_detailed_registration_state (
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_detailed_registration_state (
                 self,
                 ctx->cdma1x_state,
                 ctx->evdo_state,
@@ -987,7 +990,7 @@ custom_run_registration_checks_ready (MMIfaceModemCdma *self,
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->run_registration_checks_finish (self, res, &error))
+    if (!MM_IFACE_MODEM_CDMA_GET_IFACE (self)->run_registration_checks_finish (self, res, &error))
         g_task_return_error (task, error);
     else
         g_task_return_boolean (task, TRUE);
@@ -1014,24 +1017,24 @@ mm_iface_modem_cdma_run_registration_checks (MMIfaceModemCdma *self,
                 cdma1x_supported ? "yes" : "no",
                 evdo_supported ? "yes" : "no");
 
-    if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->run_registration_checks &&
-        MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->run_registration_checks_finish) {
+    if (MM_IFACE_MODEM_CDMA_GET_IFACE (self)->run_registration_checks &&
+        MM_IFACE_MODEM_CDMA_GET_IFACE (self)->run_registration_checks_finish) {
         /* Plugins implementing full custom registration checks shouldn't implement
          * sub-steps of the generic registration check sequence */
-        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->setup_registration_checks != NULL);
-        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->setup_registration_checks_finish != NULL);
-        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_call_manager_state != NULL);
-        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_call_manager_state_finish != NULL);
-        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_hdr_state != NULL);
-        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_hdr_state_finish != NULL);
-        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_service_status != NULL);
-        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_service_status_finish != NULL);
-        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_cdma1x_serving_system != NULL);
-        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_cdma1x_serving_system_finish != NULL);
-        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_detailed_registration_state != NULL);
-        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_detailed_registration_state_finish != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_IFACE (self)->setup_registration_checks != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_IFACE (self)->setup_registration_checks_finish != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_call_manager_state != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_call_manager_state_finish != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_hdr_state != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_hdr_state_finish != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_service_status != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_service_status_finish != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_cdma1x_serving_system != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_cdma1x_serving_system_finish != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_detailed_registration_state != NULL);
+        g_warn_if_fail (MM_IFACE_MODEM_CDMA_GET_IFACE (self)->get_detailed_registration_state_finish != NULL);
 
-        MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->run_registration_checks (
+        MM_IFACE_MODEM_CDMA_GET_IFACE (self)->run_registration_checks (
             self,
             cdma1x_supported,
             evdo_supported,
@@ -1371,7 +1374,7 @@ disable_unsolicited_events_ready (MMIfaceModemCdma *self,
     DisablingContext *ctx;
     GError *error = NULL;
 
-    MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->disable_unsolicited_events_finish (self, res, &error);
+    MM_IFACE_MODEM_CDMA_GET_IFACE (self)->disable_unsolicited_events_finish (self, res, &error);
     if (error) {
         mm_obj_dbg (self, "couldn't disable unsolicited events: %s", error->message);
         g_error_free (error);
@@ -1391,7 +1394,7 @@ cleanup_unsolicited_events_ready (MMIfaceModemCdma *self,
     DisablingContext *ctx;
     GError *error = NULL;
 
-    MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->cleanup_unsolicited_events_finish (self, res, &error);
+    MM_IFACE_MODEM_CDMA_GET_IFACE (self)->cleanup_unsolicited_events_finish (self, res, &error);
     if (error) {
         mm_obj_dbg (self, "couldn't cleanup unsolicited events: %s", error->message);
         g_error_free (error);
@@ -1423,9 +1426,9 @@ interface_disabling_step (GTask *task)
         /* fall through */
 
     case DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS:
-        if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->disable_unsolicited_events &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->disable_unsolicited_events_finish) {
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->disable_unsolicited_events (
+        if (MM_IFACE_MODEM_CDMA_GET_IFACE (self)->disable_unsolicited_events &&
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->disable_unsolicited_events_finish) {
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->disable_unsolicited_events (
                 self,
                 (GAsyncReadyCallback)disable_unsolicited_events_ready,
                 task);
@@ -1435,9 +1438,9 @@ interface_disabling_step (GTask *task)
         /* fall through */
 
     case DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS:
-        if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->cleanup_unsolicited_events &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->cleanup_unsolicited_events_finish) {
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->cleanup_unsolicited_events (
+        if (MM_IFACE_MODEM_CDMA_GET_IFACE (self)->cleanup_unsolicited_events &&
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->cleanup_unsolicited_events_finish) {
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->cleanup_unsolicited_events (
                 self,
                 (GAsyncReadyCallback)cleanup_unsolicited_events_ready,
                 task);
@@ -1531,7 +1534,7 @@ setup_unsolicited_events_ready (MMIfaceModemCdma *self,
     EnablingContext *ctx;
     GError *error = NULL;
 
-    MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->setup_unsolicited_events_finish (self, res, &error);
+    MM_IFACE_MODEM_CDMA_GET_IFACE (self)->setup_unsolicited_events_finish (self, res, &error);
     if (error) {
         /* This error shouldn't be treated as critical */
         mm_obj_dbg (self, "setting up unsolicited events failed: %s", error->message);
@@ -1552,7 +1555,7 @@ enable_unsolicited_events_ready (MMIfaceModemCdma *self,
     EnablingContext *ctx;
     GError *error = NULL;
 
-    MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->enable_unsolicited_events_finish (self, res, &error);
+    MM_IFACE_MODEM_CDMA_GET_IFACE (self)->enable_unsolicited_events_finish (self, res, &error);
     if (error) {
         /* This error shouldn't be treated as critical */
         mm_obj_dbg (self, "enabling unsolicited events failed: %s", error->message);
@@ -1586,9 +1589,9 @@ interface_enabling_step (GTask *task)
         /* fall through */
 
     case ENABLING_STEP_SETUP_UNSOLICITED_EVENTS:
-        if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->setup_unsolicited_events &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->setup_unsolicited_events_finish) {
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->setup_unsolicited_events (
+        if (MM_IFACE_MODEM_CDMA_GET_IFACE (self)->setup_unsolicited_events &&
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->setup_unsolicited_events_finish) {
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->setup_unsolicited_events (
                 self,
                 (GAsyncReadyCallback)setup_unsolicited_events_ready,
                 task);
@@ -1598,9 +1601,9 @@ interface_enabling_step (GTask *task)
         /* fall through */
 
     case ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS:
-        if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->enable_unsolicited_events &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->enable_unsolicited_events_finish) {
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->enable_unsolicited_events (
+        if (MM_IFACE_MODEM_CDMA_GET_IFACE (self)->enable_unsolicited_events &&
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->enable_unsolicited_events_finish) {
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->enable_unsolicited_events (
                 self,
                 (GAsyncReadyCallback)enable_unsolicited_events_ready,
                 task);
@@ -1695,7 +1698,7 @@ initialization_context_free (InitializationContext *ctx)
                                                                         \
         ctx = g_task_get_task_data (task);                              \
                                                                         \
-        val = MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->load_##NAME##_finish (self, res, &error); \
+        val = MM_IFACE_MODEM_CDMA_GET_IFACE (self)->load_##NAME##_finish (self, res, &error); \
         mm_gdbus_modem_cdma_set_##NAME (ctx->skeleton, val);            \
         g_free (val);                                                   \
                                                                         \
@@ -1723,7 +1726,7 @@ load_activation_state_ready (MMIfaceModemCdma *self,
 
     ctx = g_task_get_task_data (task);
 
-    state = MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->load_activation_state_finish (self, res, &error);
+    state = MM_IFACE_MODEM_CDMA_GET_IFACE (self)->load_activation_state_finish (self, res, &error);
     mm_gdbus_modem_cdma_set_activation_state (ctx->skeleton, state);
 
     if (error) {
@@ -1761,9 +1764,9 @@ interface_initialization_step (GTask *task)
          * lifetime of the modem. Therefore, if we already have it loaded,
          * don't try to load it again. */
         if (!mm_gdbus_modem_cdma_get_meid (ctx->skeleton) &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->load_meid &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->load_meid_finish) {
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->load_meid (
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->load_meid &&
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->load_meid_finish) {
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->load_meid (
                 self,
                 (GAsyncReadyCallback)load_meid_ready,
                 task);
@@ -1777,9 +1780,9 @@ interface_initialization_step (GTask *task)
          * lifetime of the modem. Therefore, if we already have it loaded,
          * don't try to load it again. */
         if (!mm_gdbus_modem_cdma_get_esn (ctx->skeleton) &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->load_esn &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->load_esn_finish) {
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->load_esn (
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->load_esn &&
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->load_esn_finish) {
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->load_esn (
                 self,
                 (GAsyncReadyCallback)load_esn_ready,
                 task);
@@ -1793,9 +1796,9 @@ interface_initialization_step (GTask *task)
          * whole lifetime of the modem. Therefore, if we already have it loaded,
          * don't try to load it again. */
         if (mm_gdbus_modem_cdma_get_activation_state (ctx->skeleton) == MM_MODEM_CDMA_ACTIVATION_STATE_UNKNOWN &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->load_activation_state &&
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->load_activation_state_finish) {
-            MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->load_activation_state (
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->load_activation_state &&
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->load_activation_state_finish) {
+            MM_IFACE_MODEM_CDMA_GET_IFACE (self)->load_activation_state (
                 self,
                 (GAsyncReadyCallback)load_activation_state_ready,
                 task);
@@ -1910,78 +1913,55 @@ mm_iface_modem_cdma_shutdown (MMIfaceModemCdma *self)
 /*****************************************************************************/
 
 static void
-iface_modem_cdma_init (gpointer g_iface)
+mm_iface_modem_cdma_default_init (MMIfaceModemCdmaInterface *iface)
 {
-    static gboolean initialized = FALSE;
+    static gsize initialized = 0;
 
-    if (initialized)
+    if (!g_once_init_enter (&initialized))
         return;
 
     /* Properties */
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_object (MM_IFACE_MODEM_CDMA_DBUS_SKELETON,
-                              "CDMA DBus skeleton",
-                              "DBus skeleton for the CDMA interface",
-                              MM_GDBUS_TYPE_MODEM_CDMA_SKELETON,
+    g_object_interface_install_property (
+        iface,
+        g_param_spec_object (MM_IFACE_MODEM_CDMA_DBUS_SKELETON,
+                             "CDMA DBus skeleton",
+                             "DBus skeleton for the CDMA interface",
+                             MM_GDBUS_TYPE_MODEM_CDMA_SKELETON,
+                             G_PARAM_READWRITE));
+
+    g_object_interface_install_property (
+        iface,
+        g_param_spec_enum (MM_IFACE_MODEM_CDMA_CDMA1X_REGISTRATION_STATE,
+                           "CDMA1x Registration State",
+                           "Registration state of the modem in the CDMA1x network",
+                           MM_TYPE_MODEM_CDMA_REGISTRATION_STATE,
+                           MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN,
+                           G_PARAM_READWRITE));
+
+    g_object_interface_install_property (
+        iface,
+        g_param_spec_enum (MM_IFACE_MODEM_CDMA_EVDO_REGISTRATION_STATE,
+                           "EV-DO Registration State",
+                           "Registration state of the modem in the EV-DO network",
+                           MM_TYPE_MODEM_CDMA_REGISTRATION_STATE,
+                           MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN,
+                           G_PARAM_READWRITE));
+
+    g_object_interface_install_property (
+        iface,
+        g_param_spec_boolean (MM_IFACE_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED,
+                              "CDMA1x network supported",
+                              "Whether the modem works in the CDMA1x network",
+                              TRUE,
                               G_PARAM_READWRITE));
 
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_enum (MM_IFACE_MODEM_CDMA_CDMA1X_REGISTRATION_STATE,
-                            "CDMA1x Registration State",
-                            "Registration state of the modem in the CDMA1x network",
-                            MM_TYPE_MODEM_CDMA_REGISTRATION_STATE,
-                            MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN,
-                            G_PARAM_READWRITE));
+    g_object_interface_install_property (
+        iface,
+        g_param_spec_boolean (MM_IFACE_MODEM_CDMA_EVDO_NETWORK_SUPPORTED,
+                              "EV-DO network supported",
+                              "Whether the modem works in the EV-DO network",
+                              TRUE,
+                              G_PARAM_READWRITE));
 
-
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_enum (MM_IFACE_MODEM_CDMA_EVDO_REGISTRATION_STATE,
-                            "EV-DO Registration State",
-                            "Registration state of the modem in the EV-DO network",
-                            MM_TYPE_MODEM_CDMA_REGISTRATION_STATE,
-                            MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN,
-                            G_PARAM_READWRITE));
-
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_boolean (MM_IFACE_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED,
-                               "CDMA1x network supported",
-                               "Whether the modem works in the CDMA1x network",
-                               TRUE,
-                               G_PARAM_READWRITE));
-
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_boolean (MM_IFACE_MODEM_CDMA_EVDO_NETWORK_SUPPORTED,
-                               "EV-DO network supported",
-                               "Whether the modem works in the EV-DO network",
-                               TRUE,
-                               G_PARAM_READWRITE));
-    initialized = TRUE;
-}
-
-GType
-mm_iface_modem_cdma_get_type (void)
-{
-    static GType iface_modem_cdma_type = 0;
-
-    if (!G_UNLIKELY (iface_modem_cdma_type)) {
-        static const GTypeInfo info = {
-            sizeof (MMIfaceModemCdma), /* class_size */
-            iface_modem_cdma_init,      /* base_init */
-            NULL,                  /* base_finalize */
-        };
-
-        iface_modem_cdma_type = g_type_register_static (G_TYPE_INTERFACE,
-                                                        "MMIfaceModemCdma",
-                                                        &info,
-                                                        0);
-
-        g_type_interface_add_prerequisite (iface_modem_cdma_type, MM_TYPE_IFACE_MODEM);
-    }
-
-    return iface_modem_cdma_type;
+    g_once_init_leave (&initialized, 1);
 }

@@ -32,9 +32,9 @@
 #include "mm-iface-modem-cdma.h"
 #include "mm-iface-modem.h"
 
-static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
+static void iface_modem_cdma_init (MMIfaceModemCdmaInterface *iface);
 
-static MMIfaceModemCdma *iface_modem_cdma_parent;
+static MMIfaceModemCdmaInterface *iface_modem_cdma_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemVia, mm_broadband_modem_via, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init))
@@ -518,7 +518,7 @@ finalize (GObject *object)
 }
 
 static void
-iface_modem_cdma_init (MMIfaceModemCdma *iface)
+iface_modem_cdma_init (MMIfaceModemCdmaInterface *iface)
 {
     iface_modem_cdma_parent = g_type_interface_peek_parent (iface);
 

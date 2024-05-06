@@ -40,7 +40,7 @@
 
 static void iface_modem_init           (MMIfaceModemInterface          *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessagingInterface *iface);
-static void iface_modem_cdma_init      (MMIfaceModemCdma               *iface);
+static void iface_modem_cdma_init      (MMIfaceModemCdmaInterface      *iface);
 static void iface_modem_time_init      (MMIfaceModemTimeInterface      *iface);
 
 static MMIfaceModemInterface *iface_modem_parent;
@@ -1584,7 +1584,7 @@ iface_modem_messaging_init (MMIfaceModemMessagingInterface *iface)
 }
 
 static void
-iface_modem_cdma_init (MMIfaceModemCdma *iface)
+iface_modem_cdma_init (MMIfaceModemCdmaInterface *iface)
 {
     iface->get_detailed_registration_state = modem_cdma_get_detailed_registration_state;
     iface->get_detailed_registration_state_finish = modem_cdma_get_detailed_registration_state_finish;

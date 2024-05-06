@@ -22,12 +22,10 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-port-serial-at.h"
+#include "mm-iface-modem.h"
 
-#define MM_TYPE_IFACE_MODEM_CDMA               (mm_iface_modem_cdma_get_type ())
-#define MM_IFACE_MODEM_CDMA(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM_CDMA, MMIfaceModemCdma))
-#define MM_IS_IFACE_MODEM_CDMA(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_CDMA))
-#define MM_IFACE_MODEM_CDMA_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_CDMA, MMIfaceModemCdma))
+#define MM_TYPE_IFACE_MODEM_CDMA mm_iface_modem_cdma_get_type ()
+G_DECLARE_INTERFACE (MMIfaceModemCdma, mm_iface_modem_cdma, MM, IFACE_MODEM_CDMA, MMIfaceModem)
 
 #define MM_IFACE_MODEM_CDMA_DBUS_SKELETON             "iface-modem-cdma-dbus-skeleton"
 #define MM_IFACE_MODEM_CDMA_CDMA1X_REGISTRATION_STATE "iface-modem-cdma-cdma1x-registration-state"
@@ -47,9 +45,7 @@
 #define MM_IFACE_MODEM_CDMA_ALL_CDMA1X_ACCESS_TECHNOLOGIES_MASK \
     (MM_MODEM_ACCESS_TECHNOLOGY_1XRTT)
 
-typedef struct _MMIfaceModemCdma MMIfaceModemCdma;
-
-struct _MMIfaceModemCdma {
+struct _MMIfaceModemCdmaInterface {
     GTypeInterface g_iface;
 
     /* Loading of the MEID property */
@@ -227,9 +223,6 @@ struct _MMIfaceModemCdma {
                                                          MMModemCdmaRegistrationState *detailed_evdo_state,
                                                          GError **error);
 };
-
-GType mm_iface_modem_cdma_get_type (void);
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModemCdma, g_object_unref)
 
 /* Initialize CDMA interface (async) */
 void     mm_iface_modem_cdma_initialize        (MMIfaceModemCdma *self,
