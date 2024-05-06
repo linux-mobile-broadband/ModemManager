@@ -29,7 +29,7 @@
 
 static void iface_modem_init          (MMIfaceModemInterface         *iface);
 static void iface_modem_location_init (MMIfaceModemLocationInterface *iface);
-static void shared_xmm_init           (MMSharedXmm                   *iface);
+static void shared_xmm_init           (MMSharedXmmInterface          *iface);
 
 static MMIfaceModemLocationInterface *iface_modem_location_parent;
 
@@ -125,7 +125,7 @@ peek_parent_location_interface (MMSharedXmm *self)
 }
 
 static void
-shared_xmm_init (MMSharedXmm *iface)
+shared_xmm_init (MMSharedXmmInterface *iface)
 {
     iface->peek_parent_broadband_modem_class = peek_parent_broadband_modem_class;
     iface->peek_parent_location_interface    = peek_parent_location_interface;

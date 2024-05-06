@@ -27,14 +27,10 @@
 #include "mm-iface-modem-signal.h"
 #include "mm-iface-modem-location.h"
 
-#define MM_TYPE_SHARED_XMM               (mm_shared_xmm_get_type ())
-#define MM_SHARED_XMM(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SHARED_XMM, MMSharedXmm))
-#define MM_IS_SHARED_XMM(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_SHARED_XMM))
-#define MM_SHARED_XMM_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_SHARED_XMM, MMSharedXmm))
+#define MM_TYPE_SHARED_XMM mm_shared_xmm_get_type ()
+G_DECLARE_INTERFACE (MMSharedXmm, mm_shared_xmm, MM, SHARED_XMM, MMIfaceModem)
 
-typedef struct _MMSharedXmm MMSharedXmm;
-
-struct _MMSharedXmm {
+struct _MMSharedXmmInterface {
     GTypeInterface g_iface;
 
     /* Peek broadband modem class of the parent class of the object */
@@ -43,8 +39,6 @@ struct _MMSharedXmm {
     /* Peek location interface of the parent class of the object */
     MMIfaceModemLocationInterface *  (* peek_parent_location_interface) (MMSharedXmm *self);
 };
-
-GType mm_shared_xmm_get_type (void);
 
 /* Shared XMM device setup */
 

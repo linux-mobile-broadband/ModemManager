@@ -28,7 +28,7 @@
 #include "mm-shared-xmm.h"
 
 static void iface_modem_init          (MMIfaceModemInterface         *iface);
-static void shared_xmm_init           (MMSharedXmm                   *iface);
+static void shared_xmm_init           (MMSharedXmmInterface          *iface);
 static void iface_modem_signal_init   (MMIfaceModemSignalInterface   *iface);
 static void iface_modem_location_init (MMIfaceModemLocationInterface *iface);
 
@@ -137,7 +137,7 @@ iface_modem_signal_init (MMIfaceModemSignalInterface *iface)
 }
 
 static void
-shared_xmm_init (MMSharedXmm *iface)
+shared_xmm_init (MMSharedXmmInterface *iface)
 {
     iface->peek_parent_broadband_modem_class = peek_parent_broadband_modem_class;
     iface->peek_parent_location_interface    = peek_parent_location_interface;

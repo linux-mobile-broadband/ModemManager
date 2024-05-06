@@ -31,6 +31,8 @@
 #include "mm-shared-xmm.h"
 #include "mm-modem-helpers-xmm.h"
 
+G_DEFINE_INTERFACE (MMSharedXmm, mm_shared_xmm, MM_TYPE_IFACE_MODEM)
+
 /*****************************************************************************/
 /* Private data context */
 
@@ -103,12 +105,12 @@ get_private (MMSharedXmm *self)
         priv->nmea_regex     = g_regex_new ("(?:\\r\\n)?(?:\\r\\n)?(\\$G.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
         /* Setup parent class' MMBroadbandModemClass */
-        g_assert (MM_SHARED_XMM_GET_INTERFACE (self)->peek_parent_broadband_modem_class);
-        priv->broadband_modem_class_parent = MM_SHARED_XMM_GET_INTERFACE (self)->peek_parent_broadband_modem_class (self);
+        g_assert (MM_SHARED_XMM_GET_IFACE (self)->peek_parent_broadband_modem_class);
+        priv->broadband_modem_class_parent = MM_SHARED_XMM_GET_IFACE (self)->peek_parent_broadband_modem_class (self);
 
         /* Setup parent class' MMIfaceModemLocation */
-        g_assert (MM_SHARED_XMM_GET_INTERFACE (self)->peek_parent_location_interface);
-        priv->iface_modem_location_parent = MM_SHARED_XMM_GET_INTERFACE (self)->peek_parent_location_interface (self);
+        g_assert (MM_SHARED_XMM_GET_IFACE (self)->peek_parent_location_interface);
+        priv->iface_modem_location_parent = MM_SHARED_XMM_GET_IFACE (self)->peek_parent_location_interface (self);
 
         g_object_set_qdata_full (G_OBJECT (self), private_quark, priv, (GDestroyNotify)private_free);
     }
@@ -1706,26 +1708,6 @@ mm_shared_xmm_setup_ports (MMBroadbandModem *self)
 /*****************************************************************************/
 
 static void
-shared_xmm_init (gpointer g_iface)
+mm_shared_xmm_default_init (MMSharedXmmInterface *iface)
 {
-}
-
-GType
-mm_shared_xmm_get_type (void)
-{
-    static GType shared_xmm_type = 0;
-
-    if (!G_UNLIKELY (shared_xmm_type)) {
-        static const GTypeInfo info = {
-            sizeof (MMSharedXmm),  /* class_size */
-            shared_xmm_init,       /* base_init */
-            NULL,                  /* base_finalize */
-        };
-
-        shared_xmm_type = g_type_register_static (G_TYPE_INTERFACE, "MMSharedXmm", &info, 0);
-        g_type_interface_add_prerequisite (shared_xmm_type, MM_TYPE_IFACE_MODEM);
-        g_type_interface_add_prerequisite (shared_xmm_type, MM_TYPE_IFACE_MODEM_LOCATION);
-    }
-
-    return shared_xmm_type;
 }
