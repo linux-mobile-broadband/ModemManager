@@ -41,7 +41,7 @@ static void iface_modem_init          (MMIfaceModemInterface         *iface);
 static void iface_modem_3gpp_init     (MMIfaceModem3gppInterface     *iface);
 static void iface_modem_location_init (MMIfaceModemLocationInterface *iface);
 static void iface_modem_voice_init    (MMIfaceModemVoiceInterface    *iface);
-static void shared_simtech_init       (MMSharedSimtech               *iface);
+static void shared_simtech_init       (MMSharedSimtechInterface      *iface);
 
 static MMIfaceModemInterface         *iface_modem_parent;
 static MMIfaceModem3gppInterface     *iface_modem_3gpp_parent;
@@ -1523,7 +1523,7 @@ peek_parent_voice_interface (MMSharedSimtech *self)
 }
 
 static void
-shared_simtech_init (MMSharedSimtech *iface)
+shared_simtech_init (MMSharedSimtechInterface *iface)
 {
     iface->peek_parent_location_interface = peek_parent_location_interface;
     iface->peek_parent_voice_interface    = peek_parent_voice_interface;

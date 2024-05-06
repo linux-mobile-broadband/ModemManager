@@ -30,6 +30,8 @@
 #include "mm-shared-simtech.h"
 #include "mm-modem-helpers-simtech.h"
 
+G_DEFINE_INTERFACE (MMSharedSimtech, mm_shared_simtech, MM_TYPE_IFACE_MODEM)
+
 /*****************************************************************************/
 /* Private data context */
 
@@ -94,11 +96,11 @@ get_private (MMSharedSimtech *self)
 
         /* Setup parent class' MMIfaceModemLocation and MMIfaceModemVoice */
 
-        g_assert (MM_SHARED_SIMTECH_GET_INTERFACE (self)->peek_parent_location_interface);
-        priv->iface_modem_location_parent = MM_SHARED_SIMTECH_GET_INTERFACE (self)->peek_parent_location_interface (self);
+        g_assert (MM_SHARED_SIMTECH_GET_IFACE (self)->peek_parent_location_interface);
+        priv->iface_modem_location_parent = MM_SHARED_SIMTECH_GET_IFACE (self)->peek_parent_location_interface (self);
 
-        g_assert (MM_SHARED_SIMTECH_GET_INTERFACE (self)->peek_parent_voice_interface);
-        priv->iface_modem_voice_parent = MM_SHARED_SIMTECH_GET_INTERFACE (self)->peek_parent_voice_interface (self);
+        g_assert (MM_SHARED_SIMTECH_GET_IFACE (self)->peek_parent_voice_interface);
+        priv->iface_modem_voice_parent = MM_SHARED_SIMTECH_GET_IFACE (self)->peek_parent_voice_interface (self);
 
         g_object_set_qdata_full (G_OBJECT (self), private_quark, priv, (GDestroyNotify)private_free);
     }
@@ -1237,25 +1239,6 @@ mm_shared_simtech_voice_check_support (MMIfaceModemVoice   *self,
 /*****************************************************************************/
 
 static void
-shared_simtech_init (gpointer g_iface)
+mm_shared_simtech_default_init (MMSharedSimtechInterface *iface)
 {
-}
-
-GType
-mm_shared_simtech_get_type (void)
-{
-    static GType shared_simtech_type = 0;
-
-    if (!G_UNLIKELY (shared_simtech_type)) {
-        static const GTypeInfo info = {
-            sizeof (MMSharedSimtech),  /* class_size */
-            shared_simtech_init,       /* base_init */
-            NULL,                  /* base_finalize */
-        };
-
-        shared_simtech_type = g_type_register_static (G_TYPE_INTERFACE, "MMSharedSimtech", &info, 0);
-        g_type_interface_add_prerequisite (shared_simtech_type, MM_TYPE_IFACE_MODEM_LOCATION);
-    }
-
-    return shared_simtech_type;
 }
