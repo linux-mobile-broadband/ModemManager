@@ -36,7 +36,7 @@
 #include "mm-bearer-list.h"
 #include "mm-shared-option.h"
 
-static void shared_option_init        (MMSharedOption                *iface);
+static void shared_option_init        (MMSharedOptionInterface       *iface);
 static void iface_modem_init          (MMIfaceModemInterface         *iface);
 static void iface_modem_3gpp_init     (MMIfaceModem3gppInterface     *iface);
 static void iface_modem_location_init (MMIfaceModemLocationInterface *iface);
@@ -782,7 +782,7 @@ mm_broadband_modem_hso_init (MMBroadbandModemHso *self)
 }
 
 static void
-shared_option_init (MMSharedOption *iface)
+shared_option_init (MMSharedOptionInterface *iface)
 {
 }
 

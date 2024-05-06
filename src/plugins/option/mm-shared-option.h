@@ -26,18 +26,12 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-location.h"
 
-#define MM_TYPE_SHARED_OPTION                   (mm_shared_option_get_type ())
-#define MM_SHARED_OPTION(obj)                   (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SHARED_OPTION, MMSharedOption))
-#define MM_IS_SHARED_OPTION(obj)                (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_SHARED_OPTION))
-#define MM_SHARED_OPTION_GET_INTERFACE(obj)     (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_SHARED_OPTION, MMSharedOption))
+#define MM_TYPE_SHARED_OPTION mm_shared_option_get_type ()
+G_DECLARE_INTERFACE (MMSharedOption, mm_shared_option, MM, SHARED_OPTION, MMIfaceModem)
 
-typedef struct _MMSharedOption MMSharedOption;
-
-struct _MMSharedOption {
+struct _MMSharedOptionInterface {
     GTypeInterface g_iface;
 };
-
-GType mm_shared_option_get_type (void);
 
 void       mm_shared_option_create_sim        (MMIfaceModem         *self,
                                                GAsyncReadyCallback   callback,

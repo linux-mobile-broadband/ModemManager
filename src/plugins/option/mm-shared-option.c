@@ -28,6 +28,8 @@
 #include "mm-sim-option.h"
 #include "mm-shared-option.h"
 
+G_DEFINE_INTERFACE (MMSharedOption, mm_shared_option, MM_TYPE_IFACE_MODEM)
+
 /*****************************************************************************/
 /* Create SIM (Modem inteface) */
 
@@ -53,25 +55,6 @@ mm_shared_option_create_sim (MMIfaceModem        *self,
 /*****************************************************************************/
 
 static void
-shared_option_init (gpointer g_iface)
+mm_shared_option_default_init (MMSharedOptionInterface *iface)
 {
-}
-
-GType
-mm_shared_option_get_type (void)
-{
-    static GType shared_option_type = 0;
-
-    if (!G_UNLIKELY (shared_option_type)) {
-        static const GTypeInfo info = {
-            sizeof (MMSharedOption),  /* class_size */
-            shared_option_init,       /* base_init */
-            NULL,                  /* base_finalize */
-        };
-
-        shared_option_type = g_type_register_static (G_TYPE_INTERFACE, "MMSharedOption", &info, 0);
-        g_type_interface_add_prerequisite (shared_option_type, MM_TYPE_IFACE_MODEM);
-    }
-
-    return shared_option_type;
 }

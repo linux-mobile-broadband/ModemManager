@@ -33,7 +33,7 @@
 #include "mm-broadband-modem-option.h"
 #include "mm-shared-option.h"
 
-static void shared_option_init    (MMSharedOption            *iface);
+static void shared_option_init    (MMSharedOptionInterface   *iface);
 static void iface_modem_init      (MMIfaceModemInterface     *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface);
 
@@ -1200,7 +1200,7 @@ mm_broadband_modem_option_init (MMBroadbandModemOption *self)
 }
 
 static void
-shared_option_init (MMSharedOption *iface)
+shared_option_init (MMSharedOptionInterface *iface)
 {
 }
 
