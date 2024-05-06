@@ -35,6 +35,8 @@
 #include "mm-broadband-modem-mbim.h"
 #endif
 
+G_DEFINE_INTERFACE (MMSharedQuectel, mm_shared_quectel, MM_TYPE_IFACE_MODEM)
+
 /*****************************************************************************/
 /* Private context */
 
@@ -91,14 +93,14 @@ get_private (MMSharedQuectel *self)
         g_assert (priv->qlwurc_regex);
         g_assert (priv->rdy_regex);
 
-        g_assert (MM_SHARED_QUECTEL_GET_INTERFACE (self)->peek_parent_broadband_modem_class);
-        priv->broadband_modem_class_parent = MM_SHARED_QUECTEL_GET_INTERFACE (self)->peek_parent_broadband_modem_class (self);
+        g_assert (MM_SHARED_QUECTEL_GET_IFACE (self)->peek_parent_broadband_modem_class);
+        priv->broadband_modem_class_parent = MM_SHARED_QUECTEL_GET_IFACE (self)->peek_parent_broadband_modem_class (self);
 
-        g_assert (MM_SHARED_QUECTEL_GET_INTERFACE (self)->peek_parent_modem_location_interface);
-        priv->iface_modem_location_parent = MM_SHARED_QUECTEL_GET_INTERFACE (self)->peek_parent_modem_location_interface (self);
+        g_assert (MM_SHARED_QUECTEL_GET_IFACE (self)->peek_parent_modem_location_interface);
+        priv->iface_modem_location_parent = MM_SHARED_QUECTEL_GET_IFACE (self)->peek_parent_modem_location_interface (self);
 
-        g_assert (MM_SHARED_QUECTEL_GET_INTERFACE (self)->peek_parent_modem_interface);
-        priv->iface_modem_parent = MM_SHARED_QUECTEL_GET_INTERFACE (self)->peek_parent_modem_interface (self);
+        g_assert (MM_SHARED_QUECTEL_GET_IFACE (self)->peek_parent_modem_interface);
+        priv->iface_modem_parent = MM_SHARED_QUECTEL_GET_IFACE (self)->peek_parent_modem_interface (self);
 
         g_object_set_qdata_full (G_OBJECT (self), private_quark, priv, (GDestroyNotify)private_free);
     }
@@ -1124,25 +1126,6 @@ mm_shared_quectel_time_check_support (MMIfaceModemTime    *self,
 /*****************************************************************************/
 
 static void
-shared_quectel_init (gpointer g_iface)
+mm_shared_quectel_default_init (MMSharedQuectelInterface *iface)
 {
-}
-
-GType
-mm_shared_quectel_get_type (void)
-{
-    static GType shared_quectel_type = 0;
-
-    if (!G_UNLIKELY (shared_quectel_type)) {
-        static const GTypeInfo info = {
-            sizeof (MMSharedQuectel),  /* class_size */
-            shared_quectel_init,       /* base_init */
-            NULL,                      /* base_finalize */
-        };
-
-        shared_quectel_type = g_type_register_static (G_TYPE_INTERFACE, "MMSharedQuectel", &info, 0);
-        g_type_interface_add_prerequisite (shared_quectel_type, MM_TYPE_IFACE_MODEM_FIRMWARE);
-    }
-
-    return shared_quectel_type;
 }

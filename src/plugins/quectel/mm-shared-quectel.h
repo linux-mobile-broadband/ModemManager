@@ -28,21 +28,15 @@
 #include "mm-iface-modem-location.h"
 #include "mm-iface-modem-time.h"
 
-#define MM_TYPE_SHARED_QUECTEL               (mm_shared_quectel_get_type ())
-#define MM_SHARED_QUECTEL(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SHARED_QUECTEL, MMSharedQuectel))
-#define MM_IS_SHARED_QUECTEL(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_SHARED_QUECTEL))
-#define MM_SHARED_QUECTEL_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_SHARED_QUECTEL, MMSharedQuectel))
+#define MM_TYPE_SHARED_QUECTEL mm_shared_quectel_get_type ()
+G_DECLARE_INTERFACE (MMSharedQuectel, mm_shared_quectel, MM, SHARED_QUECTEL, MMIfaceModem)
 
-typedef struct _MMSharedQuectel MMSharedQuectel;
-
-struct _MMSharedQuectel {
+struct _MMSharedQuectelInterface {
     GTypeInterface g_iface;
     MMBroadbandModemClass         * (* peek_parent_broadband_modem_class)    (MMSharedQuectel *self);
     MMIfaceModemInterface         * (* peek_parent_modem_interface)          (MMSharedQuectel *self);
     MMIfaceModemLocationInterface * (* peek_parent_modem_location_interface) (MMSharedQuectel *self);
 };
-
-GType mm_shared_quectel_get_type (void);
 
 void                      mm_shared_quectel_setup_ports                          (MMBroadbandModem *self);
 

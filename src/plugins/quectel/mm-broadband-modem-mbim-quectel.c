@@ -26,7 +26,7 @@ static void iface_modem_init          (MMIfaceModemInterface         *iface);
 static void iface_modem_firmware_init (MMIfaceModemFirmwareInterface *iface);
 static void iface_modem_location_init (MMIfaceModemLocationInterface *iface);
 static void iface_modem_time_init     (MMIfaceModemTimeInterface     *iface);
-static void shared_quectel_init       (MMSharedQuectel               *iface);
+static void shared_quectel_init       (MMSharedQuectelInterface      *iface);
 
 static MMIfaceModemInterface         *iface_modem_parent;
 static MMIfaceModemLocationInterface *iface_modem_location_parent;
@@ -126,7 +126,7 @@ peek_parent_broadband_modem_class (MMSharedQuectel *self)
 }
 
 static void
-shared_quectel_init (MMSharedQuectel *iface)
+shared_quectel_init (MMSharedQuectelInterface *iface)
 {
     iface->peek_parent_modem_interface          = peek_parent_modem_interface;
     iface->peek_parent_modem_location_interface = peek_parent_modem_location_interface;
