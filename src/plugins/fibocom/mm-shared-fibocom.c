@@ -31,6 +31,8 @@
 #include "mm-port-mbim-fibocom.h"
 #include "mm-base-modem-at.h"
 
+G_DEFINE_INTERFACE (MMSharedFibocom, mm_shared_fibocom, MM_TYPE_IFACE_MODEM)
+
 /*****************************************************************************/
 /* Private data context */
 
@@ -69,12 +71,12 @@ get_private (MMSharedFibocom *self)
                                              G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
         /* Setup parent class */
-        g_assert (MM_SHARED_FIBOCOM_GET_INTERFACE (self)->peek_parent_class);
-        priv->class_parent = MM_SHARED_FIBOCOM_GET_INTERFACE (self)->peek_parent_class (self);
+        g_assert (MM_SHARED_FIBOCOM_GET_IFACE (self)->peek_parent_class);
+        priv->class_parent = MM_SHARED_FIBOCOM_GET_IFACE (self)->peek_parent_class (self);
 
         /* Setup parent class' MMIfaceModem3gpp */
-        g_assert (MM_SHARED_FIBOCOM_GET_INTERFACE (self)->peek_parent_3gpp_interface);
-        priv->iface_modem_3gpp_parent = MM_SHARED_FIBOCOM_GET_INTERFACE (self)->peek_parent_3gpp_interface (self);
+        g_assert (MM_SHARED_FIBOCOM_GET_IFACE (self)->peek_parent_3gpp_interface);
+        priv->iface_modem_3gpp_parent = MM_SHARED_FIBOCOM_GET_IFACE (self)->peek_parent_3gpp_interface (self);
 
         g_object_set_qdata_full (G_OBJECT (self), private_quark, priv, (GDestroyNotify)private_free);
     }
@@ -428,26 +430,6 @@ mm_shared_fibocom_firmware_load_update_settings (MMIfaceModemFirmware *self,
 /*****************************************************************************/
 
 static void
-shared_fibocom_init (gpointer g_iface)
+mm_shared_fibocom_default_init (MMSharedFibocomInterface *iface)
 {
-}
-
-GType
-mm_shared_fibocom_get_type (void)
-{
-    static GType shared_fibocom_type = 0;
-
-    if (!G_UNLIKELY (shared_fibocom_type)) {
-        static const GTypeInfo info = {
-            sizeof (MMSharedFibocom),  /* class_size */
-            shared_fibocom_init,       /* base_init */
-            NULL,                      /* base_finalize */
-        };
-
-        shared_fibocom_type = g_type_register_static (G_TYPE_INTERFACE, "MMSharedFibocom", &info, 0);
-        g_type_interface_add_prerequisite (shared_fibocom_type, MM_TYPE_IFACE_MODEM);
-        g_type_interface_add_prerequisite (shared_fibocom_type, MM_TYPE_IFACE_MODEM_3GPP);
-    }
-
-    return shared_fibocom_type;
 }

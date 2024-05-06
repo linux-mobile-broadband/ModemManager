@@ -29,7 +29,7 @@
 #include "mm-shared-fibocom.h"
 
 static void iface_modem_3gpp_init     (MMIfaceModem3gppInterface     *iface);
-static void shared_fibocom_init       (MMSharedFibocom               *iface);
+static void shared_fibocom_init       (MMSharedFibocomInterface      *iface);
 static void iface_modem_firmware_init (MMIfaceModemFirmwareInterface *iface);
 
 static MMIfaceModem3gppInterface *iface_modem_3gpp_parent;
@@ -98,7 +98,7 @@ peek_parent_3gpp_interface (MMSharedFibocom *self)
 }
 
 static void
-shared_fibocom_init (MMSharedFibocom *iface)
+shared_fibocom_init (MMSharedFibocomInterface *iface)
 {
     iface->peek_parent_class = peek_parent_class;
     iface->peek_parent_3gpp_interface = peek_parent_3gpp_interface;
