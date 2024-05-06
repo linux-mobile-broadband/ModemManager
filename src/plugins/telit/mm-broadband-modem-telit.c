@@ -38,7 +38,7 @@
 
 static void iface_modem_init          (MMIfaceModemInterface         *iface);
 static void iface_modem_3gpp_init     (MMIfaceModem3gppInterface     *iface);
-static void shared_telit_init         (MMSharedTelit                 *iface);
+static void shared_telit_init         (MMSharedTelitInterface        *iface);
 static void iface_modem_location_init (MMIfaceModemLocationInterface *iface);
 
 static MMIfaceModemInterface         *iface_modem_parent;
@@ -1592,7 +1592,7 @@ iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
 }
 
 static void
-shared_telit_init (MMSharedTelit *iface)
+shared_telit_init (MMSharedTelitInterface *iface)
 {
 }
 

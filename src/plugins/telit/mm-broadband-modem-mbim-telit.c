@@ -30,8 +30,8 @@
 #include "mm-modem-helpers-telit.h"
 #include "mm-shared-telit.h"
 
-static void iface_modem_init  (MMIfaceModemInterface *iface);
-static void shared_telit_init (MMSharedTelit         *iface);
+static void iface_modem_init  (MMIfaceModemInterface  *iface);
+static void shared_telit_init (MMSharedTelitInterface *iface);
 
 static MMIfaceModemInterface *iface_modem_parent;
 
@@ -258,7 +258,7 @@ peek_parent_modem_interface (MMSharedTelit *self)
 }
 
 static void
-shared_telit_init (MMSharedTelit *iface)
+shared_telit_init (MMSharedTelitInterface *iface)
 {
     iface->peek_parent_modem_interface = peek_parent_modem_interface;
 }

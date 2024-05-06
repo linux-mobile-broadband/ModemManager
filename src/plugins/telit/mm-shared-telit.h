@@ -27,21 +27,15 @@
 #include "mm-iface-modem-location.h"
 #include "mm-modem-helpers-telit.h"
 
-#define MM_TYPE_SHARED_TELIT                   (mm_shared_telit_get_type ())
-#define MM_SHARED_TELIT(obj)                   (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SHARED_TELIT, MMSharedTelit))
-#define MM_IS_SHARED_TELIT(obj)                (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_SHARED_TELIT))
-#define MM_SHARED_TELIT_GET_INTERFACE(obj)     (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_SHARED_TELIT, MMSharedTelit))
+#define MM_TYPE_SHARED_TELIT mm_shared_telit_get_type ()
+G_DECLARE_INTERFACE (MMSharedTelit, mm_shared_telit, MM, SHARED_TELIT, MMIfaceModem)
 
-typedef struct _MMSharedTelit MMSharedTelit;
-
-struct _MMSharedTelit {
+struct _MMSharedTelitInterface {
     GTypeInterface g_iface;
 
     /* Peek modem interface of the parent class of the object */
     MMIfaceModemInterface * (* peek_parent_modem_interface) (MMSharedTelit *self);
 };
-
-GType mm_shared_telit_get_type (void);
 
 void        mm_shared_telit_store_supported_modes       (MMSharedTelit *self,
                                                          GArray *modes);
