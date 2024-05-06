@@ -114,6 +114,7 @@ profile_manager_enable_unsolicited_events (MMIfaceModem3gppProfileManager *self,
         mm_obj_warn (self, "continuing without enabling profile manager events");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
+        return;
     }
 
     iface_modem_3gpp_profile_manager_parent->enable_unsolicited_events (
