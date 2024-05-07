@@ -24,18 +24,13 @@
 #include "ModemManager.h"
 #include "mm-log-object.h"
 #include "mm-iface-modem.h"
-#include "mm-iface-modem-3gpp.h"
 #include "mm-broadband-modem-mbim-xmm-fibocom.h"
 #include "mm-shared-fibocom.h"
 
-static void iface_modem_3gpp_init     (MMIfaceModem3gppInterface     *iface);
 static void shared_fibocom_init       (MMSharedFibocomInterface      *iface);
 static void iface_modem_firmware_init (MMIfaceModemFirmwareInterface *iface);
 
-static MMIfaceModem3gppInterface *iface_modem_3gpp_parent;
-
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbimXmmFibocom, mm_broadband_modem_mbim_xmm_fibocom, MM_TYPE_BROADBAND_MODEM_MBIM_XMM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_FIBOCOM,  shared_fibocom_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init))
 
@@ -73,15 +68,6 @@ mm_broadband_modem_mbim_xmm_fibocom_init (MMBroadbandModemMbimXmmFibocom *self)
 }
 
 static void
-iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
-{
-    iface_modem_3gpp_parent = g_type_interface_peek_parent (iface);
-
-    iface->set_initial_eps_bearer_settings        = mm_shared_fibocom_set_initial_eps_bearer_settings;
-    iface->set_initial_eps_bearer_settings_finish = mm_shared_fibocom_set_initial_eps_bearer_settings_finish;
-}
-
-static void
 iface_modem_firmware_init (MMIfaceModemFirmwareInterface *iface)
 {
     iface->load_update_settings = mm_shared_fibocom_firmware_load_update_settings;
@@ -94,17 +80,10 @@ peek_parent_class (MMSharedFibocom *self)
     return MM_BASE_MODEM_CLASS (mm_broadband_modem_mbim_xmm_fibocom_parent_class);
 }
 
-static MMIfaceModem3gppInterface *
-peek_parent_3gpp_interface (MMSharedFibocom *self)
-{
-    return iface_modem_3gpp_parent;
-}
-
 static void
 shared_fibocom_init (MMSharedFibocomInterface *iface)
 {
     iface->peek_parent_class = peek_parent_class;
-    iface->peek_parent_3gpp_interface = peek_parent_3gpp_interface;
 }
 
 static void

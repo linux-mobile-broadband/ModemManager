@@ -23,7 +23,6 @@
 #include <libmm-glib.h>
 
 #include "mm-broadband-modem.h"
-#include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-firmware.h"
 
@@ -35,9 +34,6 @@ struct _MMSharedFibocomInterface {
 
     /* Peek parent class of the object */
     MMBaseModemClass * (* peek_parent_class) (MMSharedFibocom *self);
-
-    /* Peek 3GPP interface of the parent class of the object */
-    MMIfaceModem3gppInterface * (* peek_parent_3gpp_interface) (MMSharedFibocom *self);
 };
 
 void mm_shared_fibocom_setup_ports (MMBroadbandModem *self);
@@ -48,14 +44,6 @@ MMPort *mm_shared_fibocom_create_usbmisc_port (MMBaseModem *self,
 MMPort *mm_shared_fibocom_create_wwan_port    (MMBaseModem *self,
                                                const gchar *name,
                                                MMPortType   ptype);
-
-void     mm_shared_fibocom_set_initial_eps_bearer_settings        (MMIfaceModem3gpp    *self,
-                                                                   MMBearerProperties  *config,
-                                                                   GAsyncReadyCallback  callback,
-                                                                   gpointer             user_data);
-gboolean mm_shared_fibocom_set_initial_eps_bearer_settings_finish (MMIfaceModem3gpp    *self,
-                                                                   GAsyncResult        *res,
-                                                                   GError             **error);
 
 void                      mm_shared_fibocom_firmware_load_update_settings        (MMIfaceModemFirmware  *self,
                                                                                   GAsyncReadyCallback    callback,

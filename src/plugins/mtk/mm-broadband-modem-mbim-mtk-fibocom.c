@@ -24,21 +24,17 @@
 #include "ModemManager.h"
 #include "mm-log-object.h"
 #include "mm-iface-modem.h"
-#include "mm-iface-modem-3gpp.h"
 #include "mm-bearer-mbim-mtk-fibocom.h"
 #include "mm-broadband-modem-mbim-mtk-fibocom.h"
 #include "mm-shared-fibocom.h"
 
-static void iface_modem_init      (MMIfaceModemInterface     *iface);
-static void iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface);
-static void shared_fibocom_init   (MMSharedFibocomInterface  *iface);
+static void iface_modem_init    (MMIfaceModemInterface    *iface);
+static void shared_fibocom_init (MMSharedFibocomInterface *iface);
 
-static MMIfaceModemInterface     *iface_modem_parent;
-static MMIfaceModem3gppInterface *iface_modem_3gpp_parent;
+static MMIfaceModemInterface *iface_modem_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbimMtkFibocom, mm_broadband_modem_mbim_mtk_fibocom, MM_TYPE_BROADBAND_MODEM_MBIM_MTK, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM,      iface_modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_FIBOCOM,   shared_fibocom_init))
 
 struct _MMBroadbandModemMbimMtkFibocomPrivate {
@@ -284,32 +280,16 @@ iface_modem_init (MMIfaceModemInterface *iface)
     iface->create_bearer_list = create_bearer_list;
 }
 
-static void
-iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
-{
-    iface_modem_3gpp_parent = g_type_interface_peek_parent (iface);
-
-    iface->set_initial_eps_bearer_settings        = mm_shared_fibocom_set_initial_eps_bearer_settings;
-    iface->set_initial_eps_bearer_settings_finish = mm_shared_fibocom_set_initial_eps_bearer_settings_finish;
-}
-
 static MMBaseModemClass *
 peek_parent_class (MMSharedFibocom *self)
 {
     return MM_BASE_MODEM_CLASS (mm_broadband_modem_mbim_mtk_fibocom_parent_class);
 }
 
-static MMIfaceModem3gppInterface *
-peek_parent_3gpp_interface (MMSharedFibocom *self)
-{
-    return iface_modem_3gpp_parent;
-}
-
 static void
 shared_fibocom_init (MMSharedFibocomInterface *iface)
 {
     iface->peek_parent_class = peek_parent_class;
-    iface->peek_parent_3gpp_interface = peek_parent_3gpp_interface;
 }
 
 static void
