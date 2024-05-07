@@ -509,29 +509,6 @@ get_modem_ready (GObject      *source,
         return;
     }
 
-    ensure_modem_enabled ();
-
-    /* Request to scan networks? */
-    if (scan_flag) {
-        g_debug ("Asynchronously scanning for networks...");
-        mm_modem_3gpp_scan (ctx->modem_3gpp,
-                            ctx->cancellable,
-                            (GAsyncReadyCallback)scan_ready,
-                            NULL);
-        return;
-    }
-
-    /* Request to register the modem? */
-    if (register_in_operator_str || register_home_flag) {
-        g_debug ("Asynchronously registering the modem...");
-        mm_modem_3gpp_register (ctx->modem_3gpp,
-                                (register_in_operator_str ? register_in_operator_str : ""),
-                                ctx->cancellable,
-                                (GAsyncReadyCallback)register_ready,
-                                NULL);
-        return;
-    }
-
     /* Request to set UE mode of operation for EPS? */
     if (set_eps_ue_mode_operation_str) {
         MMModem3gppEpsUeModeOperation uemode;
@@ -566,7 +543,29 @@ get_modem_ready (GObject      *source,
                                                        NULL);
         g_object_unref (config);
         return;
+    }
 
+    ensure_modem_enabled ();
+
+    /* Request to scan networks? */
+    if (scan_flag) {
+        g_debug ("Asynchronously scanning for networks...");
+        mm_modem_3gpp_scan (ctx->modem_3gpp,
+                            ctx->cancellable,
+                            (GAsyncReadyCallback)scan_ready,
+                            NULL);
+        return;
+    }
+
+    /* Request to register the modem? */
+    if (register_in_operator_str || register_home_flag) {
+        g_debug ("Asynchronously registering the modem...");
+        mm_modem_3gpp_register (ctx->modem_3gpp,
+                                (register_in_operator_str ? register_in_operator_str : ""),
+                                ctx->cancellable,
+                                (GAsyncReadyCallback)register_ready,
+                                NULL);
+        return;
     }
 
     /* Request to set packet service state */
@@ -693,22 +692,6 @@ mmcli_modem_3gpp_run_synchronous (GDBusConnection *connection)
         return;
     }
 
-    ensure_modem_enabled ();
-
-    /* Request to register the modem? */
-    if (register_in_operator_str || register_home_flag) {
-        gboolean result;
-
-        g_debug ("Synchronously registering the modem...");
-        result = mm_modem_3gpp_register_sync (
-            ctx->modem_3gpp,
-            (register_in_operator_str ? register_in_operator_str : ""),
-            NULL,
-            &error);
-        register_process_reply (result, error);
-        return;
-    }
-
     /* Request to set UE mode of operation for EPS? */
     if (set_eps_ue_mode_operation_str) {
         MMModem3gppEpsUeModeOperation uemode;
@@ -743,6 +726,22 @@ mmcli_modem_3gpp_run_synchronous (GDBusConnection *connection)
                                                                      &error);
         set_initial_eps_bearer_settings_process_reply (result, error);
         g_object_unref (config);
+        return;
+    }
+
+    ensure_modem_enabled ();
+
+    /* Request to register the modem? */
+    if (register_in_operator_str || register_home_flag) {
+        gboolean result;
+
+        g_debug ("Synchronously registering the modem...");
+        result = mm_modem_3gpp_register_sync (
+            ctx->modem_3gpp,
+            (register_in_operator_str ? register_in_operator_str : ""),
+            NULL,
+            &error);
+        register_process_reply (result, error);
         return;
     }
 
