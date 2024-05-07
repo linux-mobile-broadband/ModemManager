@@ -196,7 +196,7 @@ after_attach_apn_modem_power_up_ready (MMIfaceModem *self,
 
     ctx = g_task_get_task_data (task);
 
-    if (!mm_iface_modem_set_power_state_finish (self, res, &error)) {
+    if (!mm_iface_modem_set_power_state_finish (self, res, NULL, &error)) {
         mm_obj_warn (self, "failed to power up modem after attach APN settings update: %s", error->message);
         if (!ctx->saved_error)
             ctx->saved_error = g_steal_pointer (&error);
@@ -260,7 +260,7 @@ before_attach_apn_modem_power_down_ready (MMIfaceModem *self,
 {
     GError *error = NULL;
 
-    if (!mm_iface_modem_set_power_state_finish (self, res, &error)) {
+    if (!mm_iface_modem_set_power_state_finish (self, res, NULL, &error)) {
         mm_obj_warn (self, "failed to power down modem before attach APN settings update: %s", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);

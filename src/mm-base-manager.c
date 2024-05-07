@@ -908,7 +908,7 @@ shutdown_low_power_ready (MMIfaceModem   *modem,
 {
     g_autoptr(GError) error = NULL;
 
-    if (!mm_iface_modem_set_power_state_finish (modem, res, &error))
+    if (!mm_iface_modem_set_power_state_finish (modem, res, NULL, &error))
         mm_obj_info (ctx->self, "changing to low power state failed: %s", error->message);
 
     if (ctx->remove)

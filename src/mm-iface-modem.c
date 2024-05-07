@@ -2418,7 +2418,7 @@ set_power_state_ready (MMIfaceModem               *self,
 {
     GError *error = NULL;
 
-    if (!mm_iface_modem_set_power_state_finish (self, res, &error)) {
+    if (!mm_iface_modem_set_power_state_finish (self, res, NULL, &error)) {
         mm_obj_warn (self, "failed setting power state '%s': %s", mm_modem_power_state_get_string (ctx->power_state), error->message);
         if (ctx->disable_after_update) {
             ctx->saved_error = error;
@@ -4152,10 +4152,17 @@ set_power_state_context_free (SetPowerStateContext *ctx)
 }
 
 gboolean
-mm_iface_modem_set_power_state_finish (MMIfaceModem  *self,
-                                       GAsyncResult  *res,
-                                       GError       **error)
+mm_iface_modem_set_power_state_finish (MMIfaceModem       *self,
+                                       GAsyncResult       *res,
+                                       MMModemPowerState  *previous_power_state,
+                                       GError            **error)
 {
+    SetPowerStateContext *ctx;
+
+    ctx = g_task_get_task_data (G_TASK (res));
+    if (previous_power_state)
+        *previous_power_state = ctx->previous_real_power_state;
+
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
@@ -4440,6 +4447,7 @@ mm_iface_modem_set_power_state (MMIfaceModem        *self,
     ctx = g_slice_new0 (SetPowerStateContext);
     ctx->step = SET_POWER_STATE_STEP_FIRST;
     ctx->requested_power_state = power_state;
+    ctx->previous_real_power_state = MM_MODEM_POWER_STATE_UNKNOWN;
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)set_power_state_context_free);
@@ -4562,7 +4570,7 @@ enabling_set_power_state_ready (MMIfaceModem *self,
     EnablingContext *ctx;
     GError *error = NULL;
 
-    if (!mm_iface_modem_set_power_state_finish (self, res, &error)) {
+    if (!mm_iface_modem_set_power_state_finish (self, res, NULL, &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;

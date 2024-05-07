@@ -499,13 +499,14 @@ gboolean mm_iface_modem_sync_finish    (MMIfaceModem *self,
 #endif
 
 /* Allow setting power state */
-void     mm_iface_modem_set_power_state        (MMIfaceModem *self,
-                                                MMModemPowerState power_state,
-                                                GAsyncReadyCallback callback,
-                                                gpointer user_data);
-gboolean mm_iface_modem_set_power_state_finish (MMIfaceModem *self,
-                                                GAsyncResult *res,
-                                                GError **error);
+void     mm_iface_modem_set_power_state        (MMIfaceModem        *self,
+                                                MMModemPowerState    power_state,
+                                                GAsyncReadyCallback  callback,
+                                                gpointer             user_data);
+gboolean mm_iface_modem_set_power_state_finish (MMIfaceModem        *self,
+                                                GAsyncResult        *res,
+                                                MMModemPowerState   *previous_power_state,
+                                                GError             **error);
 
 /* Request lock info update.
  * It will not only return the lock status, but also set the property values
