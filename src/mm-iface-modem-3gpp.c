@@ -1208,17 +1208,30 @@ handle_set_eps_ue_mode_operation (MmGdbusModem3gpp      *skeleton,
 
 /*****************************************************************************/
 
+typedef enum {
+    HANDLE_SET_INITIAL_EPS_BEARER_SETTINGS_STEP_FIRST,
+    HANDLE_SET_INITIAL_EPS_BEARER_SETTINGS_STEP_POWER_DOWN,
+    HANDLE_SET_INITIAL_EPS_BEARER_SETTINGS_STEP_UPDATE,
+    HANDLE_SET_INITIAL_EPS_BEARER_SETTINGS_STEP_PREVIOUS_POWER,
+    HANDLE_SET_INITIAL_EPS_BEARER_SETTINGS_STEP_RELOAD,
+    HANDLE_SET_INITIAL_EPS_BEARER_SETTINGS_STEP_LAST,
+} HandleSetInitialEpsBearerSettingsStep;
+
 typedef struct {
-    MmGdbusModem3gpp      *skeleton;
-    GDBusMethodInvocation *invocation;
-    MMIfaceModem3gpp      *self;
-    GVariant              *dictionary;
-    MMBearerProperties    *config;
+    HandleSetInitialEpsBearerSettingsStep  step;
+    MmGdbusModem3gpp                      *skeleton;
+    GDBusMethodInvocation                 *invocation;
+    MMIfaceModem3gpp                      *self;
+    GVariant                              *dictionary;
+    MMBearerProperties                    *config;
+    MMModemPowerState                      previous_power_state;
+    GError                                *saved_error;
 } HandleSetInitialEpsBearerSettingsContext;
 
 static void
 handle_set_initial_eps_bearer_settings_context_free (HandleSetInitialEpsBearerSettingsContext *ctx)
 {
+    g_assert (!ctx->saved_error);
     g_clear_object (&ctx->config);
     g_variant_unref (ctx->dictionary);
     g_object_unref (ctx->skeleton);
@@ -1227,72 +1240,171 @@ handle_set_initial_eps_bearer_settings_context_free (HandleSetInitialEpsBearerSe
     g_slice_free (HandleSetInitialEpsBearerSettingsContext, ctx);
 }
 
+static void handle_set_initial_eps_bearer_settings_step (HandleSetInitialEpsBearerSettingsContext *ctx);
+
 static void
-after_set_load_initial_eps_bearer_settings_ready (MMIfaceModem3gpp                         *self,
-                                                  GAsyncResult                             *res,
-                                                  HandleSetInitialEpsBearerSettingsContext *ctx)
+handle_set_initial_eps_bearer_settings_reload_ready (MMIfaceModem3gpp                         *self,
+                                                     GAsyncResult                             *res,
+                                                     HandleSetInitialEpsBearerSettingsContext *ctx)
 {
-    GError                        *error = NULL;
-    g_autoptr(MMBearerProperties)  new_config = NULL;
-    g_autoptr(GVariant)            dictionary = NULL;
+    g_autoptr(MMBearerProperties) new_config = NULL;
+    g_autoptr(GVariant)           dictionary = NULL;
 
-    new_config = MM_IFACE_MODEM_3GPP_GET_IFACE (self)->load_initial_eps_bearer_settings_finish (self, res, &error);
-    if (error) {
-        mm_obj_warn (self, "failed reloading initial EPS bearer settings after update: %s", error->message);
-        mm_dbus_method_invocation_take_error (ctx->invocation, error);
-        handle_set_initial_eps_bearer_settings_context_free (ctx);
-        return;
-    }
+    g_assert (!ctx->saved_error);
 
-    if (!mm_bearer_properties_cmp (new_config, ctx->config, MM_BEARER_PROPERTIES_CMP_FLAGS_EPS)) {
+    new_config = MM_IFACE_MODEM_3GPP_GET_IFACE (self)->load_initial_eps_bearer_settings_finish (self, res, &ctx->saved_error);
+    if (ctx->saved_error)
+        mm_obj_warn (self, "failed reloading initial EPS bearer settings after update: %s", ctx->saved_error->message);
+    else if (!mm_bearer_properties_cmp (new_config, ctx->config, MM_BEARER_PROPERTIES_CMP_FLAGS_EPS)) {
         mm_obj_warn (self, "requested and reloaded initial EPS bearer settings don't match");
         mm_obj_info (self, "reloaded initial EPS bearer settings:");
         mm_log_bearer_properties (self, MM_LOG_LEVEL_INFO, "  ", new_config);
-        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                                       "Initial EPS bearer settings were not updated");
-        handle_set_initial_eps_bearer_settings_context_free (ctx);
-        return;
+        ctx->saved_error = g_error_new_literal (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                                "Initial EPS bearer settings were not updated");
+    } else {
+        dictionary = mm_bearer_properties_get_dictionary (new_config);
+        mm_gdbus_modem3gpp_set_initial_eps_bearer_settings (ctx->skeleton, dictionary);
     }
 
-    dictionary = mm_bearer_properties_get_dictionary (new_config);
-    mm_gdbus_modem3gpp_set_initial_eps_bearer_settings (ctx->skeleton, dictionary);
-    mm_gdbus_modem3gpp_complete_set_initial_eps_bearer_settings (ctx->skeleton, ctx->invocation);
-    handle_set_initial_eps_bearer_settings_context_free (ctx);
+    ctx->step++;
+    handle_set_initial_eps_bearer_settings_step (ctx);
 }
 
 static void
-set_initial_eps_bearer_settings_ready (MMIfaceModem3gpp                         *self,
-                                       GAsyncResult                             *res,
-                                       HandleSetInitialEpsBearerSettingsContext *ctx)
+handle_set_initial_eps_bearer_settings_previous_power_ready (MMIfaceModem                             *self,
+                                                             GAsyncResult                             *res,
+                                                             HandleSetInitialEpsBearerSettingsContext *ctx)
 {
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
 
-    if (!MM_IFACE_MODEM_3GPP_GET_IFACE (self)->set_initial_eps_bearer_settings_finish (self, res, &error)) {
-        mm_obj_warn (self, "failed setting initial EPS bearer settings: %s", error->message);
+    if (!mm_iface_modem_set_power_state_finish (self, res, NULL, &error)) {
+        mm_obj_warn (self, "failed to restore power state after updating initial EPS bearer settings: %s", error->message);
+        if (!ctx->saved_error)
+            ctx->saved_error = g_steal_pointer (&error);
+    } else {
+        mm_obj_dbg (self, "modem power state updated: %s -> %s",
+                    mm_modem_power_state_get_string (MM_MODEM_POWER_STATE_LOW),
+                    mm_modem_power_state_get_string (ctx->previous_power_state));
+    }
+
+    /* Jump to last if there is any error */
+    if (ctx->saved_error)
+        ctx->step = HANDLE_SET_INITIAL_EPS_BEARER_SETTINGS_STEP_LAST;
+    else
+        ctx->step++;
+    handle_set_initial_eps_bearer_settings_step (ctx);
+}
+
+static void
+handle_set_initial_eps_bearer_settings_update_ready (MMIfaceModem3gpp                         *self,
+                                                     GAsyncResult                             *res,
+                                                     HandleSetInitialEpsBearerSettingsContext *ctx)
+{
+    if (!MM_IFACE_MODEM_3GPP_GET_IFACE (self)->set_initial_eps_bearer_settings_finish (self, res, &ctx->saved_error)) {
+        mm_obj_warn (self, "failed setting initial EPS bearer settings: %s", ctx->saved_error->message);
         /* process profile manager updates right away on error */
         mm_iface_modem_3gpp_profile_manager_update_ignore_stop (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self));
-        mm_dbus_method_invocation_take_error (ctx->invocation, error);
-        handle_set_initial_eps_bearer_settings_context_free (ctx);
-        return;
+        /* we continue the steps in order to power up after the failure if needed */
+    } else {
+        /* delay processing profile manager updates on success */
+        mm_iface_modem_3gpp_profile_manager_update_ignore_stop_delayed (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self));
+        mm_obj_info (self, "initial EPS bearer settings updated");
     }
 
-    mm_obj_info (self, "initial EPS bearer settings updated");
+    ctx->step++;
+    handle_set_initial_eps_bearer_settings_step (ctx);
+}
 
-    /* delay processing profile manager updates on success */
-    mm_iface_modem_3gpp_profile_manager_update_ignore_stop_delayed (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self));
-
-    if (MM_IFACE_MODEM_3GPP_GET_IFACE (self)->load_initial_eps_bearer_settings &&
-        MM_IFACE_MODEM_3GPP_GET_IFACE (self)->load_initial_eps_bearer_settings_finish) {
-        MM_IFACE_MODEM_3GPP_GET_IFACE (self)->load_initial_eps_bearer_settings (
-            self,
-            (GAsyncReadyCallback)after_set_load_initial_eps_bearer_settings_ready,
-            ctx);
-        return;
+static void
+handle_set_initial_eps_bearer_settings_power_down_ready (MMIfaceModem                             *self,
+                                                         GAsyncResult                             *res,
+                                                         HandleSetInitialEpsBearerSettingsContext *ctx)
+{
+    if (!mm_iface_modem_set_power_state_finish (self, res, &ctx->previous_power_state, &ctx->saved_error)) {
+        /* Jump to last if there is any error */
+        mm_obj_warn (self, "failed to power down modem before updating initial EPS bearer settings: %s", ctx->saved_error->message);
+        ctx->step = HANDLE_SET_INITIAL_EPS_BEARER_SETTINGS_STEP_LAST;
+    } else {
+        mm_obj_dbg (self, "modem power state updated: %s -> %s",
+                    mm_modem_power_state_get_string (ctx->previous_power_state),
+                    mm_modem_power_state_get_string (MM_MODEM_POWER_STATE_LOW));
+        ctx->step++;
     }
 
-    /* Assume we're ok */
-    mm_gdbus_modem3gpp_complete_set_initial_eps_bearer_settings (ctx->skeleton, ctx->invocation);
-    handle_set_initial_eps_bearer_settings_context_free (ctx);
+    handle_set_initial_eps_bearer_settings_step (ctx);
+}
+
+static void
+handle_set_initial_eps_bearer_settings_step (HandleSetInitialEpsBearerSettingsContext *ctx)
+{
+    switch (ctx->step) {
+        case HANDLE_SET_INITIAL_EPS_BEARER_SETTINGS_STEP_FIRST:
+            ctx->step++;
+            /* fall through */
+
+        case HANDLE_SET_INITIAL_EPS_BEARER_SETTINGS_STEP_POWER_DOWN:
+            mm_obj_msg (ctx->self, "set initial EPS bearer settings state (%d/%d): power down",
+                        ctx->step, HANDLE_SET_INITIAL_EPS_BEARER_SETTINGS_STEP_LAST);
+            mm_iface_modem_set_power_state (
+                MM_IFACE_MODEM (ctx->self),
+                MM_MODEM_POWER_STATE_LOW,
+                (GAsyncReadyCallback)handle_set_initial_eps_bearer_settings_power_down_ready,
+                ctx);
+            return;
+
+        case HANDLE_SET_INITIAL_EPS_BEARER_SETTINGS_STEP_UPDATE:
+            mm_obj_msg (ctx->self, "set initial EPS bearer settings state (%d/%d): update",
+                        ctx->step, HANDLE_SET_INITIAL_EPS_BEARER_SETTINGS_STEP_LAST);
+            mm_iface_modem_3gpp_profile_manager_update_ignore_start (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (ctx->self));
+            MM_IFACE_MODEM_3GPP_GET_IFACE (ctx->self)->set_initial_eps_bearer_settings (
+                ctx->self,
+                ctx->config,
+                (GAsyncReadyCallback)handle_set_initial_eps_bearer_settings_update_ready,
+                ctx);
+            return;
+
+        case HANDLE_SET_INITIAL_EPS_BEARER_SETTINGS_STEP_PREVIOUS_POWER:
+            mm_obj_msg (ctx->self, "set initial EPS bearer settings state (%d/%d): recover previous power state",
+                        ctx->step, HANDLE_SET_INITIAL_EPS_BEARER_SETTINGS_STEP_LAST);
+            mm_iface_modem_set_power_state (
+                MM_IFACE_MODEM (ctx->self),
+                ctx->previous_power_state,
+                (GAsyncReadyCallback)handle_set_initial_eps_bearer_settings_previous_power_ready,
+                ctx);
+            return;
+
+        case HANDLE_SET_INITIAL_EPS_BEARER_SETTINGS_STEP_RELOAD:
+            mm_obj_msg (ctx->self, "set initial EPS bearer settings state (%d/%d): reload",
+                        ctx->step, HANDLE_SET_INITIAL_EPS_BEARER_SETTINGS_STEP_LAST);
+            if (MM_IFACE_MODEM_3GPP_GET_IFACE (ctx->self)->load_initial_eps_bearer_settings &&
+                MM_IFACE_MODEM_3GPP_GET_IFACE (ctx->self)->load_initial_eps_bearer_settings_finish) {
+                MM_IFACE_MODEM_3GPP_GET_IFACE (ctx->self)->load_initial_eps_bearer_settings (
+                    ctx->self,
+                    (GAsyncReadyCallback)handle_set_initial_eps_bearer_settings_reload_ready,
+                    ctx);
+                return;
+            }
+            /* Otherwise, assume we're ok */
+
+            ctx->step++;
+            /* fall through */
+
+        case HANDLE_SET_INITIAL_EPS_BEARER_SETTINGS_STEP_LAST:
+            if (ctx->saved_error) {
+                mm_obj_msg (ctx->self, "set initial EPS bearer settings state (%d/%d): failed",
+                            ctx->step, HANDLE_SET_INITIAL_EPS_BEARER_SETTINGS_STEP_LAST);
+                mm_dbus_method_invocation_take_error (ctx->invocation, g_steal_pointer (&ctx->saved_error));
+            } else {
+                mm_obj_msg (ctx->self, "set initial EPS bearer settings state (%d/%d): all done",
+                            ctx->step, HANDLE_SET_INITIAL_EPS_BEARER_SETTINGS_STEP_LAST);
+                mm_gdbus_modem3gpp_complete_set_initial_eps_bearer_settings (ctx->skeleton, ctx->invocation);
+            }
+            handle_set_initial_eps_bearer_settings_context_free (ctx);
+            return;
+
+        default:
+            g_assert_not_reached ();
+    }
 }
 
 static void
@@ -1343,14 +1455,9 @@ set_initial_eps_bearer_settings_auth_ready (MMBaseModem                         
         return;
     }
 
-    /* Start ignoring our own indications */
-    mm_iface_modem_3gpp_profile_manager_update_ignore_start (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self));
-
-    MM_IFACE_MODEM_3GPP_GET_IFACE (self)->set_initial_eps_bearer_settings (
-        MM_IFACE_MODEM_3GPP (self),
-        ctx->config,
-        (GAsyncReadyCallback)set_initial_eps_bearer_settings_ready,
-        ctx);
+    /* Launch procedure */
+    ctx->step = HANDLE_SET_INITIAL_EPS_BEARER_SETTINGS_STEP_FIRST;
+    handle_set_initial_eps_bearer_settings_step (ctx);
 }
 
 static gboolean
@@ -1366,6 +1473,7 @@ handle_set_initial_eps_bearer_settings (MmGdbusModem3gpp      *skeleton,
     ctx->invocation = g_object_ref (invocation);
     ctx->self       = g_object_ref (self);
     ctx->dictionary = g_variant_ref (dictionary);
+    ctx->previous_power_state = MM_MODEM_POWER_STATE_UNKNOWN;
 
     mm_base_modem_authorize (MM_BASE_MODEM (self),
                              invocation,
