@@ -11523,28 +11523,6 @@ modem_3gpp_load_initial_eps_bearer (MMIfaceModem3gpp    *self,
 /*****************************************************************************/
 /* Initial EPS bearer settings setting */
 
-typedef enum {
-    SET_INITIAL_EPS_BEARER_SETTINGS_STEP_FIRST,
-    SET_INITIAL_EPS_BEARER_SETTINGS_STEP_LOAD_POWER_STATE,
-    SET_INITIAL_EPS_BEARER_SETTINGS_STEP_POWER_DOWN,
-    SET_INITIAL_EPS_BEARER_SETTINGS_STEP_MODIFY_PROFILE,
-    SET_INITIAL_EPS_BEARER_SETTINGS_STEP_POWER_UP,
-    SET_INITIAL_EPS_BEARER_SETTINGS_STEP_LAST_SETTING,
-} SetInitialEpsBearerSettingsStep;
-
-typedef struct {
-    SetInitialEpsBearerSettingsStep  step;
-    MM3gppProfile                   *profile;
-    MMModemPowerState                power_state;
-} SetInitialEpsBearerSettingsContext;
-
-static void
-set_initial_eps_bearer_settings_context_free (SetInitialEpsBearerSettingsContext *ctx)
-{
-    g_clear_object (&ctx->profile);
-    g_slice_free (SetInitialEpsBearerSettingsContext, ctx);
-}
-
 static gboolean
 modem_3gpp_set_initial_eps_bearer_settings_finish (MMIfaceModem3gpp  *self,
                                                    GAsyncResult      *res,
@@ -11553,166 +11531,20 @@ modem_3gpp_set_initial_eps_bearer_settings_finish (MMIfaceModem3gpp  *self,
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static void set_initial_eps_bearer_settings_step (GTask *task);
-
-static void
-set_initial_eps_bearer_power_up_ready (MMIfaceModem *self,
-                                       GAsyncResult *res,
-                                       GTask        *task)
-{
-    SetInitialEpsBearerSettingsContext *ctx;
-    GError                             *error = NULL;
-
-    ctx = g_task_get_task_data (task);
-
-    if (!modem_power_up_down_off_finish (self, res, &error)) {
-        g_prefix_error (&error, "Couldn't power up modem: ");
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
-    ctx->step++;
-    set_initial_eps_bearer_settings_step (task);
-}
-
 static void
 set_initial_eps_bearer_modify_profile_ready (MMIfaceModem3gppProfileManager *self,
                                              GAsyncResult                   *res,
                                              GTask                          *task)
 {
-    GError                             *error = NULL;
-    SetInitialEpsBearerSettingsContext *ctx;
-    g_autoptr(MM3gppProfile)            stored = NULL;
-
-    ctx = g_task_get_task_data (task);
+    GError                   *error = NULL;
+    g_autoptr(MM3gppProfile)  stored = NULL;
 
     stored = mm_iface_modem_3gpp_profile_manager_set_profile_finish (self, res, &error);
-    if (!stored) {
+    if (!stored)
         g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
-    ctx->step++;
-    set_initial_eps_bearer_settings_step (task);
-}
-
-static void
-set_initial_eps_bearer_modify_profile (GTask *task)
-{
-    MMBroadbandModemQmi                *self;
-    SetInitialEpsBearerSettingsContext *ctx;
-
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data (task);
-
-    mm_iface_modem_3gpp_profile_manager_set_profile (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self),
-                                                     ctx->profile,
-                                                     "profile-id",
-                                                     TRUE,
-                                                     (GAsyncReadyCallback)set_initial_eps_bearer_modify_profile_ready,
-                                                     task);
-}
-
-static void
-set_initial_eps_bearer_power_down_ready (MMIfaceModem *self,
-                                         GAsyncResult *res,
-                                         GTask        *task)
-{
-    SetInitialEpsBearerSettingsContext *ctx;
-    GError                             *error = NULL;
-
-    ctx = g_task_get_task_data (task);
-
-    if (!modem_power_up_down_off_finish (self, res, &error)) {
-        g_prefix_error (&error, "Couldn't power down modem: ");
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
-    ctx->step++;
-    set_initial_eps_bearer_settings_step (task);
-}
-
-static void
-set_initial_eps_bearer_load_power_state_ready (MMIfaceModem *self,
-                                               GAsyncResult *res,
-                                               GTask        *task)
-{
-    SetInitialEpsBearerSettingsContext *ctx;
-    GError                             *error = NULL;
-
-    ctx = g_task_get_task_data (task);
-
-    ctx->power_state = load_power_state_finish (self, res, &error);
-    if (ctx->power_state == MM_MODEM_POWER_STATE_UNKNOWN) {
-        g_prefix_error (&error, "Couldn't load power state: ");
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
-    ctx->step++;
-    set_initial_eps_bearer_settings_step (task);
-}
-
-static void
-set_initial_eps_bearer_settings_step (GTask *task)
-{
-    SetInitialEpsBearerSettingsContext *ctx;
-    MMBroadbandModemQmi                *self;
-
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data (task);
-
-    switch (ctx->step) {
-        case SET_INITIAL_EPS_BEARER_SETTINGS_STEP_FIRST:
-            ctx->step++;
-            /* fall through */
-
-        case SET_INITIAL_EPS_BEARER_SETTINGS_STEP_LOAD_POWER_STATE:
-            mm_obj_dbg (self, "querying current power state...");
-            load_power_state (MM_IFACE_MODEM (self),
-                              (GAsyncReadyCallback) set_initial_eps_bearer_load_power_state_ready,
-                              task);
-            return;
-
-        case SET_INITIAL_EPS_BEARER_SETTINGS_STEP_POWER_DOWN:
-            if (ctx->power_state == MM_MODEM_POWER_STATE_ON) {
-                mm_obj_dbg (self, "powering down before changing initial EPS bearer settings...");
-                modem_power_down (MM_IFACE_MODEM (self),
-                                  (GAsyncReadyCallback) set_initial_eps_bearer_power_down_ready,
-                                  task);
-                return;
-            }
-            ctx->step++;
-            /* fall through */
-
-        case SET_INITIAL_EPS_BEARER_SETTINGS_STEP_MODIFY_PROFILE:
-            mm_obj_dbg (self, "modifying initial EPS bearer settings profile...");
-            set_initial_eps_bearer_modify_profile (task);
-            return;
-
-        case SET_INITIAL_EPS_BEARER_SETTINGS_STEP_POWER_UP:
-            if (ctx->power_state == MM_MODEM_POWER_STATE_ON) {
-                mm_obj_dbg (self, "powering up after changing initial EPS bearer settings...");
-                modem_power_up (MM_IFACE_MODEM (self),
-                                (GAsyncReadyCallback) set_initial_eps_bearer_power_up_ready,
-                                task);
-                return;
-            }
-            ctx->step++;
-            /* fall through */
-
-        case SET_INITIAL_EPS_BEARER_SETTINGS_STEP_LAST_SETTING:
-            g_task_return_boolean (task, TRUE);
-            g_object_unref (task);
-            return;
-        default:
-            g_assert_not_reached ();
-    }
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -11721,10 +11553,9 @@ modem_3gpp_set_initial_eps_bearer_settings (MMIfaceModem3gpp    *_self,
                                             GAsyncReadyCallback  callback,
                                             gpointer             user_data)
 {
-    MMBroadbandModemQmi                *self = MM_BROADBAND_MODEM_QMI (_self);
-    SetInitialEpsBearerSettingsContext *ctx;
-    GTask                              *task;
-    MM3gppProfile                      *profile;
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    GTask               *task;
+    MM3gppProfile       *profile;
 
     task = g_task_new (self, NULL, callback, user_data);
 
@@ -11738,12 +11569,12 @@ modem_3gpp_set_initial_eps_bearer_settings (MMIfaceModem3gpp    *_self,
     profile = mm_bearer_properties_peek_3gpp_profile (config);
     mm_3gpp_profile_set_profile_id (profile, self->priv->default_attach_pdn);
 
-    ctx = g_slice_new0 (SetInitialEpsBearerSettingsContext);
-    ctx->profile = g_object_ref (profile);
-    ctx->step = SET_INITIAL_EPS_BEARER_SETTINGS_STEP_FIRST;
-    g_task_set_task_data (task, ctx, (GDestroyNotify) set_initial_eps_bearer_settings_context_free);
-
-    set_initial_eps_bearer_settings_step (task);
+    mm_iface_modem_3gpp_profile_manager_set_profile (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self),
+                                                     profile,
+                                                     "profile-id",
+                                                     TRUE,
+                                                     (GAsyncReadyCallback)set_initial_eps_bearer_modify_profile_ready,
+                                                     task);
 }
 
 /*****************************************************************************/
