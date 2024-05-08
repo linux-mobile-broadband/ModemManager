@@ -878,6 +878,9 @@ mm_iface_modem_3gpp_profile_manager_set_profile (MMIfaceModem3gppProfileManager 
 }
 
 /*****************************************************************************/
+/* Get a single profile.
+ *   NOTE: this method may be called before the interface is initialized.
+ */
 
 MM3gppProfile *
 mm_iface_modem_3gpp_profile_manager_get_profile_finish (MMIfaceModem3gppProfileManager  *self,
@@ -963,6 +966,9 @@ mm_iface_modem_3gpp_profile_manager_get_profile (MMIfaceModem3gppProfileManager 
 }
 
 /*****************************************************************************/
+/* List all profiles.
+ *   NOTE: this method may be called before the interface is initialized.
+ */
 
 typedef struct {
     GList *profiles;
