@@ -1810,19 +1810,10 @@ load_preferred_networks_finish (MMBaseSim     *self,
                                 GAsyncResult  *res,
                                 GError       **error)
 {
-    gchar *result;
-    GList *preferred_network_list;
+    g_autofree gchar *result = NULL;
 
     result = g_task_propagate_pointer (G_TASK (res), error);
-    if (!result)
-        return NULL;
-
-    preferred_network_list = parse_preferred_networks (result, error);
-    mm_obj_dbg (self, "loaded %u preferred networks", g_list_length (preferred_network_list));
-
-    g_free (result);
-
-    return preferred_network_list;
+    return result ? parse_preferred_networks (result, error) : NULL;
 }
 
 STR_REPLY_READY_FN (load_preferred_networks)
@@ -1954,20 +1945,10 @@ load_sim_identifier_finish (MMBaseSim *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    gchar *result;
-    gchar *sim_identifier;
+    g_autofree gchar *result = NULL;
 
     result = g_task_propagate_pointer (G_TASK (res), error);
-    if (!result)
-        return NULL;
-
-    sim_identifier = parse_iccid (result, error);
-    g_free (result);
-    if (!sim_identifier)
-        return NULL;
-
-    mm_obj_dbg (self, "loaded SIM identifier: %s", sim_identifier);
-    return sim_identifier;
+    return result ? parse_iccid (result, error) : NULL;
 }
 
 STR_REPLY_READY_FN (load_sim_identifier)
@@ -2022,20 +2003,10 @@ load_imsi_finish (MMBaseSim *self,
                   GAsyncResult *res,
                   GError **error)
 {
-    gchar *result;
-    gchar *imsi;
+    g_autofree gchar *result = NULL;
 
     result = g_task_propagate_pointer (G_TASK (res), error);
-    if (!result)
-        return NULL;
-
-    imsi = parse_imsi (result, error);
-    g_free (result);
-    if (!imsi)
-        return NULL;
-
-    mm_obj_dbg (self, "loaded IMSI: %s", imsi);
-    return imsi;
+    return result ? parse_imsi (result, error) : NULL;
 }
 
 STR_REPLY_READY_FN (load_imsi)
