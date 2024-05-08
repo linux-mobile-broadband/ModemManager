@@ -97,6 +97,14 @@ struct _MMBroadbandModemClass {
     /* signals */
     void (* sync_needed) (MMBroadbandModem *self);
 #endif
+
+    /* initial EPS bearer profile id selection */
+    void (* load_initial_eps_bearer_cid)        (MMBroadbandModem     *self,
+                                                 GAsyncReadyCallback   callback,
+                                                 gpointer              user_data);
+    gint (* load_initial_eps_bearer_cid_finish) (MMBroadbandModem     *self,
+                                                 GAsyncResult         *res,
+                                                 GError              **error);
 };
 
 GType mm_broadband_modem_get_type (void);
@@ -140,5 +148,8 @@ gboolean mm_broadband_modem_get_active_multiplexed_bearers (MMBroadbandModem  *s
                                                             guint             *out_current,
                                                             guint             *out_max,
                                                             GError           **error);
+
+/* Helper to manage initial EPS bearer */
+gint mm_broadband_modem_get_initial_eps_bearer_cid (MMBroadbandModem *self);
 
 #endif /* MM_BROADBAND_MODEM_H */

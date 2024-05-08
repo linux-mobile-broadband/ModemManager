@@ -2920,6 +2920,86 @@ modem_load_access_technologies (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+
+gint
+mm_broadband_modem_get_initial_eps_bearer_cid (MMBroadbandModem *self)
+{
+    return self->priv->initial_eps_bearer_cid_support_checked ? self->priv->initial_eps_bearer_cid : -1;
+}
+
+/*****************************************************************************/
+/* Load initial EPS bearer cid */
+
+static gint
+load_initial_eps_bearer_cid_finish (MMBroadbandModem  *self,
+                                    GAsyncResult      *res,
+                                    GError           **error)
+{
+    return g_task_propagate_int (G_TASK (res), error);
+}
+
+static void
+initial_eps_bearer_cid_cgdcont_test_ready (MMBaseModem  *_self,
+                                           GAsyncResult *res,
+                                           GTask        *task)
+{
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
+    const gchar      *response;
+    GError           *error = NULL;
+    guint             min_cid;
+
+    response = mm_base_modem_at_command_full_finish (_self, res, &error);
+    if (!response)
+        mm_obj_dbg (self, "failed +CGDCONT format check : %s", error->message);
+    else {
+        GList *format_list;
+
+        format_list = mm_3gpp_parse_cgdcont_test_response (response, self, &error);
+        if (error)
+            mm_obj_dbg (self, "error parsing +CGDCONT test response: %s", error->message);
+        else if (!mm_3gpp_pdp_context_format_list_find_range (format_list, MM_BEARER_IP_FAMILY_IPV4, &min_cid, NULL)) {
+            /* We check for IPv4 following the assumption that modems will generally support v4, while
+             * v6 is considered optional. If we ever find a modem supporting v6 exclusively and not v4
+             * we would need to update this logic to also check for v6. */
+            mm_obj_dbg (self, "context format check for IP not found");
+            error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Unexpected +CGDCONT test response");
+        } else {
+            mm_obj_dbg (self, "initial EPS bearer context cid found: %u", min_cid);
+        }
+        mm_3gpp_pdp_context_format_list_free (format_list);
+    }
+
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_int (task, (gint) min_cid);
+    g_object_unref (task);
+}
+
+static void
+load_initial_eps_bearer_cid (MMBroadbandModem    *self,
+                             GAsyncReadyCallback  callback,
+                             gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /*
+     * The cid for the attach settings:
+     *   - As per 3GPP specs, it should be cid=0
+     *   - Qualcomm based modems default this to cid=1
+     */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CGDCONT=?",
+                              3,
+                              TRUE, /* cached */
+                              (GAsyncReadyCallback)initial_eps_bearer_cid_cgdcont_test_ready,
+                              task);
+}
+
+/*****************************************************************************/
 /* Load initial EPS bearer settings currently configured in modem (3GPP interface) */
 
 static MMBearerProperties *
@@ -2984,37 +3064,18 @@ load_initial_eps_bearer_profile (GTask *task)
 }
 
 static void
-initial_eps_bearer_cid_cgdcont_test_ready (MMBaseModem  *_self,
-                                           GAsyncResult *res,
-                                           GTask        *task)
+load_initial_eps_bearer_cid_ready (MMBaseModem  *_self,
+                                   GAsyncResult *res,
+                                   GTask        *task)
 {
     MMBroadbandModem  *self = MM_BROADBAND_MODEM (_self);
-    const gchar       *response;
     g_autoptr(GError)  error = NULL;
 
     g_assert (self->priv->initial_eps_bearer_cid < 0);
 
-    response = mm_base_modem_at_command_full_finish (_self, res, &error);
-    if (!response)
-        mm_obj_dbg (self, "failed +CGDCONT format check : %s", error->message);
-    else {
-        GList *format_list;
-        guint  min_cid;
-
-        format_list = mm_3gpp_parse_cgdcont_test_response (response, self, &error);
-        if (error)
-            mm_obj_dbg (self, "error parsing +CGDCONT test response: %s", error->message);
-        else if (!mm_3gpp_pdp_context_format_list_find_range (format_list, MM_BEARER_IP_FAMILY_IPV4, &min_cid, NULL)) {
-            /* We check for IPv4 following the assumption that modems will generally support v4, while
-             * v6 is considered optional. If we ever find a modem supporting v6 exclusively and not v4
-             * we would need to update this logic to also check for v6. */
-            mm_obj_dbg (self, "context format check for IP not found");
-        } else {
-            mm_obj_dbg (self, "initial EPS bearer context cid found: %u", min_cid);
-            self->priv->initial_eps_bearer_cid = (gint) min_cid;
-        }
-        mm_3gpp_pdp_context_format_list_free (format_list);
-    }
+    self->priv->initial_eps_bearer_cid = MM_BROADBAND_MODEM_GET_CLASS (self)->load_initial_eps_bearer_cid_finish (self, res, &error);
+    if (error)
+        mm_obj_dbg (self, "couldn't load initial EPS bearer cid: %s", error->message);
 
     load_initial_eps_bearer_profile (task);
 }
@@ -3029,20 +3090,14 @@ modem_3gpp_load_initial_eps_bearer_settings (MMIfaceModem3gpp    *_self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    /* Lookup which is supposed to be the initial EPS bearer context cid.
-    *   - As per 3GPP specs, it should be cid=0
-    *   - Qualcomm based modems default this to cid=1
-    */
+    /* Lookup which is supposed to be the initial EPS bearer context cid */
     if (G_UNLIKELY (!self->priv->initial_eps_bearer_cid_support_checked)) {
         self->priv->initial_eps_bearer_cid_support_checked = TRUE;
         g_assert (self->priv->initial_eps_bearer_cid < 0);
         mm_obj_dbg (self, "looking for the initial EPS bearer context cid,,,");
-        mm_base_modem_at_command (MM_BASE_MODEM (self),
-                                  "+CGDCONT=?",
-                                  3,
-                                  TRUE, /* cached */
-                                  (GAsyncReadyCallback)initial_eps_bearer_cid_cgdcont_test_ready,
-                                  task);
+        MM_BROADBAND_MODEM_GET_CLASS (self)->load_initial_eps_bearer_cid (self,
+                                                                          (GAsyncReadyCallback)load_initial_eps_bearer_cid_ready,
+                                                                          task);
         return;
     }
 
@@ -14088,6 +14143,8 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     klass->enabling_modem_init = enabling_modem_init;
     klass->enabling_modem_init_finish = enabling_modem_init_finish;
     klass->disabling_stopped = disabling_stopped;
+    klass->load_initial_eps_bearer_cid = load_initial_eps_bearer_cid;
+    klass->load_initial_eps_bearer_cid_finish = load_initial_eps_bearer_cid_finish;
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_DBUS_SKELETON,
