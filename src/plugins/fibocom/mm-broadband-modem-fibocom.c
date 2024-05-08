@@ -20,24 +20,16 @@
 #include "mm-broadband-modem.h"
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
-#include "mm-iface-modem-3gpp.h"
-#include "mm-iface-modem-3gpp-profile-manager.h"
 #include "mm-log.h"
 #include "mm-shared-fibocom.h"
 
-static void iface_modem_init                      (MMIfaceModemInterface                   *iface);
-static void iface_modem_3gpp_init                 (MMIfaceModem3gppInterface               *iface);
-static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManagerInterface *iface);
-static void iface_modem_firmware_init             (MMIfaceModemFirmwareInterface           *iface);
-static void shared_fibocom_init                   (MMSharedFibocomInterface                *iface);
-
-static MMIfaceModem3gppProfileManagerInterface *iface_modem_3gpp_profile_manager_parent;
+static void iface_modem_init          (MMIfaceModemInterface         *iface);
+static void iface_modem_firmware_init (MMIfaceModemFirmwareInterface *iface);
+static void shared_fibocom_init       (MMSharedFibocomInterface      *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemFibocom, mm_broadband_modem_fibocom, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_FIBOCOM,  shared_fibocom_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP_PROFILE_MANAGER, iface_modem_3gpp_profile_manager_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init))
 
 typedef enum {
@@ -47,9 +39,7 @@ typedef enum {
 } FeatureSupport;
 
 struct _MMBroadbandModemFibocomPrivate {
-    FeatureSupport  gtrndis_support;
-    FeatureSupport  initial_eps_bearer_support;
-    gint            initial_eps_bearer_cid;
+    FeatureSupport gtrndis_support;
 };
 
 /*****************************************************************************/
@@ -228,273 +218,6 @@ modem_power_off (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Load initial EPS bearer properties (as agreed with network)               */
-
-static MMBearerProperties *
-modem_3gpp_load_initial_eps_bearer_finish (MMIfaceModem3gpp  *self,
-                                           GAsyncResult      *res,
-                                           GError           **error)
-{
-    return MM_BEARER_PROPERTIES (g_task_propagate_pointer (G_TASK (res), error));
-}
-
-static void
-load_initial_eps_cgcontrdp_ready (MMBaseModem  *self,
-                                  GAsyncResult *res,
-                                  GTask        *task)
-{
-    GError                  *error = NULL;
-    const gchar             *response;
-    g_autofree gchar        *apn = NULL;
-    MMBearerProperties      *properties;
-
-    response = mm_base_modem_at_command_finish (self, res, &error);
-    if (!response || !mm_3gpp_parse_cgcontrdp_response (response, NULL, NULL, &apn, NULL, NULL, NULL, NULL, NULL, &error))
-        g_task_return_error (task, error);
-    else {
-        properties = mm_bearer_properties_new ();
-        mm_bearer_properties_set_apn (properties, apn);
-        g_task_return_pointer (task, properties, g_object_unref);
-    }
-
-    g_object_unref (task);
-}
-
-static void
-modem_3gpp_load_initial_eps_bearer (MMIfaceModem3gpp    *_self,
-                                    GAsyncReadyCallback  callback,
-                                    gpointer             user_data)
-{
-    MMBroadbandModemFibocom *self = MM_BROADBAND_MODEM_FIBOCOM (_self);
-    GTask                   *task;
-    g_autofree gchar        *cmd = NULL;
-
-    task = g_task_new (self, NULL, callback, user_data);
-
-    if (self->priv->initial_eps_bearer_support != FEATURE_SUPPORTED) {
-        g_task_return_new_error (task,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_UNSUPPORTED,
-                                 "Initial EPS bearer context ID unknown");
-        g_object_unref (task);
-        return;
-    }
-
-    g_assert (self->priv->initial_eps_bearer_cid >= 0);
-    cmd = g_strdup_printf ("+CGCONTRDP=%d", self->priv->initial_eps_bearer_cid);
-
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              cmd,
-                              3,
-                              FALSE,
-                              (GAsyncReadyCallback) load_initial_eps_cgcontrdp_ready,
-                              task);
-}
-
-/*****************************************************************************/
-/* Load initial EPS bearer settings (currently configured in modem)          */
-
-static MMBearerProperties *
-modem_3gpp_load_initial_eps_bearer_settings_finish (MMIfaceModem3gpp  *self,
-                                                    GAsyncResult      *res,
-                                                    GError           **error)
-{
-    return MM_BEARER_PROPERTIES (g_task_propagate_pointer (G_TASK (res), error));
-}
-
-static void
-load_initial_eps_bearer_get_profile_ready (MMIfaceModem3gppProfileManager *self,
-                                           GAsyncResult                   *res,
-                                           GTask                          *task)
-{
-    GError                   *error = NULL;
-    g_autoptr(MM3gppProfile)  profile = NULL;
-    MMBearerProperties       *properties;
-
-    profile = mm_iface_modem_3gpp_profile_manager_get_profile_finish (self, res, &error);
-    if (!profile) {
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
-    properties = mm_bearer_properties_new_from_profile (profile, &error);
-    if (!properties)
-        g_task_return_error (task, error);
-    else
-        g_task_return_pointer (task, properties, g_object_unref);
-    g_object_unref (task);
-}
-
-static void
-modem_3gpp_load_initial_eps_bearer_settings (MMIfaceModem3gpp    *_self,
-                                             GAsyncReadyCallback  callback,
-                                             gpointer             user_data)
-{
-    MMBroadbandModemFibocom *self = MM_BROADBAND_MODEM_FIBOCOM (_self);
-    GTask                   *task;
-
-    task = g_task_new (self, NULL, callback, user_data);
-
-    /* Initial EPS bearer CID initialization run once only */
-    if (G_UNLIKELY (self->priv->initial_eps_bearer_support == FEATURE_SUPPORT_UNKNOWN)) {
-        MMPortSerialAt *port;
-        MMKernelDevice *device;
-
-        /* There doesn't seem to be a programmatic way to find the initial EPS
-         * bearer's CID, so we'll use a udev variable. */
-        port = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
-        if (!port) {
-            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                     "Couldn't check initial EPS cid support: primary port missing");
-            g_object_unref (task);
-            return;
-        }
-
-        device = mm_port_peek_kernel_device (MM_PORT (port));
-        if (mm_kernel_device_has_global_property (device, "ID_MM_FIBOCOM_INITIAL_EPS_CID")) {
-            self->priv->initial_eps_bearer_support = FEATURE_SUPPORTED;
-            self->priv->initial_eps_bearer_cid = mm_kernel_device_get_global_property_as_int (
-                device, "ID_MM_FIBOCOM_INITIAL_EPS_CID");
-        } else
-            self->priv->initial_eps_bearer_support = FEATURE_NOT_SUPPORTED;
-
-    }
-
-    if (self->priv->initial_eps_bearer_support != FEATURE_SUPPORTED) {
-        g_task_return_new_error (task,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_UNSUPPORTED,
-                                 "Initial EPS bearer context ID unknown");
-        g_object_unref (task);
-        return;
-    }
-
-    g_assert (self->priv->initial_eps_bearer_cid >= 0);
-    mm_iface_modem_3gpp_profile_manager_get_profile (
-        MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self),
-        self->priv->initial_eps_bearer_cid,
-        (GAsyncReadyCallback) load_initial_eps_bearer_get_profile_ready,
-        task);
-}
-
-/*****************************************************************************/
-/* Set initial EPS bearer settings */
-
-static gboolean
-modem_3gpp_set_initial_eps_bearer_settings_finish (MMIfaceModem3gpp  *self,
-                                                   GAsyncResult      *res,
-                                                   GError           **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
-static void
-set_initial_eps_bearer_modify_profile_ready (MMIfaceModem3gppProfileManager *self,
-                                             GAsyncResult                   *res,
-                                             GTask                          *task)
-{
-    GError                   *error = NULL;
-    g_autoptr(MM3gppProfile)  stored = NULL;
-
-    stored = mm_iface_modem_3gpp_profile_manager_set_profile_finish (self, res, &error);
-    if (!stored)
-        g_task_return_error (task, error);
-    else
-        g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
-}
-
-static void
-modem_3gpp_set_initial_eps_bearer_settings (MMIfaceModem3gpp    *_self,
-                                            MMBearerProperties  *properties,
-                                            GAsyncReadyCallback  callback,
-                                            gpointer             user_data)
-{
-    MMBroadbandModemFibocom *self = MM_BROADBAND_MODEM_FIBOCOM (_self);
-    GTask                   *task;
-    MMBearerIpFamily         ip_family;
-    MM3gppProfile           *profile;
-
-    task = g_task_new (self, NULL, callback, user_data);
-
-    if (self->priv->initial_eps_bearer_support != FEATURE_SUPPORTED) {
-        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                 "Initial EPS bearer context ID unknown");
-        g_object_unref (task);
-        return;
-    }
-
-    profile = mm_bearer_properties_peek_3gpp_profile (properties);
-    g_assert (self->priv->initial_eps_bearer_cid >= 0);
-    mm_3gpp_profile_set_profile_id (profile, self->priv->initial_eps_bearer_cid);
-    ip_family = mm_3gpp_profile_get_ip_type (profile);
-    if (ip_family == MM_BEARER_IP_FAMILY_NONE || ip_family == MM_BEARER_IP_FAMILY_ANY)
-        mm_3gpp_profile_set_ip_type (profile, MM_BEARER_IP_FAMILY_IPV4);
-
-    mm_iface_modem_3gpp_profile_manager_set_profile (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self),
-                                                     profile,
-                                                     "profile-id",
-                                                     TRUE,
-                                                     (GAsyncReadyCallback) set_initial_eps_bearer_modify_profile_ready,
-                                                     task);
-}
-
-/*****************************************************************************/
-/* Deactivate profile (3GPP profile management interface) */
-
-static gboolean
-modem_3gpp_profile_manager_deactivate_profile_finish (MMIfaceModem3gppProfileManager  *self,
-                                                      GAsyncResult                    *res,
-                                                      GError                         **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
-static void
-profile_manager_parent_deactivate_profile_ready (MMIfaceModem3gppProfileManager *self,
-                                                 GAsyncResult                   *res,
-                                                 GTask                          *task)
-{
-    GError *error = NULL;
-    if (iface_modem_3gpp_profile_manager_parent->deactivate_profile_finish(self, res, &error))
-        g_task_return_boolean (task, TRUE);
-    else
-        g_task_return_error (task, error);
-    g_object_unref (task);
-}
-
-static void
-modem_3gpp_profile_manager_deactivate_profile (MMIfaceModem3gppProfileManager *_self,
-                                               MM3gppProfile                  *profile,
-                                               GAsyncReadyCallback             callback,
-                                               gpointer                        user_data)
-{
-    MMBroadbandModemFibocom *self = MM_BROADBAND_MODEM_FIBOCOM (_self);
-    GTask                   *task;
-    gint                     profile_id;
-
-    task = g_task_new (self, NULL, callback, user_data);
-    profile_id = mm_3gpp_profile_get_profile_id (profile);
-
-    if (self->priv->initial_eps_bearer_support == FEATURE_SUPPORTED) {
-        g_assert (self->priv->initial_eps_bearer_cid >= 0);
-        if (self->priv->initial_eps_bearer_cid == profile_id) {
-            mm_obj_dbg (self, "skipping profile deactivation (initial EPS bearer)");
-            g_task_return_boolean (task, TRUE);
-            g_object_unref (task);
-            return;
-        }
-    }
-
-    iface_modem_3gpp_profile_manager_parent->deactivate_profile (
-        _self,
-        profile,
-        (GAsyncReadyCallback) profile_manager_parent_deactivate_profile_ready,
-        task);
-}
-
-/*****************************************************************************/
 
 MMBroadbandModemFibocom *
 mm_broadband_modem_fibocom_new (const gchar  *device,
@@ -524,7 +247,6 @@ mm_broadband_modem_fibocom_init (MMBroadbandModemFibocom *self)
                                               MMBroadbandModemFibocomPrivate);
 
     self->priv->gtrndis_support = FEATURE_SUPPORT_UNKNOWN;
-    self->priv->initial_eps_bearer_support = FEATURE_SUPPORT_UNKNOWN;
 }
 
 static void
@@ -538,26 +260,6 @@ iface_modem_init (MMIfaceModemInterface *iface)
     iface->modem_power_down_finish = modem_common_power_finish;
     iface->modem_power_off = modem_power_off;
     iface->modem_power_off_finish = modem_common_power_finish;
-}
-
-static void
-iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
-{
-    iface->load_initial_eps_bearer = modem_3gpp_load_initial_eps_bearer;
-    iface->load_initial_eps_bearer_finish = modem_3gpp_load_initial_eps_bearer_finish;
-    iface->load_initial_eps_bearer_settings = modem_3gpp_load_initial_eps_bearer_settings;
-    iface->load_initial_eps_bearer_settings_finish = modem_3gpp_load_initial_eps_bearer_settings_finish;
-    iface->set_initial_eps_bearer_settings = modem_3gpp_set_initial_eps_bearer_settings;
-    iface->set_initial_eps_bearer_settings_finish = modem_3gpp_set_initial_eps_bearer_settings_finish;
-}
-
-static void
-iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManagerInterface *iface)
-{
-    iface_modem_3gpp_profile_manager_parent = g_type_interface_peek_parent (iface);
-
-    iface->deactivate_profile = modem_3gpp_profile_manager_deactivate_profile;
-    iface->deactivate_profile_finish = modem_3gpp_profile_manager_deactivate_profile_finish;
 }
 
 static void
