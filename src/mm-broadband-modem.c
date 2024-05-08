@@ -3112,6 +3112,68 @@ modem_3gpp_load_initial_eps_bearer (MMIfaceModem3gpp    *_self,
 }
 
 /*****************************************************************************/
+/* Set initial EPS bearer settings (3GPP interface) */
+
+static gboolean
+modem_3gpp_set_initial_eps_bearer_settings_finish (MMIfaceModem3gpp  *self,
+                                                   GAsyncResult      *res,
+                                                   GError           **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+set_initial_eps_bearer_modify_profile_ready (MMIfaceModem3gppProfileManager *self,
+                                             GAsyncResult                   *res,
+                                             GTask                          *task)
+{
+    GError                   *error = NULL;
+    g_autoptr(MM3gppProfile)  stored = NULL;
+
+    stored = mm_iface_modem_3gpp_profile_manager_set_profile_finish (self, res, &error);
+    if (!stored)
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+modem_3gpp_set_initial_eps_bearer_settings (MMIfaceModem3gpp    *_self,
+                                            MMBearerProperties  *props,
+                                            GAsyncReadyCallback  callback,
+                                            gpointer             user_data)
+{
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
+    GTask            *task;
+    MMBearerIpFamily  ip_family;
+    MM3gppProfile    *profile = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    g_assert (self->priv->initial_eps_bearer_cid_support_checked);
+    if (self->priv->initial_eps_bearer_cid < 0) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "initial EPS bearer context ID unknown");
+        g_object_unref (task);
+        return;
+    }
+
+    profile = mm_bearer_properties_peek_3gpp_profile (props);
+    mm_3gpp_profile_set_profile_id (profile, self->priv->initial_eps_bearer_cid);
+    ip_family = mm_3gpp_profile_get_ip_type (profile);
+    if (ip_family == MM_BEARER_IP_FAMILY_NONE || ip_family == MM_BEARER_IP_FAMILY_ANY)
+        mm_3gpp_profile_set_ip_type (profile, MM_BEARER_IP_FAMILY_IPV4);
+
+    mm_iface_modem_3gpp_profile_manager_set_profile (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self),
+                                                     profile,
+                                                     "profile-id",
+                                                     TRUE,
+                                                     (GAsyncReadyCallback) set_initial_eps_bearer_modify_profile_ready,
+                                                     task);
+}
+
+/*****************************************************************************/
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
 static gboolean
@@ -10992,11 +11054,12 @@ deactivate_profile_cgact_set_ready (MMBaseModem  *self,
 }
 
 static void
-modem_3gpp_profile_manager_deactivate_profile (MMIfaceModem3gppProfileManager *self,
+modem_3gpp_profile_manager_deactivate_profile (MMIfaceModem3gppProfileManager *_self,
                                                MM3gppProfile                  *profile,
                                                GAsyncReadyCallback             callback,
                                                gpointer                        user_data)
 {
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
     GTask            *task;
     gint              profile_id;
     g_autofree gchar *cmd = NULL;
@@ -11004,6 +11067,18 @@ modem_3gpp_profile_manager_deactivate_profile (MMIfaceModem3gppProfileManager *s
     task = g_task_new (self, NULL, callback, user_data);
 
     profile_id = mm_3gpp_profile_get_profile_id (profile);
+
+    /* If the profile id for the initial EPS bearer is known (only applicable when
+     * the modem is LTE capable), do not deactivate it as it will likely unregister
+     * from the network altogether. */
+    if (self->priv->initial_eps_bearer_cid_support_checked &&
+        self->priv->initial_eps_bearer_cid == profile_id) {
+        mm_obj_dbg (self, "skipping profile deactivation (initial EPS bearer)");
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
     mm_obj_dbg (self, "deactivating profile with id '%d'...", profile_id);
 
     cmd = g_strdup_printf ("+CGACT=0,%d", profile_id);
@@ -13779,6 +13854,8 @@ iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
     iface->create_initial_eps_bearer = modem_3gpp_create_initial_eps_bearer;
     iface->set_packet_service_state = modem_3gpp_set_packet_service_state;
     iface->set_packet_service_state_finish = modem_3gpp_set_packet_service_state_finish;
+    iface->set_initial_eps_bearer_settings = modem_3gpp_set_initial_eps_bearer_settings;
+    iface->set_initial_eps_bearer_settings_finish = modem_3gpp_set_initial_eps_bearer_settings_finish;
 }
 
 static void
