@@ -3050,6 +3050,68 @@ modem_3gpp_load_initial_eps_bearer_settings (MMIfaceModem3gpp    *_self,
 }
 
 /*****************************************************************************/
+/* Load initial EPS bearer properties as agreed with network (3GPP interface) */
+
+static MMBearerProperties *
+modem_3gpp_load_initial_eps_bearer_finish (MMIfaceModem3gpp  *self,
+                                           GAsyncResult      *res,
+                                           GError           **error)
+{
+    return MM_BEARER_PROPERTIES (g_task_propagate_pointer (G_TASK (res), error));
+}
+
+static void
+load_initial_eps_cgcontrdp_ready (MMBaseModem  *self,
+                                  GAsyncResult *res,
+                                  GTask        *task)
+{
+    GError           *error = NULL;
+    const gchar      *response;
+    g_autofree gchar *apn = NULL;
+
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response || !mm_3gpp_parse_cgcontrdp_response (response, NULL, NULL, &apn, NULL, NULL, NULL, NULL, NULL, &error))
+        g_task_return_error (task, error);
+    else {
+        MMBearerProperties *props;
+
+        props = mm_bearer_properties_new ();
+        mm_bearer_properties_set_apn (props, apn);
+        g_task_return_pointer (task, props, g_object_unref);
+    }
+    g_object_unref (task);
+}
+
+static void
+modem_3gpp_load_initial_eps_bearer (MMIfaceModem3gpp    *_self,
+                                    GAsyncReadyCallback  callback,
+                                    gpointer             user_data)
+{
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
+    GTask            *task;
+    g_autofree gchar *cmd = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    g_assert (self->priv->initial_eps_bearer_cid_support_checked);
+
+    if (self->priv->initial_eps_bearer_cid < 0) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "initial EPS bearer context ID unknown");
+        g_object_unref (task);
+        return;
+    }
+
+    cmd = g_strdup_printf ("+CGCONTRDP=%d", self->priv->initial_eps_bearer_cid);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              cmd,
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback) load_initial_eps_cgcontrdp_ready,
+                              task);
+}
+
+/*****************************************************************************/
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
 static gboolean
@@ -13704,6 +13766,8 @@ iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
     iface->load_operator_code_finish = modem_3gpp_load_operator_code_finish;
     iface->load_operator_name = modem_3gpp_load_operator_name;
     iface->load_operator_name_finish = modem_3gpp_load_operator_name_finish;
+    iface->load_initial_eps_bearer = modem_3gpp_load_initial_eps_bearer;
+    iface->load_initial_eps_bearer_finish = modem_3gpp_load_initial_eps_bearer_finish;
     iface->run_registration_checks = modem_3gpp_run_registration_checks;
     iface->run_registration_checks_finish = modem_3gpp_run_registration_checks_finish;
     iface->register_in_network = modem_3gpp_register_in_network;
