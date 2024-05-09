@@ -103,6 +103,9 @@ MMPlugin *mm_plugin_create_qcom_soc (void);
 #if defined ENABLE_PLUGIN_QUECTEL
 MMPlugin *mm_plugin_create_quectel (void);
 #endif
+#if defined ENABLE_PLUGIN_ROLLING
+MMPlugin *mm_plugin_create_rolling (void);
+#endif
 #if defined ENABLE_PLUGIN_SAMSUNG
 MMPlugin *mm_plugin_create_samsung (void);
 #endif
@@ -231,6 +234,9 @@ mm_builtin_plugins_load (void)
 #endif
 #if defined ENABLE_PLUGIN_QUECTEL
     PREPEND_PLUGIN (quectel);
+#endif
+#if defined ENABLE_PLUGIN_ROLLING
+    PREPEND_PLUGIN (rolling);
 #endif
 #if defined ENABLE_PLUGIN_SAMSUNG
     PREPEND_PLUGIN (samsung);

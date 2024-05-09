@@ -73,12 +73,15 @@ if plugins_shared['fibocom']
   c_args = '-DMM_MODULE_NAME="shared-fibocom"'
 
   sources = files(
+    'fibocom/mm-broadband-bearer-fibocom-ecm.c',
+    'fibocom/mm-broadband-modem-fibocom.c',
     'fibocom/mm-shared.c',
     'fibocom/mm-shared-fibocom.c',
   )
 
   if enable_mbim
     sources += files(
+      'fibocom/mm-broadband-modem-mbim-fibocom.c',
       'fibocom/mm-port-mbim-fibocom.c',
     )
   endif
@@ -383,14 +386,11 @@ if plugins_options['fibocom']
   incs = plugins_incs + [xmm_inc] + [fibocom_inc]
 
   sources = files(
-    'fibocom/mm-broadband-bearer-fibocom-ecm.c',
-    'fibocom/mm-broadband-modem-fibocom.c',
     'fibocom/mm-plugin-fibocom.c',
   )
   if enable_mbim
     sources += files(
       'fibocom/mm-broadband-modem-mbim-xmm-fibocom.c',
-      'fibocom/mm-broadband-modem-mbim-fibocom.c',
     )
   endif
   plugins += {'plugin-fibocom': {
@@ -801,6 +801,25 @@ if plugins_options['quectel']
   }}
 
   plugins_udev_rules += files('quectel/77-mm-quectel-port-types.rules')
+endif
+
+# plugin: rolling
+if plugins_options['rolling']
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_ROLLING="@0@"'.format(plugins_dir / 'rolling')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
+
+  incs = plugins_incs + [fibocom_inc]
+
+  sources = files(
+    'rolling/mm-plugin-rolling.c',
+  )
+
+  plugins += {'plugin-rolling': {
+    'plugin': true,
+    'module': {'sources': sources, 'include_directories': incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="rolling"']},
+  }}
+
+  plugins_udev_rules += files('rolling/77-mm-rolling-port-types.rules')
 endif
 
 # plugin: samsung

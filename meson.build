@@ -351,6 +351,7 @@ plugins_options_reqs = {
   'pantech': {'available': true, 'shared': []},
   'qcom-soc': {'available': enable_qmi, 'shared': []},
   'quectel': {'available': true, 'shared': []},
+  'rolling': {'available': true, 'shared': ['fibocom']},
   'samsung': {'available': true, 'shared': ['icera']},
   'sierra-legacy': {'available': true, 'shared': ['icera', 'sierra']},
   'sierra': {'available': true, 'shared': ['xmm']},

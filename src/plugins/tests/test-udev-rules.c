@@ -192,6 +192,14 @@ test_linktop (void)
 }
 #endif
 
+#if defined ENABLE_PLUGIN_ROLLING
+static void
+test_rolling (void)
+{
+    common_test (TESTUDEVRULESDIR_ROLLING);
+}
+#endif
+
 /************************************************************/
 
 int main (int argc, char **argv)
@@ -252,6 +260,9 @@ int main (int argc, char **argv)
 #endif
 #if defined ENABLE_PLUGIN_LINKTOP
     g_test_add_func ("/MM/test-udev-rules/linktop", test_linktop);
+#endif
+#if defined ENABLE_PLUGIN_ROLLING
+    g_test_add_func ("/MM/test-udev-rules/rolling", test_rolling);
 #endif
 
     return g_test_run ();
