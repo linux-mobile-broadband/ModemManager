@@ -66,17 +66,22 @@ if enable_qmi
   plugins_deps += qmi_glib_dep
 endif
 
-# common Fibocom support library (MBIM only)
+# common Fibocom support library
 if plugins_shared['fibocom']
   fibocom_inc = include_directories('fibocom')
 
   c_args = '-DMM_MODULE_NAME="shared-fibocom"'
 
   sources = files(
-    'fibocom/mm-port-mbim-fibocom.c',
     'fibocom/mm-shared.c',
     'fibocom/mm-shared-fibocom.c',
   )
+
+  if enable_mbim
+    sources += files(
+      'fibocom/mm-port-mbim-fibocom.c',
+    )
+  endif
 
   plugins += {'shared-fibocom': {
     'plugin': false,
@@ -375,7 +380,7 @@ if plugins_options['fibocom']
   test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_FIBOCOM="@0@"'.format(plugins_dir / 'fibocom')]
   plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
 
-  incs = plugins_incs + [xmm_inc]
+  incs = plugins_incs + [xmm_inc] + [fibocom_inc]
 
   sources = files(
     'fibocom/mm-broadband-bearer-fibocom-ecm.c',
@@ -383,8 +388,6 @@ if plugins_options['fibocom']
     'fibocom/mm-plugin-fibocom.c',
   )
   if enable_mbim
-    incs += [fibocom_inc]
-
     sources += files(
       'fibocom/mm-broadband-modem-mbim-xmm-fibocom.c',
       'fibocom/mm-broadband-modem-mbim-fibocom.c',

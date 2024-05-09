@@ -16,6 +16,8 @@
 #ifndef MM_SHARED_FIBOCOM_H
 #define MM_SHARED_FIBOCOM_H
 
+#include <config.h>
+
 #include <glib-object.h>
 #include <gio/gio.h>
 
@@ -38,12 +40,16 @@ struct _MMSharedFibocomInterface {
 
 void mm_shared_fibocom_setup_ports (MMBroadbandModem *self);
 
+#if defined WITH_MBIM
+
 MMPort *mm_shared_fibocom_create_usbmisc_port (MMBaseModem *self,
                                                const gchar *name,
                                                MMPortType   ptype);
 MMPort *mm_shared_fibocom_create_wwan_port    (MMBaseModem *self,
                                                const gchar *name,
                                                MMPortType   ptype);
+
+#endif
 
 void                      mm_shared_fibocom_firmware_load_update_settings        (MMIfaceModemFirmware  *self,
                                                                                   GAsyncReadyCallback    callback,

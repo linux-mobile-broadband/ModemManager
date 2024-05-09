@@ -24,11 +24,12 @@
 
 #include "mm-log-object.h"
 #include "mm-broadband-modem.h"
-#include "mm-broadband-modem-mbim.h"
 #include "mm-iface-modem.h"
 #include "mm-shared-fibocom.h"
-#include "mm-port-mbim-fibocom.h"
 #include "mm-base-modem-at.h"
+#if defined WITH_MBIM
+# include "mm-port-mbim-fibocom.h"
+#endif
 
 G_DEFINE_INTERFACE (MMSharedFibocom, mm_shared_fibocom, MM_TYPE_IFACE_MODEM)
 
@@ -79,6 +80,8 @@ get_private (MMSharedFibocom *self)
 
 /*****************************************************************************/
 
+#if defined WITH_MBIM
+
 MMPort *
 mm_shared_fibocom_create_usbmisc_port (MMBaseModem *self,
                                        const gchar *name,
@@ -110,6 +113,8 @@ mm_shared_fibocom_create_wwan_port (MMBaseModem *self,
 
     return priv->class_parent->create_wwan_port (self, name, ptype);
 }
+
+#endif /* WITH_MBIM */
 
 /*****************************************************************************/
 
