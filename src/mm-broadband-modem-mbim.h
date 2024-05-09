@@ -17,6 +17,7 @@
 #define MM_BROADBAND_MODEM_MBIM_H
 
 #include "mm-broadband-modem.h"
+#include "mm-port-mbim.h"
 
 #define MM_TYPE_BROADBAND_MODEM_MBIM            (mm_broadband_modem_mbim_get_type ())
 #define MM_BROADBAND_MODEM_MBIM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_BROADBAND_MODEM_MBIM, MMBroadbandModemMbim))
