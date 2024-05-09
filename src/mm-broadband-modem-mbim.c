@@ -149,6 +149,7 @@ struct _MMBroadbandModemMbimPrivate {
     gboolean is_slot_info_status_supported;
     gboolean is_ms_sar_supported;
     gboolean is_google_carrier_lock_supported;
+    gboolean is_ms_device_reset_supported;
 
     /* Process unsolicited notifications */
     gulong                  notification_id;
@@ -2300,6 +2301,14 @@ modem_reset_finish (MMIfaceModem  *self,
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
+static void
+reset_operation_unsupported (GTask *task)
+{
+    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                             "modem reset operation is not supported");
+    g_object_unref (task);
+}
+
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 
 static void
@@ -2307,53 +2316,103 @@ shared_qmi_reset_ready (MMIfaceModem *self,
                         GAsyncResult *res,
                         GTask        *task)
 {
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
 
-    if (!mm_shared_qmi_reset_finish (self, res, &error))
-        g_task_return_error (task, error);
-    else
-        g_task_return_boolean (task, TRUE);
+    if (!mm_shared_qmi_reset_finish (self, res, &error)) {
+        mm_obj_dbg (self, "reset using QMI failed: %s", error->message);
+        reset_operation_unsupported (task);
+        return;
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+#endif
+
+static void
+reset_fallback_to_qmi_or_unsupported (GTask *task)
+{
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    MMBroadbandModemMbim   *self;
+
+    self = g_task_get_source_object (task);
+    mm_obj_dbg (self, "attempting reset using QMI...");
+    mm_shared_qmi_reset (MM_IFACE_MODEM (self),
+                         (GAsyncReadyCallback)shared_qmi_reset_ready,
+                         task);
+#else
+    reset_operation_unsupported (task);
+#endif
+}
+
+static void
+ms_basic_connect_extensions_device_reset_set_ready (MbimDevice   *device,
+                                                    GAsyncResult *res,
+                                                    GTask        *task)
+{
+    MMBroadbandModemMbim   *self;
+    g_autoptr(MbimMessage)  response = NULL;
+    g_autoptr(GError)       error = NULL;
+
+    self = g_task_get_source_object (task);
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response || !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error)) {
+        mm_obj_dbg (self, "reset using the ms extensions device reset operation failed: %s", error->message);
+        reset_fallback_to_qmi_or_unsupported (task);
+        return;
+    }
+
+    g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
 
 static void
-modem_reset_shared_qmi (GTask *task)
+modem_reset_ms_ext (GTask      *task,
+                    MbimDevice *device)
 {
-    mm_shared_qmi_reset (MM_IFACE_MODEM (g_task_get_source_object (task)),
-                         (GAsyncReadyCallback)shared_qmi_reset_ready,
+    MMBroadbandModemMbim   *self;
+    g_autoptr(MbimMessage)  message = NULL;
+
+    self = g_task_get_source_object (task);
+
+    if (!self->priv->is_ms_device_reset_supported) {
+        reset_fallback_to_qmi_or_unsupported (task);
+        return;
+    }
+
+    mm_obj_dbg (self, "attempting reset using the ms extensions device reset operation...");
+    message = mbim_message_ms_basic_connect_extensions_device_reset_set_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)ms_basic_connect_extensions_device_reset_set_ready,
                          task);
 }
-
-#endif
 
 static void
 intel_firmware_update_modem_reboot_set_ready (MbimDevice   *device,
                                               GAsyncResult *res,
                                               GTask        *task)
 {
-    MbimMessage      *response;
-    GError           *error = NULL;
+    MMBroadbandModemMbim   *self;
+    g_autoptr(MbimMessage)  response = NULL;
+    g_autoptr(GError)       error = NULL;
+
+    self = g_task_get_source_object (task);
 
     response = mbim_device_command_finish (device, res, &error);
     if (!response || !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error)) {
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-        /* We don't really expect the Intel firmware update service to be
-         * available in QMI modems, but doesn't harm to fallback to the QMI
-         * implementation here */
-        mm_obj_dbg (g_task_get_source_object (task), "couldn't run intel reset: %s", error->message);
-        g_error_free (error);
-        modem_reset_shared_qmi (task);
-#else
-        g_task_return_error (task, error);
-        g_object_unref (task);
-#endif
-    } else {
-        g_task_return_boolean (task, TRUE);
-        g_object_unref (task);
+        mm_obj_dbg (self, "reset using the intel firmware update modem reboot operation failed: %s", error->message);
+        /* fallback to MS extensions reset */
+        modem_reset_ms_ext (task, device);
+        return;
     }
 
-    if (response)
-        mbim_message_unref (response);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -2361,10 +2420,10 @@ modem_reset (MMIfaceModem        *_self,
              GAsyncReadyCallback  callback,
              gpointer             user_data)
 {
-    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
-    GTask                *task;
-    MbimDevice           *device;
-    MbimMessage          *message;
+    MMBroadbandModemMbim   *self = MM_BROADBAND_MODEM_MBIM (_self);
+    GTask                  *task;
+    MbimDevice             *device;
+    g_autoptr(MbimMessage)  message = NULL;
 
     if (!peek_device (self, &device, callback, user_data))
         return;
@@ -2372,18 +2431,14 @@ modem_reset (MMIfaceModem        *_self,
     task = g_task_new (self, NULL, callback, user_data);
 
     if (!self->priv->is_intel_reset_supported) {
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-        modem_reset_shared_qmi (task);
-#else
-        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                 "modem reset operation is not supported");
-        g_object_unref (task);
-#endif
+        /* fallback to MS extensions reset otherwise */
+        modem_reset_ms_ext (task, device);
         return;
     }
 
     /* This message is defined in the Intel Firmware Update service, but it
      * really is just a standard modem reboot. */
+    mm_obj_dbg (self, "attempting reset using the intel firmware update modem reboot operation...");
     message = mbim_message_intel_firmware_update_modem_reboot_set_new (NULL);
     mbim_device_command (device,
                          message,
@@ -2391,7 +2446,6 @@ modem_reset (MMIfaceModem        *_self,
                          NULL,
                          (GAsyncReadyCallback)intel_firmware_update_modem_reboot_set_ready,
                          task);
-    mbim_message_unref (message);
 }
 
 /*****************************************************************************/
@@ -3377,6 +3431,9 @@ query_device_services_ready (MbimDevice   *device,
                             self->priv->is_profile_management_ext_supported = TRUE;
                         } else
                             mm_obj_dbg (self, "Profile management extension is supported but not allowed");
+                    } else if (device_services[i]->cids[j] == MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_DEVICE_RESET) {
+                        mm_obj_dbg (self, "Device reset is supported");
+                        self->priv->is_ms_device_reset_supported = TRUE;
                     }
                 }
                 continue;
