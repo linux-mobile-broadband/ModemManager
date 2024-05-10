@@ -314,7 +314,6 @@ preload_contents_platform (MMKernelDeviceGeneric *self,
         ptr_array_add_sysfs_attribute_link_basename (subsystems, iter, "subsystem", &current_subsystem);
 
         /* Take first parent with the given platform subsystem as physical device */
-        current_subsystem = read_sysfs_attribute_link_basename (iter, "subsystem");
         if (!self->priv->physdev_sysfs_path && (g_strcmp0 (current_subsystem, platform) == 0)) {
             self->priv->physdev_sysfs_path = g_strdup (iter);
             /* stop traversing as soon as the physical device is found */
