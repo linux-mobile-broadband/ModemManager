@@ -1505,7 +1505,7 @@ device_context_run_ready (MMPluginManager    *self,
 
     /*
      * Once the task is finished, we can also remove it from the plugin manager
-     * list. We MUST have the port context in the list at this point, because
+     * list. We MUST have the device context in the list at this point, because
      * we're going to dispose the reference, so assert if this is not true.
      */
     g_assert (g_list_find (common->self->priv->device_contexts, common->device_context));
