@@ -148,6 +148,7 @@ static PortContext   *port_context_ref     (PortContext   *port_context);
 static void           port_context_unref   (PortContext   *port_context);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (DeviceContext, device_context_unref)
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (PortContext,   port_context_unref)
 
 typedef struct {
     MMPluginManager *self;
@@ -501,11 +502,12 @@ port_context_defer_until_suggested (PortContext *port_context,
 static void
 plugin_supports_port_ready (MMPlugin     *plugin,
                             GAsyncResult *res,
-                            PortContext  *port_context)
+                            PortContext  *_port_context) /* full reference */
 {
+    g_autoptr(PortContext)  port_context = _port_context;
+    g_autoptr(GError)       error = NULL;
     MMPluginManager        *self;
     MMPluginSupportsResult  support_result;
-    GError                 *error = NULL;
 
     self = g_task_get_source_object (port_context->task);
 
@@ -515,7 +517,6 @@ plugin_supports_port_ready (MMPlugin     *plugin,
         g_assert_cmpuint (support_result, ==, MM_PLUGIN_SUPPORTS_PORT_UNKNOWN);
         mm_obj_warn (self, "task %s: error when checking support with plugin '%s': %s",
                      port_context->name, mm_plugin_get_name (plugin), error->message);
-        g_error_free (error);
     }
 
     switch (support_result) {
@@ -535,10 +536,6 @@ plugin_supports_port_ready (MMPlugin     *plugin,
     default:
         g_assert_not_reached ();
     }
-
-    /* We received a full reference, to make sure the context was always
-     * valid during the async call */
-    port_context_unref (port_context);
 }
 
 static void
@@ -578,9 +575,15 @@ port_context_next (PortContext *port_context)
 }
 
 static gboolean
-port_context_cancel (PortContext *port_context)
+port_context_cancel (PortContext *_port_context)
 {
-    MMPluginManager *self;
+    g_autoptr(PortContext)  port_context = NULL;
+    MMPluginManager        *self;
+
+    /* Make sure we hold a port context reference while cancelling, as the
+     * cancellable signal handlers may end up unref-ing our last reference
+     * otherwise. */
+    port_context = port_context_ref (_port_context);
 
     /* Port context cancellation, which only makes sense if the context is
      * actually being run, so just exit if it isn't. */
@@ -594,27 +597,20 @@ port_context_cancel (PortContext *port_context)
     self = g_task_get_source_object (port_context->task);
     mm_obj_dbg (self, "task %s: cancellation requested", port_context->name);
 
-    /* Make sure we hold a port context reference while cancelling, as the
-     * cancellable signal handlers may end up unref-ing our last reference
-     * otherwise. */
-    port_context_ref (port_context);
-    {
-        /* The port context is cancelled now */
-        g_cancellable_cancel (port_context->cancellable);
+    /* The port context is cancelled now */
+    g_cancellable_cancel (port_context->cancellable);
 
-        /* If the task was deferred, we can cancel and complete it right away */
-        if (port_context->defer_id) {
-            g_source_remove (port_context->defer_id);
-            port_context->defer_id = 0;
-            port_context_complete (port_context);
-        }
-        /* If the task was deferred until a result is suggested, we can also
-         * complete it right away */
-        else if (port_context->defer_until_suggested)
-            port_context_complete (port_context);
-        /* else, the task may be currently checking support with a given plugin */
+    /* If the task was deferred, we can cancel and complete it right away */
+    if (port_context->defer_id) {
+        g_source_remove (port_context->defer_id);
+        port_context->defer_id = 0;
+        port_context_complete (port_context);
     }
-    port_context_unref (port_context);
+    /* If the task was deferred until a result is suggested, we can also
+     * complete it right away */
+    else if (port_context->defer_until_suggested)
+        port_context_complete (port_context);
+    /* else, the task may be currently checking support with a given plugin */
 
     return TRUE;
 }
