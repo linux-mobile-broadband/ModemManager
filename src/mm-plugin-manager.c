@@ -147,6 +147,8 @@ static void           device_context_unref (DeviceContext *device_context);
 static PortContext   *port_context_ref     (PortContext   *port_context);
 static void           port_context_unref   (PortContext   *port_context);
 
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (DeviceContext, device_context_unref)
+
 typedef struct {
     MMPluginManager *self;
     DeviceContext   *device_context;
@@ -1328,9 +1330,17 @@ device_context_port_added (MMPluginManager *self,
 }
 
 static gboolean
-device_context_cancel (DeviceContext *device_context)
+device_context_cancel (DeviceContext *_device_context)
 {
-    MMPluginManager *self;
+    g_autoptr(DeviceContext)  device_context = NULL;
+    MMPluginManager          *self;
+
+    /* The device context cancellation operation will also independently request cancellation
+     * of each port context. Depending on the probing task of the port, this may be completed
+     * asynchronously or in-place. Therefore we need to consider the case where the last port
+     * context cancellation also completes the device context operation in-place, so we must
+     * ensure the DeviceContext is valid throughout the whole method. */
+    device_context = device_context_ref (_device_context);
 
     /* If cancelled already, do nothing */
     if (g_cancellable_is_cancelled (device_context->cancellable))
@@ -1353,7 +1363,6 @@ device_context_cancel (DeviceContext *device_context)
     /* Cancel all ongoing port contexts, if they're not already cancelled */
     if (device_context->port_contexts) {
         g_assert (!device_context->wait_port_contexts);
-        /* Request cancellation, will be completed asynchronously */
         g_list_foreach (device_context->port_contexts, (GFunc) port_context_cancel, NULL);
     }
 
@@ -1371,9 +1380,11 @@ device_context_cancel (DeviceContext *device_context)
         device_context->extra_probing_time_id = 0;
     }
 
-    /* Wakeup the device context logic. If we were still waiting for the
-     * min probing time, this will complete the device context. */
-    device_context_continue (device_context);
+    /* If the device context task is not yet completed, wakeup the device context
+     * logic. If we were still waiting for the min probing time, this will complete
+     * the device context. */
+    if (device_context->task)
+        device_context_continue (device_context);
     return TRUE;
 }
 
