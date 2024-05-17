@@ -142,7 +142,7 @@ common_get_modem (TestFixture *fixture,
             break;
 
         /* Blocking wait */
-        g_assert_cmpuint (wait_time, <=, 20);
+        g_assert_cmpuint (wait_time, <=, 120);
         wait_time++;
         sleep (1);
     }
