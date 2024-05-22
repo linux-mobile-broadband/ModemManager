@@ -799,48 +799,44 @@ static BandTable lte_bands[] = {
 };
 
 static gboolean
-bands_array_to_huawei (BandTable *band_table,
-                       guint      band_table_len,
-                       GArray    *bands_array,
-                       guint64   *out_huawei)
+bands_array_to_huawei (GArray  *bands_array,
+                       guint64 *out_gsm_umts_huawei,
+                       guint64 *out_lte_huawei)
 {
     guint i;
+    MMModemBand mm_band;
 
-    /* Treat ANY as a special case: All huawei flags enabled */
-    if (bands_array->len == 1 &&
-        g_array_index (bands_array, MMModemBand, 0) == MM_MODEM_BAND_ANY) {
-        /* This is only correct for 2G/3G bands when using ^SYSCFG(EX).
-         * For setting LTE bands with ^SYSCFGEX, the
-         * MM_HUAWEI_SYSCFGEX_BAND_ANY_LTE mask has to be used
-         */
-        *out_huawei = MM_HUAWEI_SYSCFG_BAND_ANY;
+    g_assert (out_gsm_umts_huawei);
+    g_assert (out_lte_huawei);
+
+    if (bands_array->len == 1 && g_array_index (bands_array, MMModemBand, 0) == MM_MODEM_BAND_ANY) {
+        *out_gsm_umts_huawei = MM_HUAWEI_SYSCFG_BAND_ANY;
+        *out_lte_huawei = MM_HUAWEI_SYSCFGEX_BAND_ANY_LTE;
         return TRUE;
     }
 
-    *out_huawei = 0;
+    *out_gsm_umts_huawei = 0;
+    *out_lte_huawei = 0;
+
     for (i = 0; i < bands_array->len; i++) {
         guint j;
+        
+        mm_band = g_array_index (bands_array, MMModemBand, i);
 
-        for (j = 0; j < band_table_len; j++) {
-            if (g_array_index (bands_array, MMModemBand, i) == band_table[j].mm)
-                *out_huawei |= band_table[j].huawei;
+        if (mm_band < MM_MODEM_BAND_EUTRAN_1) {
+            for (j = 0; j < G_N_ELEMENTS (gsm_umts_bands); j++) {
+                if (mm_band == gsm_umts_bands[j].mm)
+                    *out_gsm_umts_huawei |= gsm_umts_bands[j].huawei;
+            }
+        } else {
+            for (j = 0; j < G_N_ELEMENTS (lte_bands); j++) {
+                if (mm_band == lte_bands[j].mm)
+                    *out_lte_huawei |= lte_bands[j].huawei;
+            }
         }
     }
 
-    return (*out_huawei > 0 ? TRUE : FALSE);
-}
-
-static gboolean
-gsm_umts_bands_array_to_huawei (GArray  *bands_array,
-                                guint32 *out_huawei)
-{
-    gboolean success;
-    guint64  huawei64;
-
-    success = bands_array_to_huawei (gsm_umts_bands, G_N_ELEMENTS (gsm_umts_bands), bands_array, &huawei64);
-
-    *out_huawei = (guint32) huawei64;
-    return success;
+    return (*out_gsm_umts_huawei + *out_lte_huawei) > 0;
 }
 
 static gboolean
@@ -1036,41 +1032,63 @@ syscfg_set_ready (MMBaseModem *self,
 }
 
 static void
-set_current_bands (MMIfaceModem *self,
-                   GArray *bands_array,
-                   GAsyncReadyCallback callback,
-                   gpointer user_data)
+set_current_bands (MMIfaceModem        *self,
+                   GArray              *bands_array,
+                   GAsyncReadyCallback  callback,
+                   gpointer             user_data)
 {
     GTask *task;
-    gchar *cmd;
-    guint32 huawei_band = 0x3FFFFFFF;
-    gchar *bands_string;
+    g_autofree gchar *cmd = NULL;
+    g_autofree gchar *bands_string = NULL;
+    guint64 huawei_gsm_umts_bands;
+    guint64 huawei_lte_bands;
 
     task = g_task_new (self, NULL, callback, user_data);
 
     bands_string = mm_common_build_bands_string ((MMModemBand *)(gpointer)bands_array->data,
                                                  bands_array->len);
 
-    if (!gsm_umts_bands_array_to_huawei (bands_array, &huawei_band)) {
+    /* We need to split the bands array into two parts: gsm/umts and lte bands.
+     * The encoded huawei values overlap and need to be passed as separate
+     * AT command parameters to ^SYSCFG(EX) */
+    if (!bands_array_to_huawei (bands_array, &huawei_gsm_umts_bands, &huawei_lte_bands)) {
         g_task_return_new_error (task,
                                  MM_CORE_ERROR,
                                  MM_CORE_ERROR_FAILED,
                                  "Invalid bands requested: '%s'",
                                  bands_string);
         g_object_unref (task);
-        g_free (bands_string);
         return;
     }
 
-    cmd = g_strdup_printf ("AT^SYSCFG=16,3,%X,2,4", huawei_band);
+    /* Note: SYSCFG(EX) requires at least one band per enabled technology/mode.
+     * E.g. if the user wants to set only LTE bands, we'd also need to switch
+     * to LTE-only mode ("03"). "Automatic" mode ("00") won't work in this case.
+     * "No Change" ("99" or 16) will work if the mode is already set accordingly.
+     * So to keep things simple here, assume that the current mode is correct.
+     */
+    if (MM_BROADBAND_MODEM_HUAWEI (self)->priv->syscfgex_support == FEATURE_SUPPORTED) {
+        cmd = g_strdup_printf ("^SYSCFGEX=\"99\",%" G_GINT64_MODIFIER "X,2,4,%" G_GINT64_MODIFIER "X,,",
+                               huawei_gsm_umts_bands,
+                               huawei_lte_bands);
+    } else if (MM_BROADBAND_MODEM_HUAWEI (self)->priv->syscfg_support == FEATURE_SUPPORTED) {
+        cmd = g_strdup_printf ("^SYSCFG=16,3,%" G_GINT64_MODIFIER "X,2,4",
+                               huawei_gsm_umts_bands);
+    } else {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_UNSUPPORTED,
+                                 "Neither ^SYSCFG nor ^SYSCFGEX is supported to set bands");
+        g_object_unref (task);
+        return;
+    }
+
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               cmd,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)syscfg_set_ready,
                               task);
-    g_free (cmd);
-    g_free (bands_string);
 }
 
 /*****************************************************************************/
