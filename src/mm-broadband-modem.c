@@ -6617,9 +6617,10 @@ out:
         if (error)
             g_task_return_error (task, error);
         else if (converted)
-            g_task_return_pointer (task, converted, g_free);
+            g_task_return_pointer (task, g_steal_pointer (&converted), g_free);
         else
             g_assert_not_reached ();
+        g_clear_pointer (&converted, g_free);
         return;
     }
 
