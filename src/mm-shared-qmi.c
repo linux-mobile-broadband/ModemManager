@@ -4795,9 +4795,10 @@ pds_get_agps_config_ready (QmiClientPds *client,
         str = g_strdup ("");
 
 out:
-    if (error)
+    if (error) {
+        g_free (str);
         g_task_return_error (task, error);
-    else {
+    } else {
         g_assert (str);
         g_task_return_pointer (task, str, g_free);
     }
