@@ -1641,7 +1641,7 @@ check_data_format_combination (GTask *task)
 
     /* go on to the next supported combination */
     for (++ctx->data_format_combination_i;
-         ctx->data_format_combination_i <= (gint)G_N_ELEMENTS (data_format_combinations);
+         ctx->data_format_combination_i < (gint)G_N_ELEMENTS (data_format_combinations);
          ctx->data_format_combination_i++) {
         const DataFormatCombination *combination;
         g_autofree gchar            *kernel_data_mode_str = NULL;
