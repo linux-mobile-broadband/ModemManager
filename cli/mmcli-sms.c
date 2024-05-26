@@ -186,7 +186,7 @@ print_sms_info (MMSms *sms)
     mmcli_output_string           (MMC_F_SMS_PROPERTIES_TELESERVICE_ID,   mm_sms_cdma_teleservice_id_get_string (mm_sms_get_teleservice_id (sms)));
     mmcli_output_string           (MMC_F_SMS_PROPERTIES_SERVICE_CATEGORY, mm_sms_cdma_service_category_get_string (mm_sms_get_service_category (sms)));
     mmcli_output_string           (MMC_F_SMS_PROPERTIES_DELIVERY_REPORT,  delivery_report);
-    mmcli_output_string           (MMC_F_SMS_PROPERTIES_MSG_REFERENCE,    message_reference);
+    mmcli_output_string_take      (MMC_F_SMS_PROPERTIES_MSG_REFERENCE,    message_reference);
     mmcli_output_string           (MMC_F_SMS_PROPERTIES_TIMESTAMP,        mm_sms_get_timestamp (sms));
     mmcli_output_string           (MMC_F_SMS_PROPERTIES_DELIVERY_STATE,   delivery_state);
     mmcli_output_string           (MMC_F_SMS_PROPERTIES_DISCH_TIMESTAMP,  mm_sms_get_discharge_timestamp (sms));
