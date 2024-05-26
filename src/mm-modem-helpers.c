@@ -1870,6 +1870,8 @@ mm_3gpp_parse_cgdcont_read_response (const gchar *reply,
             MM3gppPdpContext *pdp;
 
             pdp = g_slice_new0 (MM3gppPdpContext);
+            list = g_list_prepend (list, pdp);
+
             if (!mm_get_uint_from_match_info (match_info, 1, &pdp->cid)) {
                 inner_error = g_error_new (MM_CORE_ERROR,
                                            MM_CORE_ERROR_FAILED,
@@ -1879,8 +1881,6 @@ mm_3gpp_parse_cgdcont_read_response (const gchar *reply,
             }
             pdp->pdp_type = ip_family;
             pdp->apn = mm_get_string_unquoted_from_match_info (match_info, 3);
-
-            list = g_list_prepend (list, pdp);
         }
 
         g_free (str);
