@@ -379,7 +379,7 @@ mm_signal_get_string (MMSignal *self)
         g_string_append_printf (printable, "%serror rate: %f %%", printable->len ? ", " : "", self->priv->error_rate);
     if (self->priv->rscp != MM_SIGNAL_UNKNOWN)
         g_string_append_printf (printable, "%sRSCP: %f dBm", printable->len ? ", " : "", self->priv->rscp);
-    if (self->priv->rscp != MM_SIGNAL_UNKNOWN)
+    if (self->priv->rsrp != MM_SIGNAL_UNKNOWN)
         g_string_append_printf (printable, "%sRSRP: %f dBm", printable->len ? ", " : "", self->priv->rsrp);
     if (self->priv->rsrq != MM_SIGNAL_UNKNOWN)
         g_string_append_printf (printable, "%sRSRQ: %f dB", printable->len ? ", " : "", self->priv->rsrq);
