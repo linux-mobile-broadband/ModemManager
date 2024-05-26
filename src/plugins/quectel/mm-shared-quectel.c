@@ -372,8 +372,8 @@ quectel_at_port_get_firmware_revision_ready (MMBaseModem  *self,
     LoadUpdateSettingsContext   *ctx;
     MMModemFirmwareUpdateMethod  update_methods;
     const gchar                 *revision;
-    const gchar                 *name;
     const gchar                 *id;
+    gchar                       *name;
     g_autoptr(GPtrArray)         ids = NULL;
     GError                      *error = NULL;
 
@@ -396,6 +396,7 @@ quectel_at_port_get_firmware_revision_ready (MMBaseModem  *self,
         mm_obj_dbg (self, "revision %s converted to modem name %s", revision, name);
         id = (const gchar *) g_ptr_array_index (ids, 0);
         g_ptr_array_insert (ids, 0, g_strdup_printf ("%s&NAME_%s", id, name));
+        g_free (name);
     }
 
     mm_firmware_update_settings_set_device_ids (ctx->update_settings, (const gchar **)ids->pdata);
