@@ -991,11 +991,13 @@ set_preferred_networks_reload_ready (MMBaseSim    *self,
         }
         /* Check if there are access technology bits requested but unset */
         if ((loaded_act & set_act) != set_act) {
-            MMModemAccessTechnology unset = set_act & ~loaded_act;
+            MMModemAccessTechnology  unset = set_act & ~loaded_act;
+            gchar                   *act;
 
+            act = mm_modem_access_technology_build_string_from_mask (unset);
             mm_obj_warn (self, "access technologies '%s' not set for operator code '%s'",
-                         mm_modem_access_technology_build_string_from_mask (unset),
-                         set_op_code);
+                         act, set_op_code);
+            g_free (act);
             error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                  "Access technology unsupported by modem or SIM");
             break;
