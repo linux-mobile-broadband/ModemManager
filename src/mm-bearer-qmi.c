@@ -1330,7 +1330,7 @@ build_start_network_input (ConnectContext *ctx)
         if (ctx->auth != QMI_WDS_AUTHENTICATION_NONE) {
             if (ctx->user)
                 qmi_message_wds_start_network_input_set_username (input, ctx->user, NULL);
-            if (ctx->user)
+            if (ctx->password)
                 qmi_message_wds_start_network_input_set_password (input, ctx->password, NULL);
         }
     }
