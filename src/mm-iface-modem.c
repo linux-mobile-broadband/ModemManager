@@ -1998,10 +1998,12 @@ periodic_signal_check_disable (MMIfaceModem *self,
 
     /* Clear access technology and signal quality */
     if (clear) {
-        update_signal_quality (self, 0, FALSE);
-        mm_iface_modem_update_access_technologies (self,
-                                                   MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
-                                                   MM_MODEM_ACCESS_TECHNOLOGY_ANY);
+        if (priv->signal_quality_polling_supported)
+            update_signal_quality (self, 0, FALSE);
+        if (priv->access_technology_polling_supported)
+            mm_iface_modem_update_access_technologies (self,
+                                                       MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
+                                                       MM_MODEM_ACCESS_TECHNOLOGY_ANY);
     }
 
     /* Remove scheduled timeout */
