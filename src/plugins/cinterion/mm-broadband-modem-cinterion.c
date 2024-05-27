@@ -1679,7 +1679,7 @@ cops_set_current_modes (MMBroadbandModemCinterion *self,
     mm_base_modem_at_command (
         MM_BASE_MODEM (self),
         command,
-        20,
+        30,
         FALSE,
         (GAsyncReadyCallback)allowed_access_technology_update_ready,
         task);
