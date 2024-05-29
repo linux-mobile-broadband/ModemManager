@@ -820,7 +820,7 @@ bands_array_to_huawei (GArray  *bands_array,
 
     for (i = 0; i < bands_array->len; i++) {
         guint j;
-        
+
         mm_band = g_array_index (bands_array, MMModemBand, i);
 
         if (mm_band < MM_MODEM_BAND_EUTRAN_1) {
