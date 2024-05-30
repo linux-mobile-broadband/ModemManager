@@ -119,7 +119,7 @@ at_command_ready (MbimDevice   *device,
                   GAsyncResult *res,
                   GTask        *task)
 {
-    g_autoptr(GError)       error    = NULL;
+    GError                 *error = NULL;
     MMPortMbimFibocom      *self;
     guint32                 ret_size = 0;
     const guint8           *ret_str  = NULL;
