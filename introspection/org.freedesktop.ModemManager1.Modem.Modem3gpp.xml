@@ -161,6 +161,53 @@
     <property name="RegistrationState" type="u" access="read" />
 
     <!--
+        NetworkRejection:
+
+        This property holds the latest network rejection information received from the
+        network during registration failure, and it will be cleared whenever the modem
+        successfully registers.
+        Network errors are defined in 3GPP TS 24.008 in sections 10.5.3.6 and
+        10.5.5.14 (detailed in annex G) and in 3GPP TS 24.301 in section 9.9.3.9.
+
+        Mandatory items include:
+        <variablelist>
+          <varlistentry><term><literal>"error"</literal></term>
+            <listitem>
+              A <link linkend="MMNetworkError">MMNetworkError</link>,
+              specifying the reason why a request from the mobile station
+              is rejected by the network, given as an unsigned integer value
+              (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        Optionally following items could be included if reported by modem along
+        with network error.
+        <variablelist>
+          <varlistentry><term><literal>"operator-id"</literal></term>
+            <listitem>
+              Operator id reported along with network error, given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"operator-name"</literal></term>
+            <listitem>
+              Operator name reported along with network error, given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"access-technology"</literal></term>
+            <listitem>
+              A <link linkend="MMModemAccessTechnology">MMModemAccessTechnology</link>,
+              specifying the available data class reported along with network error,
+              given as an unsigned integer value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        Since: 1.24
+    -->
+    <property name="NetworkRejection" type="a{sv}" access="read" />
+
+    <!--
         OperatorCode:
 
         Code of the operator to which the mobile is currently registered.

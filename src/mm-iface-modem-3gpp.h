@@ -363,6 +363,12 @@ void mm_iface_modem_3gpp_update_initial_eps_bearer  (MMIfaceModem3gpp *self,
                                                      MMBearerProperties *properties);
 void mm_iface_modem_3gpp_reload_initial_eps_bearer  (MMIfaceModem3gpp *self);
 
+void mm_iface_modem_3gpp_update_network_rejection   (MMIfaceModem3gpp       *self,
+                                                     MMNetworkError          error,
+                                                     const gchar            *operator_code,
+                                                     const gchar            *operator_name,
+                                                     MMModemAccessTechnology access_technology);
+
 /* Run all registration checks */
 void mm_iface_modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
                                                   GAsyncReadyCallback callback,

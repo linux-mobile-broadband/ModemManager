@@ -52,6 +52,7 @@ struct _MMModem3gppPrivate {
 
     PROPERTY_OBJECT_DECLARE (initial_eps_bearer_settings, MMBearerProperties)
     PROPERTY_OBJECT_DECLARE (nr5g_registration_settings,  MMNr5gRegistrationSettings)
+    PROPERTY_OBJECT_DECLARE (network_rejection,           MMNetworkRejection)
 };
 
 /*****************************************************************************/
@@ -695,6 +696,52 @@ PROPERTY_OBJECT_DEFINE_FAILABLE (initial_eps_bearer_settings,
                                  Modem3gpp, modem_3gpp, MODEM_3GPP,
                                  MMBearerProperties,
                                  mm_bearer_properties_new_from_dictionary)
+
+/**
+ * mm_modem_3gpp_get_network_rejection:
+ * @self: A #MMModem3gpp.
+ *
+ * Gets a #MMNetworkRejection object specifying the network rejection
+ * information received during registration failure.
+ *
+ * <warning>The values reported by @self are not updated when the values in the
+ * interface change. Instead, the client is expected to call
+ * mm_modem_3gpp_get_network_rejection() again to get a new
+ * #MMNetworkRejection with the new values.</warning>
+ *
+ * Returns: (transfer full): A #MMNetworkRejection that must be freed with
+ * g_object_unref() or %NULL if unknown.
+ *
+ * Since: 1.24
+ */
+
+/**
+ * mm_modem_3gpp_peek_network_rejection:
+ * @self: A #MMModem3gpp.
+ *
+ * Gets a #MMNetworkRejection object specifying the network rejection
+ * information received during registration failure.
+ *
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_modem_3gpp_get_network_rejection()
+ * if on another thread.</warning>
+ *
+ * Returns: (transfer none): A #MMNetworkRejection. Do not free the returned
+ * value, it belongs to @self.
+ *
+ * Since: 1.24
+ */
+
+/* helpers to match the property substring name with the one in our API */
+#define mm_gdbus_modem_3gpp_dup_network_rejection mm_gdbus_modem3gpp_dup_network_rejection
+
+PROPERTY_OBJECT_DEFINE_FAILABLE (network_rejection,
+                                 Modem3gpp, modem_3gpp, MODEM_3GPP,
+                                 MMNetworkRejection,
+                                 mm_network_rejection_new_from_dictionary)
+
+/*****************************************************************************/
 
 /*****************************************************************************/
 
@@ -1613,6 +1660,7 @@ mm_modem_3gpp_init (MMModem3gpp *self)
 
     PROPERTY_INITIALIZE (initial_eps_bearer_settings, "initial-eps-bearer-settings")
     PROPERTY_INITIALIZE (nr5g_registration_settings,  "nr5g-registration-settings")
+    PROPERTY_INITIALIZE (network_rejection,           "network-rejection")
 }
 
 static void
@@ -1624,6 +1672,7 @@ finalize (GObject *object)
 
     PROPERTY_OBJECT_FINALIZE (initial_eps_bearer_settings);
     PROPERTY_OBJECT_FINALIZE (nr5g_registration_settings);
+    PROPERTY_OBJECT_FINALIZE (network_rejection);
 
     G_OBJECT_CLASS (mm_modem_3gpp_parent_class)->finalize (object);
 }

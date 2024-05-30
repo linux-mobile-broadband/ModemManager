@@ -32,6 +32,7 @@
 
 #include "mm-bearer.h"
 #include "mm-nr5g-registration-settings.h"
+#include "mm-network-rejection.h"
 #include "mm-gdbus-modem.h"
 
 G_BEGIN_DECLS
@@ -97,6 +98,9 @@ MMModem3gppPacketServiceState mm_modem_3gpp_get_packet_service_state (MMModem3gp
 
 MMNr5gRegistrationSettings *mm_modem_3gpp_get_nr5g_registration_settings  (MMModem3gpp *self);
 MMNr5gRegistrationSettings *mm_modem_3gpp_peek_nr5g_registration_settings (MMModem3gpp *self);
+
+MMNetworkRejection *mm_modem_3gpp_get_network_rejection  (MMModem3gpp *self);
+MMNetworkRejection *mm_modem_3gpp_peek_network_rejection (MMModem3gpp *self);
 
 void     mm_modem_3gpp_register        (MMModem3gpp *self,
                                         const gchar *network_id,

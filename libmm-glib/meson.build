@@ -61,6 +61,7 @@ headers = files(
   'mm-sms.h',
   'mm-sms-properties.h',
   'mm-unlock-retries.h',
+  'mm-network-rejection.h',
 )
 
 install_headers(
@@ -123,6 +124,7 @@ sources = files(
   'mm-sms.c',
   'mm-sms-properties.c',
   'mm-unlock-retries.c',
+  'mm-network-rejection.c',
 )
 
 deps = [include_dep]

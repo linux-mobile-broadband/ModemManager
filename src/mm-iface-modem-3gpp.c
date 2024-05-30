@@ -2363,6 +2363,13 @@ update_registration_state (MMIfaceModem3gpp             *self,
     if (mm_modem_3gpp_registration_state_is_registered (new_state)) {
         MMModemState modem_state;
 
+        /* When moving to registered state, clear network rejection */
+        mm_iface_modem_3gpp_update_network_rejection (self,
+                                                      MM_NETWORK_ERROR_NONE,
+                                                      NULL,
+                                                      NULL,
+                                                      MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+
         /* If already reloading registration info, skip it */
         if (priv->reloading_registration_info)
             return;
@@ -2592,6 +2599,57 @@ mm_iface_modem_3gpp_update_pco_list (MMIfaceModem3gpp *self,
     mm_gdbus_modem3gpp_set_pco (skeleton, variant);
     g_variant_unref (variant);
     g_object_unref (skeleton);
+}
+
+/*****************************************************************************/
+
+void
+mm_iface_modem_3gpp_update_network_rejection (MMIfaceModem3gpp       *self,
+                                              MMNetworkError          error,
+                                              const gchar            *operator_id,
+                                              const gchar            *operator_name,
+                                              MMModemAccessTechnology access_technology)
+{
+    MmGdbusModem3gpp              *skeleton = NULL;
+    Private                       *priv;
+    g_autoptr(MMNetworkRejection)  new_code = NULL;
+    g_autoptr(GVariant)            dictionary = NULL;
+    g_autofree gchar              *access_tech_str = NULL;
+    const gchar                   *nw_rejection_error = NULL;
+
+    priv = get_private (self);
+    if (!priv->iface_enabled)
+        return;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &skeleton,
+                  NULL);
+    if (!skeleton)
+        return;
+
+    if (!error) {
+        mm_gdbus_modem3gpp_set_network_rejection (skeleton, NULL);
+        return;
+    }
+
+    access_tech_str = mm_modem_access_technology_build_string_from_mask (access_technology);
+    nw_rejection_error = mm_network_error_get_string (error);
+
+    mm_obj_warn (self, "Network rejection received: reason '%s' (%u), "
+                 "operator id '%s', operator name '%s', access technology '%s'",
+                 nw_rejection_error ? nw_rejection_error : "unknown", error,
+                 operator_id ? operator_id : "none",
+                 operator_name ? operator_name : "none",
+                 access_tech_str);
+
+    new_code = mm_network_rejection_new ();
+    mm_network_rejection_set_error (new_code, error);
+    mm_network_rejection_set_operator_id (new_code, operator_id);
+    mm_network_rejection_set_operator_name (new_code, operator_name);
+    mm_network_rejection_set_access_technology (new_code, access_technology);
+
+    dictionary = mm_network_rejection_get_dictionary (new_code);
+    mm_gdbus_modem3gpp_set_network_rejection (skeleton, dictionary);
 }
 
 /*****************************************************************************/

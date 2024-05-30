@@ -412,6 +412,11 @@ print_modem_info (void)
         const gchar *initial_eps_bearer_password = NULL;
         const gchar *nr5g_registration_settings_mico_mode_str = NULL;
         const gchar *nr5g_registration_settings_drx_cycle_str = NULL;
+        MMNetworkRejection *network_rejection = NULL;
+        const gchar  *nw_rejection_operator_id = NULL;
+        const gchar  *nw_rejection_operator_name = NULL;
+        g_autofree gchar *nw_rejection_access_technology = NULL;
+        g_autofree gchar *nw_rejection_error_str = NULL;
 
         if (ctx->modem_3gpp) {
             imei = mm_modem_3gpp_get_imei (ctx->modem_3gpp);
@@ -445,22 +450,43 @@ print_modem_info (void)
                     nr5g_registration_settings_drx_cycle_str = mm_modem_3gpp_drx_cycle_get_string (mm_nr5g_registration_settings_get_drx_cycle (nr5g_registration_settings));
                 }
             }
+
+            network_rejection = mm_modem_3gpp_peek_network_rejection (ctx->modem_3gpp);
+            if (network_rejection) {
+                MMNetworkError nw_rejection_error_n;
+                MMModemAccessTechnology nw_rejection_access_technology_n;
+                const gchar *nw_rejection_error = NULL;
+
+                nw_rejection_error_n = mm_network_rejection_get_error (network_rejection);
+                nw_rejection_error = mm_network_error_get_string (nw_rejection_error_n);
+                nw_rejection_error_str = nw_rejection_error ? g_strdup_printf ("%s", nw_rejection_error) :
+                                         g_strdup_printf ("unknown network rejection error: %u", nw_rejection_error_n);
+                nw_rejection_operator_id = mm_network_rejection_get_operator_id (network_rejection);
+                nw_rejection_operator_name = mm_network_rejection_get_operator_name (network_rejection);
+                nw_rejection_access_technology_n = mm_network_rejection_get_access_technology (network_rejection);
+                nw_rejection_access_technology = mm_modem_access_technology_build_string_from_mask (nw_rejection_access_technology_n);
+
+            }
         }
 
-        mmcli_output_string      (MMC_F_3GPP_IMEI,                         imei);
-        mmcli_output_string_list (MMC_F_3GPP_ENABLED_LOCKS,                facility_locks);
-        mmcli_output_string      (MMC_F_3GPP_OPERATOR_ID,                  operator_code);
-        mmcli_output_string      (MMC_F_3GPP_OPERATOR_NAME,                operator_name);
-        mmcli_output_string      (MMC_F_3GPP_REGISTRATION,                 registration);
-        mmcli_output_string      (MMC_F_3GPP_PACKET_SERVICE_STATE,         packet_service_state);
-        mmcli_output_string      (MMC_F_3GPP_EPS_UE_MODE,                  eps_ue_mode);
-        mmcli_output_string      (MMC_F_3GPP_EPS_INITIAL_BEARER_PATH,      g_strcmp0 (initial_eps_bearer_path, "/") != 0 ? initial_eps_bearer_path : NULL);
-        mmcli_output_string      (MMC_F_3GPP_EPS_BEARER_SETTINGS_APN,      initial_eps_bearer_apn);
-        mmcli_output_string_take (MMC_F_3GPP_EPS_BEARER_SETTINGS_IP_TYPE,  initial_eps_bearer_ip_family_str);
-        mmcli_output_string      (MMC_F_3GPP_EPS_BEARER_SETTINGS_USER,     initial_eps_bearer_user);
-        mmcli_output_string      (MMC_F_3GPP_EPS_BEARER_SETTINGS_PASSWORD, initial_eps_bearer_password);
-        mmcli_output_string      (MMC_F_3GPP_5GNR_REGISTRATION_MICO_MODE,  nr5g_registration_settings_mico_mode_str);
-        mmcli_output_string      (MMC_F_3GPP_5GNR_REGISTRATION_DRX_CYCLE,  nr5g_registration_settings_drx_cycle_str);
+        mmcli_output_string      (MMC_F_3GPP_IMEI,                                imei);
+        mmcli_output_string_list (MMC_F_3GPP_ENABLED_LOCKS,                       facility_locks);
+        mmcli_output_string      (MMC_F_3GPP_OPERATOR_ID,                         operator_code);
+        mmcli_output_string      (MMC_F_3GPP_OPERATOR_NAME,                       operator_name);
+        mmcli_output_string      (MMC_F_3GPP_REGISTRATION,                        registration);
+        mmcli_output_string_take (MMC_F_3GPP_NETWORK_REJECTION_ERROR,             g_steal_pointer (&nw_rejection_error_str));
+        mmcli_output_string      (MMC_F_3GPP_NETWORK_REJECTION_OPERATOR_ID,       nw_rejection_operator_id);
+        mmcli_output_string      (MMC_F_3GPP_NETWORK_REJECTION_OPERATOR_NAME,     nw_rejection_operator_name);
+        mmcli_output_string_take (MMC_F_3GPP_NETWORK_REJECTION_ACCESS_TECHNOLOGY, g_steal_pointer (&nw_rejection_access_technology));
+        mmcli_output_string      (MMC_F_3GPP_PACKET_SERVICE_STATE,                packet_service_state);
+        mmcli_output_string      (MMC_F_3GPP_EPS_UE_MODE,                         eps_ue_mode);
+        mmcli_output_string      (MMC_F_3GPP_EPS_INITIAL_BEARER_PATH,             g_strcmp0 (initial_eps_bearer_path, "/") != 0 ? initial_eps_bearer_path : NULL);
+        mmcli_output_string      (MMC_F_3GPP_EPS_BEARER_SETTINGS_APN,             initial_eps_bearer_apn);
+        mmcli_output_string_take (MMC_F_3GPP_EPS_BEARER_SETTINGS_IP_TYPE,         initial_eps_bearer_ip_family_str);
+        mmcli_output_string      (MMC_F_3GPP_EPS_BEARER_SETTINGS_USER,            initial_eps_bearer_user);
+        mmcli_output_string      (MMC_F_3GPP_EPS_BEARER_SETTINGS_PASSWORD,        initial_eps_bearer_password);
+        mmcli_output_string      (MMC_F_3GPP_5GNR_REGISTRATION_MICO_MODE,         nr5g_registration_settings_mico_mode_str);
+        mmcli_output_string      (MMC_F_3GPP_5GNR_REGISTRATION_DRX_CYCLE,         nr5g_registration_settings_drx_cycle_str);
         mmcli_output_pco_list    (pco_list);
 
         g_free (facility_locks);
