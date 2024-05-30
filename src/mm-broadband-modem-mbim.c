@@ -5061,6 +5061,22 @@ common_process_register_state (MMBroadbandModemMbim  *self,
     mm_obj_dbg (self, "available data classes: '%s'", available_data_classes_str);
     mm_obj_dbg (self, "preferred data classes: '%s'", preferred_data_classes_str);
 
+    if ((register_state != MBIM_REGISTER_STATE_HOME) &&
+        (register_state != MBIM_REGISTER_STATE_ROAMING) &&
+        mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self))) {
+        MMNetworkError mm_nw_error;
+        MMModemAccessTechnology access_technology;
+
+        mm_nw_error = mm_modem_nw_error_from_mbim_nw_error (nw_error);
+        access_technology = mm_modem_access_technology_from_mbim_data_class (available_data_classes);
+
+        mm_iface_modem_3gpp_update_network_rejection (MM_IFACE_MODEM_3GPP (self),
+                                                      mm_nw_error,
+                                                      provider_id,
+                                                      provider_name,
+                                                      access_technology);
+    }
+
     update_registration_info (self,
                               FALSE,
                               register_state,
