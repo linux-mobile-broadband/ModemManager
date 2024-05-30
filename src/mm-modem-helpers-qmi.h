@@ -111,6 +111,8 @@ MMModemCdmaRegistrationState mm_modem_cdma_registration_state_from_qmi_registrat
 
 MMModemCdmaActivationState mm_modem_cdma_activation_state_from_qmi_activation_state (QmiDmsActivationState state);
 
+MMNetworkError mm_modem_nw_error_from_qmi_nw_error (QmiNasRejectCause nw_error);
+
 /*****************************************************************************/
 /* QMI NAS System Info processor */
 

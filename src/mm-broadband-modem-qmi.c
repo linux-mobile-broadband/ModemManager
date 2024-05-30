@@ -5408,6 +5408,7 @@ network_reject_indication_cb (QmiClientNas                        *client,
     guint16                    mcc = 0;
     guint16                    mnc = 0;
     guint32                    closed_subscriber_group = 0;
+    gboolean                   has_pcs_digit;
 
     mm_obj_warn (self, "network reject indication received");
     if (qmi_indication_nas_network_reject_output_get_service_domain (output, &service_domain, NULL))
@@ -5416,12 +5417,28 @@ network_reject_indication_cb (QmiClientNas                        *client,
         mm_obj_warn (self, "  radio interface: %s", qmi_nas_radio_interface_get_string (radio_interface));
     if (qmi_indication_nas_network_reject_output_get_reject_cause (output, &reject_cause, NULL))
         mm_obj_warn (self, "  reject cause: %s", qmi_nas_reject_cause_get_string (reject_cause));
-    if (qmi_indication_nas_network_reject_output_get_plmn (output, &mcc, &mnc, NULL, NULL)) {
+    if (qmi_indication_nas_network_reject_output_get_plmn (output, &mcc, &mnc, &has_pcs_digit, NULL)) {
         mm_obj_warn (self, "  mcc: %" G_GUINT16_FORMAT, mcc);
         mm_obj_warn (self, "  mnc: %" G_GUINT16_FORMAT, mnc);
     }
     if (qmi_indication_nas_network_reject_output_get_closed_subscriber_group (output, &closed_subscriber_group, NULL))
         mm_obj_warn (self, "  closed subscriber group: %u", closed_subscriber_group);
+
+    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self))) {
+        MMNetworkError mm_nw_error;
+        MMModemAccessTechnology access_technology;
+        g_autofree gchar *operator_id = NULL;
+
+        mm_nw_error = mm_modem_nw_error_from_qmi_nw_error (reject_cause);
+        access_technology  = mm_modem_access_technology_from_qmi_radio_interface (radio_interface);
+        if (has_pcs_digit)
+            operator_id = g_strdup_printf ("%.3" G_GUINT16_FORMAT "%.3" G_GUINT16_FORMAT, mcc, mnc);
+        else
+            operator_id = g_strdup_printf ("%.3" G_GUINT16_FORMAT "%.2" G_GUINT16_FORMAT, mcc, mnc);
+
+        mm_iface_modem_3gpp_update_network_rejection (MM_IFACE_MODEM_3GPP (self),
+                                                      mm_nw_error, operator_id, NULL, access_technology);
+    }
 }
 
 static void
