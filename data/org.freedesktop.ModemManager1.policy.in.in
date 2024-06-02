@@ -9,6 +9,15 @@
   <vendor_url>http://www.freedesktop.org/wiki/ModemManager</vendor_url>
   <icon_name>ModemManager</icon_name>
 
+  <action id="org.freedesktop.ModemManager1.CellBroadcast">
+    <description>Enable and view Cell Broadcast messages</description>
+    <message>System policy prevents enabling or viewing this device's text messages.</message>
+    <defaults>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>@MM_DEFAULT_USER_POLICY@</allow_active>
+    </defaults>
+  </action>
+
   <action id="org.freedesktop.ModemManager1.Control">
     <description>Control the Modem Manager daemon</description>
     <message>System policy prevents controlling the Modem Manager.</message>
