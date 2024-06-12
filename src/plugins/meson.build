@@ -132,6 +132,23 @@ if plugins_shared['icera']
   }}
 endif
 
+# common mtk support library
+if plugins_shared['mtk']
+  mtk_inc = include_directories('mtk')
+
+  c_args = '-DMM_MODULE_NAME="shared-mtk"'
+
+  sources = files(
+    'mtk/mm-shared.c',
+    'mtk/mm-shared-mtk.c',
+  )
+
+  plugins += {'shared-mtk': {
+    'plugin': false,
+    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': c_args},
+  }}
+endif
+
 # common novatel support
 if plugins_shared['novatel']
   novatel_inc = include_directories('novatel')
@@ -630,6 +647,7 @@ if plugins_options['mtk-legacy']
   test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_MTK="@0@"'.format(plugins_dir / 'mtk')]
   plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
 
+  incs = plugins_incs + [mtk_inc]
   sources = files(
     'mtk/mm-broadband-modem-mtk-legacy.c',
     'mtk/mm-plugin-mtk-legacy.c',
@@ -637,7 +655,7 @@ if plugins_options['mtk-legacy']
 
   plugins += {'plugin-mtk-legacy': {
     'plugin': true,
-    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="mtk-legacy"']},
+    'module': {'sources': sources, 'include_directories': incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="mtk-legacy"']},
   }}
 
   plugins_udev_rules += files('mtk/77-mm-mtk-legacy-port-types.rules')
@@ -648,7 +666,7 @@ if plugins_options['mtk']
   test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_MTK="@0@"'.format(plugins_dir / 'mtk')]
   plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
 
-  incs = plugins_incs
+  incs = plugins_incs + [mtk_inc]
   sources = files(
     'mtk/mm-plugin-mtk.c',
   )
@@ -658,7 +676,7 @@ if plugins_options['mtk']
     sources += files(
       'mtk/mm-bearer-mbim-mtk-fibocom.c',
       'mtk/mm-broadband-modem-mbim-mtk.c',
-      'mtk/mm-broadband-modem-mbim-mtk-fibocom.c'
+      'mtk/mm-broadband-modem-mbim-mtk-fibocom.c',
     )
   endif
 

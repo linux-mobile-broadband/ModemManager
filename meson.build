@@ -306,6 +306,7 @@ plugins_shared_reqs = {
   'fibocom': true,
   'foxconn': enable_mbim,
   'icera': true,
+  'mtk': true,
   'novatel': true,
   'option': true,
   'sierra': true,
@@ -314,7 +315,7 @@ plugins_shared_reqs = {
 }
 
 dell_shared_reqs = ['novatel', 'sierra', 'telit', 'xmm']
-mtk_shared_reqs = []
+mtk_shared_reqs = ['mtk']
 if enable_mbim
   dell_shared_reqs += ['foxconn']
   # only the MBIM implementation in MTK needs the shared fibocom utils
@@ -340,7 +341,7 @@ plugins_options_reqs = {
   'longcheer': {'available': true, 'shared': []},
   'mbm': {'available': true, 'shared': []},
   'motorola': {'available': true, 'shared': []},
-  'mtk-legacy': {'available': true, 'shared': []},
+  'mtk-legacy': {'available': true, 'shared': mtk_shared_reqs},
   'mtk': {'available': true, 'shared': mtk_shared_reqs},
   'nokia': {'available': true, 'shared': []},
   'nokia-icera': {'available': true, 'shared': ['icera']},

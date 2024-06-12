@@ -27,15 +27,18 @@
 #include "mm-bearer-mbim-mtk-fibocom.h"
 #include "mm-broadband-modem-mbim-mtk-fibocom.h"
 #include "mm-shared-fibocom.h"
+#include "mm-shared-mtk.h"
 
 static void iface_modem_init    (MMIfaceModemInterface    *iface);
 static void shared_fibocom_init (MMSharedFibocomInterface *iface);
+static void shared_mtk_init     (MMSharedMtkInterface *iface);
 
 static MMIfaceModemInterface *iface_modem_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbimMtkFibocom, mm_broadband_modem_mbim_mtk_fibocom, MM_TYPE_BROADBAND_MODEM_MBIM_MTK, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM,      iface_modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_FIBOCOM,   shared_fibocom_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_FIBOCOM,   shared_fibocom_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_MTK,       shared_mtk_init))
 
 struct _MMBroadbandModemMbimMtkFibocomPrivate {
     /* Custom MTK/Fibocom bearer behavior */
@@ -278,6 +281,9 @@ iface_modem_init (MMIfaceModemInterface *iface)
     iface->create_bearer = create_bearer;
     iface->create_bearer_finish = create_bearer_finish;
     iface->create_bearer_list = create_bearer_list;
+    iface->load_unlock_retries = mm_shared_mtk_load_unlock_retries;
+    iface->load_unlock_retries_finish = mm_shared_mtk_load_unlock_retries_finish;
+
 }
 
 static MMBaseModemClass *
@@ -290,6 +296,11 @@ static void
 shared_fibocom_init (MMSharedFibocomInterface *iface)
 {
     iface->peek_parent_class = peek_parent_class;
+}
+
+static void
+shared_mtk_init (MMSharedMtkInterface *iface)
+{
 }
 
 static void
