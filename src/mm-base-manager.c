@@ -249,6 +249,7 @@ modem_setup (FindDeviceSupportContext *ctx)
             case MM_MODEM_PORT_TYPE_AT:
             case MM_MODEM_PORT_TYPE_QMI:
             case MM_MODEM_PORT_TYPE_MBIM:
+            case MM_MODEM_PORT_TYPE_XMMRPC:
                 g_ptr_array_add (aux, g_strdup (port_infos[i].name));
                 break;
             case MM_MODEM_PORT_TYPE_UNKNOWN:

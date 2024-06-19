@@ -221,6 +221,19 @@
 #define ID_MM_PORT_TYPE_MBIM "ID_MM_PORT_TYPE_MBIM"
 
 /**
+ * ID_MM_PORT_TYPE_XMMRPC:
+ *
+ * This is a port-specific tag applied to generic ports that we know in advance
+ * are RPC control ports for Intel XMM modems.
+ *
+ * This tag will also prevent other types of probing (e.g. AT, QMI) on the
+ * port.
+ *
+ * Since: 1.24
+ */
+#define ID_MM_PORT_TYPE_XMMRPC "ID_MM_PORT_TYPE_XMMRPC"
+
+/**
  * ID_MM_TTY_BAUDRATE:
  *
  * This is a port-specific tag applied to TTYs that require a specific

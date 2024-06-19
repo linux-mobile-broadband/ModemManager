@@ -314,6 +314,13 @@ base_modem_create_wwan_port (MMBaseModem *self,
     if (ptype == MM_PORT_TYPE_AT)
         return MM_PORT (mm_port_serial_at_new (name, MM_PORT_SUBSYS_WWAN));
 
+    if (ptype == MM_PORT_TYPE_XMMRPC)
+        return MM_PORT (g_object_new (MM_TYPE_PORT,
+                                      MM_PORT_DEVICE, name,
+                                      MM_PORT_SUBSYS, MM_PORT_SUBSYS_WWAN,
+                                      MM_PORT_TYPE, MM_PORT_TYPE_XMMRPC,
+                                      NULL));
+
     return NULL;
 }
 
@@ -1221,6 +1228,9 @@ mm_base_modem_get_port_infos (MMBaseModem *self,
         case MM_PORT_TYPE_MBIM:
             port_info.type = MM_MODEM_PORT_TYPE_MBIM;
             break;
+        case MM_PORT_TYPE_XMMRPC:
+            port_info.type = MM_MODEM_PORT_TYPE_XMMRPC;
+            break;
         case MM_PORT_TYPE_IGNORED:
             port_info.type = MM_MODEM_PORT_TYPE_IGNORED;
             break;
@@ -1350,6 +1360,7 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     MMPortSerialGps *gps = NULL;
     MMPortSerial *audio = NULL;
     MMPortSerialAt *data_at_primary = NULL;
+    MMPort *xmmrpc = NULL;
     GList *l;
     /* These lists don't keep full references, so they should be
      * g_list_free()-ed on error exits */
@@ -1443,6 +1454,12 @@ mm_base_modem_organize_ports (MMBaseModem *self,
             g_assert (MM_IS_PORT_SERIAL (candidate));
             if (!audio)
                 audio = MM_PORT_SERIAL (candidate);
+            break;
+
+        case MM_PORT_TYPE_XMMRPC:
+            g_assert (MM_IS_PORT (candidate));
+            if (!xmmrpc)
+                xmmrpc = MM_PORT (candidate);
             break;
 
 #if defined WITH_QMI
@@ -1572,6 +1589,7 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     log_port (self, MM_PORT (gps_control),     "gps (control)");
     log_port (self, MM_PORT (gps),             "gps (nmea)");
     log_port (self, MM_PORT (audio),           "audio");
+    log_port (self, MM_PORT (xmmrpc),          "xmmrpc");
 #if defined WITH_QMI
     for (l = qmi; l; l = g_list_next (l))
         log_port (self, MM_PORT (l->data),     "qmi");

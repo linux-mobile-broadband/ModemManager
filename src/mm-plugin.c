@@ -94,6 +94,7 @@ struct _MMPluginPrivate {
     gboolean qcdm_required;
     gboolean qmi;
     gboolean mbim;
+    gboolean xmmrpc;
     gboolean icera_probe;
     gboolean xmm_probe;
     MMPortProbeAtCommand *custom_at_probe;
@@ -128,6 +129,7 @@ enum {
     PROP_REQUIRED_QCDM,
     PROP_ALLOWED_QMI,
     PROP_ALLOWED_MBIM,
+    PROP_ALLOWED_XMMRPC,
     PROP_ICERA_PROBE,
     PROP_ALLOWED_ICERA,
     PROP_FORBIDDEN_ICERA,
@@ -283,7 +285,8 @@ apply_pre_probing_filters (MMPlugin       *self,
     if (self->priv->drivers ||
         self->priv->forbidden_drivers ||
         !self->priv->qmi ||
-        !self->priv->mbim) {
+        !self->priv->mbim ||
+        !self->priv->xmmrpc) {
         static const gchar *virtual_drivers [] = { "virtual", NULL };
         const gchar **drivers;
 
@@ -1256,6 +1259,10 @@ set_property (GObject *object,
         /* Construct only */
         self->priv->mbim = g_value_get_boolean (value);
         break;
+    case PROP_ALLOWED_XMMRPC:
+        /* Construct only */
+        self->priv->xmmrpc = g_value_get_boolean (value);
+        break;
     case PROP_ICERA_PROBE:
         /* Construct only */
         self->priv->icera_probe = g_value_get_boolean (value);
@@ -1368,6 +1375,9 @@ get_property (GObject *object,
         break;
     case PROP_ALLOWED_MBIM:
         g_value_set_boolean (value, self->priv->mbim);
+        break;
+    case PROP_ALLOWED_XMMRPC:
+        g_value_set_boolean (value, self->priv->xmmrpc);
         break;
     case PROP_ALLOWED_UDEV_TAGS:
         g_value_set_boxed (value, self->priv->udev_tags);
@@ -1617,6 +1627,14 @@ mm_plugin_class_init (MMPluginClass *klass)
          g_param_spec_boolean (MM_PLUGIN_ALLOWED_MBIM,
                                "Allowed MBIM",
                                "Whether MBIM ports are allowed in this plugin",
+                               FALSE,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+        g_object_class_install_property
+        (object_class, PROP_ALLOWED_XMMRPC,
+         g_param_spec_boolean (MM_PLUGIN_ALLOWED_XMMRPC,
+                               "Allowed XMMRPC",
+                               "Whether XMMRPC ports are allowed in this plugin.",
                                FALSE,
                                G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 

@@ -90,6 +90,7 @@ struct _MMPortProbePrivate {
     gboolean is_ignored;
     gboolean is_gps;
     gboolean is_audio;
+    gboolean is_xmmrpc;
     gboolean maybe_at;
     gboolean maybe_qcdm;
     gboolean maybe_qmi;
@@ -189,6 +190,7 @@ mm_port_probe_set_result_at (MMPortProbe *self,
         self->priv->is_qcdm = FALSE;
         self->priv->is_qmi = FALSE;
         self->priv->is_mbim = FALSE;
+        self->priv->is_xmmrpc = FALSE;
         self->priv->flags |= (MM_PORT_PROBE_QCDM | MM_PORT_PROBE_QMI | MM_PORT_PROBE_MBIM);
     } else {
         mm_obj_dbg (self, "port is not AT-capable");
@@ -282,6 +284,7 @@ mm_port_probe_set_result_qcdm (MMPortProbe *self,
         self->priv->product = NULL;
         self->priv->is_icera = FALSE;
         self->priv->is_xmm = FALSE;
+        self->priv->is_xmmrpc = FALSE;
         self->priv->flags |= (MM_PORT_PROBE_AT |
                               MM_PORT_PROBE_AT_VENDOR |
                               MM_PORT_PROBE_AT_PRODUCT |
@@ -307,6 +310,7 @@ mm_port_probe_set_result_qmi (MMPortProbe *self,
         self->priv->is_at = FALSE;
         self->priv->is_qcdm = FALSE;
         self->priv->is_mbim = FALSE;
+        self->priv->is_xmmrpc = FALSE;
         self->priv->vendor = NULL;
         self->priv->product = NULL;
         self->priv->flags |= (MM_PORT_PROBE_AT |
@@ -334,6 +338,7 @@ mm_port_probe_set_result_mbim (MMPortProbe *self,
         self->priv->is_at = FALSE;
         self->priv->is_qcdm = FALSE;
         self->priv->is_qmi = FALSE;
+        self->priv->is_xmmrpc = FALSE;
         self->priv->vendor = NULL;
         self->priv->product = NULL;
         self->priv->flags |= (MM_PORT_PROBE_AT |
@@ -1514,6 +1519,15 @@ mm_port_probe_run (MMPortProbe                *self,
         mm_port_probe_set_result_mbim (self, FALSE);
     }
 
+    /* If this is a port flagged as an XMMRPC port, don't do any other probing */
+    if (self->priv->is_xmmrpc) {
+        mm_obj_dbg (self, "XMMRPC port detected");
+        mm_port_probe_set_result_at   (self, FALSE);
+        mm_port_probe_set_result_qcdm (self, FALSE);
+        mm_port_probe_set_result_qmi  (self, FALSE);
+        mm_port_probe_set_result_mbim (self, FALSE);
+    }
+
     /* If this is a port flagged as being an AT port, don't do any other probing */
     if (self->priv->maybe_at) {
         mm_obj_dbg (self, "no QCDM/QMI/MBIM probing in possible AT port");
@@ -1694,6 +1708,30 @@ mm_port_probe_list_has_mbim_port (GList *list)
     return FALSE;
 }
 
+gboolean
+mm_port_probe_is_xmmrpc (MMPortProbe *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
+
+    return self->priv->is_xmmrpc;
+}
+
+gboolean
+mm_port_probe_list_has_xmmrpc_port (GList *list)
+{
+    GList *l;
+
+    for (l = list; l; l = g_list_next (l)) {
+        MMPortProbe *probe = MM_PORT_PROBE (l->data);
+
+        if (!probe->priv->is_ignored &&
+            mm_port_probe_is_xmmrpc (probe))
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
 MMPortType
 mm_port_probe_get_port_type (MMPortProbe *self)
 {
@@ -1731,6 +1769,9 @@ mm_port_probe_get_port_type (MMPortProbe *self)
 
     if (self->priv->is_audio)
         return MM_PORT_TYPE_AUDIO;
+
+    if (self->priv->is_xmmrpc)
+        return MM_PORT_TYPE_XMMRPC;
 
     return MM_PORT_TYPE_UNKNOWN;
 }
@@ -1864,6 +1905,7 @@ initialize_port_type_hints (MMPortProbe *self)
     guint              n_udev_hints = 0;
     gboolean           auto_maybe_qmi = FALSE;
     gboolean           auto_maybe_mbim = FALSE;
+    gboolean           auto_is_xmmrpc = FALSE;
     gboolean           auto_maybe_at = FALSE;
     gboolean           auto_maybe_qcdm = FALSE;
     gboolean           auto_ignored = FALSE;
@@ -1884,6 +1926,7 @@ initialize_port_type_hints (MMPortProbe *self)
     /* Process udev-configured port type hints */
     ADD_HINT_FROM_UDEV_TAG (ID_MM_PORT_TYPE_GPS,           is_gps);
     ADD_HINT_FROM_UDEV_TAG (ID_MM_PORT_TYPE_AUDIO,         is_audio);
+    ADD_HINT_FROM_UDEV_TAG (ID_MM_PORT_TYPE_XMMRPC,        is_xmmrpc);
     ADD_HINT_FROM_UDEV_TAG (ID_MM_PORT_TYPE_AT_PRIMARY,    maybe_at);
     ADD_HINT_FROM_UDEV_TAG (ID_MM_PORT_TYPE_AT_SECONDARY,  maybe_at);
     ADD_HINT_FROM_UDEV_TAG (ID_MM_PORT_TYPE_AT_PPP,        maybe_at);
@@ -1923,6 +1966,9 @@ initialize_port_type_hints (MMPortProbe *self)
             } else if (!g_strcmp0 (type, "MBIM")) {
                 mm_obj_dbg (self, "port may be MBIM based on the wwan type attribute");
                 auto_maybe_mbim = TRUE;
+            } else if (!g_strcmp0 (type, "XMMRPC")) {
+                mm_obj_dbg (self, "port is XMMRPC based on the wwan type attribute");
+                auto_is_xmmrpc = TRUE;
             } else if (!g_strcmp0 (type, "QMI")) {
                 mm_obj_dbg (self, "port may be QMI based on the wwan type attribute");
                 auto_maybe_qmi = TRUE;
@@ -1961,7 +2007,12 @@ initialize_port_type_hints (MMPortProbe *self)
         }
     }
 
-    g_assert ((auto_maybe_qmi + auto_maybe_mbim + auto_maybe_at + auto_maybe_qcdm + auto_ignored) <= 1);
+    g_assert ((auto_maybe_qmi +
+               auto_maybe_mbim +
+               auto_is_xmmrpc +
+               auto_maybe_at +
+               auto_maybe_qcdm +
+               auto_ignored) <= 1);
 
 #define PROCESS_AUTO_HINTS(TYPE, FIELD) do {                            \
         if (auto_##FIELD) {                                             \
@@ -1972,18 +2023,20 @@ initialize_port_type_hints (MMPortProbe *self)
         }                                                               \
     } while (0)
 
-    PROCESS_AUTO_HINTS ("QMI",  maybe_qmi);
-    PROCESS_AUTO_HINTS ("MBIM", maybe_mbim);
-    PROCESS_AUTO_HINTS ("AT",   maybe_at);
-    PROCESS_AUTO_HINTS ("QCDM", maybe_qcdm);
+    PROCESS_AUTO_HINTS ("QMI",    maybe_qmi);
+    PROCESS_AUTO_HINTS ("MBIM",   maybe_mbim);
+    PROCESS_AUTO_HINTS ("XMMRPC", is_xmmrpc);
+    PROCESS_AUTO_HINTS ("AT",     maybe_at);
+    PROCESS_AUTO_HINTS ("QCDM",   maybe_qcdm);
 
 #undef PROCESS_AUTO_HINTS
 
-    mm_obj_dbg (self, "port type hints loaded: AT %s, QMI %s, MBIM %s, QCDM %s, AUDIO %s, GPS %s",
+    mm_obj_dbg (self, "port type hints loaded: AT %s, QMI %s, MBIM %s, QCDM %s, XMMRPC %s, AUDIO %s, GPS %s",
                 self->priv->maybe_at ? "yes" : "no",
                 self->priv->maybe_qmi ? "yes" : "no",
                 self->priv->maybe_mbim ? "yes" : "no",
                 self->priv->maybe_qcdm ? "yes" : "no",
+                self->priv->is_xmmrpc ? "yes" : "no",
                 self->priv->is_audio ? "yes" : "no",
                 self->priv->is_gps ? "yes" : "no");
 
