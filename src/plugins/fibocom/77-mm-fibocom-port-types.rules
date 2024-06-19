@@ -25,6 +25,9 @@ ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a0", ENV{.MM_USBIFNUM}=="04", ENV{
 # Fibocom NL668 doesn't support multiplexing properly
 ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a0", ENV{ID_MM_MAX_MULTIPLEXED_LINKS}="0"
 
+# Fibocom NL668 doesn't support CPOL features properly
+ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a0", ENV{ID_MM_PREFERRED_NETWORKS_CPOL_DISABLED}="1"
+
 # Fibocom FM150
 #  ttyUSB0 (if #0): QCDM port
 #  ttyUSB1 (if #1): AT port
