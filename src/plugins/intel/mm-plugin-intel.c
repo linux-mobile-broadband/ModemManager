@@ -55,6 +55,16 @@ create_modem (MMPlugin      *self,
     }
 #endif
 
+    if (mm_port_probe_list_has_xmmrpc_port (probes)) {
+        mm_obj_dbg (self, "Intel modem with RPC control port found...");
+        if (product == 0x7360) {
+            g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "Intel XMM7360 in RPC mode not supported");
+            return NULL;
+        }
+    }
+
+
     mm_obj_dbg (self, "Generic Intel modem found...");
     return MM_BASE_MODEM (mm_broadband_modem_new (uid,
                                                   physdev,
@@ -79,6 +89,7 @@ mm_plugin_create_intel (void)
                              MM_PLUGIN_ALLOWED_VENDOR_IDS, vendor_ids,
                              MM_PLUGIN_ALLOWED_AT,         TRUE,
                              MM_PLUGIN_ALLOWED_MBIM,       TRUE,
+                             MM_PLUGIN_ALLOWED_XMMRPC,     TRUE,
                              NULL));
 }
 
