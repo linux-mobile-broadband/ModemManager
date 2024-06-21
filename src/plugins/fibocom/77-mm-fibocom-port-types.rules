@@ -22,6 +22,9 @@ ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a0", ENV{.MM_USBIFNUM}=="02", SUBS
 ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a0", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a0", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_IGNORE}="1"
 
+# Fibocom NL668 doesn't support AT over MBIM properly
+ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a0", ENV{ID_MM_FIBOCOM_AT_OVER_MBIM_DISABLED}="1"
+
 # Fibocom NL668 doesn't support multiplexing properly
 ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a0", ENV{ID_MM_MAX_MULTIPLEXED_LINKS}="0"
 

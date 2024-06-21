@@ -64,6 +64,10 @@ iface_port_at_check_support (MMIfacePortAt  *_self,
         if (!mm_port_mbim_supports_command (MM_PORT_MBIM (self), MBIM_SERVICE_FIBOCOM, MBIM_CID_FIBOCOM_AT_COMMAND)) {
             mm_obj_msg (self, "MBIM device is not AT capable");
             self->priv->at_over_mbim = FEATURE_NOT_SUPPORTED;
+        } else if (mm_kernel_device_get_property_as_boolean (mm_port_peek_kernel_device (MM_PORT (self)),
+                                                             "ID_MM_FIBOCOM_AT_OVER_MBIM_DISABLED")) {
+            mm_obj_msg (self, "MBIM device is AT capable but support is disabled");
+            self->priv->at_over_mbim = FEATURE_NOT_SUPPORTED;
         } else {
             mm_obj_msg (self, "MBIM device is AT capable");
             self->priv->at_over_mbim = FEATURE_SUPPORTED;
