@@ -1,0 +1,131 @@
+#!/bin/bash
+
+# SPDX-License-Identifier: CC0-1.0
+# 2024 Thomas Vogt
+#
+# RPC-powered Intel XMM7360 (8086:7360) FCC unlock
+
+if [[ "$FCC_UNLOCK_DEBUG_LOG" == '1' ]]; then
+    exec 3>&1 4>&2
+    trap 'exec 2>&4 1>&3' 0 1 2 3
+    exec 1>>/var/log/mm-xmm7360-fcc.log 2>&1
+fi
+
+# require program name and at least 2 arguments
+[ $# -lt 2 ] && exit 1
+
+# first argument is DBus path, not needed here
+shift
+
+# second and next arguments are control port names
+for PORT in "$@"; do
+  # support for XMM7360 has been added in 5.18
+  # match port type, assuming Linux 5.14 and newer
+  grep -q XMMRPC "/sys/class/wwan/$PORT/type" 2>/dev/null && {
+    XMMRPC_PORT=$PORT
+    break
+  }
+done
+
+# fail if no XMMRPC port exposed
+[ -n "$XMMRPC_PORT" ] || exit 2
+
+DEVICE=/dev/${XMMRPC_PORT}
+
+log() {
+    echo "$1"
+}
+
+error() {
+    echo "$1" >&2
+}
+
+reverseHexEndianness() {
+    num="$1"
+    printf "%s" "${num:6:2}${num:4:2}${num:2:2}${num:0:2}"
+}
+
+littleEndianToDec() {
+    printf "%d" "0x$1"
+}
+
+bigEndianToDec() {
+    littleEndianToDec "$(reverseHexEndianness "$1")"
+}
+
+readNBytesAsHex() {
+    data=$(head "-c$1" <&99 | xxd -p -c0 | tr -d '\n')
+    printf "%s" "$data"
+}
+
+writeHexAsBinary() {
+    printf "%s" "$1" | xxd -r -p >&99
+}
+
+readResponseAsHex() {
+    length_hex=$(readNBytesAsHex 4)
+    length=$(bigEndianToDec "$length_hex")
+    content=$(readNBytesAsHex $length)
+    printf "%s" "$length_hex$content"
+}
+
+rpc_command() {
+    exec 99<>"$DEVICE"
+    writeHexAsBinary $1
+    answer=$(readResponseAsHex)  # ignore "async-ack" response
+    answer=$(readResponseAsHex)
+    printf "%s" "$answer"
+    exec 99>&-
+}
+
+VENDOR_ID_HASH="3df8c719"
+
+for i in {1..3}; do
+    log "Attempt #${i} to unlock WWAN modem"
+
+    log "Requesting FCC lock state from modem"
+    # --> (async) csi-fcc-lock-query-req
+    RESP=$(rpc_command "1c00000002040000001c02040000018e11000101020411000101020400000000")
+    MODE=$(littleEndianToDec "${RESP: -8}")
+    STATE=$(littleEndianToDec "${RESP: -20:8}")
+
+    log "Got response from modem: state=$STATE, mode=$MODE"
+
+    if [ "$MODE" = "0" ]; then
+        log "FCC lock is deactivated, nothing to do."
+        exit 0
+    fi
+
+    if [ "$STATE" != "0" ]; then
+        log "FCC already unlocked, nothing to do."
+        exit 0
+    fi
+
+    log "Requesting challenge from modem"
+    # --> (async) csi-fcc-lock-gen-challenge-req
+    RESP=$(rpc_command "1c00000002040000001c02040000019011000101020411000101020400000000")
+    HEX_CHALLENGE=$(printf "%s" "${RESP: -8}")
+
+    log "Got challenge from modem: $HEX_CHALLENGE"
+    REVERSE_HEX_CHALLENGE=$(reverseHexEndianness "${HEX_CHALLENGE}")
+    COMBINED_CHALLENGE="${REVERSE_HEX_CHALLENGE}${VENDOR_ID_HASH}"
+    RESPONSE_HASH=$(printf "%s" "$COMBINED_CHALLENGE" | xxd -r -p | sha256sum | cut -d ' ' -f 1)
+    REVERSED_RESPONSE=$(reverseHexEndianness "${RESPONSE_HASH:0:8}")
+
+    log "Sending hash to modem: $REVERSED_RESPONSE"
+    # --> (async) csi-fcc-lock-ver-challenge-req
+    RESP=$(rpc_command "1c00000002040000001c020400000192110001010204110001010204${REVERSED_RESPONSE}")
+    UNLOCK_RESPONSE=$(littleEndianToDec "${RESP: -8}")
+
+    if [ "$UNLOCK_RESPONSE" = "0" ]; then
+        error "Unlock failed."
+    else
+        log "FCC unlock successful (response $UNLOCK_RESPONSE)"
+        exit 0
+    fi
+
+    sleep 0.5
+done
+
+exit 2
+
