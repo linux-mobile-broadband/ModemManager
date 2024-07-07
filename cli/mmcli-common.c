@@ -1045,6 +1045,7 @@ mmcli_get_sim_sync (GDBusConnection  *connection,
     }
 
     g_list_free_full (modems, g_object_unref);
+    g_free (modem_uid);
     g_free (sim_path);
 
     if (o_manager)
