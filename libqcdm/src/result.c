@@ -73,7 +73,7 @@ val_new_string (const char *key, const char *value)
     qcdm_return_val_if_fail (key[0] != '\0', NULL);
     qcdm_return_val_if_fail (value != NULL, NULL);
 
-    v = calloc (sizeof (Val), 1);
+    v = calloc (1, sizeof (Val));
     if (v == NULL)
         return NULL;
 
@@ -91,7 +91,7 @@ val_new_u8 (const char *key, uint8_t u)
     qcdm_return_val_if_fail (key != NULL, NULL);
     qcdm_return_val_if_fail (key[0] != '\0', NULL);
 
-    v = calloc (sizeof (Val), 1);
+    v = calloc (1, sizeof (Val));
     if (v == NULL)
         return NULL;
 
@@ -111,7 +111,7 @@ val_new_u8_array (const char *key, const uint8_t *array, size_t array_len)
     qcdm_return_val_if_fail (array != NULL, NULL);
     qcdm_return_val_if_fail (array_len > 0, NULL);
 
-    v = calloc (sizeof (Val), 1);
+    v = calloc (1, sizeof (Val));
     if (v == NULL)
         return NULL;
 
@@ -136,7 +136,7 @@ val_new_u32 (const char *key, uint32_t u)
     qcdm_return_val_if_fail (key != NULL, NULL);
     qcdm_return_val_if_fail (key[0] != '\0', NULL);
 
-    v = calloc (sizeof (Val), 1);
+    v = calloc (1, sizeof (Val));
     if (v == NULL)
         return NULL;
 
@@ -157,7 +157,7 @@ val_new_u16_array (const char *key, const uint16_t *array, size_t array_len)
     qcdm_return_val_if_fail (array != NULL, NULL);
     qcdm_return_val_if_fail (array_len > 0, NULL);
 
-    v = calloc (sizeof (Val), 1);
+    v = calloc (1, sizeof (Val));
     if (v == NULL)
         return NULL;
 
@@ -187,7 +187,7 @@ qcdm_result_new (void)
 {
     QcdmResult *r;
 
-    r = calloc (sizeof (QcdmResult), 1);
+    r = calloc (1, sizeof (QcdmResult));
     if (r)
         r->refcount = 1;
     return r;
