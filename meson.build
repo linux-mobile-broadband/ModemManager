@@ -258,7 +258,7 @@ config_h.set('WITH_BUILTIN_PLUGINS', enable_builtin_plugins)
 # MBIM support (enabled by default)
 enable_mbim = get_option('mbim')
 if enable_mbim
-  mbim_glib_dep = dependency('mbim-glib', version: '>= 1.30.0')
+  mbim_glib_dep = dependency('mbim-glib', version: '>= 1.31.2')
 endif
 config_h.set('WITH_MBIM', enable_mbim)
 
