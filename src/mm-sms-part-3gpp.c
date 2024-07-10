@@ -635,6 +635,8 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint         index,
     } else
         g_assert_not_reached ();
 
+    mm_obj_dbg (log_object, "  timestamp: %s", mm_sms_part_get_timestamp (sms_part));
+
     if (tp_pid_offset > 0) {
         PDU_SIZE_CHECK (tp_pid_offset + 1, "cannot read TP-PID");
         mm_obj_dbg (log_object, "  PID: %u", (guint)pdu[tp_pid_offset]);
