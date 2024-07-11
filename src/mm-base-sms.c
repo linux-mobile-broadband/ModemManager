@@ -739,6 +739,12 @@ mm_base_sms_is_multipart (MMBaseSms *self)
 }
 
 guint
+mm_base_sms_get_max_parts (MMBaseSms *self)
+{
+    return self->priv->max_parts;
+}
+
+guint
 mm_base_sms_get_multipart_reference (MMBaseSms *self)
 {
     g_return_val_if_fail (self->priv->is_multipart, 0);
@@ -1858,6 +1864,7 @@ mm_base_sms_multipart_new (MMBaseModem *modem,
                   MM_BASE_SMS_IS_MULTIPART,        TRUE,
                   MM_BASE_SMS_MAX_PARTS,           max_parts,
                   MM_BASE_SMS_MULTIPART_REFERENCE, reference,
+                  "number",                        mm_sms_part_get_number (first_part),
                   "state",                         state,
                   "storage",                       storage,
                   "validity",                      g_variant_new ("(uv)",

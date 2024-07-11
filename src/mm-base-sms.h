@@ -121,6 +121,7 @@ gboolean     mm_base_sms_has_part_index (MMBaseSms *self,
 GList       *mm_base_sms_get_parts      (MMBaseSms *self);
 
 gboolean     mm_base_sms_is_multipart            (MMBaseSms *self);
+guint        mm_base_sms_get_max_parts           (MMBaseSms *self);
 guint        mm_base_sms_get_multipart_reference (MMBaseSms *self);
 gboolean     mm_base_sms_multipart_is_complete   (MMBaseSms *self);
 gboolean     mm_base_sms_multipart_is_assembled  (MMBaseSms *self);
