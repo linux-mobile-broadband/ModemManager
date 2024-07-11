@@ -268,6 +268,8 @@ take_singlepart (MMSmsList *self,
     if (!sms)
         return FALSE;
 
+    mm_obj_dbg (sms, "creating new singlepart SMS object");
+
     self->priv->list = g_list_prepend (self->priv->list, sms);
     g_signal_emit (self, signals[SIGNAL_ADDED], 0,
                    mm_base_sms_get_path (sms),
@@ -291,7 +293,7 @@ take_multipart (MMSmsList *self,
                             (GCompareFunc)cmp_sms_by_number_reference);
     if (l) {
         /* Try to take the part */
-        mm_obj_dbg (self, "found existing multipart SMS object with reference '%u': adding new part", concat_reference);
+        mm_obj_dbg (l->data, "found existing multipart SMS object with reference '%u': adding new part", concat_reference);
         return mm_base_sms_multipart_take_part (MM_BASE_SMS (l->data), part, error);
     }
 
@@ -306,7 +308,7 @@ take_multipart (MMSmsList *self,
     if (!sms)
         return FALSE;
 
-    mm_obj_dbg (self, "creating new multipart SMS object: need to receive %u parts with reference '%u'",
+    mm_obj_dbg (sms, "creating new multipart SMS object: need to receive %u parts with reference '%u'",
                 mm_sms_part_get_concat_max (part),
                 concat_reference);
     self->priv->list = g_list_prepend (self->priv->list, sms);
