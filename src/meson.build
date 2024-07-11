@@ -208,6 +208,7 @@ libport_dep = declare_dependency(
 # Daemon enums, required by plugins
 headers = files(
   'mm-base-bearer.h',
+  'mm-base-modem.h',
   'mm-filter.h',
   'mm-port-probe.h',
 )

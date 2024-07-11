@@ -227,14 +227,50 @@ guint mm_base_modem_get_subsystem_vendor_id (MMBaseModem *self);
 
 GCancellable *mm_base_modem_peek_cancellable (MMBaseModem *self);
 
-void     mm_base_modem_authorize        (MMBaseModem *self,
-                                         GDBusMethodInvocation *invocation,
-                                         const gchar *authorization,
-                                         GAsyncReadyCallback callback,
-                                         gpointer user_data);
-gboolean mm_base_modem_authorize_finish (MMBaseModem *self,
-                                         GAsyncResult *res,
-                                         GError **error);
+/******************************************************************************/
+/* Polkit */
+
+void     mm_base_modem_authorize        (MMBaseModem            *self,
+                                         GDBusMethodInvocation  *invocation,
+                                         const gchar            *authorization,
+                                         GAsyncReadyCallback     callback,
+                                         gpointer                user_data);
+gboolean mm_base_modem_authorize_finish (MMBaseModem            *self,
+                                         GAsyncResult           *res,
+                                         GError                **error);
+
+/******************************************************************************/
+/* Operation lock support */
+
+typedef enum {  /*< underscore_name=mm_base_modem_operation_priority >*/
+    /* Default operations are scheduled at the end of the list of pending
+     * operations */
+    MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
+} MMBaseModemOperationPriority;
+
+void   mm_base_modem_operation_lock        (MMBaseModem                  *self,
+                                            MMBaseModemOperationPriority  priority,
+                                            const gchar                  *description,
+                                            GAsyncReadyCallback           callback,
+                                            gpointer                      user_data);
+gssize mm_base_modem_operation_lock_finish (MMBaseModem                  *self,
+                                            GAsyncResult                 *res,
+                                            GError                      **error);
+void   mm_base_modem_operation_unlock      (MMBaseModem                  *self,
+                                            gssize                        operation_id);
+
+void    mm_base_modem_authorize_and_operation_lock       (MMBaseModem                  *self,
+                                                          GDBusMethodInvocation        *invocation,
+                                                          const gchar                  *authorization,
+                                                          MMBaseModemOperationPriority  operation_priority,
+                                                          const gchar                  *operation_description,
+                                                          GAsyncReadyCallback           callback,
+                                                          gpointer                      user_data);
+gssize mm_base_modem_authorize_and_operation_lock_finish (MMBaseModem                  *self,
+                                                          GAsyncResult                 *res,
+                                                          GError                      **error);
+
+/******************************************************************************/
 
 void     mm_base_modem_initialize        (MMBaseModem *self,
                                           GAsyncReadyCallback callback,
