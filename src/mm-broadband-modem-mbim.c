@@ -5571,6 +5571,7 @@ static gboolean process_pdu_messages (MMBroadbandModemMbim       *self,
                                       MbimSmsFormat               format,
                                       guint32                     messages_count,
                                       MbimSmsPduReadRecordArray  *pdu_messages,
+                                      guint                       expected_index,
                                       GError                    **error);
 
 static void
@@ -5594,6 +5595,7 @@ sms_notification_read_flash_sms (MMBroadbandModemMbim *self,
                                format,
                                messages_count,
                                pdu_messages,
+                               SMS_PART_INVALID_INDEX,
                                &error))
         mm_obj_dbg (self, "flash SMS message reading failed: %s", error->message);
 }
@@ -5635,10 +5637,22 @@ basic_connect_notification (MMBroadbandModemMbim *self,
     }
 }
 
+typedef struct {
+    MMBroadbandModemMbim *self;
+    guint                 expected_index;
+} SmsNotificationContext;
+
 static void
-alert_sms_read_query_ready (MbimDevice           *device,
-                            GAsyncResult         *res,
-                            MMBroadbandModemMbim *self) /* full ref */
+sms_notification_context_free (SmsNotificationContext *ctx)
+{
+    g_object_unref (ctx->self);
+    g_slice_free (SmsNotificationContext, ctx);
+}
+
+static void
+alert_sms_read_query_ready (MbimDevice             *device,
+                            GAsyncResult           *res,
+                            SmsNotificationContext *ctx)
 {
     g_autoptr(MbimMessage)               response = NULL;
     g_autoptr(GError)                    error = NULL;
@@ -5656,14 +5670,15 @@ alert_sms_read_query_ready (MbimDevice           *device,
             &pdu_messages,
             NULL, /* cdma_messages */
             &error) ||
-        !process_pdu_messages (self,
+        !process_pdu_messages (ctx->self,
                                format,
                                messages_count,
                                pdu_messages,
+                               ctx->expected_index,
                                &error))
-        mm_obj_dbg (self, "SMS message reading failed: %s", error->message);
+        mm_obj_dbg (ctx->self, "SMS message reading failed: %s", error->message);
 
-    g_object_unref (self);
+    sms_notification_context_free (ctx);
 }
 
 static void
@@ -5673,6 +5688,7 @@ sms_notification_read_stored_sms (MMBroadbandModemMbim *self,
     g_autoptr(MbimMessage)  message = NULL;
     MMPortMbim             *port;
     MbimDevice             *device;
+    SmsNotificationContext *ctx;
 
     port = mm_broadband_modem_mbim_peek_port_mbim (self);
     if (!port)
@@ -5686,12 +5702,15 @@ sms_notification_read_stored_sms (MMBroadbandModemMbim *self,
                                                MBIM_SMS_FLAG_INDEX,
                                                index,
                                                NULL);
+    ctx = g_slice_new0 (SmsNotificationContext);
+    ctx->self = g_object_ref (self);
+    ctx->expected_index = index;
     mbim_device_command (device,
                          message,
                          10,
                          NULL,
                          (GAsyncReadyCallback)alert_sms_read_query_ready,
-                         g_object_ref (self));
+                         ctx);
 }
 
 static void
@@ -8739,7 +8758,8 @@ load_initial_sms_parts_finish (MMIfaceModemMessaging  *self,
 
 static void
 add_sms_part (MMBroadbandModemMbim       *self,
-              const MbimSmsPduReadRecord *pdu)
+              const MbimSmsPduReadRecord *pdu,
+              guint                       expected_index)
 {
     MMSmsPart         *part;
     g_autoptr(GError)  error = NULL;
@@ -8752,6 +8772,14 @@ add_sms_part (MMBroadbandModemMbim       *self,
                                                  &error);
     if (part) {
         mm_obj_dbg (self, "correctly parsed PDU (%d)", pdu->message_index);
+        if (expected_index != SMS_PART_INVALID_INDEX && (expected_index != mm_sms_part_get_index (part))) {
+            /* Some Fibocom L850 modems report an invalid part index (always 1) in the response
+             * message. Because we know which message part was requested, we can use that value
+             * instead to workaround this bug. */
+            mm_obj_dbg (self, "Expected SMS part index '%u' but device reports index '%u': using the expected one",
+                        expected_index, mm_sms_part_get_index (part));
+            mm_sms_part_set_index (part, expected_index);
+        }
         mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
                                             part,
                                             mm_sms_state_from_mbim_message_status (pdu->message_status),
@@ -8768,6 +8796,7 @@ process_pdu_messages (MMBroadbandModemMbim       *self,
                       MbimSmsFormat               format,
                       guint32                     messages_count,
                       MbimSmsPduReadRecordArray  *pdu_messages,
+                      guint                       expected_index,
                       GError                    **error)
 {
     guint i;
@@ -8785,11 +8814,17 @@ process_pdu_messages (MMBroadbandModemMbim       *self,
         return FALSE;
     }
 
+    if (messages_count > 1 && expected_index != SMS_PART_INVALID_INDEX) {
+        mm_obj_warn (self, "can read only single message when expected index is set ('%u')",
+                     expected_index);
+        messages_count = 1;
+    }
+
     mm_obj_dbg (self, "%u SMS PDUs reported", messages_count);
     for (i = 0; i < messages_count; i++) {
         if (pdu_messages[i]) {
             mm_obj_dbg (self, "processing SMS PDU %u/%u...", i+1, messages_count);
-            add_sms_part (self, pdu_messages[i]);
+            add_sms_part (self, pdu_messages[i], expected_index);
         } else
             mm_obj_dbg (self, "ignoring invalid SMS PDU %u/%u...", i+1, messages_count);
     }
@@ -8825,6 +8860,7 @@ sms_read_query_ready (MbimDevice   *device,
                                format,
                                messages_count,
                                pdu_messages,
+                               SMS_PART_INVALID_INDEX,
                                &error))
         g_task_return_error (task, error);
     else
