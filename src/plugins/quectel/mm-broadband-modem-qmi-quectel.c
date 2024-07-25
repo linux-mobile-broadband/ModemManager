@@ -189,10 +189,10 @@ iface_modem_time_init (MMIfaceModemTimeInterface *iface)
     iface->check_support_finish = mm_shared_quectel_time_check_support_finish;
 }
 
-static MMBroadbandModemClass *
-peek_parent_broadband_modem_class (MMSharedQuectel *self)
+static MMBaseModemClass *
+peek_parent_class (MMSharedQuectel *self)
 {
-    return MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_qmi_quectel_parent_class);
+    return MM_BASE_MODEM_CLASS (mm_broadband_modem_qmi_quectel_parent_class);
 }
 
 static MMIfaceModemInterface *
@@ -221,7 +221,7 @@ shared_quectel_init (MMSharedQuectelInterface *iface)
 {
     iface->peek_parent_modem_interface          = peek_parent_modem_interface;
     iface->peek_parent_modem_location_interface = peek_parent_modem_location_interface;
-    iface->peek_parent_broadband_modem_class    = peek_parent_broadband_modem_class;
+    iface->peek_parent_class                    = peek_parent_class;
 }
 
 static void

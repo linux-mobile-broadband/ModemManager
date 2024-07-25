@@ -32,7 +32,7 @@
 #include "mm-modem-helpers-quectel.h"
 
 #if defined WITH_MBIM
-#include "mm-broadband-modem-mbim.h"
+#include "mm-port-mbim-quectel.h"
 #endif
 
 G_DEFINE_INTERFACE (MMSharedQuectel, mm_shared_quectel, MM_TYPE_IFACE_MODEM)
@@ -50,7 +50,7 @@ typedef enum {
 } FeatureSupport;
 
 typedef struct {
-    MMBroadbandModemClass         *broadband_modem_class_parent;
+    MMBaseModemClass              *class_parent;
     MMIfaceModemInterface         *iface_modem_parent;
     MMIfaceModemLocationInterface *iface_modem_location_parent;
     MMModemLocationSource          provided_sources;
@@ -93,8 +93,8 @@ get_private (MMSharedQuectel *self)
         g_assert (priv->qlwurc_regex);
         g_assert (priv->rdy_regex);
 
-        g_assert (MM_SHARED_QUECTEL_GET_IFACE (self)->peek_parent_broadband_modem_class);
-        priv->broadband_modem_class_parent = MM_SHARED_QUECTEL_GET_IFACE (self)->peek_parent_broadband_modem_class (self);
+        g_assert (MM_SHARED_QUECTEL_GET_IFACE (self)->peek_parent_class);
+        priv->class_parent = MM_SHARED_QUECTEL_GET_IFACE (self)->peek_parent_class (self);
 
         g_assert (MM_SHARED_QUECTEL_GET_IFACE (self)->peek_parent_modem_location_interface);
         priv->iface_modem_location_parent = MM_SHARED_QUECTEL_GET_IFACE (self)->peek_parent_modem_location_interface (self);
@@ -107,6 +107,39 @@ get_private (MMSharedQuectel *self)
     return priv;
 }
 
+#if defined WITH_MBIM
+MMPort *
+mm_shared_quectel_create_usbmisc_port (MMBaseModem *self,
+                                       const gchar *name,
+                                       MMPortType   ptype)
+{
+    Private *priv;
+
+    priv = get_private (MM_SHARED_QUECTEL (self));
+    if (ptype == MM_PORT_TYPE_MBIM) {
+        mm_obj_dbg (self, "creating quectel-specific MBIM port");
+        return MM_PORT (mm_port_mbim_quectel_new (name, MM_PORT_SUBSYS_USBMISC));
+    }
+
+    return priv->class_parent->create_usbmisc_port (self, name, ptype);
+}
+
+MMPort *
+mm_shared_quectel_create_wwan_port (MMBaseModem *self,
+                                    const gchar *name,
+                                    MMPortType   ptype)
+{
+    Private *priv;
+
+    priv = get_private (MM_SHARED_QUECTEL (self));
+    if (ptype == MM_PORT_TYPE_MBIM) {
+        mm_obj_dbg (self, "creating quectel-specific MBIM port");
+        return MM_PORT (mm_port_mbim_quectel_new (name, MM_PORT_SUBSYS_WWAN));
+    }
+
+    return priv->class_parent->create_wwan_port (self, name, ptype);
+}
+#endif
 /*****************************************************************************/
 /* RDY unsolicited event handler */
 
@@ -137,11 +170,11 @@ mm_shared_quectel_setup_ports (MMBroadbandModem *self)
     mm_obj_dbg (self, "setting up ports in quectel modem...");
 
     priv = get_private (MM_SHARED_QUECTEL (self));
-    g_assert (priv->broadband_modem_class_parent);
-    g_assert (priv->broadband_modem_class_parent->setup_ports);
+    g_assert (priv->class_parent);
+    g_assert (MM_BROADBAND_MODEM_CLASS (priv->class_parent)->setup_ports);
 
     /* Parent setup always first */
-    priv->broadband_modem_class_parent->setup_ports (self);
+    MM_BROADBAND_MODEM_CLASS (priv->class_parent)->setup_ports (self);
 
     ports[0] = mm_base_modem_peek_port_primary   (MM_BASE_MODEM (self));
     ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
@@ -315,30 +348,6 @@ quectel_at_port_get_firmware_version_ready (MMBaseModem  *modem,
     g_timeout_add_seconds (1, (GSourceFunc) quectel_at_port_get_firmware_version_retry, task);
 }
 
-#if defined WITH_MBIM
-static void
-quectel_mbim_port_get_firmware_version_ready (MbimDevice   *device,
-                                              GAsyncResult *res,
-                                              GTask        *task)
-{
-    g_autoptr(MbimMessage)    response = NULL;
-    guint32                   version_id;
-    g_autofree gchar         *version_str = NULL;
-    LoadUpdateSettingsContext  *ctx;
-
-    ctx = g_task_get_task_data (task);
-
-    response = mbim_device_command_finish (device, res, NULL);
-    if (response && mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, NULL) &&
-        mbim_message_qdu_quectel_read_version_response_parse (response, &version_id, &version_str, NULL)) {
-        mm_firmware_update_settings_set_version (ctx->update_settings, version_str);
-    }
-
-    g_task_return_pointer (task, g_object_ref (ctx->update_settings), g_object_unref);
-    g_object_unref (task);
-}
-#endif
-
 static void
 qfastboot_test_ready (MMBaseModem  *self,
                       GAsyncResult *res,
@@ -426,8 +435,8 @@ mm_shared_quectel_firmware_load_update_settings (MMIfaceModemFirmware *self,
                                                  GAsyncReadyCallback   callback,
                                                  gpointer              user_data)
 {
-    GTask *task;
-    MMPortSerialAt *at_port;
+    GTask                      *task;
+    MMIfacePortAt              *at_port;
     MMModemFirmwareUpdateMethod update_methods;
     LoadUpdateSettingsContext *ctx;
 
@@ -435,8 +444,8 @@ mm_shared_quectel_firmware_load_update_settings (MMIfaceModemFirmware *self,
     ctx = g_new0 (LoadUpdateSettingsContext, 1);
     g_task_set_task_data (task, ctx, (GDestroyNotify)load_update_settings_context_free);
 
-    /* We always report the primary port as the one to be used for FW upgrade */
-    at_port = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    /* Get the best at port to be used for FW vision update */
+    at_port = mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL);
     if (at_port) {
     	update_methods = quectel_get_firmware_update_methods (MM_BASE_MODEM (self), MM_PORT (at_port));
         ctx->update_settings = mm_firmware_update_settings_new (update_methods);
@@ -452,33 +461,6 @@ mm_shared_quectel_firmware_load_update_settings (MMIfaceModemFirmware *self,
 
         return;
     }
-
-#if defined WITH_MBIM
-    {
-        MMPortMbim *mbim = NULL;
-
-        if (MM_IS_BROADBAND_MODEM_MBIM (self))
-            mbim = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self));
-
-        if (mbim) {
-            g_autoptr(MbimMessage) message = NULL;
-
-            update_methods = quectel_get_firmware_update_methods (MM_BASE_MODEM (self), MM_PORT (mbim));
-            ctx->update_settings = mm_firmware_update_settings_new (update_methods);
-            ctx->get_firmware_maximum_retry_int = QUECTEL_STD_AP_FIRMWARE_INVALID_MAXIMUM_RETRY;
-
-            /* Fetch firmware info */
-            message = mbim_message_qdu_quectel_read_version_set_new (MBIM_QDU_QUECTEL_VERSION_TYPE_FW_BUILD_ID, NULL);
-            mbim_device_command (mm_port_mbim_peek_device (mbim),
-                                 message,
-                                 5,
-                                 NULL,
-                                 (GAsyncReadyCallback) quectel_mbim_port_get_firmware_version_ready,
-                                 task);
-            return;
-        }
-    }
-#endif
 
     g_task_return_new_error (task,
                              MM_CORE_ERROR,

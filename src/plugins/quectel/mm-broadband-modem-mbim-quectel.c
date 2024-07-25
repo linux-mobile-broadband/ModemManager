@@ -119,10 +119,10 @@ peek_parent_modem_location_interface (MMSharedQuectel *self)
     return iface_modem_location_parent;
 }
 
-static MMBroadbandModemClass *
-peek_parent_broadband_modem_class (MMSharedQuectel *self)
+static MMBaseModemClass *
+peek_parent_class (MMSharedQuectel *self)
 {
-    return MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_mbim_quectel_parent_class);
+    return MM_BASE_MODEM_CLASS (mm_broadband_modem_mbim_quectel_parent_class);
 }
 
 static void
@@ -130,13 +130,16 @@ shared_quectel_init (MMSharedQuectelInterface *iface)
 {
     iface->peek_parent_modem_interface          = peek_parent_modem_interface;
     iface->peek_parent_modem_location_interface = peek_parent_modem_location_interface;
-    iface->peek_parent_broadband_modem_class    = peek_parent_broadband_modem_class;
+    iface->peek_parent_class                    = peek_parent_class;
 }
 
 static void
 mm_broadband_modem_mbim_quectel_class_init (MMBroadbandModemMbimQuectelClass *klass)
 {
+    MMBaseModemClass      *base_modem_class = MM_BASE_MODEM_CLASS (klass);
     MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
 
+    base_modem_class->create_usbmisc_port = mm_shared_quectel_create_usbmisc_port;
+    base_modem_class->create_wwan_port = mm_shared_quectel_create_wwan_port;
     broadband_modem_class->setup_ports = mm_shared_quectel_setup_ports;
 }

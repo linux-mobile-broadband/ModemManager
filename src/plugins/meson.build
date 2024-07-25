@@ -790,7 +790,10 @@ if plugins_options['quectel']
   endif
 
   if enable_mbim
-    sources += files('quectel/mm-broadband-modem-mbim-quectel.c')
+    sources += files(
+      'quectel/mm-broadband-modem-mbim-quectel.c',
+      'quectel/mm-port-mbim-quectel.c'
+    )
   endif
 
   plugins += {'plugin-quectel': {

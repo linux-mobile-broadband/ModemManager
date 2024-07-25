@@ -33,7 +33,7 @@ G_DECLARE_INTERFACE (MMSharedQuectel, mm_shared_quectel, MM, SHARED_QUECTEL, MMI
 
 struct _MMSharedQuectelInterface {
     GTypeInterface g_iface;
-    MMBroadbandModemClass         * (* peek_parent_broadband_modem_class)    (MMSharedQuectel *self);
+    MMBaseModemClass              * (* peek_parent_class)                    (MMSharedQuectel *self);
     MMIfaceModemInterface         * (* peek_parent_modem_interface)          (MMSharedQuectel *self);
     MMIfaceModemLocationInterface * (* peek_parent_modem_location_interface) (MMSharedQuectel *self);
 };
@@ -83,5 +83,13 @@ void                  mm_shared_quectel_time_check_support                (MMIfa
 gboolean              mm_shared_quectel_time_check_support_finish         (MMIfaceModemTime     *self,
                                                                            GAsyncResult         *res,
                                                                            GError              **error);
+#if defined WITH_MBIM
+MMPort               *mm_shared_quectel_create_usbmisc_port               (MMBaseModem *self,
+                                                                           const gchar *name,
+                                                                           MMPortType   ptype);
+MMPort               *mm_shared_quectel_create_wwan_port                  (MMBaseModem *self,
+                                                                           const gchar *name,
+                                                                           MMPortType   ptype);
+#endif
 
 #endif  /* MM_SHARED_QUECTEL_H */
