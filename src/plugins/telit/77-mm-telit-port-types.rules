@@ -127,6 +127,15 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="110a", ENV{.MM_USBIFNUM}=="00", ENV{
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="110a", ENV{.MM_USBIFNUM}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="110a", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 
+# FN912C04 (NMEA)
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="3000", ENV{.MM_USBIFNUM}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="3000", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="3000", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_TYPE_QCDM}="1"
+
+# FN912C04
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="3001", ENV{.MM_USBIFNUM}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="3001", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_TYPE_QCDM}="1"
+
 # LE910S1 (RNDIS)
 # The following port is ignored since it's a diagnostic port for collecting proprietary modem traces (not QCDM)
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="7010", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_IGNORE}="1"
@@ -156,6 +165,10 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1061", ENV{ID_MM_TELIT_PORT_DELAY}="
 # FN990 initial port delay
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1070", ENV{ID_MM_TELIT_PORT_DELAY}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1071", ENV{ID_MM_TELIT_PORT_DELAY}="1"
+
+# FN912C04 initial port delay
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="3000", ENV{ID_MM_TELIT_PORT_DELAY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="3001", ENV{ID_MM_TELIT_PORT_DELAY}="1"
 
 GOTO="mm_telit_end"
 
