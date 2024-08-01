@@ -260,7 +260,7 @@ quectel_get_firmware_update_methods (MMBaseModem *modem,
     return update_methods;
 }
 
-static gboolean quectel_at_port_get_firmware_version_retry (GTask *task);
+static gboolean quectel_get_firmware_version_retry (GTask *task);
 
 /* Eg. Sometimes when the module is booted up and sends the command to acquire the version to the modem,
  * the modem may not be ready. The standard app version number of the response was not obtained;
@@ -294,7 +294,7 @@ quectel_at_port_get_firmware_version_retry_ready (MMBaseModem  *modem,
     /* When the maximum repeat fetch count is greater than or equal to 0,
      * attempt to retrieve version information again. */
     if (ctx->get_firmware_maximum_retry_int >= 0) {
-        g_timeout_add_seconds (1, (GSourceFunc) quectel_at_port_get_firmware_version_retry, task);
+        g_timeout_add_seconds (1, (GSourceFunc) quectel_get_firmware_version_retry, task);
         return;
     }
 
@@ -304,7 +304,7 @@ quectel_at_port_get_firmware_version_retry_ready (MMBaseModem  *modem,
 }
 
 static gboolean
-quectel_at_port_get_firmware_version_retry (GTask *task)
+quectel_get_firmware_version_retry (GTask *task)
 {
     MMBaseModem *self;
 
@@ -345,7 +345,7 @@ quectel_at_port_get_firmware_version_ready (MMBaseModem  *modem,
 
     if (version)
         mm_obj_dbg (modem, "Invalid firmware version %s return, retrying", version);
-    g_timeout_add_seconds (1, (GSourceFunc) quectel_at_port_get_firmware_version_retry, task);
+    g_timeout_add_seconds (1, (GSourceFunc) quectel_get_firmware_version_retry, task);
 }
 
 static void
@@ -379,12 +379,13 @@ quectel_at_port_get_firmware_revision_ready (MMBaseModem  *self,
                                              GTask        *task)
 {
     LoadUpdateSettingsContext   *ctx;
+    const gchar                 *at_response = NULL;
+    const gchar                 *id          = NULL;
+    g_autofree gchar            *name        = NULL;
+    g_autoptr(GPtrArray)         ids         = NULL;
+    GError                      *error       = NULL;
+    g_auto(GStrv)                ati_infos   = NULL;
     MMModemFirmwareUpdateMethod  update_methods;
-    const gchar                 *revision;
-    const gchar                 *id;
-    gchar                       *name;
-    g_autoptr(GPtrArray)         ids = NULL;
-    GError                      *error = NULL;
 
     ctx = g_task_get_task_data (task);
     update_methods = mm_firmware_update_settings_get_method (ctx->update_settings);
@@ -399,13 +400,18 @@ quectel_at_port_get_firmware_revision_ready (MMBaseModem  *self,
     }
 
     /* Add device id based on modem name */
-    revision = mm_base_modem_at_command_finish (self, res, NULL);
-    if (revision && g_utf8_validate (revision, -1, NULL)) {
-        name = g_strndup (revision, 7);
-        mm_obj_dbg (self, "revision %s converted to modem name %s", revision, name);
-        id = (const gchar *) g_ptr_array_index (ids, 0);
-        g_ptr_array_insert (ids, 0, g_strdup_printf ("%s&NAME_%s", id, name));
-        g_free (name);
+    at_response = mm_base_modem_at_command_finish (self, res, NULL);
+    if (at_response && g_utf8_validate (at_response, -1, NULL)) {
+        mm_obj_dbg (self, "revision reported by device: %s", at_response);
+        /* at_response: vendor\nmodem_name\nrevision, split it by '\n' and use the second part
+         * to set modem name */
+        ati_infos = g_strsplit (at_response, "\n", -1);
+        if (ati_infos && (g_strv_length (ati_infos) > 1) && ati_infos[1]) {
+            name = g_strdup (ati_infos[1]);
+            mm_obj_dbg (self, "device name reported by device: %s", name);
+            id = (const gchar *) g_ptr_array_index (ids, 0);
+            g_ptr_array_insert (ids, 0, g_strdup_printf ("%s&NAME_%s", id, name));
+        }
     }
 
     mm_firmware_update_settings_set_device_ids (ctx->update_settings, (const gchar **)ids->pdata);
@@ -438,22 +444,22 @@ mm_shared_quectel_firmware_load_update_settings (MMIfaceModemFirmware *self,
     GTask                      *task;
     MMIfacePortAt              *at_port;
     MMModemFirmwareUpdateMethod update_methods;
-    LoadUpdateSettingsContext *ctx;
+    LoadUpdateSettingsContext  *ctx;
 
     task = g_task_new (self, NULL, callback, user_data);
     ctx = g_new0 (LoadUpdateSettingsContext, 1);
     g_task_set_task_data (task, ctx, (GDestroyNotify)load_update_settings_context_free);
 
-    /* Get the best at port to be used for FW vision update */
+    /* Get the best at port to get firmware revision */
     at_port = mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL);
     if (at_port) {
-    	update_methods = quectel_get_firmware_update_methods (MM_BASE_MODEM (self), MM_PORT (at_port));
+        update_methods = quectel_get_firmware_update_methods (MM_BASE_MODEM (self), MM_PORT (at_port));
         ctx->update_settings = mm_firmware_update_settings_new (update_methods);
         ctx->get_firmware_maximum_retry_int = QUECTEL_STD_AP_FIRMWARE_INVALID_MAXIMUM_RETRY;
 
-        /* Fetch modem name */
+        /* Fetch modem name by "ATI" command */
         mm_base_modem_at_command (MM_BASE_MODEM (self),
-                                  "+CGMR",
+                                  "I",
                                   3,
                                   TRUE,
                                   (GAsyncReadyCallback) quectel_at_port_get_firmware_revision_ready,
