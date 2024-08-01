@@ -73,9 +73,7 @@ typedef struct {
     /* If both signal and access tech polling are either unsupported
      * or disabled, we'll automatically stop polling */
     gboolean signal_quality_polling_supported;
-    gboolean signal_quality_polling_disabled;
     gboolean access_technology_polling_supported;
-    gboolean access_technology_polling_disabled;
 
     /* Signal quality and access tech polling support */
     gboolean signal_check_enabled;
@@ -133,12 +131,6 @@ get_private (MMIfaceModem *self)
          * this flag and no longer poll. */
         priv->signal_quality_polling_supported = (MM_IFACE_MODEM_GET_IFACE (self)->load_signal_quality &&
                                                   MM_IFACE_MODEM_GET_IFACE (self)->load_signal_quality_finish);
-
-        /* Get plugin-specific setup for the polling logic */
-        g_object_get (self,
-                      MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,      &priv->signal_quality_polling_disabled,
-                      MM_IFACE_MODEM_PERIODIC_ACCESS_TECH_CHECK_DISABLED, &priv->access_technology_polling_disabled,
-                      NULL);
 
         g_object_set_qdata_full (G_OBJECT (self), private_quark, priv, (GDestroyNotify)private_free);
     }
@@ -1835,10 +1827,17 @@ periodic_signal_check_step (GTask *task)
     MMIfaceModem       *self;
     Private            *priv;
     SignalCheckContext *ctx;
+    gboolean            signal_quality_polling_disabled;
+    gboolean            access_technology_polling_disabled;
 
     self = g_task_get_source_object (task);
     priv = get_private (self);
     ctx  = g_task_get_task_data (task);
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,      &signal_quality_polling_disabled,
+                  MM_IFACE_MODEM_PERIODIC_ACCESS_TECH_CHECK_DISABLED, &access_technology_polling_disabled,
+                  NULL);
 
     switch (ctx->running_step) {
     case SIGNAL_CHECK_STEP_FIRST:
@@ -1847,7 +1846,7 @@ periodic_signal_check_step (GTask *task)
 
     case SIGNAL_CHECK_STEP_SIGNAL_QUALITY:
         if (priv->signal_check_enabled && priv->signal_quality_polling_supported &&
-            (!priv->signal_check_initial_done || !priv->signal_quality_polling_disabled)) {
+            (!priv->signal_check_initial_done || !signal_quality_polling_disabled)) {
             MM_IFACE_MODEM_GET_IFACE (self)->load_signal_quality (
                 self, (GAsyncReadyCallback)load_signal_quality_ready, task);
             return;
@@ -1857,7 +1856,7 @@ periodic_signal_check_step (GTask *task)
 
     case SIGNAL_CHECK_STEP_ACCESS_TECHNOLOGIES:
         if (priv->signal_check_enabled && priv->access_technology_polling_supported &&
-            (!priv->signal_check_initial_done || !priv->access_technology_polling_disabled)) {
+            (!priv->signal_check_initial_done || !access_technology_polling_disabled)) {
             MM_IFACE_MODEM_GET_IFACE (self)->load_access_technologies (
                 self, (GAsyncReadyCallback)load_access_technologies_ready, task);
             return;
@@ -1899,8 +1898,8 @@ periodic_signal_check_step (GTask *task)
          * loading are either disabled or unsupported, we'll stop polling completely,
          * because they may be loaded asynchronously by unsolicited messages */
         if (priv->signal_check_initial_done &&
-            (!priv->signal_quality_polling_supported    || priv->signal_quality_polling_disabled) &&
-            (!priv->access_technology_polling_supported || priv->access_technology_polling_disabled)) {
+            (!priv->signal_quality_polling_supported    || signal_quality_polling_disabled) &&
+            (!priv->access_technology_polling_supported || access_technology_polling_disabled)) {
             mm_obj_dbg (self, "periodic signal quality and access technology checks not rescheduled: unneeded or unsupported");
             periodic_signal_check_disable (self, FALSE);
         } else {
