@@ -312,6 +312,7 @@ plugins_shared_reqs = {
   'sierra': true,
   'telit': true,
   'xmm': true,
+  'quectel': true,
 }
 
 dell_shared_reqs = ['novatel', 'sierra', 'telit', 'xmm']
@@ -351,7 +352,7 @@ plugins_options_reqs = {
   'option-hso': {'available': true, 'shared': ['option']},
   'pantech': {'available': true, 'shared': []},
   'qcom-soc': {'available': enable_qmi, 'shared': []},
-  'quectel': {'available': true, 'shared': []},
+  'quectel': {'available': true, 'shared': ['quectel']},
   'rolling': {'available': true, 'shared': ['fibocom']},
   'samsung': {'available': true, 'shared': ['icera']},
   'sierra-legacy': {'available': true, 'shared': ['icera', 'sierra']},
@@ -365,6 +366,7 @@ plugins_options_reqs = {
   'wavecom': {'available': true, 'shared': []},
   'x22x': {'available': true, 'shared': []},
   'zte': {'available': true, 'shared': ['icera']},
+  'netprisma': {'available': true, 'shared': ['quectel']},
 }
 
 plugins_shared = {}

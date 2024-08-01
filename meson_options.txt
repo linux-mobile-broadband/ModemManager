@@ -68,6 +68,7 @@ option('plugin_via', type: 'feature', value: 'auto', description: 'enable via pl
 option('plugin_wavecom', type: 'feature', value: 'auto', description: 'enable wavecom plugin support')
 option('plugin_x22x', type: 'feature', value: 'auto', description: 'enable x22x plugin support')
 option('plugin_zte', type: 'feature', value: 'auto', description: 'enable zte plugin support')
+option('plugin_netprisma', type: 'feature', value: 'auto', description: 'enable netprisma plugin support')
 
 option('introspection', type: 'boolean', value: true, description: 'build introspection support')
 option('vapi', type: 'boolean', value: false, description: 'build vala bindings')

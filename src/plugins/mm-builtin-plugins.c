@@ -142,6 +142,9 @@ MMPlugin *mm_plugin_create_x22x (void);
 #if defined ENABLE_PLUGIN_ZTE
 MMPlugin *mm_plugin_create_zte (void);
 #endif
+#if defined ENABLE_PLUGIN_NETPRISMA
+MMPlugin *mm_plugin_create_netprisma (void);
+#endif
 
 GList *
 mm_builtin_plugins_load (void)
@@ -273,6 +276,9 @@ mm_builtin_plugins_load (void)
 #endif
 #if defined ENABLE_PLUGIN_ZTE
     PREPEND_PLUGIN (zte);
+#endif
+#if defined ENABLE_PLUGIN_NETPRISMA
+    PREPEND_PLUGIN (netprisma);
 #endif
 #undef PREPEND_PLUGIN
     return builtin_plugins;

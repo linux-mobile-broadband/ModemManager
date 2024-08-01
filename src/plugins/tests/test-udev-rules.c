@@ -200,6 +200,14 @@ test_rolling (void)
 }
 #endif
 
+#if defined ENABLE_PLUGIN_NETPRISMA
+static void
+test_netprisma (void)
+{
+    common_test (TESTUDEVRULESDIR_NETPRISMA);
+}
+#endif
+
 /************************************************************/
 
 int main (int argc, char **argv)
@@ -263,6 +271,9 @@ int main (int argc, char **argv)
 #endif
 #if defined ENABLE_PLUGIN_ROLLING
     g_test_add_func ("/MM/test-udev-rules/rolling", test_rolling);
+#endif
+#if defined ENABLE_PLUGIN_NETPRISMA
+    g_test_add_func ("/MM/test-udev-rules/netprisma", test_netprisma);
 #endif
 
     return g_test_run ();
