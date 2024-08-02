@@ -87,7 +87,6 @@ MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
 mm_plugin_create_netprisma (void)
 {
     static const gchar *subsystems[] = { "tty", "net", "usbmisc", "wwan", NULL };
-    static const gchar *vendor_strings[] = { "netprisma", NULL };
     static const guint16 vendor_ids[] = {
         0x3731, /* usb vid */
         0x203e, /* pci vid */
@@ -95,14 +94,13 @@ mm_plugin_create_netprisma (void)
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_NETPRISMA,
-                      MM_PLUGIN_NAME,                   MM_MODULE_NAME,
-                      MM_PLUGIN_ALLOWED_SUBSYSTEMS,     subsystems,
-                      MM_PLUGIN_ALLOWED_VENDOR_IDS,     vendor_ids,
-                      MM_PLUGIN_ALLOWED_VENDOR_STRINGS, vendor_strings,
-                      MM_PLUGIN_ALLOWED_AT,             TRUE,
-                      MM_PLUGIN_ALLOWED_QCDM,           TRUE,
-                      MM_PLUGIN_ALLOWED_QMI,            TRUE,
-                      MM_PLUGIN_ALLOWED_MBIM,           TRUE,
+                      MM_PLUGIN_NAME,               MM_MODULE_NAME,
+                      MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
+                      MM_PLUGIN_ALLOWED_VENDOR_IDS, vendor_ids,
+                      MM_PLUGIN_ALLOWED_AT,         TRUE,
+                      MM_PLUGIN_ALLOWED_QCDM,       TRUE,
+                      MM_PLUGIN_ALLOWED_QMI,        TRUE,
+                      MM_PLUGIN_ALLOWED_MBIM,       TRUE,
                       NULL));
 }
 
