@@ -46,6 +46,7 @@ option('plugin_mbm', type: 'feature', value: 'auto', description: 'enable mbm pl
 option('plugin_motorola', type: 'feature', value: 'auto', description: 'enable motorola plugin support')
 option('plugin_mtk_legacy', type: 'feature', value: 'auto', description: 'enable mtk legacy plugin support')
 option('plugin_mtk', type: 'feature', value: 'auto', description: 'enable mtk plugin support')
+option('plugin_netprisma', type: 'feature', value: 'auto', description: 'enable netprisma plugin support')
 option('plugin_nokia', type: 'feature', value: 'auto', description: 'enable nokia plugin support')
 option('plugin_nokia_icera', type: 'feature', value: 'auto', description: 'enable nokia icera plugin support')
 option('plugin_novatel', type: 'feature', value: 'auto', description: 'enable novatel plugin support')
@@ -68,7 +69,6 @@ option('plugin_via', type: 'feature', value: 'auto', description: 'enable via pl
 option('plugin_wavecom', type: 'feature', value: 'auto', description: 'enable wavecom plugin support')
 option('plugin_x22x', type: 'feature', value: 'auto', description: 'enable x22x plugin support')
 option('plugin_zte', type: 'feature', value: 'auto', description: 'enable zte plugin support')
-option('plugin_netprisma', type: 'feature', value: 'auto', description: 'enable netprisma plugin support')
 
 option('introspection', type: 'boolean', value: true, description: 'build introspection support')
 option('vapi', type: 'boolean', value: false, description: 'build vala bindings')

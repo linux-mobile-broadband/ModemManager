@@ -344,6 +344,7 @@ plugins_options_reqs = {
   'motorola': {'available': true, 'shared': []},
   'mtk-legacy': {'available': true, 'shared': mtk_shared_reqs},
   'mtk': {'available': true, 'shared': mtk_shared_reqs},
+  'netprisma': {'available': true, 'shared': ['quectel']},
   'nokia': {'available': true, 'shared': []},
   'nokia-icera': {'available': true, 'shared': ['icera']},
   'novatel': {'available': true, 'shared': ['novatel']},
@@ -366,7 +367,6 @@ plugins_options_reqs = {
   'wavecom': {'available': true, 'shared': []},
   'x22x': {'available': true, 'shared': []},
   'zte': {'available': true, 'shared': ['icera']},
-  'netprisma': {'available': true, 'shared': ['quectel']},
 }
 
 plugins_shared = {}
