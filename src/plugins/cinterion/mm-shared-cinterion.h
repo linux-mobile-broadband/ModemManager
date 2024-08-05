@@ -26,6 +26,7 @@
 
 #include "mm-broadband-modem.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-firmware.h"
 #include "mm-iface-modem-location.h"
 #include "mm-iface-modem-voice.h"
 #include "mm-iface-modem-time.h"
@@ -58,6 +59,17 @@ void     mm_shared_cinterion_modem_reset        (MMIfaceModem        *self,
 gboolean mm_shared_cinterion_modem_reset_finish (MMIfaceModem        *self,
                                                  GAsyncResult        *res,
                                                  GError             **error);
+
+/*****************************************************************************/
+/* Firmware interface */
+
+void mm_shared_cinterion_firmware_load_update_settings (MMIfaceModemFirmware *self,
+                                                        GAsyncReadyCallback   callback,
+                                                        gpointer              user_data);
+
+MMFirmwareUpdateSettings *mm_shared_cinterion_firmware_load_update_settings_finish (MMIfaceModemFirmware  *self,
+                                                                                    GAsyncResult          *res,
+                                                                                    GError               **error);
 
 /*****************************************************************************/
 /* Location interface */

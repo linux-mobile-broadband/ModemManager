@@ -1670,19 +1670,21 @@ typedef enum { /*< underscore_name=mm_call_direction >*/
  * @MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE: Device supports Firehose based update. Since 1.18.
  * @MM_MODEM_FIRMWARE_UPDATE_METHOD_SAHARA: Device supports Sahara protocol. Usually used in combination with Firehose. Since 1.20.
  * @MM_MODEM_FIRMWARE_UPDATE_METHOD_DFOTA: Device supports Quectel DFOTA based update. Since 1.24.
+ * @MM_MODEM_FIRMWARE_UPDATE_METHOD_CINTERION_FDL: Device supports AT^SFDL based update. Since 1.24.
  *
  * Type of firmware update method supported by the module.
  *
  * Since: 1.10
  */
 typedef enum { /*< underscore_name=mm_modem_firmware_update_method >*/
-    MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE     = 0,
-    MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT = 1 << 0,
-    MM_MODEM_FIRMWARE_UPDATE_METHOD_QMI_PDC  = 1 << 1,
-    MM_MODEM_FIRMWARE_UPDATE_METHOD_MBIM_QDU = 1 << 2,
-    MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE = 1 << 3,
-    MM_MODEM_FIRMWARE_UPDATE_METHOD_SAHARA   = 1 << 4,
-    MM_MODEM_FIRMWARE_UPDATE_METHOD_DFOTA    = 1 << 5,
+    MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE          = 0,
+    MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT      = 1 << 0,
+    MM_MODEM_FIRMWARE_UPDATE_METHOD_QMI_PDC       = 1 << 1,
+    MM_MODEM_FIRMWARE_UPDATE_METHOD_MBIM_QDU      = 1 << 2,
+    MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE      = 1 << 3,
+    MM_MODEM_FIRMWARE_UPDATE_METHOD_SAHARA        = 1 << 4,
+    MM_MODEM_FIRMWARE_UPDATE_METHOD_DFOTA         = 1 << 5,
+    MM_MODEM_FIRMWARE_UPDATE_METHOD_CINTERION_FDL = 1 << 6,
 } MMModemFirmwareUpdateMethod;
 
 /**

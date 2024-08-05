@@ -25,6 +25,7 @@
 
 #include "mm-log-object.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-firmware.h"
 #include "mm-iface-modem-location.h"
 #include "mm-base-modem.h"
 #include "mm-base-modem-at.h"
@@ -189,6 +190,97 @@ mm_shared_cinterion_modem_reset (MMIfaceModem        *self,
     }
 
     modem_reset_at (task);
+}
+
+/*****************************************************************************/
+/* Firmware update settings loading (Firmware interface) */
+
+typedef struct {
+    MMFirmwareUpdateSettings *update_settings;
+} LoadUpdateSettingsContext;
+
+static void
+load_update_settings_context_free (LoadUpdateSettingsContext *ctx)
+{
+    g_clear_object (&ctx->update_settings);
+    g_free (ctx);
+}
+
+MMFirmwareUpdateSettings *
+mm_shared_cinterion_firmware_load_update_settings_finish (MMIfaceModemFirmware  *self,
+                                                          GAsyncResult          *res,
+                                                          GError               **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+sfdl_test_ready (MMBaseModem  *self,
+                 GAsyncResult *res,
+                 GTask        *task)
+{
+    LoadUpdateSettingsContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    if (mm_base_modem_at_command_finish (self, res, NULL))
+        mm_firmware_update_settings_set_method (ctx->update_settings, MM_MODEM_FIRMWARE_UPDATE_METHOD_CINTERION_FDL);
+
+    g_task_return_pointer (task, g_object_ref (ctx->update_settings), g_object_unref);
+    g_object_unref (task);
+}
+
+static void
+modem_set_cinterion_firmware_update_method (MMBaseModem *self,
+                                            GTask       *task)
+{
+    LoadUpdateSettingsContext *ctx;
+    MMPortSerialAt            *at_port;
+
+    ctx = g_task_get_task_data (task);
+
+    /* We always report the primary port as the one to be used for FW upgrade */
+    at_port = mm_base_modem_peek_port_primary (self);
+    if (at_port) {
+        mm_base_modem_at_command (self,
+                                  "AT^SFDL=?",
+                                  3,
+                                  TRUE,
+                                  (GAsyncReadyCallback) sfdl_test_ready,
+                                  task);
+        return;
+    }
+
+    g_task_return_pointer (task, g_object_ref (ctx->update_settings), g_object_unref);
+    g_object_unref (task);
+}
+
+void
+mm_shared_cinterion_firmware_load_update_settings (MMIfaceModemFirmware *self,
+                                                   GAsyncReadyCallback   callback,
+                                                   gpointer              user_data)
+{
+    LoadUpdateSettingsContext *ctx;
+    g_autoptr(GPtrArray)       ids = NULL;
+    GError                    *error = NULL;
+    GTask                     *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    ctx = g_new0 (LoadUpdateSettingsContext, 1);
+
+    g_task_set_task_data (task, ctx, (GDestroyNotify)load_update_settings_context_free);
+
+    ctx->update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE);
+    ids = mm_iface_firmware_build_generic_device_ids (MM_IFACE_MODEM_FIRMWARE (self), &error);
+    if (error) {
+        mm_obj_warn (self, "failed to build generic device ids: %s", error->message);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    mm_firmware_update_settings_set_device_ids (ctx->update_settings, (const gchar **)ids->pdata);
+    modem_set_cinterion_firmware_update_method (MM_BASE_MODEM (self), task);
 }
 
 /*****************************************************************************/

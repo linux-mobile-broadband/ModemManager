@@ -32,6 +32,7 @@
 #include "mm-errors-types.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-iface-modem-firmware.h"
 #include "mm-iface-modem-messaging.h"
 #include "mm-iface-modem-location.h"
 #include "mm-iface-modem-voice.h"
@@ -43,6 +44,7 @@
 #include "mm-iface-modem-signal.h"
 
 static void iface_modem_init           (MMIfaceModemInterface          *iface);
+static void iface_modem_firmware_init  (MMIfaceModemFirmwareInterface  *iface);
 static void iface_modem_3gpp_init      (MMIfaceModem3gppInterface      *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessagingInterface *iface);
 static void iface_modem_location_init  (MMIfaceModemLocationInterface  *iface);
@@ -60,6 +62,7 @@ static MMIfaceModemSignalInterface   *iface_modem_signal_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemCinterion, mm_broadband_modem_cinterion, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
@@ -3095,6 +3098,13 @@ static MMIfaceModemInterface *
 peek_parent_interface (MMSharedCinterion *self)
 {
     return iface_modem_parent;
+}
+
+static void
+iface_modem_firmware_init (MMIfaceModemFirmwareInterface *iface)
+{
+    iface->load_update_settings = mm_shared_cinterion_firmware_load_update_settings;
+    iface->load_update_settings_finish = mm_shared_cinterion_firmware_load_update_settings_finish;
 }
 
 static void

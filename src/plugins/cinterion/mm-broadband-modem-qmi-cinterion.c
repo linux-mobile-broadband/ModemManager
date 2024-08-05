@@ -26,12 +26,14 @@
 #include "mm-log.h"
 #include "mm-errors-types.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-firmware.h"
 #include "mm-iface-modem-location.h"
 #include "mm-iface-modem-voice.h"
 #include "mm-broadband-modem-qmi-cinterion.h"
 #include "mm-shared-cinterion.h"
 
 static void iface_modem_init          (MMIfaceModemInterface         *iface);
+static void iface_modem_firmware_init (MMIfaceModemFirmwareInterface *iface);
 static void iface_modem_location_init (MMIfaceModemLocationInterface *iface);
 static void iface_modem_voice_init    (MMIfaceModemVoiceInterface    *iface);
 static void iface_modem_time_init     (MMIfaceModemTimeInterface     *iface);
@@ -44,6 +46,7 @@ static MMIfaceModemTimeInterface     *iface_modem_time_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmiCinterion, mm_broadband_modem_qmi_cinterion, MM_TYPE_BROADBAND_MODEM_QMI, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_VOICE, iface_modem_voice_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init)
@@ -91,6 +94,13 @@ static MMIfaceModemInterface *
 peek_parent_interface (MMSharedCinterion *self)
 {
     return iface_modem_parent;
+}
+
+static void
+iface_modem_firmware_init (MMIfaceModemFirmwareInterface *iface)
+{
+    iface->load_update_settings = mm_shared_cinterion_firmware_load_update_settings;
+    iface->load_update_settings_finish = mm_shared_cinterion_firmware_load_update_settings_finish;
 }
 
 static void
