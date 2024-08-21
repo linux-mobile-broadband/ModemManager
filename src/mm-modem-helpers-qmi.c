@@ -2373,6 +2373,8 @@ mm_bearer_apn_type_to_qmi_apn_type (MMBearerApnType apn_type,
         value |= QMI_WDS_APN_TYPE_MASK_IMS;
     if (apn_type & MM_BEARER_APN_TYPE_MMS)
         value |= QMI_WDS_APN_TYPE_MASK_MMS;
+    if (apn_type & MM_BEARER_APN_TYPE_TETHERING)
+        value |= QMI_WDS_APN_TYPE_MASK_DUN;
     if (apn_type & MM_BEARER_APN_TYPE_MANAGEMENT)
         value |= QMI_WDS_APN_TYPE_MASK_FOTA;
     if (apn_type & MM_BEARER_APN_TYPE_INITIAL)
@@ -2393,6 +2395,8 @@ mm_bearer_apn_type_from_qmi_apn_type (QmiWdsApnTypeMask apn_type)
         value |= MM_BEARER_APN_TYPE_IMS;
     if (apn_type & QMI_WDS_APN_TYPE_MASK_MMS)
         value |= MM_BEARER_APN_TYPE_MMS;
+    if (apn_type & QMI_WDS_APN_TYPE_MASK_DUN)
+        value |= MM_BEARER_APN_TYPE_TETHERING;
     if (apn_type & QMI_WDS_APN_TYPE_MASK_FOTA)
         value |= MM_BEARER_APN_TYPE_MANAGEMENT;
     if (apn_type & QMI_WDS_APN_TYPE_MASK_IA)
