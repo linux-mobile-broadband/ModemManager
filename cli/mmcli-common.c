@@ -1454,7 +1454,7 @@ look_for_call_in_modem (GTask *task)
 
     modem = mm_object_get_modem_voice (ctx->current);
     if (!modem) {
-        /* Current modem has no messaging capabilities, try with next modem */
+        /* Current modem has no call capabilities, try with next modem */
         look_for_call_in_modem (task);
         return;
     }
