@@ -500,13 +500,13 @@ main (gint argc, gchar **argv)
         mmcli_modem_signal_shutdown ();
     } else if (mmcli_modem_oma_options_enabled ()) {
         mmcli_modem_oma_shutdown ();
-    }  else if (mmcli_sim_options_enabled ()) {
+    } else if (mmcli_sim_options_enabled ()) {
         mmcli_sim_shutdown ();
     } else if (mmcli_bearer_options_enabled ()) {
         mmcli_bearer_shutdown ();
-    }  else if (mmcli_sms_options_enabled ()) {
+    } else if (mmcli_sms_options_enabled ()) {
         mmcli_sms_shutdown ();
-    }  else if (mmcli_call_options_enabled ()) {
+    } else if (mmcli_call_options_enabled ()) {
         mmcli_call_shutdown ();
     } else if (mmcli_modem_options_enabled ()) {
         mmcli_modem_shutdown ();
