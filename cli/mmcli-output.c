@@ -87,6 +87,9 @@ static SectionInfo section_infos[] = {
     [MMC_S_SMS_PROPERTIES]             = { "Properties"           },
     [MMC_S_SIM_GENERAL]                = { "General"              },
     [MMC_S_SIM_PROPERTIES]             = { "Properties"           },
+    [MMC_S_CBM_GENERAL]                = { "General"              },
+    [MMC_S_CBM_CONTENT]                = { "Content"              },
+    [MMC_S_CBM_PROPERTIES]             = { "Properties"           },
 };
 
 /******************************************************************************/
@@ -285,6 +288,11 @@ static FieldInfo field_infos[] = {
     [MMC_F_CALL_AUDIO_FORMAT_ENCODING]               = { "call.audio-format.encoding",                      "encoding",                 MMC_S_CALL_AUDIO_FORMAT,          },
     [MMC_F_CALL_AUDIO_FORMAT_RESOLUTION]             = { "call.audio-format.resolution",                    "resolution",               MMC_S_CALL_AUDIO_FORMAT,          },
     [MMC_F_CALL_AUDIO_FORMAT_RATE]                   = { "call.audio-format.rate",                          "rate",                     MMC_S_CALL_AUDIO_FORMAT,          },
+    [MMC_F_CBM_GENERAL_DBUS_PATH]                    = { "cbm.dbus-path",                                   "path",                     MMC_S_CBM_GENERAL,                },
+    [MMC_F_CBM_CONTENT_TEXT]                         = { "cbm.content.text",                                "text",                     MMC_S_CBM_CONTENT,                },
+    [MMC_F_CBM_PROPERTIES_CHANNEL]                   = { "cbm.properties.channel",                          "channel",                  MMC_S_CBM_PROPERTIES,             },
+    [MMC_F_CBM_PROPERTIES_UPDATE]                    = { "cbm.properties.update",                           "update",                   MMC_S_CBM_PROPERTIES,             },
+    [MMC_F_CBM_PROPERTIES_MESSAGE_CODE]              = { "cbm.properties.message-code",                     "message code",             MMC_S_CBM_PROPERTIES,             },
     [MMC_F_SMS_GENERAL_DBUS_PATH]                    = { "sms.dbus-path",                                   "path",                     MMC_S_SMS_GENERAL,                },
     [MMC_F_SMS_CONTENT_NUMBER]                       = { "sms.content.number",                              "number",                   MMC_S_SMS_CONTENT,                },
     [MMC_F_SMS_CONTENT_TEXT]                         = { "sms.content.text",                                "text",                     MMC_S_SMS_CONTENT,                },
@@ -321,6 +329,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_MODEM_LIST_DBUS_PATH]                     = { "modem-list",                                      "modems",                   MMC_S_UNKNOWN,                    },
     [MMC_F_SMS_LIST_DBUS_PATH]                       = { "modem.messaging.sms",                             "sms messages",             MMC_S_UNKNOWN,                    },
     [MMC_F_CALL_LIST_DBUS_PATH]                      = { "modem.voice.call",                                "calls",                    MMC_S_UNKNOWN,                    },
+    [MMC_F_CBM_LIST_DBUS_PATH]                       = { "modem.cell-broadcast.cbm",                        "cell broadcast messages",  MMC_S_UNKNOWN,                    },
 };
 
 /******************************************************************************/

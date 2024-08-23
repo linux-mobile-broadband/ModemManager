@@ -1583,6 +1583,269 @@ mmcli_get_call_sync (GDBusConnection  *connection,
 }
 
 /******************************************************************************/
+/* Cell Broadcast Message */
+
+typedef struct {
+    gchar     *cbm_path;
+    MMManager *manager;
+    GList     *modems;
+    MMObject  *current;
+} GetCbmContext;
+
+typedef struct {
+    MMManager *manager;
+    MMObject  *object;
+    MMCbm     *cbm;
+} GetCbmResults;
+
+static void
+get_cbm_results_free (GetCbmResults *results)
+{
+    g_object_unref (results->manager);
+    g_object_unref (results->object);
+    g_object_unref (results->cbm);
+    g_free (results);
+}
+
+static void
+get_cbm_context_free (GetCbmContext *ctx)
+{
+    if (ctx->current)
+        g_object_unref (ctx->current);
+    if (ctx->manager)
+        g_object_unref (ctx->manager);
+    g_list_free_full (ctx->modems, g_object_unref);
+    g_free (ctx->cbm_path);
+    g_free (ctx);
+}
+
+MMCbm *
+mmcli_get_cbm_finish (GAsyncResult  *res,
+                      MMManager    **o_manager,
+                      MMObject     **o_object)
+{
+    GetCbmResults *results;
+    MMCbm         *obj;
+
+    results = g_task_propagate_pointer (G_TASK (res), NULL);
+    g_assert (results);
+    if (o_manager)
+        *o_manager = g_object_ref (results->manager);
+    if (o_object)
+        *o_object = g_object_ref (results->object);
+    obj = g_object_ref (results->cbm);
+    get_cbm_results_free (results);
+    return obj;
+}
+
+static void look_for_cbm_in_modem (GTask *task);
+
+static MMCbm *
+find_cbm_in_list (GList       *list,
+                  const gchar *cbm_path)
+{
+    GList *l;
+
+    for (l = list; l; l = g_list_next (l)) {
+        MMCbm *cbm = MM_CBM (l->data);
+
+        if (g_str_equal (mm_cbm_get_path (cbm), cbm_path)) {
+            g_debug ("CBM found at '%s'\n", cbm_path);
+            return g_object_ref (cbm);
+        }
+    }
+
+    return NULL;
+}
+
+static void
+list_cbm_ready (MMModemCellBroadcast *modem,
+                GAsyncResult         *res,
+                GTask                *task)
+{
+    GetCbmContext *ctx;
+    GetCbmResults *results;
+    MMCbm         *found;
+    GList         *cbm_list;
+    GError        *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    cbm_list = mm_modem_cell_broadcast_list_finish (modem, res, &error);
+    if (error) {
+        g_printerr ("error: couldn't list CBM at '%s': '%s'\n",
+                    mm_modem_cell_broadcast_get_path (modem),
+                    error->message);
+        exit (EXIT_FAILURE);
+    }
+
+    found = find_cbm_in_list (cbm_list, ctx->cbm_path);
+    g_list_free_full (cbm_list, g_object_unref);
+
+    if (!found) {
+        /* Not found, try with next modem */
+        look_for_cbm_in_modem (task);
+        return;
+    }
+
+    /* Found! */
+    results = g_new (GetCbmResults, 1);
+    results->manager = g_object_ref (ctx->manager);
+    results->object  = g_object_ref (ctx->current);
+    results->cbm     = found;
+    g_task_return_pointer (task, results, (GDestroyNotify) get_cbm_results_free);
+    g_object_unref (task);
+}
+
+static void
+look_for_cbm_in_modem (GTask *task)
+{
+    GetCbmContext    *ctx;
+    MMModemCellBroadcast *modem;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!ctx->modems) {
+        g_printerr ("error: couldn't find CBM at '%s': 'not found in any modem'\n",
+                    ctx->cbm_path);
+        exit (EXIT_FAILURE);
+    }
+
+    /* Loop looking for the cbm in each modem found */
+    ctx->current = MM_OBJECT (ctx->modems->data);
+    ctx->modems = g_list_delete_link (ctx->modems, ctx->modems);
+
+    modem = mm_object_get_modem_cell_broadcast (ctx->current);
+    if (!modem) {
+        /* Current modem has no cell broadcast capabilities, try with next modem */
+        look_for_cbm_in_modem (task);
+        return;
+    }
+
+    g_debug ("Looking for cbm '%s' in modem '%s'...",
+             ctx->cbm_path,
+             mm_object_get_path (ctx->current));
+    mm_modem_cell_broadcast_list (modem,
+                             g_task_get_cancellable (task),
+                             (GAsyncReadyCallback)list_cbm_ready,
+                             task);
+    g_object_unref (modem);
+}
+
+static void
+get_cbm_manager_ready (GDBusConnection *connection,
+                       GAsyncResult    *res,
+                       GTask           *task)
+{
+    GetCbmContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    ctx->manager = mmcli_get_manager_finish (res);
+    ctx->modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (ctx->manager));
+    if (!ctx->modems) {
+        g_printerr ("error: couldn't find CBM at '%s': 'no modems found'\n",
+                    ctx->cbm_path);
+        exit (EXIT_FAILURE);
+    }
+
+    look_for_cbm_in_modem (task);
+}
+
+void
+mmcli_get_cbm (GDBusConnection     *connection,
+               const gchar         *str,
+               GCancellable        *cancellable,
+               GAsyncReadyCallback  callback,
+               gpointer             user_data)
+{
+    GTask         *task;
+    GetCbmContext *ctx;
+
+    task = g_task_new (connection, cancellable, callback, user_data);
+
+    ctx = g_new0 (GetCbmContext, 1);
+    get_object_lookup_info (str, "CBM", MM_DBUS_CBM_PREFIX,
+                            &ctx->cbm_path, NULL, NULL, NULL);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) get_cbm_context_free);
+
+    mmcli_get_manager (connection,
+                       cancellable,
+                       (GAsyncReadyCallback)get_cbm_manager_ready,
+                       task);
+}
+
+MMCbm *
+mmcli_get_cbm_sync (GDBusConnection  *connection,
+                    const gchar      *str,
+                    MMManager       **o_manager,
+                    MMObject        **o_object)
+{
+    MMManager *manager;
+    GList *modems;
+    GList *l;
+    MMCbm *found = NULL;
+    gchar *cbm_path = NULL;
+
+    get_object_lookup_info (str, "CBM", MM_DBUS_CBM_PREFIX,
+                            &cbm_path, NULL, NULL, NULL);
+
+    manager = mmcli_get_manager_sync (connection);
+    modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (manager));
+    if (!modems) {
+        g_printerr ("error: couldn't find CBM at '%s': 'no modems found'\n",
+                    cbm_path);
+        exit (EXIT_FAILURE);
+    }
+
+    for (l = modems; !found && l; l = g_list_next (l)) {
+        GError *error = NULL;
+        MMObject *object;
+        MMModemCellBroadcast *modem;
+        GList *cbm_list;
+
+        object = MM_OBJECT (l->data);
+        modem = mm_object_get_modem_cell_broadcast (object);
+
+        /* If this modem doesn't implement cell broadcast, continue to next one */
+        if (!modem)
+            continue;
+
+        cbm_list = mm_modem_cell_broadcast_list_sync (modem, NULL, &error);
+        if (error) {
+            g_printerr ("error: couldn't list CBM at '%s': '%s'\n",
+                        mm_modem_cell_broadcast_get_path (modem),
+                        error->message);
+            exit (EXIT_FAILURE);
+        }
+
+        found = find_cbm_in_list (cbm_list, cbm_path);
+        g_list_free_full (cbm_list, g_object_unref);
+
+        if (found && o_object)
+            *o_object = g_object_ref (object);
+
+        g_object_unref (modem);
+    }
+
+    if (!found) {
+        g_printerr ("error: couldn't find CBM at '%s': 'not found in any modem'\n",
+                    cbm_path);
+        exit (EXIT_FAILURE);
+    }
+
+    g_list_free_full (modems, g_object_unref);
+    g_free (cbm_path);
+
+    if (o_manager)
+        *o_manager = manager;
+    else
+        g_object_unref (manager);
+
+    return found;
+}
+
+/******************************************************************************/
 
 const gchar *
 mmcli_get_state_reason_string (MMModemStateChangeReason reason)
@@ -1607,6 +1870,7 @@ static gchar *bearer_str;
 static gchar *sim_str;
 static gchar *sms_str;
 static gchar *call_str;
+static gchar *cbm_str;
 
 static GOptionEntry entries[] = {
     { "modem", 'm', 0, G_OPTION_ARG_STRING, &modem_str,
@@ -1627,6 +1891,10 @@ static GOptionEntry entries[] = {
     },
     { "call", 'o', 0, G_OPTION_ARG_STRING, &call_str,
       "Specify Call by path or index. Shows Call information if no action specified.",
+      "[PATH|INDEX]"
+    },
+    { "cbm", 'o', 0, G_OPTION_ARG_STRING, &cbm_str,
+      "Specify CBM by path or index. Shows Cbm information if no action specified.",
       "[PATH|INDEX]"
     },
     { NULL }
@@ -1676,6 +1944,12 @@ const gchar *
 mmcli_get_common_call_string (void)
 {
     return call_str;
+}
+
+const gchar *
+mmcli_get_common_cbm_string (void)
+{
+    return cbm_str;
 }
 
 gchar *

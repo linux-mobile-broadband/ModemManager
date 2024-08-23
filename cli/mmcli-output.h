@@ -83,6 +83,9 @@ typedef enum {
     MMC_S_SMS_PROPERTIES,
     MMC_S_SIM_GENERAL,
     MMC_S_SIM_PROPERTIES,
+    MMC_S_CBM_GENERAL,
+    MMC_S_CBM_CONTENT,
+    MMC_S_CBM_PROPERTIES,
 } MmcS;
 
 /******************************************************************************/
@@ -303,6 +306,11 @@ typedef enum {
     MMC_F_CALL_AUDIO_FORMAT_ENCODING,
     MMC_F_CALL_AUDIO_FORMAT_RESOLUTION,
     MMC_F_CALL_AUDIO_FORMAT_RATE,
+    MMC_F_CBM_GENERAL_DBUS_PATH,
+    MMC_F_CBM_CONTENT_TEXT,
+    MMC_F_CBM_PROPERTIES_CHANNEL,
+    MMC_F_CBM_PROPERTIES_UPDATE,
+    MMC_F_CBM_PROPERTIES_MESSAGE_CODE,
     MMC_F_SMS_GENERAL_DBUS_PATH,
     MMC_F_SMS_CONTENT_NUMBER,
     MMC_F_SMS_CONTENT_TEXT,
@@ -340,6 +348,7 @@ typedef enum {
     MMC_F_MODEM_LIST_DBUS_PATH,
     MMC_F_SMS_LIST_DBUS_PATH,
     MMC_F_CALL_LIST_DBUS_PATH,
+    MMC_F_CBM_LIST_DBUS_PATH,
 } MmcF;
 
 /******************************************************************************/

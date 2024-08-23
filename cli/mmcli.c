@@ -269,6 +269,10 @@ main (gint argc, gchar **argv)
     g_option_context_add_group (context,
                                 mmcli_call_get_option_group ());
     g_option_context_add_group (context,
+                                mmcli_modem_cell_broadcast_get_option_group ());
+    g_option_context_add_group (context,
+                                mmcli_cbm_get_option_group ());
+    g_option_context_add_group (context,
                                 test_get_option_group ());
     g_option_context_add_main_entries (context, main_entries, NULL);
     g_option_context_parse (context, &argc, &argv, NULL);
@@ -361,6 +365,10 @@ main (gint argc, gchar **argv)
         else
             mmcli_call_run_synchronous (connection);
     }
+    /* Cbm options? */
+    else if (mmcli_cbm_options_enabled ()) {
+        mmcli_cbm_run_synchronous (connection);
+    }
     /* Modem 3GPP options? */
     else if (mmcli_modem_3gpp_options_enabled ()) {
         if (async_flag)
@@ -452,6 +460,13 @@ main (gint argc, gchar **argv)
         else
             mmcli_modem_oma_run_synchronous (connection);
     }
+    /* Modem Cell Broadcast options? */
+    else if (mmcli_modem_cell_broadcast_options_enabled ()) {
+        if (async_flag)
+            mmcli_modem_cell_broadcast_run_asynchronous (connection, cancellable);
+        else
+            mmcli_modem_cell_broadcast_run_synchronous (connection);
+    }
     /* Modem options?
      * NOTE: let this check be always the last one, as other groups also need
      * having a modem specified, and therefore if -m is set, modem options
@@ -500,6 +515,8 @@ main (gint argc, gchar **argv)
         mmcli_modem_signal_shutdown ();
     } else if (mmcli_modem_oma_options_enabled ()) {
         mmcli_modem_oma_shutdown ();
+    } else if (mmcli_modem_cell_broadcast_options_enabled ()) {
+        mmcli_modem_cell_broadcast_shutdown ();
     } else if (mmcli_sim_options_enabled ()) {
         mmcli_sim_shutdown ();
     } else if (mmcli_bearer_options_enabled ()) {
@@ -508,6 +525,8 @@ main (gint argc, gchar **argv)
         mmcli_sms_shutdown ();
     } else if (mmcli_call_options_enabled ()) {
         mmcli_call_shutdown ();
+    } else if (mmcli_cbm_options_enabled ()) {
+        mmcli_cbm_shutdown ();
     } else if (mmcli_modem_options_enabled ()) {
         mmcli_modem_shutdown ();
     }

@@ -150,6 +150,14 @@ void          mmcli_modem_oma_run_asynchronous   (GDBusConnection *connection,
 void          mmcli_modem_oma_run_synchronous    (GDBusConnection *connection);
 void          mmcli_modem_oma_shutdown           (void);
 
+/* CellBroadcast group */
+GOptionGroup *mmcli_modem_cell_broadcast_get_option_group   (void);
+gboolean      mmcli_modem_cell_broadcast_options_enabled    (void);
+void          mmcli_modem_cell_broadcast_run_asynchronous   (GDBusConnection *connection,
+                                                             GCancellable    *cancellable);
+void          mmcli_modem_cell_broadcast_run_synchronous    (GDBusConnection *connection);
+void          mmcli_modem_cell_broadcast_shutdown           (void);
+
 /* Bearer group */
 GOptionGroup *mmcli_bearer_get_option_group   (void);
 gboolean      mmcli_bearer_options_enabled    (void);
@@ -181,5 +189,13 @@ void          mmcli_call_run_asynchronous   (GDBusConnection *connection,
                                             GCancellable    *cancellable);
 void          mmcli_call_run_synchronous    (GDBusConnection *connection);
 void          mmcli_call_shutdown           (void);
+
+/* CBM group */
+GOptionGroup *mmcli_cbm_get_option_group   (void);
+gboolean      mmcli_cbm_options_enabled    (void);
+void          mmcli_cbm_run_asynchronous   (GDBusConnection *connection,
+                                            GCancellable    *cancellable);
+void          mmcli_cbm_run_synchronous    (GDBusConnection *connection);
+void          mmcli_cbm_shutdown           (void);
 
 #endif /* __MMCLI_H__ */
