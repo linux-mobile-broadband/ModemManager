@@ -24,21 +24,25 @@
 #include "ModemManager.h"
 #include "mm-log-object.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-signal.h"
 #include "mm-bearer-mbim-mtk-fibocom.h"
 #include "mm-broadband-modem-mbim-mtk-fibocom.h"
 #include "mm-shared-fibocom.h"
 #include "mm-shared-mtk.h"
 
-static void iface_modem_init    (MMIfaceModemInterface    *iface);
-static void shared_fibocom_init (MMSharedFibocomInterface *iface);
-static void shared_mtk_init     (MMSharedMtkInterface *iface);
+static void iface_modem_init        (MMIfaceModemInterface        *iface);
+static void iface_modem_signal_init (MMIfaceModemSignalInterface  *iface);
+static void shared_fibocom_init     (MMSharedFibocomInterface     *iface);
+static void shared_mtk_init         (MMSharedMtkInterface         *iface);
 
-static MMIfaceModemInterface *iface_modem_parent;
+static MMIfaceModemInterface        *iface_modem_parent;
+static MMIfaceModemSignalInterface  *iface_modem_signal_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbimMtkFibocom, mm_broadband_modem_mbim_mtk_fibocom, MM_TYPE_BROADBAND_MODEM_MBIM_MTK, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM,      iface_modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_FIBOCOM,   shared_fibocom_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_MTK,       shared_mtk_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM,        iface_modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SIGNAL, iface_modem_signal_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_FIBOCOM,     shared_fibocom_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_MTK,         shared_mtk_init))
 
 struct _MMBroadbandModemMbimMtkFibocomPrivate {
     /* Custom MTK/Fibocom bearer behavior */
@@ -64,6 +68,9 @@ struct _MMBroadbandModemMbimMtkFibocomPrivate {
 
 /* NW error normalization required in old firmware versions. */
 #define NORMALIZE_NW_ERROR_UNNEEDED 29, 22, 13
+
+/* Default rssi threshold in the module. */
+#define DEFAULT_RSSI_THRESHOLD 6
 
 static inline gboolean
 fm350_check_version (guint A1, guint A2, guint A3,
@@ -230,6 +237,142 @@ normalize_nw_error (MMBroadbandModemMbim *self,
     return nw_error;
 }
 
+/*****************************************************************************/
+/* Load extended signal information (Signal interface) */
+
+static gboolean
+signal_setup_thresholds_finish (MMIfaceModemSignal *self,
+                                GAsyncResult       *res,
+                                GError             **error)
+{
+    return iface_modem_signal_parent->setup_thresholds_finish (self, res, error);
+}
+
+static void
+setup_default_thresholds_ready (MMIfaceModemSignal *self,
+                                GAsyncResult       *res,
+                                GTask              *task)
+{
+    GError *error  = NULL;
+
+    if (!iface_modem_signal_parent->setup_thresholds_finish (self, res, &error)) {
+        mm_obj_dbg (self, "setup rssi thresholds failed: %s", error->message);
+        g_task_return_error (task, error);
+    } else {
+        g_task_return_boolean (task, TRUE);
+    }
+
+    g_object_unref (task);
+}
+
+static void
+signal_state_query_ready (MbimDevice   *device,
+                          GAsyncResult *res,
+                          GTask        *task)
+{
+    MMBroadbandModemMbimMtkFibocom   *self;
+    GError                           *error   = NULL;
+    g_autoptr(MbimMessage)           response = NULL;
+    guint32                          rssi_threshold;
+    guint32                          error_rate_threshold;
+
+    self = g_task_get_source_object (task);
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response || !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!mbim_device_check_ms_mbimex_version (device, 2, 0)) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Failed MBIMEx v2.0 signal state response support check");
+        g_object_unref (task);
+        return;
+    }
+
+    if (!mbim_message_ms_basic_connect_v2_signal_state_response_parse (
+            response,
+            NULL,            /* rssi */
+            NULL,            /* error_rate */
+            NULL,            /* signal_strength_interval */
+            &rssi_threshold,
+            &error_rate_threshold,
+            NULL,            /* rsrp_snr_count */
+            NULL,            /* rsrp_snr */
+            &error)) {
+        g_prefix_error (&error, "Failed processing MBIMEx v2.0 signal state response: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* If the device doesn't have a default rssi threshold, to set one. */
+    if (rssi_threshold == 0) {
+        iface_modem_signal_parent->setup_thresholds (
+            MM_IFACE_MODEM_SIGNAL (self),
+            DEFAULT_RSSI_THRESHOLD,
+            error_rate_threshold,
+            (GAsyncReadyCallback)setup_default_thresholds_ready,
+            task);
+        return;
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+parent_setup_thresholds_ready (MMIfaceModemSignal *self,
+                               GAsyncResult       *res,
+                               GTask              *task)
+{
+    MMPortMbim                *port;
+    MbimDevice                *device;
+    g_autoptr(MbimMessage)    message = NULL;
+
+    port = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self));
+    if (!port) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't peek MBIM port");
+        g_object_unref (task);
+        return;
+    }
+
+    device = mm_port_mbim_peek_device (port);
+
+    message = mbim_message_signal_state_query_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         5,
+                         NULL,
+                         (GAsyncReadyCallback)signal_state_query_ready,
+                         task);
+}
+
+static void
+signal_setup_thresholds (MMIfaceModemSignal  *self,
+                         guint               rssi_threshold,
+                         gboolean            error_rate_threshold,
+                         GAsyncReadyCallback callback,
+                         gpointer            user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* First call the parent setup_thresholds method to set the rssi threshold (0) for the module,
+     * making the module to set this value to its internal default according to the specification.
+     * Then use the signal state MBIM request to check the default rssi threshold for module responses.
+     * If there is no valid rssi threshold, to set a default value. */
+    iface_modem_signal_parent->setup_thresholds (
+        self,
+        rssi_threshold,
+        error_rate_threshold,
+        (GAsyncReadyCallback)parent_setup_thresholds_ready,
+        task);
+}
+
 /******************************************************************************/
 
 MMBroadbandModemMbimMtkFibocom *
@@ -284,6 +427,15 @@ iface_modem_init (MMIfaceModemInterface *iface)
     iface->load_unlock_retries = mm_shared_mtk_load_unlock_retries;
     iface->load_unlock_retries_finish = mm_shared_mtk_load_unlock_retries_finish;
 
+}
+
+static void
+iface_modem_signal_init (MMIfaceModemSignalInterface *iface)
+{
+    iface_modem_signal_parent   = g_type_interface_peek_parent (iface);
+
+    iface->setup_thresholds        = signal_setup_thresholds;
+    iface->setup_thresholds_finish = signal_setup_thresholds_finish;
 }
 
 static MMBaseModemClass *
