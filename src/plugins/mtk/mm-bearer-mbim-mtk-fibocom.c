@@ -27,7 +27,6 @@ G_DEFINE_TYPE (MMBearerMbimMtkFibocom, mm_bearer_mbim_mtk_fibocom, MM_TYPE_BEARE
 struct _MMBearerMbimMtkFibocomPrivate {
     /* Whether IP packet filters need to be removed */
     gboolean remove_ip_packet_filters;
-    gboolean reload_stats_unsupported;
 };
 
 /*****************************************************************************/
@@ -45,70 +44,15 @@ reload_stats_finish (MMBaseBearer  *_self,
                      GAsyncResult  *res,
                      GError       **error)
 {
-    MMBearerMbimMtkFibocom       *self = MM_BEARER_MBIM_MTK_FIBOCOM (_self);
-    g_autofree ReloadStatsResult *stats = NULL;
-    g_autoptr(GError)             inner_error = NULL;
+    if (!g_task_propagate_boolean (G_TASK (res), error))
+        return FALSE;
 
-    stats = g_task_propagate_pointer (G_TASK (res), &inner_error);
-    if (!stats) {
-        /* If filters need to be removed on every stats query, we must never
-         * return an error, otherwise the upper layers will stop the stats reloading
-         * logic. Only return an error when filters are not being removed. */
-        if (!self->priv->remove_ip_packet_filters) {
-            g_propagate_error (error, inner_error);
-            return FALSE;
-        }
-        /* Flag as stats reloading being unsupported, we will avoid querying. */
-        self->priv->reload_stats_unsupported = TRUE;
-    }
-
+    /* Fake TX/RX values just to ensure the stats polling keeps going on */
     if (rx_bytes)
-        *rx_bytes = stats ? stats->rx_bytes : 0;
+        *rx_bytes = 0;
     if (tx_bytes)
-        *tx_bytes = stats ? stats->tx_bytes : 0;
+        *tx_bytes = 0;
     return TRUE;
-}
-
-static void
-parent_reload_stats_ready (MMBaseBearer *self,
-                           GAsyncResult *res,
-                           GTask        *task)
-{
-    g_autofree ReloadStatsResult *stats = NULL;
-    GError                       *error = NULL;
-
-    stats = g_new0 (ReloadStatsResult, 1);
-
-    if (!MM_BASE_BEARER_CLASS (mm_bearer_mbim_mtk_fibocom_parent_class)->reload_stats_finish (
-            self,
-            &stats->rx_bytes,
-            &stats->tx_bytes,
-            res,
-            &error))
-        g_task_return_error (task, g_steal_pointer (&error));
-    else
-        g_task_return_pointer (task, g_steal_pointer (&stats), g_free);
-    g_object_unref (task);
-}
-
-static void
-packet_statistics_query (GTask *task)
-{
-    MMBearerMbimMtkFibocom *self;
-
-    self = g_task_get_source_object (task);
-    if (self->priv->reload_stats_unsupported) {
-        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                 "Skipping stats reloading");
-        g_object_unref (task);
-        return;
-    }
-
-    /* Chain up parent's stats query */
-    MM_BASE_BEARER_CLASS (mm_bearer_mbim_mtk_fibocom_parent_class)->reload_stats (
-        MM_BASE_BEARER (self),
-        (GAsyncReadyCallback) parent_reload_stats_ready,
-        task);
 }
 
 static void
@@ -116,9 +60,10 @@ packet_filters_set_ready (MbimDevice   *device,
                           GAsyncResult *res,
                           GTask        *task)
 {
-    MMBearerMbim           *self;
-    g_autoptr(GError)       error = NULL;
-    g_autoptr(MbimMessage)  response = NULL;
+    MMBearerMbim                 *self;
+    g_autoptr(GError)             error = NULL;
+    g_autoptr(MbimMessage)        response = NULL;
+    g_autofree ReloadStatsResult *stats = NULL;
 
     self = g_task_get_source_object (task);
 
@@ -126,7 +71,10 @@ packet_filters_set_ready (MbimDevice   *device,
     if (!response || !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error))
         mm_obj_dbg (self, "Couldn't reset IP packet filters: %s", error->message);
 
-    packet_statistics_query (task);
+    /* The IP packet filter reset should keep on happening periodically, so we
+     * must not return an error in the packet stats query. */
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -152,7 +100,6 @@ ensure_removed_filters (GTask *task)
     }
 
     mm_obj_dbg (self, "Resetting IP packet filters...");
-
     session_id = mm_bearer_mbim_get_session_id (MM_BEARER_MBIM (self));
     message = mbim_message_ip_packet_filters_set_new (session_id, 0, NULL, NULL);
     mbim_device_command (mm_port_mbim_peek_device (port),
@@ -173,10 +120,20 @@ reload_stats (MMBaseBearer        *_self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    if (self->priv->remove_ip_packet_filters)
+    /* The periodic stats reloading logic is abused here to remove the IP packet
+     * filters wrongly configured in the device. */
+    if (self->priv->remove_ip_packet_filters) {
         ensure_removed_filters (task);
-    else
-        packet_statistics_query (task);
+        return;
+    }
+
+    /* If there is no need to remove IP packet filters (i.e. if the underlying
+     * issue is already fixed in the firmware) then we will fully avoid
+     * periodically polling for TX/RX stats, as they are not supported in the
+     * FM350. */
+    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                             "TX/RX stats loading unsupported in FM350");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
