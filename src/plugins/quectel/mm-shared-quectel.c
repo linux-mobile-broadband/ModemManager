@@ -244,6 +244,13 @@ quectel_is_firehose_supported (MMBaseModem *modem,
     return mm_kernel_device_get_global_property_as_boolean (mm_port_peek_kernel_device (port), "ID_MM_QUECTEL_FIREHOSE");
 }
 
+static gboolean
+quectel_is_dfota_supported (MMBaseModem *modem,
+                            MMPort      *port)
+{
+    return mm_kernel_device_get_global_property_as_boolean (mm_port_peek_kernel_device (port), "ID_MM_QUECTEL_DFOTA");
+}
+
 static MMModemFirmwareUpdateMethod
 quectel_get_firmware_update_methods (MMBaseModem *modem,
                                      MMPort      *port)
@@ -256,6 +263,11 @@ quectel_get_firmware_update_methods (MMBaseModem *modem,
         update_methods |= MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE;
     if (quectel_is_sahara_supported (modem, port))
         update_methods |= MM_MODEM_FIRMWARE_UPDATE_METHOD_SAHARA;
+
+    /* DFOTA should not be used in combination with any other update method. */
+    if (update_methods == MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE &&
+        quectel_is_dfota_supported (modem, port))
+        update_methods |= MM_MODEM_FIRMWARE_UPDATE_METHOD_DFOTA;
 
     return update_methods;
 }
@@ -417,7 +429,8 @@ quectel_at_port_get_firmware_revision_ready (MMBaseModem  *self,
     mm_firmware_update_settings_set_device_ids (ctx->update_settings, (const gchar **)ids->pdata);
 
     /* Set update methods */
-    if (update_methods & MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE) {
+    if (update_methods & MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE ||
+        update_methods & MM_MODEM_FIRMWARE_UPDATE_METHOD_DFOTA) {
         /* Fetch full firmware info */
         mm_base_modem_at_command (self,
                                   "+QGMR?",
