@@ -47,11 +47,11 @@ ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="01a4", ENV{.MM_USBIFNUM}=="06", SUBS
 ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="01a4", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_FIBOCOM_FASTBOOT}="1"
 
 # Rolling RW135 (MBIM in iface #0, ADB in iface #5)
-#  ttyUSB0 (if #2): QCDM port.
-#  ttyUSB1 (if #3): AT port
-#  ttyUSB2 (if #4): GNSS data
-ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0115", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_QCDM}="1"
-ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0115", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
-ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0115", ENV{.MM_USBIFNUM}=="04", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+#  ttyUSB0 (if #2): GNSS data
+#  ttyUSB1 (if #3): QCDM port
+#  ttyUSB2 (if #4): AT port
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0115", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0115", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_QCDM}="1"
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0115", ENV{.MM_USBIFNUM}=="04", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
 
 LABEL="mm_rolling_port_types_end"
