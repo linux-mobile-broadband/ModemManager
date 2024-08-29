@@ -33,6 +33,37 @@ typedef struct _MMBroadbandModemMbimPrivate MMBroadbandModemMbimPrivate;
 #define MM_BROADBAND_MODEM_MBIM_QMI_UNSUPPORTED "broadband-modem-mbim-qmi-unsupported"
 #define MM_BROADBAND_MODEM_MBIM_INTEL_FIRMWARE_UPDATE_UNSUPPORTED "broadband-modem-mbim-intel-firmware-update-unsupported"
 
+/* Flags to modify the behavior of the generic initial EPS bearer settings
+ * operation, given that different modules may end up having different needs at
+ * different times.
+ *
+ * The "home" section is always included and always updated.
+ *
+ * The "update partner" and "update non partner" flags control which settings are
+ * used for the given section. If the flag is given, the section receives the same
+ * settings as "home", otherwise the section receives the same settings it already
+ * had before.
+ *
+ * The "skip" partner and "skip non partner" flags control whether the given section
+ * is included in the list of configurations given to the device. If any of the
+ * section is flagged to be skipped, the "update" flag for that section is irrelevant.
+ *
+ * By default for now all 3 sections are included, but partner and non partner are not
+ * updated.
+ */
+typedef enum {
+    MM_BROADBAND_MODEM_MBIM_SET_INITIAL_EPS_BEARER_SETTINGS_FLAG_NONE,
+    MM_BROADBAND_MODEM_MBIM_SET_INITIAL_EPS_BEARER_SETTINGS_FLAG_UPDATE_HOME        = 1 << 0,
+    MM_BROADBAND_MODEM_MBIM_SET_INITIAL_EPS_BEARER_SETTINGS_FLAG_UPDATE_PARTNER     = 1 << 1,
+    MM_BROADBAND_MODEM_MBIM_SET_INITIAL_EPS_BEARER_SETTINGS_FLAG_UPDATE_NON_PARTNER = 1 << 2,
+    MM_BROADBAND_MODEM_MBIM_SET_INITIAL_EPS_BEARER_SETTINGS_FLAG_SKIP_PARTNER       = 1 << 3,
+    MM_BROADBAND_MODEM_MBIM_SET_INITIAL_EPS_BEARER_SETTINGS_FLAG_SKIP_NON_PARTNER   = 1 << 4,
+} MMBroadbandModemMbimSetInitialEpsBearerSettingsFlag;
+
+/* By default: provide home/partner/non-partner but only update home */
+#define MM_BROADBAND_MODEM_MBIM_SET_INITIAL_EPS_BEARER_SETTINGS_FLAG_DEFAULT \
+    MM_BROADBAND_MODEM_MBIM_SET_INITIAL_EPS_BEARER_SETTINGS_FLAG_UPDATE_HOME
+
 struct _MMBroadbandModemMbim {
     MMBroadbandModem parent;
     MMBroadbandModemMbimPrivate *priv;
@@ -41,11 +72,13 @@ struct _MMBroadbandModemMbim {
 struct _MMBroadbandModemMbimClass{
     MMBroadbandModemClass parent;
 
-    MMPortMbim * (* peek_port_mbim_for_data) (MMBroadbandModemMbim  *self,
-                                              MMPort                *data,
-                                              GError               **error);
-    guint32      (* normalize_nw_error)      (MMBroadbandModemMbim *self,
-                                              guint32               nw_error);
+    MMPortMbim * (* peek_port_mbim_for_data)                   (MMBroadbandModemMbim  *self,
+                                                                MMPort                *data,
+                                                                GError               **error);
+    guint32      (* normalize_nw_error)                        (MMBroadbandModemMbim *self,
+                                                                guint32               nw_error);
+    MMBroadbandModemMbimSetInitialEpsBearerSettingsFlag
+                 (* load_set_initial_eps_bearer_settings_mask) (MMBroadbandModemMbim *self);
 };
 
 GType mm_broadband_modem_mbim_get_type (void);
