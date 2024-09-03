@@ -21,7 +21,6 @@
 #include <ctype.h>
 #include <glib.h>
 #include <string.h>
-#include <ctype.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
 
