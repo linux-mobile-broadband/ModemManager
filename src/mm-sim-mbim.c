@@ -823,128 +823,6 @@ load_eid (MMBaseSim           *self,
 }
 
 /*****************************************************************************/
-/* Load operator identifier */
-
-static gchar *
-load_operator_identifier_finish (MMBaseSim *self,
-                                 GAsyncResult *res,
-                                 GError **error)
-{
-    return g_task_propagate_pointer (G_TASK (res), error);
-}
-
-static void
-load_operator_identifier_ready (MbimDevice *device,
-                                GAsyncResult *res,
-                                GTask *task)
-{
-    MbimMessage *response;
-    GError *error = NULL;
-    MbimProvider *provider;
-
-    response = mbim_device_command_finish (device, res, &error);
-    if (response &&
-        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
-        mbim_message_home_provider_response_parse (
-            response,
-            &provider,
-            &error)) {
-        g_task_return_pointer (task, g_strdup (provider->provider_id), g_free);
-        mbim_provider_free (provider);
-    } else
-        g_task_return_error (task, error);
-    g_object_unref (task);
-
-    if (response)
-        mbim_message_unref (response);
-}
-
-static void
-load_operator_identifier (MMBaseSim *self,
-                          GAsyncReadyCallback callback,
-                          gpointer user_data)
-{
-    MbimDevice *device;
-    MbimMessage *message;
-    GTask *task;
-
-    if (!peek_device (self, &device, callback, user_data))
-        return;
-
-    task = g_task_new (self, NULL, callback, user_data);
-
-    message = mbim_message_home_provider_query_new (NULL);
-    mbim_device_command (device,
-                         message,
-                         30,
-                         NULL,
-                         (GAsyncReadyCallback)load_operator_identifier_ready,
-                         task);
-    mbim_message_unref (message);
-}
-
-/*****************************************************************************/
-/* Load operator name */
-
-static gchar *
-load_operator_name_finish (MMBaseSim *self,
-                           GAsyncResult *res,
-                           GError **error)
-{
-    return g_task_propagate_pointer (G_TASK (res), error);
-}
-
-static void
-load_operator_name_ready (MbimDevice *device,
-                          GAsyncResult *res,
-                          GTask *task)
-{
-    MbimMessage *response;
-    GError *error = NULL;
-    MbimProvider *provider;
-
-    response = mbim_device_command_finish (device, res, &error);
-    if (response &&
-        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
-        mbim_message_home_provider_response_parse (
-            response,
-            &provider,
-            &error)) {
-        g_task_return_pointer (task, g_strdup (provider->provider_name), g_free);
-        mbim_provider_free (provider);
-    } else
-        g_task_return_error (task, error);
-    g_object_unref (task);
-
-    if (response)
-        mbim_message_unref (response);
-}
-
-static void
-load_operator_name (MMBaseSim *self,
-                    GAsyncReadyCallback callback,
-                    gpointer user_data)
-{
-    MbimDevice *device;
-    MbimMessage *message;
-    GTask *task;
-
-    if (!peek_device (self, &device, callback, user_data))
-        return;
-
-    task = g_task_new (self, NULL, callback, user_data);
-
-    message = mbim_message_home_provider_query_new (NULL);
-    mbim_device_command (device,
-                         message,
-                         30,
-                         NULL,
-                         (GAsyncReadyCallback)load_operator_name_ready,
-                         task);
-    mbim_message_unref (message);
-}
-
-/*****************************************************************************/
 /* Common method to read transparent files */
 
 typedef struct {
@@ -1147,6 +1025,173 @@ common_read_binary (MMSimMbim           *self,
     preload_subscriber_info (self,
                              (GAsyncReadyCallback) read_binary_subscriber_info_ready,
                              task);
+}
+
+/*****************************************************************************/
+/* Load operator identifier */
+
+static gchar *
+load_operator_identifier_finish (MMBaseSim *self,
+                                 GAsyncResult *res,
+                                 GError **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+parent_load_operator_id_ready (MMBaseSim    *self,
+                               GAsyncResult *res,
+                               GTask        *task)
+{
+    g_autoptr(GError)  error = NULL;
+    gchar             *value;
+
+    value = MM_BASE_SIM_CLASS (mm_sim_mbim_parent_class)->load_operator_identifier_finish (self, res, &error);
+    if (value) {
+        g_task_return_pointer (task, value, g_free);
+    } else {
+        mm_obj_dbg (self, "failed reading operator ID using AT: %s", error->message);
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Failed reading operator ID from SIM card");
+    }
+
+    g_object_unref (task);
+}
+
+static void
+common_read_binary_operator_id_ready (MMSimMbim    *self,
+                                      GAsyncResult *res,
+                                      GTask        *task)
+{
+    g_autoptr(GError)  error = NULL;
+    GByteArray        *value;
+
+    value = common_read_binary_finish (self, res, &error);
+    if (!value) {
+        mm_obj_dbg (self, "failed reading operator ID using MBIM: %s", error->message);
+    } else if (value->len != 4) {
+        mm_obj_dbg (self, "failed reading operator ID using MBIM: unexpected field size");
+    } else {
+        guint mnc_len = value->data[3];
+
+        if (mnc_len == 2 || mnc_len == 3) {
+            g_task_return_pointer (task, g_strndup (self->priv->imsi, 3 + mnc_len), g_free);
+            g_object_unref (task);
+            return;
+        }
+        mm_obj_dbg (self, "failed reading operator ID using MBIM: unexpected MNC length: %u", mnc_len);
+    }
+
+    /* Fallback to parent implementation if possible */
+    MM_BASE_SIM_CLASS (mm_sim_mbim_parent_class)->load_operator_identifier (MM_BASE_SIM (self),
+                                                                            (GAsyncReadyCallback)parent_load_operator_id_ready,
+                                                                            task);
+}
+
+static void
+load_operator_identifier (MMBaseSim *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    GTask        *task;
+    const guint8  file_path[] = { 0x7F, 0xFF, 0x6F, 0xAD };
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    common_read_binary (MM_SIM_MBIM (self),
+                        file_path,
+                        G_N_ELEMENTS (file_path),
+                        (GAsyncReadyCallback)common_read_binary_operator_id_ready,
+                        task);
+}
+
+/*****************************************************************************/
+/* Load operator name */
+
+static gchar *
+load_operator_name_finish (MMBaseSim *self,
+                           GAsyncResult *res,
+                           GError **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+parent_load_operator_name_ready (MMBaseSim    *self,
+                                 GAsyncResult *res,
+                                 GTask        *task)
+{
+    g_autoptr(GError)  error = NULL;
+    gchar             *value;
+
+    value = MM_BASE_SIM_CLASS (mm_sim_mbim_parent_class)->load_operator_name_finish (self, res, &error);
+    if (value) {
+        g_task_return_pointer (task, value, g_free);
+    } else {
+        mm_obj_dbg (self, "failed reading operator name using AT: %s", error->message);
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Failed reading operator name from SIM card");
+    }
+
+    g_object_unref (task);
+}
+
+static void
+common_read_binary_operator_name_ready (MMSimMbim    *self,
+                                        GAsyncResult *res,
+                                        GTask        *task)
+{
+    g_autoptr(GError)  error = NULL;
+    GByteArray        *value;
+
+    value = common_read_binary_finish (self, res, &error);
+    if (!value) {
+        mm_obj_dbg (self, "failed reading operator name using MBIM: %s", error->message);
+    } else {
+        gsize len = value->len;
+
+        while (len > 1 && value->data[len - 1] == 0xff)
+            len--;
+        if (len <= 1) {
+            mm_obj_dbg (self, "failed reading operator name using MBIM: value is empty");
+        } else {
+            g_autoptr(GByteArray) array = NULL;
+            gchar *name;
+
+            /* Remove the first metadata byte and convert remainder to UTF8 string */
+            array = g_byte_array_sized_new (len - 1);
+            g_byte_array_append (array, value->data + 1, len - 1);
+            name = mm_modem_charset_bytearray_to_utf8 (array, MM_MODEM_CHARSET_GSM, FALSE, &error);
+            if (name) {
+                g_task_return_pointer (task, name, g_free);
+                g_object_unref (task);
+                return;
+            }
+            mm_obj_dbg (self, "failed reading operator name using MBIM: %s", error->message);
+        }
+    }
+
+    /* Fallback to parent implementation if possible */
+    MM_BASE_SIM_CLASS (mm_sim_mbim_parent_class)->load_operator_name (MM_BASE_SIM (self),
+                                                                      (GAsyncReadyCallback)parent_load_operator_name_ready,
+                                                                      task);
+}
+
+static void
+load_operator_name (MMBaseSim *self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    GTask        *task;
+    const guint8  file_path[] = { 0x7F, 0xFF, 0x6F, 0x46 };
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    common_read_binary (MM_SIM_MBIM (self),
+                        file_path,
+                        G_N_ELEMENTS (file_path),
+                        (GAsyncReadyCallback)common_read_binary_operator_name_ready,
+                        task);
 }
 
 /*****************************************************************************/
