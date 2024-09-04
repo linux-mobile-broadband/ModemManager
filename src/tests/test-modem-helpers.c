@@ -4649,6 +4649,46 @@ test_cpol_response (void)
 
 /*****************************************************************************/
 
+typedef struct {
+    const gchar *response;
+    gboolean     expected_empty;
+    const gchar *expected_groups[4];
+} TestStringGroup;
+
+static const TestStringGroup test_groups[] = {
+    { "(\"SM\",\"ME\"),(\"SM\",\"ME\"),(\"SM\",\"ME\")", FALSE, { "\"SM\",\"ME\"", "\"SM\",\"ME\"", "\"SM\",\"ME\"", NULL } },
+    { "\"SM\",\"SM\",\"SM\"",                            FALSE, { "\"SM\"", "\"SM\"", "\"SM\"", NULL } },
+    { "\"SM\",(\"SM\",\"ME\"),(\"SM\",\"ME\")",          FALSE, { "\"SM\"", "\"SM\",\"ME\"", "\"SM\",\"ME\"", NULL } },
+    { "",                                                FALSE, { "", NULL } },
+    { ",,",                                              FALSE, { "", "", "", NULL } },
+    { "(A,B",                                            FALSE, { "A,B", NULL } },
+    { "A,B)",                                            FALSE, { "A", "B)", NULL } },
+    { NULL,                                              TRUE,  { NULL } },
+};
+
+static void
+test_mm_split_string_groups (void)
+{
+    guint i, j;
+
+    for (i = 0; i < G_N_ELEMENTS (test_groups); i++) {
+        g_auto(GStrv) groups = NULL;
+
+        groups = mm_split_string_groups (test_groups[i].response);
+        if (test_groups[i].expected_empty) {
+            g_assert_null (groups);
+        } else {
+            g_assert (groups);
+            g_assert_cmpint (g_strv_length (groups), ==, g_strv_length ((gchar **) test_groups[i].expected_groups));
+            for (j = 0; j < g_strv_length (groups); j++) {
+                g_assert_cmpstr (groups[j], ==, test_groups[i].expected_groups[j]);
+            }
+        }
+    }
+}
+
+/*****************************************************************************/
+
 #define TESTCASE(t, d) g_test_create_case (#t, 0, d, NULL, (GTestFixtureFunc) t, NULL)
 
 int main (int argc, char **argv)
@@ -4886,6 +4926,8 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_at_quote_string, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cpol_response, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_mm_split_string_groups, NULL));
 
     result = g_test_run ();
 
