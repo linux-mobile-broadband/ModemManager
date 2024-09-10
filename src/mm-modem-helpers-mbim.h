@@ -60,9 +60,11 @@ MMBearerAllowedAuth mm_bearer_allowed_auth_from_mbim_auth_protocol (MbimAuthProt
 MbimAuthProtocol    mm_bearer_allowed_auth_to_mbim_auth_protocol   (MMBearerAllowedAuth   bearer_auth,
                                                                     gpointer              log_object,
                                                                     GError              **error);
+gchar              *mm_mbim_auth_protocol_get_printable            (MbimAuthProtocol      auth_protocol);
 MMBearerIpFamily    mm_bearer_ip_family_from_mbim_context_ip_type  (MbimContextIpType     ip_type);
 MbimContextIpType   mm_bearer_ip_family_to_mbim_context_ip_type    (MMBearerIpFamily      ip_family,
                                                                     GError              **error);
+gchar              *mm_mbim_context_ip_type_get_printable          (MbimContextIpType     ip_type);
 MMBearerApnType     mm_bearer_apn_type_from_mbim_context_type      (MbimContextType       context_type);
 MbimContextType     mm_bearer_apn_type_to_mbim_context_type        (MMBearerApnType       apn_type,
                                                                     gboolean              mbim_extensions_supported,

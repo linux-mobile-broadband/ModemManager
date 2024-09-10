@@ -4443,16 +4443,26 @@ update_lte_attach_configuration (MMBroadbandModemMbim               *self,
     }
 
     if (!previous_config || !new_config || (previous_config->ip_type != new_config->ip_type)) {
+        g_autofree gchar *previous_ip_type = NULL;
+        g_autofree gchar *new_ip_type = NULL;
+
+        previous_ip_type = previous_config ? mm_mbim_context_ip_type_get_printable (previous_config->ip_type) : NULL;
+        new_ip_type = new_config ? mm_mbim_context_ip_type_get_printable (new_config->ip_type) : NULL;
         mm_obj_dbg (self, "  ip type: '%s' -> '%s'",
-                    previous_config ? mbim_context_ip_type_get_string (previous_config->ip_type) : "",
-                    new_config ? mbim_context_ip_type_get_string (new_config->ip_type) : "");
+                    previous_ip_type ? previous_ip_type : "",
+                    new_ip_type ? new_ip_type : "");
         n_updates++;
     }
 
     if (!previous_config || !new_config || (previous_config->auth_protocol != new_config->auth_protocol)) {
+        g_autofree gchar *previous_auth_protocol = NULL;
+        g_autofree gchar *new_auth_protocol = NULL;
+
+        previous_auth_protocol = previous_config ? mm_mbim_auth_protocol_get_printable (previous_config->auth_protocol) : NULL;
+        new_auth_protocol = new_config ? mm_mbim_auth_protocol_get_printable (new_config->auth_protocol) : NULL;
         mm_obj_dbg (self, "  auth protocol: '%s' -> '%s'",
-                    previous_config ? mbim_auth_protocol_get_string (previous_config->auth_protocol) : "",
-                    new_config ? mbim_auth_protocol_get_string (new_config->auth_protocol) : "");
+                    previous_auth_protocol ? previous_auth_protocol : "",
+                    new_auth_protocol ? new_auth_protocol : "");
         n_updates++;
     }
 
