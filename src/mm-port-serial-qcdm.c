@@ -12,6 +12,7 @@
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
  * Copyright (C) 2009 - 2010 Red Hat, Inc.
+ * Copyright (C) 2024 JUCR GmbH
  */
 
 #include <stdio.h>
@@ -70,6 +71,9 @@ find_qcdm_start (GByteArray *response, gsize *start)
     return FALSE;
 }
 
+/* /r/nNO CARRIER/r/n */
+static const gchar no_carrier[] = { 0x0d, 0x0a, 0x4e, 0x4f, 0x20, 0x43, 0x41, 0x52, 0x52, 0x49, 0x45, 0x52, 0x0d, 0x0a };
+
 static MMPortSerialResponseType
 parse_qcdm (GByteArray *response,
             gboolean want_log,
@@ -84,6 +88,18 @@ parse_qcdm (GByteArray *response,
 
     /* Get the offset into the buffer of where the QCDM frame starts */
     if (!find_qcdm_start (response, &start)) {
+        /* As a special case detect \r\nNO CARRIER\r\n which happens when a port
+         * is in PPP mode and QCDM attemps to send QCDM requests. The modem will
+         * often terminate PPP when it receives the bogus frame.
+         */
+        if (response->len >= sizeof (no_carrier) && memcmp (response->data, no_carrier, sizeof (no_carrier)) == 0) {
+            g_set_error (error,
+                         MM_CONNECTION_ERROR,
+                         MM_CONNECTION_ERROR_NO_CARRIER,
+                         "Received NO CARRIER response");
+            return MM_PORT_SERIAL_RESPONSE_ERROR;
+        }
+
         /* Discard the unparsable data right away, we do need a QCDM
          * start, and anything that comes before it is unknown data
          * that we'll never use. */

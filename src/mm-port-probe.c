@@ -114,10 +114,12 @@ struct _MMPortProbePrivate {
 
 /*****************************************************************************/
 
-void
-mm_port_probe_reset (MMPortProbe *self)
+static void
+mm_port_probe_clear (MMPortProbe *self)
 {
-    g_assert (!self->priv->task);
+    /* Clears existing probe results so probing can restart from the beginning.
+     * Should only be used internally as it does not ensure `task` is NULL.
+     */
     self->priv->flags = 0;
     self->priv->is_at = FALSE;
     self->priv->is_qcdm = FALSE;
@@ -127,6 +129,14 @@ mm_port_probe_reset (MMPortProbe *self)
     self->priv->is_xmm = FALSE;
     self->priv->is_qmi = FALSE;
     self->priv->is_mbim = FALSE;
+}
+
+void
+mm_port_probe_reset (MMPortProbe *self)
+{
+    /* Clears existing probe results after probing is complete */
+    g_assert (!self->priv->task);
+    mm_port_probe_clear (self);
 }
 
 /*****************************************************************************/
@@ -669,7 +679,7 @@ serial_probe_qcdm_parse_response (MMPortSerialQcdm *port,
     gint                 err = QCDM_SUCCESS;
     gboolean             is_qcdm = FALSE;
     gboolean             retry = FALSE;
-    GError              *error = NULL;
+    g_autoptr(GError)    error = NULL;
     GByteArray          *response;
     PortProbeRunContext *ctx;
 
@@ -695,11 +705,17 @@ serial_probe_qcdm_parse_response (MMPortSerialQcdm *port,
     } else if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_PARSE_FAILED)) {
         /* Failed to unescape QCDM packet: don't retry */
         mm_obj_dbg (self, "QCDM parsing error: %s", error->message);
-        g_error_free (error);
+    } else if (g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_NO_CARRIER)) {
+        /* Special-case: the port may have been in PPP mode (if system is restarted
+         * but the modem still had power) and failed AT probing. QCDM probing
+         * sends empty HDLC frames that PPP parses and then terminates the
+         * connection with "NO CARRIER". Match this and go back to AT probing.
+         */
+        mm_obj_dbg (self, "QCDM parsing got NO CARRIER; retrying AT probing");
+        mm_port_probe_clear (self);
     } else {
         if (!g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT))
             mm_obj_dbg (self, "QCDM probe error: (%d) %s", error->code, error->message);
-        g_error_free (error);
         retry = TRUE;
     }
 
