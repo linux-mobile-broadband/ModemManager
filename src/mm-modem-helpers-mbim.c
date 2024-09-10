@@ -747,7 +747,6 @@ mm_boolean_from_mbim_context_state (MbimContextState   value,
                      "Unsupported context state value: 0x%x", value);
         return FALSE;
     }
-
 }
 
 MbimContextState
