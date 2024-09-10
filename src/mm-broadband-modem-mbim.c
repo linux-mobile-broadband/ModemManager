@@ -4147,9 +4147,9 @@ modem_3gpp_load_initial_eps_bearer_settings_finish (MMIfaceModem3gpp  *self,
 }
 
 static MMBearerProperties *
-common_process_lte_attach_configuration (MMBroadbandModemMbim        *self,
-                                         MbimLteAttachConfiguration  *config,
-                                         GError                     **error)
+common_process_lte_attach_configuration (MMBroadbandModemMbim              *self,
+                                         const MbimLteAttachConfiguration  *config,
+                                         GError                           **error)
 {
     MMBearerProperties  *properties;
     MMBearerIpFamily     ip_family = MM_BEARER_IP_FAMILY_NONE;
@@ -4176,18 +4176,84 @@ common_process_lte_attach_configuration (MMBroadbandModemMbim        *self,
     return properties;
 }
 
+static const MbimLteAttachConfiguration *
+lte_attach_configuration_response_detect_home_settings (MMBroadbandModemMbim                    *self,
+                                                        const MbimLteAttachConfiguration *const *configurations,
+                                                        guint32                                  n_configurations,
+                                                        const MbimLteAttachConfiguration       **out_partner,
+                                                        const MbimLteAttachConfiguration       **out_non_partner,
+                                                        GError                                 **error)
+{
+    const MbimLteAttachConfiguration *home = NULL;
+    guint32                           i;
+
+    if (out_partner)
+        *out_partner = NULL;
+    if (out_non_partner)
+        *out_non_partner = NULL;
+
+    for (i = 0; i < n_configurations; i++) {
+        switch (configurations[i]->roaming) {
+            case MBIM_LTE_ATTACH_CONTEXT_ROAMING_CONTROL_HOME:
+                if (home)
+                    mm_obj_dbg (self, "duplicated 'home' settings found at configuration index %u: skipping", i);
+                else {
+                    mm_obj_dbg (self, "'home' settings found at configuration index %u", i);
+                    home = configurations[i];
+                }
+                break;
+            case MBIM_LTE_ATTACH_CONTEXT_ROAMING_CONTROL_PARTNER:
+                if (out_partner) {
+                    if (*out_partner)
+                        mm_obj_dbg (self, "duplicated 'partner' settings found at configuration index %u: skipping", i);
+                    else {
+                        mm_obj_dbg (self, "'partner' settings found at configuration index %u", i);
+                        *out_partner = configurations[i];
+                    }
+                }
+                break;
+            case MBIM_LTE_ATTACH_CONTEXT_ROAMING_CONTROL_NON_PARTNER:
+                if (out_non_partner) {
+                    if (*out_non_partner)
+                        mm_obj_dbg (self, "duplicated 'non-partner' settings found at configuration index %u: skipping", i);
+                    else {
+                        mm_obj_dbg (self, "'non-partner' settings found at configuration index %u", i);
+                        *out_non_partner = configurations[i];
+                    }
+                }
+                break;
+            default:
+                mm_obj_dbg (self, "settings with unknown roaming control configuration (0x%x) found at index %u: skipping",
+                            configurations[i]->roaming, i);
+                break;
+        }
+    }
+
+    if (!home) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
+                     "'home' settings not found");
+        return NULL;
+    }
+
+    if (out_partner && !*out_partner)
+        mm_obj_dbg (self, "'partner' settings not found");
+    if (out_non_partner && !*out_non_partner)
+        mm_obj_dbg (self, "'non-partner' settings not found");
+    return home;
+}
+
 static void
 lte_attach_configuration_query_ready (MbimDevice   *device,
                                       GAsyncResult *res,
                                       GTask        *task)
 {
-    MMBroadbandModemMbim        *self;
-    MbimMessage                 *response;
-    GError                      *error = NULL;
-    MMBearerProperties          *properties = NULL;
-    guint32                      n_configurations = 0;
-    MbimLteAttachConfiguration **configurations = NULL;
-    guint                        i;
+    MMBroadbandModemMbim                       *self;
+    GError                                     *error = NULL;
+    g_autoptr(MbimMessage)                      response = NULL;
+    MMBearerProperties                         *properties = NULL;
+    guint32                                     n_configurations = 0;
+    g_autoptr(MbimLteAttachConfigurationArray)  configurations = NULL;
+    const MbimLteAttachConfiguration           *home;
 
     self = g_task_get_source_object (task);
 
@@ -4201,34 +4267,28 @@ lte_attach_configuration_query_ready (MbimDevice   *device,
             &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
-        goto out;
+        return;
     }
 
-    /* We should always receive 3 configurations but the MBIM API doesn't force
-     * that so we'll just assume we don't get always the same fixed number */
-    for (i = 0; i < n_configurations; i++) {
-        /* We only support configuring the HOME settings */
-        if (configurations[i]->roaming != MBIM_LTE_ATTACH_CONTEXT_ROAMING_CONTROL_HOME)
-            continue;
-        properties = common_process_lte_attach_configuration (self, configurations[i], &error);
-        break;
+    /* Lookup the home settings, which are the ones we always control via the MM API */
+    home = lte_attach_configuration_response_detect_home_settings (self,
+                                                                   (const MbimLteAttachConfiguration *const *)configurations,
+                                                                   n_configurations,
+                                                                   NULL, /* partner */
+                                                                   NULL, /* non-partner */
+                                                                   &error);
+    if (!home) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
     }
-    mbim_lte_attach_configuration_array_free (configurations);
 
-    if (!properties && !error)
-        error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
-                             "Couldn't find home network LTE attach settings");
-
-    g_assert (properties || error);
+    properties = common_process_lte_attach_configuration (self, home, &error);
     if (properties)
         g_task_return_pointer (task, properties, g_object_unref);
     else
         g_task_return_error (task, error);
     g_object_unref (task);
-
- out:
-    if (response)
-        mbim_message_unref (response);
 }
 
 static void
