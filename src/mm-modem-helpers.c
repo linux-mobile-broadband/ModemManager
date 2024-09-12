@@ -5339,3 +5339,20 @@ mm_decode_eid (const gchar *eid, gsize eid_len)
 
     return mm_bcd_to_string ((const guint8 *) eid, eid_len, FALSE /* low_nybble_first */);
 }
+
+/*****************************************************************************/
+
+guint
+mm_string_uint_map_lookup (const MMStringUintMap *map,
+                           const gsize            map_size,
+                           const gchar           *str,
+                           const guint            default_value)
+{
+    guint i;
+
+    for (i = 0; i < map_size; i++) {
+        if (g_str_equal (str, map[i].str))
+            return map[i].val;
+    }
+    return default_value;
+}

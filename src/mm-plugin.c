@@ -749,6 +749,16 @@ mm_plugin_supports_port_finish (MMPlugin      *self,
     return (MMPluginSupportsResult)value;
 }
 
+static const MMStringUintMap subsys_flags_map[] = {
+    { "tty",     MM_PORT_PROBE_AT | MM_PORT_PROBE_QCDM },
+    { "usbmisc", MM_PORT_PROBE_QMI | MM_PORT_PROBE_MBIM | MM_PORT_PROBE_AT },
+    { "rpmsg",   MM_PORT_PROBE_AT | MM_PORT_PROBE_QMI },
+    { "wwan",    MM_PORT_PROBE_QMI | MM_PORT_PROBE_MBIM | MM_PORT_PROBE_AT | MM_PORT_PROBE_QCDM },
+#if defined WITH_QRTR
+    { "qrtr",    MM_PORT_PROBE_QMI },
+#endif
+};
+
 void
 mm_plugin_supports_port (MMPlugin            *self,
                          MMDevice            *device,
@@ -803,19 +813,10 @@ mm_plugin_supports_port (MMPlugin            *self,
     }
 
     /* Build mask of flags based on subsystem */
-    subsystem_expected_flags = MM_PORT_PROBE_NONE;
-    if (g_str_equal (mm_kernel_device_get_subsystem (port), "tty"))
-        subsystem_expected_flags |= (MM_PORT_PROBE_AT | MM_PORT_PROBE_QCDM);
-    else if (g_str_equal (mm_kernel_device_get_subsystem (port), "usbmisc"))
-        subsystem_expected_flags |= (MM_PORT_PROBE_QMI | MM_PORT_PROBE_MBIM | MM_PORT_PROBE_AT);
-    else if (g_str_equal (mm_kernel_device_get_subsystem (port), "rpmsg"))
-        subsystem_expected_flags |= (MM_PORT_PROBE_AT | MM_PORT_PROBE_QMI);
-    else if (g_str_equal (mm_kernel_device_get_subsystem (port), "wwan"))
-        subsystem_expected_flags |= (MM_PORT_PROBE_QMI | MM_PORT_PROBE_MBIM | MM_PORT_PROBE_AT | MM_PORT_PROBE_QCDM);
-#if defined WITH_QRTR
-    else if (g_str_equal (mm_kernel_device_get_subsystem (port), "qrtr"))
-        subsystem_expected_flags |= MM_PORT_PROBE_QMI;
-#endif
+    subsystem_expected_flags = mm_string_uint_map_lookup (subsys_flags_map,
+                                                          G_N_ELEMENTS (subsys_flags_map),
+                                                          mm_kernel_device_get_subsystem (port),
+                                                          MM_PORT_PROBE_NONE);
 
     /* Build mask of flags based on plugin */
     plugin_expected_flags = MM_PORT_PROBE_NONE;

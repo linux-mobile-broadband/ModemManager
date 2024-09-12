@@ -112,6 +112,12 @@ struct _MMPortProbePrivate {
     GTask *task;
 };
 
+static const MMStringUintMap port_subsys_map[] = {
+    { "usbmisc", MM_PORT_SUBSYS_USBMISC },
+    { "rpmsg",   MM_PORT_SUBSYS_RPMSG },
+    { "wwan",    MM_PORT_SUBSYS_WWAN },
+};
+
 /*****************************************************************************/
 
 static void
@@ -542,11 +548,12 @@ wdm_probe_qmi (MMPortProbe *self)
     } else
 #endif /* WITH_QRTR */
     {
-        MMPortSubsys subsys = MM_PORT_SUBSYS_USBMISC;
+        MMPortSubsys subsys;
 
-        if (g_str_equal (mm_kernel_device_get_subsystem (self->priv->port), "rpmsg"))
-            subsys = MM_PORT_SUBSYS_RPMSG;
-
+        subsys = mm_string_uint_map_lookup (port_subsys_map,
+                                            G_N_ELEMENTS (port_subsys_map),
+                                            mm_kernel_device_get_subsystem (self->priv->port),
+                                            MM_PORT_SUBSYS_USBMISC);
         ctx->port_qmi = mm_port_qmi_new (mm_kernel_device_get_name (self->priv->port), subsys);
     }
 
@@ -1215,15 +1222,13 @@ serial_open_at (MMPortProbe *self)
 
     /* Create AT serial port if not done before */
     if (!ctx->serial) {
-        gpointer parser;
-        MMPortSubsys subsys = MM_PORT_SUBSYS_TTY;
+        gpointer     parser;
+        MMPortSubsys subsys;
 
-        if (g_str_equal (mm_kernel_device_get_subsystem (self->priv->port), "usbmisc"))
-            subsys = MM_PORT_SUBSYS_USBMISC;
-        else if (g_str_equal (mm_kernel_device_get_subsystem (self->priv->port), "rpmsg"))
-            subsys = MM_PORT_SUBSYS_RPMSG;
-        else if (g_str_equal (mm_kernel_device_get_subsystem (self->priv->port), "wwan"))
-            subsys = MM_PORT_SUBSYS_WWAN;
+        subsys = mm_string_uint_map_lookup (port_subsys_map,
+                                            G_N_ELEMENTS (port_subsys_map),
+                                            mm_kernel_device_get_subsystem (self->priv->port),
+                                            MM_PORT_SUBSYS_TTY);
 
         ctx->serial = MM_PORT_SERIAL (mm_port_serial_at_new (mm_kernel_device_get_name (self->priv->port), subsys));
         if (!ctx->serial) {
