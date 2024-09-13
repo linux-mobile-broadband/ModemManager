@@ -963,6 +963,7 @@ foreach_disable (gpointer        key,
 
     mm_base_modem_disable (modem,
                            MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
+                           MM_BASE_MODEM_OPERATION_PRIORITY_OVERRIDE,
                            (GAsyncReadyCallback)shutdown_disable_ready,
                            ctx);
 }

@@ -230,6 +230,7 @@ gboolean mm_base_modem_authorize_finish (MMBaseModem            *self,
 /* Operation lock support */
 
 typedef enum {  /*< underscore_name=mm_base_modem_operation_priority >*/
+    MM_BASE_MODEM_OPERATION_PRIORITY_UNKNOWN,
     /* Default operations are scheduled at the end of the list of pending
      * operations */
     MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
@@ -285,13 +286,14 @@ gboolean mm_base_modem_enable_finish     (MMBaseModem              *self,
                                           GAsyncResult             *res,
                                           GError                  **error);
 
-void     mm_base_modem_disable           (MMBaseModem              *self,
-                                          MMBaseModemOperationLock  operation_lock,
-                                          GAsyncReadyCallback       callback,
-                                          gpointer                  user_data);
-gboolean mm_base_modem_disable_finish    (MMBaseModem              *self,
-                                          GAsyncResult             *res,
-                                          GError                  **error);
+void     mm_base_modem_disable           (MMBaseModem                   *self,
+                                          MMBaseModemOperationLock       operation_lock,
+                                          MMBaseModemOperationPriority   priority,
+                                          GAsyncReadyCallback            callback,
+                                          gpointer                       user_data);
+gboolean mm_base_modem_disable_finish    (MMBaseModem                   *self,
+                                          GAsyncResult                  *res,
+                                          GError                       **error);
 
 #if defined WITH_SUSPEND_RESUME
 void     mm_base_modem_sync              (MMBaseModem              *self,

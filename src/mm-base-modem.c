@@ -808,11 +808,12 @@ lock_before_state_operation_ready (MMBaseModem  *self,
 }
 
 static void
-state_operation (MMBaseModem              *self,
-                 StateOperationType        operation_type,
-                 MMBaseModemOperationLock  operation_lock,
-                 GAsyncReadyCallback       callback,
-                 gpointer                  user_data)
+state_operation (MMBaseModem                  *self,
+                 StateOperationType            operation_type,
+                 MMBaseModemOperationLock      operation_lock,
+                 MMBaseModemOperationPriority  operation_priority,
+                 GAsyncReadyCallback           callback,
+                 gpointer                      user_data)
 {
     GTask                 *task;
     StateOperationContext *ctx;
@@ -871,7 +872,7 @@ state_operation (MMBaseModem              *self,
 
     g_assert (operation_lock == MM_BASE_MODEM_OPERATION_LOCK_REQUIRED);
     mm_base_modem_operation_lock (self,
-                                  MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
+                                  operation_priority,
                                   operation_description,
                                   (GAsyncReadyCallback) lock_before_state_operation_ready,
                                   task);
@@ -898,6 +899,7 @@ mm_base_modem_sync (MMBaseModem              *self,
     state_operation (self,
                      STATE_OPERATION_TYPE_SYNC,
                      operation_lock,
+                     MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
                      callback,
                      user_data);
 }
@@ -915,14 +917,16 @@ mm_base_modem_disable_finish (MMBaseModem   *self,
 }
 
 void
-mm_base_modem_disable (MMBaseModem              *self,
-                       MMBaseModemOperationLock  operation_lock,
-                       GAsyncReadyCallback       callback,
-                       gpointer                  user_data)
+mm_base_modem_disable (MMBaseModem                  *self,
+                       MMBaseModemOperationLock      operation_lock,
+                       MMBaseModemOperationPriority  operation_priority,
+                       GAsyncReadyCallback           callback,
+                       gpointer                      user_data)
 {
     state_operation (self,
                      STATE_OPERATION_TYPE_DISABLE,
                      operation_lock,
+                     operation_priority,
                      callback,
                      user_data);
 }
@@ -946,6 +950,7 @@ mm_base_modem_enable (MMBaseModem              *self,
     state_operation (self,
                      STATE_OPERATION_TYPE_ENABLE,
                      operation_lock,
+                     MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
                      callback,
                      user_data);
 }
@@ -969,6 +974,7 @@ mm_base_modem_initialize (MMBaseModem              *self,
     state_operation (self,
                      STATE_OPERATION_TYPE_INITIALIZE,
                      operation_lock,
+                     MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
                      callback,
                      user_data);
 }
