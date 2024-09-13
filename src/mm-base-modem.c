@@ -136,8 +136,13 @@ struct _MMBaseModemPrivate {
      * organized ports */
     GHashTable *link_ports;
 
-    /* Scheduled operations */
-    GList *scheduled_operations;
+    /* Scheduled operations. The forbidden_forever flag will be set to TRUE
+     * if an "override" operation is requested, and will never be set to FALSE
+     * back, it is expected the modem object will eventually be removed after
+     * the operation has finished,
+     */
+    GList    *scheduled_operations;
+    gboolean  scheduled_operations_forbidden_forever;
 };
 
 guint
@@ -1831,6 +1836,55 @@ base_modem_operation_run (MMBaseModem *self)
     g_object_unref (task);
 }
 
+static gboolean
+abort_pending_operation_in_idle_cb (GTask *task)
+{
+    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED,
+                             "Operation aborted");
+    g_object_unref (task);
+    return G_SOURCE_REMOVE;
+}
+
+static void
+abort_pending_operations (MMBaseModem *self)
+{
+    GList *head = NULL;
+    GList *abort_operations;
+
+    /* Steal the whole list before iterating it */
+    abort_operations = g_steal_pointer (&self->priv->scheduled_operations);
+
+    while (abort_operations) {
+        OperationInfo *info;
+        GTask         *task;
+
+        info = (OperationInfo *)(abort_operations->data);
+
+        /* Head operation may already be running, we should not abort that one */
+        if (!info->wait_task) {
+            /* Keep the head item as a single-element list */
+            g_assert (!head);
+            head = abort_operations;
+            abort_operations = g_list_remove_link (abort_operations, head);
+            continue;
+        }
+
+        g_assert (info->wait_task);
+        mm_obj_dbg (self, "[operation %" G_GSSIZE_FORMAT "] %s - %s: aborted early",
+                    info->id,
+                    mm_base_modem_operation_priority_get_string (info->priority),
+                    info->description);
+
+        task = g_steal_pointer (&info->wait_task);
+        g_idle_add ((GSourceFunc) abort_pending_operation_in_idle_cb, task);
+        abort_operations = g_list_delete_link (abort_operations, abort_operations);
+        operation_info_free (info);
+    }
+
+    /* Keep the running head, if any, in the list of scheduled operations */
+    self->priv->scheduled_operations = head;
+}
+
 void
 mm_base_modem_operation_lock (MMBaseModem                   *self,
                               MMBaseModemOperationPriority   priority,
@@ -1838,14 +1892,24 @@ mm_base_modem_operation_lock (MMBaseModem                   *self,
                               GAsyncReadyCallback            callback,
                               gpointer                       user_data)
 {
+    GTask          *task;
     OperationInfo  *info;
     static gssize   operation_id = 0;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    if (self->priv->scheduled_operations_forbidden_forever) {
+        mm_obj_dbg (self, "operation forbidden as override has already been requested");
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED,
+                                 "Operation aborted");
+        g_object_unref (task);
+        return;
+    }
 
     info = g_slice_new0 (OperationInfo);
     info->id = operation_id;
     info->priority = priority;
     info->description = g_strdup (description);
-    info->wait_task = g_task_new (self, NULL, callback, user_data);
+    info->wait_task = task;
 
     if (operation_id == G_MAXSSIZE) {
         mm_obj_dbg (self, "operation id reset");
@@ -1853,11 +1917,23 @@ mm_base_modem_operation_lock (MMBaseModem                   *self,
     } else
         operation_id++;
 
-    mm_obj_dbg (self, "[operation %" G_GSSIZE_FORMAT "] %s - %s: scheduled",
-                info->id,
-                mm_base_modem_operation_priority_get_string (info->priority),
-                info->description);
-    self->priv->scheduled_operations = g_list_append (self->priv->scheduled_operations, info);
+    if (info->priority == MM_BASE_MODEM_OPERATION_PRIORITY_OVERRIDE) {
+        mm_obj_dbg (self, "[operation %" G_GSSIZE_FORMAT "] %s - %s: override requested - no new operations will be allowed",
+                    info->id,
+                    mm_base_modem_operation_priority_get_string (info->priority),
+                    info->description);
+        g_assert (!self->priv->scheduled_operations_forbidden_forever);
+        self->priv->scheduled_operations_forbidden_forever = TRUE;
+        abort_pending_operations (self);
+        self->priv->scheduled_operations = g_list_append (self->priv->scheduled_operations, info);
+    } else if (info->priority == MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT) {
+        mm_obj_dbg (self, "[operation %" G_GSSIZE_FORMAT "] %s - %s: scheduled",
+                    info->id,
+                    mm_base_modem_operation_priority_get_string (info->priority),
+                    info->description);
+        self->priv->scheduled_operations = g_list_append (self->priv->scheduled_operations, info);
+    } else
+        g_assert_not_reached ();
 
     base_modem_operation_run (self);
 }

@@ -233,6 +233,10 @@ typedef enum {  /*< underscore_name=mm_base_modem_operation_priority >*/
     /* Default operations are scheduled at the end of the list of pending
      * operations */
     MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
+    /* An override operation will make all pending operations be cancelled, and
+     * it will also disallow adding new operations. This type of operation would
+     * be the last one expected in a modem object. */
+    MM_BASE_MODEM_OPERATION_PRIORITY_OVERRIDE,
 } MMBaseModemOperationPriority;
 
 void   mm_base_modem_operation_lock        (MMBaseModem                  *self,
