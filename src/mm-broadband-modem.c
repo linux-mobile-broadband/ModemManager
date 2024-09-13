@@ -12706,13 +12706,14 @@ syncing_step (GTask *task)
 /* 'sync' as function name conflicts with a declared function in unistd.h */
 static void
 synchronize (MMBaseModem         *self,
+             GCancellable        *cancellable,
              GAsyncReadyCallback  callback,
              gpointer             user_data)
 {
     SyncingContext *ctx;
     GTask          *task;
 
-    task = g_task_new (MM_BROADBAND_MODEM (self), NULL, callback, user_data);
+    task = g_task_new (self, cancellable, callback, user_data);
 
     /* Create SyncingContext */
     ctx = g_new0 (SyncingContext, 1);

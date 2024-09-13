@@ -961,7 +961,10 @@ foreach_disable (gpointer        key,
     ctx->low_power = foreach_ctx->low_power;
     ctx->remove = foreach_ctx->remove;
 
-    mm_base_modem_disable (modem, (GAsyncReadyCallback)shutdown_disable_ready, ctx);
+    mm_base_modem_disable (modem,
+                           MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
+                           (GAsyncReadyCallback)shutdown_disable_ready,
+                           ctx);
 }
 
 static gboolean
@@ -1067,8 +1070,12 @@ mm_base_manager_sync (MMBaseManager *self)
         modem = mm_device_peek_modem (MM_DEVICE (value));
 
         /* We just want to start the synchronization, we don't need the result */
-        if (modem)
-            mm_base_modem_sync (modem, (GAsyncReadyCallback)base_modem_sync_ready, NULL);
+        if (modem) {
+            mm_base_modem_sync (modem,
+                                MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
+                                (GAsyncReadyCallback)base_modem_sync_ready,
+                                NULL);
+        }
     }
 }
 

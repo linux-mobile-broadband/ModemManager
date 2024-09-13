@@ -345,6 +345,7 @@ mm_iface_modem_process_sim_event (MMIfaceModem *self)
 
     mm_base_modem_set_reprobe (MM_BASE_MODEM (self), TRUE);
     mm_base_modem_disable (MM_BASE_MODEM (self),
+                           MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
                            (GAsyncReadyCallback) after_sim_event_disable_ready,
                            NULL);
 }
@@ -2328,11 +2329,13 @@ handle_enable_auth_ready (MMBaseModem *self,
     if (ctx->enable) {
         mm_obj_info (self, "processing user request to enable modem...");
         mm_base_modem_enable (self,
+                              MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
                               (GAsyncReadyCallback)enable_ready,
                               ctx);
     } else {
         mm_obj_info (self, "processing user request to disable modem...");
         mm_base_modem_disable (self,
+                               MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
                                (GAsyncReadyCallback)enable_ready,
                                ctx);
     }
@@ -2408,6 +2411,7 @@ disable_after_low (MMIfaceModem               *self,
 {
     mm_obj_info (self, "automatically disable modem after low-power mode...");
     mm_base_modem_disable (MM_BASE_MODEM (self),
+                           MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
                            (GAsyncReadyCallback)disable_after_low_ready,
                            ctx);
 }
@@ -3703,6 +3707,7 @@ restart_initialize_idle (MMIfaceModem *self)
     priv = get_private (self);
 
     mm_base_modem_initialize (MM_BASE_MODEM (self),
+                              MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
                               (GAsyncReadyCallback) reinitialize_ready,
                               NULL);
 

@@ -756,6 +756,7 @@ connection_step (ConnectionContext *ctx)
         mm_obj_msg (ctx->self, "simple connect state (%d/%d): enable",
                     ctx->step, CONNECTION_STEP_LAST);
         mm_base_modem_enable (MM_BASE_MODEM (ctx->self),
+                              MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
                               (GAsyncReadyCallback)enable_ready,
                               ctx);
         return;

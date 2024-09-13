@@ -712,6 +712,167 @@ mm_base_modem_wait_link_port (MMBaseModem         *self,
 }
 
 /******************************************************************************/
+/* Common support to perform state update/sync operations with the base modem. */
+
+typedef enum {
+    STATE_OPERATION_TYPE_INITIALIZE,
+    STATE_OPERATION_TYPE_ENABLE,
+    STATE_OPERATION_TYPE_DISABLE,
+#if defined WITH_SUSPEND_RESUME
+    STATE_OPERATION_TYPE_SYNC,
+#endif
+} StateOperationType;
+
+typedef struct {
+    StateOperation       operation;
+    StateOperationFinish operation_finish;
+    gssize               operation_id;
+} StateOperationContext;
+
+static void
+state_operation_context_free (StateOperationContext *ctx)
+{
+    g_assert (ctx->operation_id < 0);
+    g_slice_free (StateOperationContext, ctx);
+}
+
+static gboolean
+state_operation_finish (MMBaseModem   *self,
+                        GAsyncResult  *res,
+                        GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+state_operation_ready (MMBaseModem  *self,
+                       GAsyncResult *res,
+                       GTask        *task)
+{
+    GError *error = NULL;
+
+    StateOperationContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    if (ctx->operation_id >= 0) {
+        mm_base_modem_operation_unlock (self, ctx->operation_id);
+        ctx->operation_id = (gssize) -1;
+    }
+
+    if (!ctx->operation_finish (self, res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+state_operation_run (GTask *task)
+{
+    MMBaseModem           *self;
+    StateOperationContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    ctx->operation (self,
+                    self->priv->cancellable,
+                    (GAsyncReadyCallback) state_operation_ready,
+                    task);
+}
+
+static void
+lock_before_state_operation_ready (MMBaseModem  *self,
+                                   GAsyncResult *res,
+                                   GTask        *task)
+{
+    GError                *error = NULL;
+    StateOperationContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    ctx->operation_id = mm_base_modem_operation_lock_finish (self, res, &error);
+    if (ctx->operation_id < 0) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    state_operation_run (task);
+}
+
+static void
+state_operation (MMBaseModem              *self,
+                 StateOperationType        operation_type,
+                 MMBaseModemOperationLock  operation_lock,
+                 GAsyncReadyCallback       callback,
+                 gpointer                  user_data)
+{
+    GTask                 *task;
+    StateOperationContext *ctx;
+    gboolean               optional;
+    const gchar           *operation_description;
+
+    ctx = g_slice_new0 (StateOperationContext);
+    ctx->operation_id = (gssize) -1;
+
+    /* configure operation to run */
+    switch (operation_type) {
+        case STATE_OPERATION_TYPE_INITIALIZE:
+            operation_description = "initialization";
+            optional = FALSE;
+            ctx->operation        = MM_BASE_MODEM_GET_CLASS (self)->initialize;
+            ctx->operation_finish = MM_BASE_MODEM_GET_CLASS (self)->initialize_finish;
+            break;
+        case STATE_OPERATION_TYPE_ENABLE:
+            operation_description = "enabling";
+            optional = FALSE;
+            ctx->operation        = MM_BASE_MODEM_GET_CLASS (self)->enable;
+            ctx->operation_finish = MM_BASE_MODEM_GET_CLASS (self)->enable_finish;
+            break;
+        case STATE_OPERATION_TYPE_DISABLE:
+            operation_description = "disabling";
+            optional = FALSE;
+            ctx->operation        = MM_BASE_MODEM_GET_CLASS (self)->disable;
+            ctx->operation_finish = MM_BASE_MODEM_GET_CLASS (self)->disable_finish;
+            break;
+#if defined WITH_SUSPEND_RESUME
+        case STATE_OPERATION_TYPE_SYNC:
+            operation_description = "sync";
+            optional = TRUE;
+            ctx->operation        = MM_BASE_MODEM_GET_CLASS (self)->sync;
+            ctx->operation_finish = MM_BASE_MODEM_GET_CLASS (self)->sync_finish;
+            break;
+#endif
+        default:
+            g_assert_not_reached ();
+    }
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) state_operation_context_free);
+
+    if (optional && (!ctx->operation || !ctx->operation_finish)) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED, "Unsupported");
+        g_object_unref (task);
+        return;
+    }
+    g_assert (ctx->operation && ctx->operation_finish);
+
+    if (operation_lock == MM_BASE_MODEM_OPERATION_LOCK_ALREADY_ACQUIRED) {
+        state_operation_run (task);
+        return;
+    }
+
+    g_assert (operation_lock == MM_BASE_MODEM_OPERATION_LOCK_REQUIRED);
+    mm_base_modem_operation_lock (self,
+                                  MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
+                                  operation_description,
+                                  (GAsyncReadyCallback) lock_before_state_operation_ready,
+                                  task);
+}
+
+/******************************************************************************/
 
 #if defined WITH_SUSPEND_RESUME
 
@@ -720,43 +881,20 @@ mm_base_modem_sync_finish (MMBaseModem   *self,
                            GAsyncResult  *res,
                            GError       **error)
 {
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
-static void
-sync_ready (MMBaseModem  *self,
-            GAsyncResult *res,
-            GTask        *task)
-{
-    GError *error = NULL;
-
-    if (!MM_BASE_MODEM_GET_CLASS (self)->sync_finish (self, res, &error))
-        g_task_return_error (task, error);
-    else
-        g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+    return state_operation_finish (self, res, error);
 }
 
 void
-mm_base_modem_sync (MMBaseModem         *self,
-                    GAsyncReadyCallback  callback,
-                    gpointer             user_data)
+mm_base_modem_sync (MMBaseModem              *self,
+                    MMBaseModemOperationLock  operation_lock,
+                    GAsyncReadyCallback       callback,
+                    gpointer                  user_data)
 {
-    GTask *task;
-
-    task = g_task_new (self, NULL, callback, user_data);
-
-    if (!MM_BASE_MODEM_GET_CLASS (self)->sync ||
-        !MM_BASE_MODEM_GET_CLASS (self)->sync_finish) {
-        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                 "Suspend/resume quick synchronization unsupported");
-        g_object_unref (task);
-        return;
-    }
-
-    MM_BASE_MODEM_GET_CLASS (self)->sync (self,
-                                          (GAsyncReadyCallback) sync_ready,
-                                          task);
+    state_operation (self,
+                     STATE_OPERATION_TYPE_SYNC,
+                     operation_lock,
+                     callback,
+                     user_data);
 }
 
 #endif /* WITH_SUSPEND_RESUME */
@@ -768,66 +906,69 @@ mm_base_modem_disable_finish (MMBaseModem   *self,
                               GAsyncResult  *res,
                               GError       **error)
 {
-    return MM_BASE_MODEM_GET_CLASS (self)->disable_finish (self, res, error);
+    return state_operation_finish (self, res, error);
 }
 
 void
-mm_base_modem_disable (MMBaseModem         *self,
-                       GAsyncReadyCallback  callback,
-                       gpointer             user_data)
+mm_base_modem_disable (MMBaseModem              *self,
+                       MMBaseModemOperationLock  operation_lock,
+                       GAsyncReadyCallback       callback,
+                       gpointer                  user_data)
 {
-    g_assert (MM_BASE_MODEM_GET_CLASS (self)->disable != NULL);
-    g_assert (MM_BASE_MODEM_GET_CLASS (self)->disable_finish != NULL);
-    MM_BASE_MODEM_GET_CLASS (self)->disable (
-        self,
-        self->priv->cancellable,
-        callback,
-        user_data);
+    state_operation (self,
+                     STATE_OPERATION_TYPE_DISABLE,
+                     operation_lock,
+                     callback,
+                     user_data);
 }
+
+/******************************************************************************/
 
 gboolean
 mm_base_modem_enable_finish (MMBaseModem   *self,
                              GAsyncResult  *res,
                              GError       **error)
 {
-    return MM_BASE_MODEM_GET_CLASS (self)->enable_finish (self, res, error);
+    return state_operation_finish (self, res, error);
 }
 
 void
-mm_base_modem_enable (MMBaseModem         *self,
-                      GAsyncReadyCallback  callback,
-                      gpointer             user_data)
+mm_base_modem_enable (MMBaseModem              *self,
+                      MMBaseModemOperationLock  operation_lock,
+                      GAsyncReadyCallback       callback,
+                      gpointer                  user_data)
 {
-    g_assert (MM_BASE_MODEM_GET_CLASS (self)->enable != NULL);
-    g_assert (MM_BASE_MODEM_GET_CLASS (self)->enable_finish != NULL);
-    MM_BASE_MODEM_GET_CLASS (self)->enable (
-        self,
-        self->priv->cancellable,
-        callback,
-        user_data);
+    state_operation (self,
+                     STATE_OPERATION_TYPE_ENABLE,
+                     operation_lock,
+                     callback,
+                     user_data);
 }
+
+/******************************************************************************/
 
 gboolean
 mm_base_modem_initialize_finish (MMBaseModem   *self,
                                  GAsyncResult  *res,
                                  GError       **error)
 {
-    return MM_BASE_MODEM_GET_CLASS (self)->initialize_finish (self, res, error);
+    return state_operation_finish (self, res, error);
 }
 
 void
-mm_base_modem_initialize (MMBaseModem         *self,
-                          GAsyncReadyCallback  callback,
-                          gpointer             user_data)
+mm_base_modem_initialize (MMBaseModem              *self,
+                          MMBaseModemOperationLock  operation_lock,
+                          GAsyncReadyCallback       callback,
+                          gpointer                  user_data)
 {
-    g_assert (MM_BASE_MODEM_GET_CLASS (self)->initialize != NULL);
-    g_assert (MM_BASE_MODEM_GET_CLASS (self)->initialize_finish != NULL);
-    MM_BASE_MODEM_GET_CLASS (self)->initialize (
-        self,
-        self->priv->cancellable,
-        callback,
-        user_data);
+    state_operation (self,
+                     STATE_OPERATION_TYPE_INITIALIZE,
+                     operation_lock,
+                     callback,
+                     user_data);
 }
+
+/******************************************************************************/
 
 void
 mm_base_modem_set_hotplugged (MMBaseModem *self,

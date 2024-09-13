@@ -437,6 +437,7 @@ mm_device_initialize_modem (MMDevice *self)
 
     mm_obj_dbg (self, "modem initializing...");
     mm_base_modem_initialize (modem,
+                              MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
                               (GAsyncReadyCallback)initialize_ready,
                               g_object_ref (self));
 }
@@ -749,6 +750,7 @@ mm_device_inhibit (MMDevice            *self,
 
     /* Make sure modem is disabled while inhibited */
     mm_base_modem_disable (self->priv->modem,
+                           MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
                            (GAsyncReadyCallback)inhibit_disable_ready,
                            task);
 }
