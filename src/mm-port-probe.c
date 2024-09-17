@@ -410,6 +410,21 @@ static gboolean serial_probe_qcdm     (MMPortProbe *self);
 static void     serial_probe_schedule (MMPortProbe *self);
 
 static void
+clear_probe_serial_port (PortProbeRunContext *ctx)
+{
+    if (ctx->serial) {
+        if (ctx->buffer_full_id) {
+            g_signal_handler_disconnect (ctx->serial, ctx->buffer_full_id);
+            ctx->buffer_full_id = 0;
+        }
+
+        if (mm_port_serial_is_open (ctx->serial))
+            mm_port_serial_close (ctx->serial);
+        g_clear_object (&ctx->serial);
+    }
+}
+
+static void
 port_probe_run_context_free (PortProbeRunContext *ctx)
 {
     if (ctx->cancellable && ctx->at_probing_cancellable_linked) {
@@ -422,16 +437,7 @@ port_probe_run_context_free (PortProbeRunContext *ctx)
         ctx->source_id = 0;
     }
 
-    if (ctx->serial && ctx->buffer_full_id) {
-        g_signal_handler_disconnect (ctx->serial, ctx->buffer_full_id);
-        ctx->buffer_full_id = 0;
-    }
-
-    if (ctx->serial) {
-        if (mm_port_serial_is_open (ctx->serial))
-            mm_port_serial_close (ctx->serial);
-        g_object_unref (ctx->serial);
-    }
+    clear_probe_serial_port (ctx);
 
 #if defined WITH_QMI
     if (ctx->port_qmi) {
@@ -449,10 +455,8 @@ port_probe_run_context_free (PortProbeRunContext *ctx)
     }
 #endif
 
-    if (ctx->at_probing_cancellable)
-        g_object_unref (ctx->at_probing_cancellable);
-    if (ctx->cancellable)
-        g_object_unref (ctx->cancellable);
+    g_clear_object (&ctx->at_probing_cancellable);
+    g_clear_object (&ctx->cancellable);
 
     g_slice_free (PortProbeRunContext, ctx);
 }
@@ -799,15 +803,7 @@ serial_probe_qcdm (MMPortProbe *self)
     mm_obj_dbg (self, "probing QCDM...");
 
     /* If open, close the AT port */
-    if (ctx->serial) {
-        /* Explicitly clear the buffer full signal handler */
-        if (ctx->buffer_full_id) {
-            g_signal_handler_disconnect (ctx->serial, ctx->buffer_full_id);
-            ctx->buffer_full_id = 0;
-        }
-        mm_port_serial_close (ctx->serial);
-        g_object_unref (ctx->serial);
-    }
+    clear_probe_serial_port (ctx);
 
     if (g_str_equal (mm_kernel_device_get_subsystem (self->priv->port), "wwan"))
         subsys = MM_PORT_SUBSYS_WWAN;
