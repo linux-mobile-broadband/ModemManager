@@ -132,7 +132,7 @@ handle_qrtr_node_added (QrtrBus          *qrtr_bus,
 
     qrtr_node_wait_for_services (node,
                                  services,
-                                 1000, /* ms */
+                                 4000, /* ms */
                                  NULL,
                                  (GAsyncReadyCallback) qrtr_node_services_ready,
                                  ctx);
