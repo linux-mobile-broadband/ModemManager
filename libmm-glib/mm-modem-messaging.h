@@ -116,6 +116,19 @@ gboolean mm_modem_messaging_delete_sync   (MMModemMessaging *self,
                                            GCancellable *cancellable,
                                            GError **error);
 
+void     mm_modem_messaging_set_default_storage        (MMModemMessaging *self,
+                                                        MMSmsStorage storage,
+                                                        GCancellable *cancellable,
+                                                        GAsyncReadyCallback callback,
+                                                        gpointer user_data);
+gboolean mm_modem_messaging_set_default_storage_finish (MMModemMessaging *self,
+                                                        GAsyncResult *res,
+                                                        GError **error);
+gboolean mm_modem_messaging_set_default_storage_sync   (MMModemMessaging *self,
+                                                        MMSmsStorage storage,
+                                                        GCancellable *cancellable,
+                                                        GError **error);
+
 G_END_DECLS
 
 #endif /* _MM_MODEM_MESSAGING_H_ */

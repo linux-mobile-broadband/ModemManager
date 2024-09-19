@@ -377,6 +377,109 @@ handle_list (MmGdbusModemMessaging *skeleton,
 
 /*****************************************************************************/
 
+typedef struct {
+    MmGdbusModemMessaging *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModemMessaging *self;
+    MMSmsStorage           storage;
+} HandleSetDefaultStorageContext;
+
+static void
+handle_set_default_storage_context_free (HandleSetDefaultStorageContext *ctx)
+{
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_slice_free (HandleSetDefaultStorageContext, ctx);
+}
+static void
+handle_set_default_storage_ready (MMIfaceModemMessaging          *self,
+                                  GAsyncResult                   *res,
+                                  HandleSetDefaultStorageContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->set_default_storage_finish (self, res, &error)) {
+        mm_obj_warn (self, "could not set default storage: %s", error->message);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_set_default_storage_context_free (ctx);
+        return;
+    }
+
+    g_object_set (self,
+                  MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE, ctx->storage,
+                  NULL);
+
+    mm_obj_info (self, "set the default storage successfully");
+    mm_gdbus_modem_messaging_complete_set_default_storage (ctx->skeleton, ctx->invocation);
+    handle_set_default_storage_context_free (ctx);
+}
+
+static void
+handle_set_default_storage_auth_ready (MMBaseModem                    *self,
+                                       GAsyncResult                   *res,
+                                       HandleSetDefaultStorageContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_set_default_storage_context_free (ctx);
+        return;
+    }
+
+    if (ctx->storage == MM_SMS_STORAGE_UNKNOWN) {
+        mm_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot set default storage: Unknown storage");
+        handle_set_default_storage_context_free (ctx);
+        return;
+    }
+
+    mm_obj_info (self, "procesing user request to set default storage '%s'...",
+                 mm_sms_storage_get_string (ctx->storage));
+
+    if (!(MM_IFACE_MODEM_MESSAGING_GET_IFACE (ctx->self)->set_default_storage) ||
+        !(MM_IFACE_MODEM_MESSAGING_GET_IFACE (ctx->self)->set_default_storage_finish)) {
+        mm_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot set default storage: not supported");
+        handle_set_default_storage_context_free (ctx);
+        return;
+    }
+
+    MM_IFACE_MODEM_MESSAGING_GET_IFACE (ctx->self)->set_default_storage (
+        ctx->self,
+        ctx->storage,
+        (GAsyncReadyCallback)handle_set_default_storage_ready,
+        ctx);
+}
+
+static gboolean
+handle_set_default_storage (MmGdbusModemMessaging *skeleton,
+                            GDBusMethodInvocation *invocation,
+                            guint32                storage,
+                            MMIfaceModemMessaging *self)
+{
+    HandleSetDefaultStorageContext *ctx;
+
+    ctx = g_slice_new0 (HandleSetDefaultStorageContext);
+    ctx->skeleton   = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self       = g_object_ref (self);
+    ctx->storage    = (MMSmsStorage)storage;
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_MESSAGING,
+                             (GAsyncReadyCallback)handle_set_default_storage_auth_ready,
+                             ctx);
+    return TRUE;
+}
+/*****************************************************************************/
+
 gboolean
 mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,
                                     MMSmsPart             *sms_part,
@@ -1322,6 +1425,10 @@ interface_initialization_step (GTask *task)
         g_signal_connect (ctx->skeleton,
                           "handle-list",
                           G_CALLBACK (handle_list),
+                          self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-set-default-storage",
+                          G_CALLBACK (handle_set_default_storage),
                           self);
 
         /* Finally, export the new interface */

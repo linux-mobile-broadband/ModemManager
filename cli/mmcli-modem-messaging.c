@@ -53,6 +53,7 @@ static gchar *create_str;
 static gchar *create_with_data_str;
 static gchar *create_with_text_str;
 static gchar *delete_str;
+static gchar *set_default_storage_str;
 
 static GOptionEntry entries[] = {
     { "messaging-status", 0, 0, G_OPTION_ARG_NONE, &status_flag,
@@ -78,6 +79,10 @@ static GOptionEntry entries[] = {
     { "messaging-delete-sms", 0, 0, G_OPTION_ARG_STRING, &delete_str,
       "Delete a SMS from a given modem",
       "[PATH|INDEX]"
+    },
+    { "set-default-storage", 0, 0, G_OPTION_ARG_STRING, &set_default_storage_str,
+      "Set Default storage for storing SMS",
+      "[Storage]"
     },
     { NULL }
 };
@@ -109,7 +114,8 @@ mmcli_modem_messaging_options_enabled (void)
     n_actions = (status_flag +
                  list_flag +
                  !!create_str +
-                 !!delete_str);
+                 !!delete_str +
+                 !!set_default_storage_str);
 
     if (n_actions > 1) {
         g_printerr ("error: too many Messaging actions requested\n");
@@ -401,6 +407,33 @@ get_sms_to_delete_ready (GDBusConnection *connection,
 }
 
 static void
+set_default_storage_process_reply (gboolean      result,
+                                   const GError *error)
+{
+    if (!result) {
+      g_printerr ("error: couldn't set default storage: '%s'\n",
+                   error ? error->message : "unknown error");
+      exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully set the default storage\n");
+}
+
+static void
+set_default_storage_ready (MMModemMessaging *modem,
+                           GAsyncResult     *result,
+                           gpointer          nothing)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_messaging_set_default_storage_finish (modem, result, &error);
+    set_default_storage_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
 get_modem_ready (GObject      *source,
                  GAsyncResult *result,
                  gpointer      none)
@@ -451,6 +484,26 @@ get_modem_ready (GObject      *source,
                        ctx->cancellable,
                        (GAsyncReadyCallback)get_sms_to_delete_ready,
                        NULL);
+        return;
+    }
+
+    /* Request to set default storage */
+    if (set_default_storage_str) {
+        MMSmsStorage storage;
+        GError *error = NULL;
+
+        storage = mm_common_get_sms_storage_from_string (set_default_storage_str, &error);
+        if (error) {
+            g_printerr ("error: couldn't set default storage: %s\n",
+                        error->message);
+            exit (EXIT_FAILURE);
+        }
+
+        mm_modem_messaging_set_default_storage (ctx->modem_messaging,
+                                                storage,
+                                                ctx->cancellable,
+                                                (GAsyncReadyCallback)set_default_storage_ready,
+                                                NULL);
         return;
     }
 
@@ -554,6 +607,26 @@ mmcli_modem_messaging_run_synchronous (GDBusConnection *connection)
         g_object_unref (obj);
 
         delete_process_reply (result, error);
+        return;
+    }
+
+    /* Request to set default storage for storing SMS */
+    if (set_default_storage_str) {
+        gboolean operation_result;
+        MMSmsStorage storage;
+
+        storage = mm_common_get_sms_storage_from_string (set_default_storage_str, &error);
+        if (error) {
+            g_printerr ("error: couldn't set default storage: %s\n",
+                         error->message);
+            exit (EXIT_FAILURE);
+        }
+
+        operation_result = mm_modem_messaging_set_default_storage_sync (ctx->modem_messaging,
+                                                                        storage,
+                                                                        NULL,
+                                                                        &error);
+        set_default_storage_process_reply (operation_result, error);
         return;
     }
 

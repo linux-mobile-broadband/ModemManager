@@ -43,6 +43,14 @@
     </method>
 
     <!--
+         SetDefaultStorage
+         @storage: set the default storage to storage
+    -->
+    <method name="SetDefaultStorage">
+      <arg name="storage" type="u" direction="in" />
+    </method>
+
+    <!--
         Delete:
         @path: The object path of the SMS to delete.
 
