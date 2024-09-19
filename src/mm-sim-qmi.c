@@ -679,20 +679,11 @@ uim_read_efad_ready (QmiClientUim *client,
         return;
     }
 
-    if (read_result->len < 4) {
-        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                 "Unexpected response length reading EFad: %u", read_result->len);
-        g_object_unref (task);
-        return;
-    }
-
-    /* MNC length is byte 4 of this SIM file */
-    mnc_length = read_result->data[3];
-    if (mnc_length == 2 || mnc_length == 3) {
-        g_task_return_pointer (task, g_strndup (self->priv->imsi, 3 + mnc_length), g_free);
+    mnc_length = mm_sim_validate_mnc_length ((const guint8 *) read_result->data, read_result->len, &error);
+    if (!mnc_length) {
+        g_task_return_error (task, error);
     } else {
-        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                 "SIM returned invalid MNC length %d (should be either 2 or 3)", mnc_length);
+        g_task_return_pointer (task, g_strndup (self->priv->imsi, 3 + mnc_length), g_free);
     }
     g_object_unref (task);
 }
@@ -738,31 +729,6 @@ load_operator_name_finish (MMBaseSim     *self,
     return g_task_propagate_pointer (G_TASK (res), error);
 }
 
-static gchar *
-parse_spn (const guint8  *bin,
-           gsize          len,
-           GError       **error)
-{
-    g_autoptr(GByteArray)  bin_array = NULL;
-    gsize                  binlen;
-
-    /* Remove the FF filler at the end */
-    binlen = len;
-    while (binlen > 1 && bin[binlen - 1] == 0xff)
-        binlen--;
-    if (binlen <= 1) {
-        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "SIM returned empty spn");
-        return NULL;
-    }
-
-    /* Setup as bytearray.
-     * First byte is metadata; remainder is GSM-7 unpacked into octets; convert to UTF8 */
-    bin_array = g_byte_array_sized_new (binlen - 1);
-    g_byte_array_append (bin_array, bin + 1, binlen - 1);
-
-    return mm_modem_charset_bytearray_to_utf8 (bin_array, MM_MODEM_CHARSET_GSM, FALSE, error);
-}
-
 static void
 uim_read_efspn_ready (QmiClientUim *client,
                       GAsyncResult *res,
@@ -779,8 +745,7 @@ uim_read_efspn_ready (QmiClientUim *client,
         return;
     }
 
-    spn = parse_spn ((const guint8 *) read_result->data, read_result->len, &error);
-
+    spn = mm_sim_convert_spn_to_utf8 ((const guint8 *) read_result->data, read_result->len, &error);
     if (!spn) {
         g_task_return_error (task, error);
     } else {

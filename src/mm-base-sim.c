@@ -2050,7 +2050,6 @@ parse_mnc_length (const gchar *response,
         (sw1 == 0x92) ||
         (sw1 == 0x9f)) {
         gsize              buflen = 0;
-        guint32            mnc_len;
         g_autofree guint8 *bin = NULL;
 
         /* Convert hex string to binary */
@@ -2059,20 +2058,8 @@ parse_mnc_length (const gchar *response,
             g_prefix_error (error, "SIM returned malformed response '%s': ", hex);
             return 0;
         }
-        if (buflen < 4) {
-            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                         "SIM returned malformed response '%s': too short", hex);
-            return 0;
-        }
 
-        /* MNC length is byte 4 of this SIM file */
-        mnc_len = bin[3];
-        if (mnc_len == 2 || mnc_len == 3)
-            return mnc_len;
-
-        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                     "SIM returned invalid MNC length %d (should be either 2 or 3)", mnc_len);
-        return 0;
+        return mm_sim_validate_mnc_length (bin, buflen, error);
     }
 
     g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
@@ -2157,7 +2144,6 @@ parse_spn (const gchar *response,
         (sw1 == 0x91) ||
         (sw1 == 0x92) ||
         (sw1 == 0x9f)) {
-        g_autoptr(GByteArray)  bin_array = NULL;
         g_autofree guint8     *bin = NULL;
         gsize                  binlen = 0;
 
@@ -2168,20 +2154,7 @@ parse_spn (const gchar *response,
             return NULL;
         }
 
-        /* Remove the FF filler at the end */
-        while (binlen > 1 && bin[binlen - 1] == 0xff)
-            binlen--;
-        if (binlen <= 1) {
-            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                         "SIM returned empty response '%s'", hex);
-            return NULL;
-        }
-        /* Setup as bytearray.
-         * First byte is metadata; remainder is GSM-7 unpacked into octets; convert to UTF8 */
-        bin_array = g_byte_array_sized_new (binlen - 1);
-        g_byte_array_append (bin_array, bin + 1, binlen - 1);
-
-        return mm_modem_charset_bytearray_to_utf8 (bin_array, MM_MODEM_CHARSET_GSM, FALSE, error);
+        return mm_sim_convert_spn_to_utf8 (bin, binlen, error);
     }
 
     g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,

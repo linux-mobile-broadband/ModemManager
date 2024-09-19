@@ -4689,6 +4689,89 @@ test_mm_split_string_groups (void)
 
 /*****************************************************************************/
 
+typedef struct {
+    const guint8  bin_array[10];
+    gsize         bin_len;
+    const gchar  *expected_name;
+    gboolean      expected_error;
+} TestSpnData;
+
+static const TestSpnData test_spn_data[] = {
+    { { 0, 'T', 'e', 's', 't', 0xff, 0xff, 0xff, 0xff, 0xff }, 10, "Test",   FALSE },
+    { { 'T', 'e', 's', 't', 0xff, 0xff },                       6, "est",    FALSE },
+    { { 0, 0, '$', 'T', 'e', 's', 't' },                        7, "@¤Test", FALSE },
+    { { 0 },                                                    0, "",       TRUE },
+    { { 0, 0xff },                                              2, "",       TRUE },
+    { { 0xff, 0xff },                                           2, "",       TRUE },
+};
+
+static void
+test_spn_to_utf8 (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (test_spn_data); i++) {
+        gchar  *result = NULL;
+        GError *error = NULL;
+
+        result = mm_sim_convert_spn_to_utf8 (test_spn_data[i].bin_array,
+                                             test_spn_data[i].bin_len,
+                                             &error);
+
+        if (test_spn_data[i].expected_error) {
+            g_assert (!result);
+            g_assert (error);
+            g_error_free (error);
+        } else {
+            g_assert (result);
+            g_assert_no_error (error);
+            g_assert_cmpstr (result, ==, test_spn_data[i].expected_name);
+            g_free (result);
+        }
+    }
+}
+
+typedef struct {
+    const guint8 bin_array[4];
+    gsize        bin_len;
+    guint        expected_length;
+    gboolean     expected_error;
+} TestMncData;
+
+static const TestMncData test_mnc_data[] = {
+    { { 0 }, 0, 0, TRUE },
+    { { 0, 0, 0, 2 }, 3, 0, TRUE },
+    { { 0, 0, 0, 2 }, 5, 2, FALSE },
+    { { 0, 0, 0, 2 }, 4, 2, FALSE },
+    { { 0, 0, 0, 3 }, 4, 3, FALSE },
+    { { 0, 0, 0, 4 }, 4, 0, TRUE },
+};
+
+static void
+test_mnc_length (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (test_mnc_data); i++) {
+        guint   result;
+        GError *error = NULL;
+
+        result = mm_sim_validate_mnc_length (test_mnc_data[i].bin_array,
+                                             test_mnc_data[i].bin_len,
+                                             &error);
+
+        if (test_mnc_data[i].expected_error) {
+            g_assert (error);
+            g_error_free (error);
+        } else {
+            g_assert_no_error (error);
+        }
+        g_assert_cmpuint (result, ==, test_mnc_data[i].expected_length);
+    }
+}
+
+/*****************************************************************************/
+
 #define TESTCASE(t, d) g_test_create_case (#t, 0, d, NULL, (GTestFixtureFunc) t, NULL)
 
 int main (int argc, char **argv)
@@ -4928,6 +5011,9 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cpol_response, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_mm_split_string_groups, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_spn_to_utf8, NULL));
+    g_test_suite_add (suite, TESTCASE (test_mnc_length, NULL));
 
     result = g_test_run ();
 

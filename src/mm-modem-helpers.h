@@ -571,6 +571,15 @@ gboolean mm_sim_parse_cpol_test_response (const gchar  *response,
                                           guint        *out_max_index,
                                           GError      **error);
 
+/* Parse operator name and mnc length */
+gchar *mm_sim_convert_spn_to_utf8 (const guint8  *bin,
+                                   gsize          len,
+                                   GError       **error);
+
+guint mm_sim_validate_mnc_length (const guint8  *bin,
+                                  gsize          len,
+                                  GError       **error);
+
 /*****************************************************************************/
 
 /* Useful when clamp-ing an unsigned integer with implicit low limit set to 0,

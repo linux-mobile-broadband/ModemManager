@@ -1067,20 +1067,15 @@ common_read_binary_operator_id_ready (MMSimMbim    *self,
     GByteArray        *value;
 
     value = common_read_binary_finish (self, res, &error);
-    if (!value) {
-        mm_obj_dbg (self, "failed reading operator ID using MBIM: %s", error->message);
-    } else if (value->len != 4) {
-        mm_obj_dbg (self, "failed reading operator ID using MBIM: unexpected field size");
-    } else {
-        guint mnc_len = value->data[3];
-
-        if (mnc_len == 2 || mnc_len == 3) {
+    if (value) {
+        guint mnc_len = mm_sim_validate_mnc_length (value->data, value->len, &error);;
+        if (mnc_len) {
             g_task_return_pointer (task, g_strndup (self->priv->imsi, 3 + mnc_len), g_free);
             g_object_unref (task);
             return;
         }
-        mm_obj_dbg (self, "failed reading operator ID using MBIM: unexpected MNC length: %u", mnc_len);
     }
+    mm_obj_dbg (self, "failed reading operator ID using MBIM: %s", error->message);
 
     /* Fallback to parent implementation if possible */
     MM_BASE_SIM_CLASS (mm_sim_mbim_parent_class)->load_operator_identifier (MM_BASE_SIM (self),
@@ -1145,31 +1140,15 @@ common_read_binary_operator_name_ready (MMSimMbim    *self,
     GByteArray        *value;
 
     value = common_read_binary_finish (self, res, &error);
-    if (!value) {
-        mm_obj_dbg (self, "failed reading operator name using MBIM: %s", error->message);
-    } else {
-        gsize len = value->len;
-
-        while (len > 1 && value->data[len - 1] == 0xff)
-            len--;
-        if (len <= 1) {
-            mm_obj_dbg (self, "failed reading operator name using MBIM: value is empty");
-        } else {
-            g_autoptr(GByteArray) array = NULL;
-            gchar *name;
-
-            /* Remove the first metadata byte and convert remainder to UTF8 string */
-            array = g_byte_array_sized_new (len - 1);
-            g_byte_array_append (array, value->data + 1, len - 1);
-            name = mm_modem_charset_bytearray_to_utf8 (array, MM_MODEM_CHARSET_GSM, FALSE, &error);
-            if (name) {
-                g_task_return_pointer (task, name, g_free);
-                g_object_unref (task);
-                return;
-            }
-            mm_obj_dbg (self, "failed reading operator name using MBIM: %s", error->message);
+    if (value) {
+        gchar *name = mm_sim_convert_spn_to_utf8 (value->data, value->len, &error);
+        if (name) {
+            g_task_return_pointer (task, name, g_free);
+            g_object_unref (task);
+            return;
         }
     }
+    mm_obj_dbg (self, "failed reading operator name using MBIM: %s", error->message);
 
     /* Fallback to parent implementation if possible */
     MM_BASE_SIM_CLASS (mm_sim_mbim_parent_class)->load_operator_name (MM_BASE_SIM (self),
