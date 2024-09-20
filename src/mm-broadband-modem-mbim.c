@@ -153,6 +153,7 @@ struct _MMBroadbandModemMbimPrivate {
     gboolean is_ms_sar_supported;
     gboolean is_google_carrier_lock_supported;
     gboolean is_ms_device_reset_supported;
+    gboolean is_qdu_supported;
 
     /* Process unsolicited notifications */
     gulong                  notification_id;
@@ -3534,6 +3535,12 @@ query_device_services_ready (MbimDevice   *device,
                         self->priv->is_google_carrier_lock_supported = TRUE;
                     }
                 }
+                continue;
+            }
+
+            if (service == MBIM_SERVICE_QDU) {
+                mm_obj_dbg (self, "Qualcomm Device Upgrade method mbim-qdu supported");
+                self->priv->is_qdu_supported = TRUE;
                 continue;
             }
 
@@ -10380,11 +10387,43 @@ modem_firmware_load_update_settings_finish (MMIfaceModemFirmware  *self,
     return mm_iface_modem_firmware_load_update_settings_in_port_finish (self, res, error);
 }
 
+static gboolean
+modem_is_qdu_supported (MMBaseModem    *modem,
+                        MMKernelDevice *kernel_device)
+{
+    return mm_kernel_device_get_global_property_as_boolean (kernel_device, "ID_MM_MBIM_QDU");
+}
+
 static void
 modem_firmware_load_update_settings (MMIfaceModemFirmware *self,
                                      GAsyncReadyCallback   callback,
                                      gpointer              user_data)
 {
+    GTask                               *task;
+    MMPortMbim                          *mbim_port;
+    MMKernelDevice                      *kernel_device;
+    MMModemFirmwareUpdateMethod          update_methods;
+    g_autoptr(MMFirmwareUpdateSettings)  update_settings = NULL;
+
+    /* Check first if 'mbim-qdu' is supported and selected via udev. If the
+     * update method 'mbim-qdu' is not supported and not selected via udev,
+     * then the generic update method 'firehose/sahara' are checked.
+     */
+    update_methods = MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE;
+    mbim_port = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self));
+    if (mbim_port) {
+        kernel_device = mm_port_peek_kernel_device (MM_PORT (mbim_port));
+        if ((MM_BROADBAND_MODEM_MBIM (self)->priv->is_qdu_supported) &&
+            modem_is_qdu_supported (MM_BASE_MODEM (self), kernel_device)) {
+            task = g_task_new (self, NULL, callback, user_data);
+            update_settings = mm_firmware_update_settings_new (update_methods);
+            mm_firmware_update_settings_set_method (update_settings, MM_MODEM_FIRMWARE_UPDATE_METHOD_MBIM_QDU);
+            g_task_return_pointer (task, g_object_ref (update_settings), (GDestroyNotify) g_object_unref);
+            g_object_unref (task);
+            return;
+        }
+    }
+
     mm_iface_modem_firmware_load_update_settings_in_port (
         self,
         MM_PORT (mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self))),
