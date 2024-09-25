@@ -27,11 +27,9 @@
 
 typedef struct _MMBroadbandModemQuectel MMBroadbandModemQuectel;
 typedef struct _MMBroadbandModemQuectelClass MMBroadbandModemQuectelClass;
-typedef struct _MMBroadbandModemQuectelPrivate MMBroadbandModemQuectelPrivate;
 
 struct _MMBroadbandModemQuectel {
-    MMBroadbandModem                parent;
-    MMBroadbandModemQuectelPrivate *priv;
+    MMBroadbandModem parent;
 };
 
 struct _MMBroadbandModemQuectelClass{

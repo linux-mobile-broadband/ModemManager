@@ -40,33 +40,6 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQuectel, mm_broadband_modem_quectel, MM_
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_QUECTEL, shared_quectel_init))
 
-struct _MMBroadbandModemQuectelPrivate {
-    /* Flag to specify whether a power operation is ongoing */
-    gboolean power_operation_ongoing;
-};
-
-/*****************************************************************************/
-
-static gboolean
-acquire_power_operation (MMBroadbandModemQuectel  *self,
-                         GError                  **error)
-{
-    if (self->priv->power_operation_ongoing) {
-        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_RETRY,
-                     "An operation which requires power updates is currently in progress");
-        return FALSE;
-    }
-    self->priv->power_operation_ongoing = TRUE;
-    return TRUE;
-}
-
-static void
-release_power_operation (MMBroadbandModemQuectel *self)
-{
-    g_assert (self->priv->power_operation_ongoing);
-    self->priv->power_operation_ongoing = FALSE;
-}
-
 /*****************************************************************************/
 /* Power state loading (Modem interface) */
 
@@ -132,23 +105,7 @@ common_modem_power_operation_finish (MMIfaceModem  *self,
                                      GAsyncResult  *res,
                                      GError       **error)
 {
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
-static void
-power_operation_ready (MMBaseModem  *self,
-                       GAsyncResult *res,
-                       GTask        *task)
-{
-    GError *error = NULL;
-
-    release_power_operation (MM_BROADBAND_MODEM_QUECTEL (self));
-
-    if (!mm_base_modem_at_command_finish (self, res, &error))
-        g_task_return_error (task, error);
-    else
-        g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
 }
 
 static void
@@ -157,24 +114,12 @@ common_modem_power_operation (MMBroadbandModemQuectel  *self,
                               GAsyncReadyCallback       callback,
                               gpointer                  user_data)
 {
-    GTask  *task;
-    GError *error = NULL;
-
-    task = g_task_new (self, NULL, callback, user_data);
-
-    /* Fail if there is already an ongoing power management operation */
-    if (!acquire_power_operation (self, &error)) {
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               command,
                               30,
                               FALSE,
-                              (GAsyncReadyCallback) power_operation_ready,
-                              task);
+                              callback,
+                              user_data);
 }
 
 static void
@@ -236,9 +181,6 @@ mm_broadband_modem_quectel_new (const gchar  *device,
 static void
 mm_broadband_modem_quectel_init (MMBroadbandModemQuectel *self)
 {
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
-                                              MM_TYPE_BROADBAND_MODEM_QUECTEL,
-                                              MMBroadbandModemQuectelPrivate);
 }
 
 static void
