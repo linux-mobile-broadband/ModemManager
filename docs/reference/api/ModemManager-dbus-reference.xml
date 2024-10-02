@@ -31,6 +31,7 @@
         All objects (<link linkend="ref-dbus-object-manager">Manager</link>,
         <link linkend="ref-dbus-object-modem">Modems</link>,
         <link linkend="ref-dbus-object-bearer">Bearers</link>,
+        <link linkend="ref-dbus-object-cbm">CBMs</link>,
         <link linkend="ref-dbus-object-sim">SIMs</link>,
         <link linkend="ref-dbus-object-sms">SMSs</link>) exported at the
         <link linkend="ref-dbus-bus-name"><literal>org.freedesktop.ModemManager1</literal></link>
@@ -48,6 +49,7 @@
         All objects (<link linkend="ref-dbus-object-manager">Manager</link>,
         <link linkend="ref-dbus-object-modem">Modems</link>,
         <link linkend="ref-dbus-object-bearer">Bearers</link>,
+        <link linkend="ref-dbus-object-cbm">CBMs</link>,
         <link linkend="ref-dbus-object-sim">SIMs</link>,
         <link linkend="ref-dbus-object-sms">SMSs</link>) exported at the
         <link linkend="ref-dbus-bus-name"><literal>org.freedesktop.ModemManager1</literal></link>
@@ -137,6 +139,7 @@
     <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Location.xml"/>
     <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Time.xml"/>
     <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Voice.xml"/>
+    <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.CellBroadcast.xml"/>
     <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Firmware.xml"/>
     <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Sar.xml"/>
     <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Signal.xml"/>
@@ -182,6 +185,16 @@
       Modems implementing the
       <link linkend="gdbus-org.freedesktop.ModemManager1.Modem.Voice">Voice interface</link>
       will export one Call object for each Call managed in the device.
+    </para>
+    <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Call.xml"/>
+  </chapter>
+
+  <chapter id="ref-dbus-object-call">
+    <title>The <literal>/org/freedesktop/ModemManager/CBM</literal> objects</title>
+    <para>
+      Modems implementing the
+      <link linkend="gdbus-org.freedesktop.ModemManager1.Modem.CellBroadcast">Cell Broadcast interface</link>
+      will export one CBM object for each Cell Broadcast message received by the device.
     </para>
     <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Call.xml"/>
   </chapter>

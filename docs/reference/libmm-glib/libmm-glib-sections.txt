@@ -91,6 +91,8 @@ mm_object_peek_modem_3gpp_ussd
 mm_object_get_modem_3gpp_ussd
 mm_object_peek_modem_cdma
 mm_object_get_modem_cdma
+mm_object_peek_modem_cell_broadcast
+mm_object_get_modem_cell_broadcast
 mm_object_peek_modem_location
 mm_object_get_modem_location
 mm_object_peek_modem_messaging
@@ -920,6 +922,32 @@ MM_MODEM_MESSAGING_CLASS
 MM_MODEM_MESSAGING_GET_CLASS
 MM_TYPE_MODEM_MESSAGING
 mm_modem_messaging_get_type
+</SECTION>
+
+<SECTION>
+<FILE>mm-modem-cell-broadcast</FILE>
+<TITLE>MMModemCellBroadcast</TITLE>
+MMModemCellBroadcast
+<SUBSECTION Getters>
+mm_modem_cell_broadcast_get_path
+mm_modem_cell_broadcast_dup_path
+<SUBSECTION Methods>
+mm_modem_cell_broadcast_delete
+mm_modem_cell_broadcast_delete_finish
+mm_modem_cell_broadcast_delete_sync
+mm_modem_cell_broadcast_list
+mm_modem_cell_broadcast_list_finish
+mm_modem_cell_broadcast_list_sync
+<SUBSECTION Standard>
+MMModemCellBroadcastClass
+MMModemCellBroadcastPrivate
+MM_GDBUS_IS_MODEM_CELL_BROADCAST
+MM_IS_MODEM_CELL_BROADCAST_CLASS
+MM_MODEM_CELL_BROADCAST
+MM_MODEM_CELL_BROADCAST_CLASS
+MM_MODEM_CELL_BROADCAST_GET_CLASS
+MM_TYPE_MODEM_CELL_BROADCAST
+mm_modem_cell_broadcast_get_type
 </SECTION>
 
 <SECTION>
@@ -1843,6 +1871,30 @@ mm_call_properties_get_type
 </SECTION>
 
 <SECTION>
+<FILE>mm-cbm</FILE>
+<TITLE>MMCbm</TITLE>
+MMCbm
+<SUBSECTION Getters>
+mm_cbm_get_channel
+mm_cbm_get_path
+mm_cbm_dup_path
+mm_cbm_get_state
+mm_cbm_get_text
+mm_cbm_dup_text
+mm_cbm_get_message_code
+mm_cbm_get_update
+<SUBSECTION Standard>
+MMCbmClass
+MM_IS_CBM
+MM_IS_CBM_CLASS
+MM_CBM
+MM_CBM_CLASS
+MM_CBM_GET_CLASS
+MM_TYPE_CBM
+mm_cbm_get_type
+</SECTION>
+
+<SECTION>
 <FILE>mm-pco</FILE>
 <TITLE>MMPco</TITLE>
 MMPco
@@ -2094,6 +2146,7 @@ mm_call_state_reason_get_string
 mm_cell_type_get_string
 mm_serving_cell_type_get_string
 mm_network_error_get_string
+mm_cbm_state_get_string
 <SUBSECTION Standard>
 MM_TYPE_BEARER_TYPE
 MM_TYPE_BEARER_IP_FAMILY
@@ -2147,6 +2200,7 @@ MM_TYPE_OMA_SESSION_TYPE
 MM_TYPE_CALL_DIRECTION
 MM_TYPE_CALL_STATE
 MM_TYPE_CALL_STATE_REASON
+MM_TYPE_CBM_STATE
 MM_TYPE_MODEM_FIRMWARE_UPDATE_METHOD
 MM_TYPE_CELL_TYPE
 MM_TYPE_SERVING_CELL_TYPE
@@ -2207,6 +2261,7 @@ mm_modem_firmware_update_method_get_type
 mm_cell_type_get_type
 mm_serving_cell_type_get_type
 mm_network_error_get_type
+mm_cbm_state_get_type
 </SECTION>
 
 <SECTION>
@@ -3205,6 +3260,77 @@ MmGdbusModemMessagingSkeletonPrivate
 mm_gdbus_modem_messaging_skeleton_get_type
 </SECTION>
 
+<SECTION>
+<FILE>MmGdbusModemCellBroadcast</FILE>
+<TITLE>MmGdbusModemCellBroadcast</TITLE>
+MmGdbusModemCellBroadcast
+MmGdbusModemCellBroadcastIface
+<SUBSECTION Getters>
+mm_gdbus_modem_cell_broadcast_get_cell_broadcasts
+mm_gdbus_modem_cell_broadcast_dup_cell_broadcasts
+<SUBSECTION Methods>
+mm_gdbus_modem_cell_broadcast_call_delete
+mm_gdbus_modem_cell_broadcast_call_delete_finish
+mm_gdbus_modem_cell_broadcast_call_delete_sync
+mm_gdbus_modem_cell_broadcast_call_list
+mm_gdbus_modem_cell_broadcast_call_list_finish
+mm_gdbus_modem_cell_broadcast_call_list_sync
+<SUBSECTION Private>
+mm_gdbus_modem_cell_broadcast_set_cell_broadcasts
+mm_gdbus_modem_cell_broadcast_complete_delete
+mm_gdbus_modem_cell_broadcast_complete_list
+mm_gdbus_modem_cell_broadcast_override_properties
+mm_gdbus_modem_cell_broadcast_interface_info
+mm_gdbus_modem_cell_broadcast_emit_added
+mm_gdbus_modem_cell_broadcast_emit_deleted
+<SUBSECTION Standard>
+MM_IS_MODEM_CELL_BROADCAST
+MM_GDBUS_MODEM_CELL_BROADCAST
+MM_GDBUS_MODEM_CELL_BROADCAST_GET_IFACE
+MM_GDBUS_TYPE_MODEM_CELL_BROADCAST
+mm_gdbus_modem_cell_broadcast_get_type
+</SECTION>
+
+<SECTION>
+<FILE>MmGdbusModemCellBroadcastProxy</FILE>
+<TITLE>MmGdbusModemCellBroadcastProxy</TITLE>
+MmGdbusModemCellBroadcastProxy
+<SUBSECTION New>
+mm_gdbus_modem_cell_broadcast_proxy_new
+mm_gdbus_modem_cell_broadcast_proxy_new_finish
+mm_gdbus_modem_cell_broadcast_proxy_new_for_bus
+mm_gdbus_modem_cell_broadcast_proxy_new_for_bus_finish
+mm_gdbus_modem_cell_broadcast_proxy_new_for_bus_sync
+mm_gdbus_modem_cell_broadcast_proxy_new_sync
+<SUBSECTION Standard>
+MmGdbusModemCellBroadcastProxyClass
+MM_GDBUS_IS_MODEM_CELL_BROADCAST_PROXY
+MM_GDBUS_IS_MODEM_CELL_BROADCAST_PROXY_CLASS
+MM_GDBUS_MODEM_CELL_BROADCAST_PROXY
+MM_GDBUS_MODEM_CELL_BROADCAST_PROXY_CLASS
+MM_GDBUS_MODEM_CELL_BROADCAST_PROXY_GET_CLASS
+MM_GDBUS_TYPE_MODEM_CELL_BROADCAST_PROXY
+MmGdbusModemCellBroadcastProxyPrivate
+mm_gdbus_modem_cell_broadcast_proxy_get_type
+</SECTION>
+
+<SECTION>
+<FILE>MmGdbusModemCellBroadcastSkeleton</FILE>
+<TITLE>MmGdbusModemCellBroadcastSkeleton</TITLE>
+MmGdbusModemCellBroadcastSkeleton
+<SUBSECTION New>
+mm_gdbus_modem_cell_broadcast_skeleton_new
+<SUBSECTION Standard>
+MmGdbusModemCellBroadcastSkeletonClass
+MM_GDBUS_IS_MODEM_CELL_BROADCAST_SKELETON
+MM_GDBUS_IS_MODEM_CELL_BROADCAST_SKELETON_CLASS
+MM_GDBUS_MODEM_CELL_BROADCAST_SKELETON
+MM_GDBUS_MODEM_CELL_BROADCAST_SKELETON_CLASS
+MM_GDBUS_MODEM_CELL_BROADCAST_SKELETON_GET_CLASS
+MM_GDBUS_TYPE_MODEM_CELL_BROADCAST_SKELETON
+MmGdbusModemCellBroadcastSkeletonPrivate
+mm_gdbus_modem_cell_broadcast_skeleton_get_type
+</SECTION>
 
 <SECTION>
 <FILE>MmGdbusModemTime</FILE>
@@ -3779,6 +3905,8 @@ mm_gdbus_object_peek_modem3gpp_profile_manager
 mm_gdbus_object_get_modem3gpp_profile_manager
 mm_gdbus_object_peek_modem_cdma
 mm_gdbus_object_get_modem_cdma
+mm_gdbus_object_get_modem_cell_broadcast
+mm_gdbus_object_peek_modem_cell_broadcast
 mm_gdbus_object_peek_modem_location
 mm_gdbus_object_get_modem_location
 mm_gdbus_object_peek_modem_messaging
@@ -3837,6 +3965,7 @@ mm_gdbus_object_skeleton_set_modem3gpp
 mm_gdbus_object_skeleton_set_modem3gpp_ussd
 mm_gdbus_object_skeleton_set_modem3gpp_profile_manager
 mm_gdbus_object_skeleton_set_modem_cdma
+mm_gdbus_object_skeleton_set_modem_cell_broadcast
 mm_gdbus_object_skeleton_set_modem_firmware
 mm_gdbus_object_skeleton_set_modem_oma
 mm_gdbus_object_skeleton_set_modem_location
@@ -4207,4 +4336,73 @@ MM_GDBUS_CALL_SKELETON_GET_CLASS
 MM_GDBUS_TYPE_CALL_SKELETON
 MmGdbusCallSkeletonPrivate
 mm_gdbus_call_skeleton_get_type
+</SECTION>
+
+<SECTION>
+<FILE>MmGdbusCbm</FILE>
+<TITLE>MmGdbusCbm</TITLE>
+MmGdbusCbm
+MmGdbusCbmIface
+<SUBSECTION Getters>
+mm_gdbus_cbm_dup_text
+mm_gdbus_cbm_get_channel
+mm_gdbus_cbm_get_message_code
+mm_gdbus_cbm_get_state
+mm_gdbus_cbm_get_text
+mm_gdbus_cbm_get_update
+<SUBSECTION Private>
+mm_gdbus_cbm_set_channel
+mm_gdbus_cbm_set_message_code
+mm_gdbus_cbm_set_state
+mm_gdbus_cbm_set_text
+mm_gdbus_cbm_set_update
+mm_gdbus_cbm_interface_info
+mm_gdbus_cbm_override_properties
+p<SUBSECTION Standard>
+MM_GDBUS_IS_CBM
+MM_GDBUS_CBM
+MM_GDBUS_CBM_GET_IFACE
+MM_GDBUS_TYPE_CBM
+mm_gdbus_cbm_get_type
+</SECTION>
+
+<SECTION>
+<FILE>MmGdbusCbmProxy</FILE>
+<TITLE>MmGdbusCbmProxy</TITLE>
+MmGdbusCallProxy
+<SUBSECTION New>
+mm_gdbus_cbm_proxy_new
+mm_gdbus_cbm_proxy_new_finish
+mm_gdbus_cbm_proxy_new_for_bus
+mm_gdbus_cbm_proxy_new_for_bus_finish
+mm_gdbus_cbm_proxy_new_for_bus_sync
+mm_gdbus_cbm_proxy_new_sync
+<SUBSECTION Standard>
+MmGdbusCbmProxyClass
+MM_GDBUS_IS_CBM_PROXY
+MM_GDBUS_IS_CBM_PROXY_CLASS
+MM_GDBUS_CBM_PROXY
+MM_GDBUS_CBM_PROXY_CLASS
+MM_GDBUS_CBM_PROXY_GET_CLASS
+MM_GDBUS_TYPE_CBM_PROXY
+MmGdbusCbmProxyPrivate
+mm_gdbus_cbm_proxy_get_type
+</SECTION>
+
+<SECTION>
+<FILE>MmGdbusCbmSkeleton</FILE>
+<TITLE>MmGdbusCbmSkeleton</TITLE>
+MmGdbusCallSkeleton
+<SUBSECTION New>
+mm_gdbus_cbm_skeleton_new
+<SUBSECTION Standard>
+MmGdbusCbmSkeletonClass
+MM_GDBUS_IS_CBM_SKELETON
+MM_GDBUS_IS_CBM_SKELETON_CLASS
+MM_GDBUS_CBM_SKELETON
+MM_GDBUS_CBM_SKELETON_CLASS
+MM_GDBUS_CBM_SKELETON_GET_CLASS
+MM_GDBUS_TYPE_CBM_SKELETON
+MmGdbusCbmSkeletonPrivate
+mm_gdbus_cbm_skeleton_get_type
 </SECTION>

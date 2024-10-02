@@ -161,6 +161,10 @@
         <title>SAR support</title>
         <xi:include href="xml/mm-modem-sar.xml"/>
       </section>
+      <section>
+        <title>Cell Broadcast support</title>
+        <xi:include href="xml/mm-modem-cell-broadcast.xml"/>
+      </section>
     </chapter>
 
     <chapter>
@@ -188,6 +192,11 @@
       <xi:include href="xml/mm-call.xml"/>
       <xi:include href="xml/mm-call-properties.xml"/>
       <xi:include href="xml/mm-call-audio-format.xml"/>
+    </chapter>
+
+    <chapter>
+      <title>The CBM object</title>
+      <xi:include href="xml/mm-cbm.xml"/>
     </chapter>
 
   </part>
@@ -222,6 +231,10 @@
     <xi:include href="xml/MmGdbusModemCdma.xml"/>
     <xi:include href="xml/MmGdbusModemCdmaProxy.xml"/>
     <xi:include href="xml/MmGdbusModemCdmaSkeleton.xml"/>
+
+    <xi:include href="xml/MmGdbusModemCellBroadcast.xml"/>
+    <xi:include href="xml/MmGdbusModemCellBroadcastProxy.xml"/>
+    <xi:include href="xml/MmGdbusModemCellBroadcastSkeleton.xml"/>
 
     <xi:include href="xml/MmGdbusModemLocation.xml"/>
     <xi:include href="xml/MmGdbusModemLocationProxy.xml"/>
@@ -278,6 +291,10 @@
     <xi:include href="xml/MmGdbusCall.xml"/>
     <xi:include href="xml/MmGdbusCallProxy.xml"/>
     <xi:include href="xml/MmGdbusCallSkeleton.xml"/>
+
+    <xi:include href="xml/MmGdbusCbm.xml"/>
+    <xi:include href="xml/MmGdbusCbmProxy.xml"/>
+    <xi:include href="xml/MmGdbusCbmSkeleton.xml"/>
   </part>
 
   <chapter>
