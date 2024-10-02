@@ -125,12 +125,12 @@ mm_cbm_part_new_from_binary_pdu (const guint8  *pdu,
         return NULL;
     }
     cbm_part->serial = serial;
-    offset+=2;
+    offset += 2;
 
     /* Channel / Message identifier */
     PDU_SIZE_CHECK (offset + 2, "cannot read channel");
     cbm_part->channel = pdu[offset] << 8 | pdu[offset+1];
-    offset+=2;
+    offset += 2;
 
     PDU_SIZE_CHECK (offset + 1, "cannot read encoding scheme");
     group = pdu[offset] & CBS_DATA_CODING_GROUP_MASK;
@@ -139,11 +139,11 @@ mm_cbm_part_new_from_binary_pdu (const guint8  *pdu,
         cbm_part->encoding = MM_SMS_ENCODING_GSM7;
     } else if (pdu[offset] == CBS_DATA_CODING_GSM7) {
         PDU_SIZE_CHECK (offset + 4, "cannot skip lang");
-        offset+=3;
+        offset += 3;
         cbm_part->encoding = MM_SMS_ENCODING_GSM7;
     } else if (pdu[offset] == CBS_DATA_CODING_UCS2) {
         PDU_SIZE_CHECK (offset + 3, "cannot skip lang");
-        offset+=2;
+        offset += 2;
         cbm_part->encoding = MM_SMS_ENCODING_UCS2;
     } else if ((group == CBS_DATA_CODING_GENERAL_CLASS) ||
                (group == CBS_DATA_CODING_GENERAL_NO_CLASS) ||
