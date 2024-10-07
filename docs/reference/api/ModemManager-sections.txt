@@ -49,6 +49,7 @@ MMModemStateChangeReason
 MMModemPowerState
 MMModemPortType
 MMModemFirmwareUpdateMethod
+MMNetworkError
 MMOmaFeature
 MMOmaSessionState
 MMOmaSessionStateFailedReason

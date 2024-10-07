@@ -462,6 +462,8 @@ mm_cell_info_lte_get_earfcn
 mm_cell_info_lte_get_rsrp
 mm_cell_info_lte_get_rsrq
 mm_cell_info_lte_get_timing_advance
+mm_cell_info_lte_get_bandwidth
+mm_cell_info_lte_get_serving_cell_type
 <SUBSECTION Private>
 mm_cell_info_lte_new_from_dictionary
 mm_cell_info_lte_set_operator_id
@@ -472,6 +474,8 @@ mm_cell_info_lte_set_earfcn
 mm_cell_info_lte_set_rsrp
 mm_cell_info_lte_set_rsrq
 mm_cell_info_lte_set_timing_advance
+mm_cell_info_lte_set_bandwidth
+mm_cell_info_lte_set_serving_cell_type
 <SUBSECTION Standard>
 MMCellInfoLteClass
 MMCellInfoLtePrivate
@@ -498,6 +502,8 @@ mm_cell_info_nr5g_get_rsrp
 mm_cell_info_nr5g_get_rsrq
 mm_cell_info_nr5g_get_sinr
 mm_cell_info_nr5g_get_timing_advance
+mm_cell_info_nr5g_get_bandwidth
+mm_cell_info_nr5g_get_serving_cell_type
 <SUBSECTION Private>
 mm_cell_info_nr5g_new_from_dictionary
 mm_cell_info_nr5g_set_operator_id
@@ -509,6 +515,8 @@ mm_cell_info_nr5g_set_rsrp
 mm_cell_info_nr5g_set_rsrq
 mm_cell_info_nr5g_set_sinr
 mm_cell_info_nr5g_set_timing_advance
+mm_cell_info_nr5g_set_bandwidth
+mm_cell_info_nr5g_set_serving_cell_type
 <SUBSECTION Standard>
 MMCellInfoNr5gClass
 MMCellInfoNr5gPrivate
@@ -556,6 +564,8 @@ mm_modem_3gpp_peek_initial_eps_bearer_settings
 mm_modem_3gpp_get_packet_service_state
 mm_modem_3gpp_get_nr5g_registration_settings
 mm_modem_3gpp_peek_nr5g_registration_settings
+mm_modem_3gpp_get_network_rejection
+mm_modem_3gpp_peek_network_rejection
 <SUBSECTION Methods>
 mm_modem_3gpp_register
 mm_modem_3gpp_register_finish
@@ -1185,6 +1195,7 @@ mm_simple_connect_properties_get_bearer_properties
 mm_simple_connect_properties_new_from_dictionary
 mm_simple_connect_properties_new_from_string
 mm_simple_connect_properties_get_dictionary
+mm_simple_connect_properties_print
 <SUBSECTION Standard>
 MMSimpleConnectPropertiesClass
 MMSimpleConnectPropertiesPrivate
@@ -1301,6 +1312,7 @@ mm_signal_get_error_rate
 mm_signal_new
 mm_signal_new_from_dictionary
 mm_signal_get_dictionary
+mm_signal_get_string
 mm_signal_set_rssi
 mm_signal_set_rscp
 mm_signal_set_ecio
@@ -1553,6 +1565,8 @@ mm_bearer_properties_get_access_type_preference
 mm_bearer_properties_set_access_type_preference
 mm_bearer_properties_get_roaming_allowance
 mm_bearer_properties_set_roaming_allowance
+mm_bearer_properties_get_force
+mm_bearer_properties_set_force
 <SUBSECTION Private>
 mm_bearer_properties_new_from_dictionary
 mm_bearer_properties_new_from_string
@@ -1564,6 +1578,7 @@ mm_bearer_properties_consume_variant
 mm_bearer_properties_dup
 mm_bearer_properties_get_dictionary
 mm_bearer_properties_peek_3gpp_profile
+mm_bearer_properties_print
 <SUBSECTION Standard>
 MMBearerPropertiesClass
 MMBearerPropertiesPrivate
@@ -1920,6 +1935,7 @@ mm_3gpp_profile_new_from_string
 mm_3gpp_profile_consume_string
 mm_3gpp_profile_consume_variant
 mm_3gpp_profile_get_dictionary
+mm_3gpp_profile_print
 MM3gppProfileCmpFlags
 mm_3gpp_profile_cmp
 <SUBSECTION Standard>
@@ -1991,11 +2007,40 @@ mm_nr5g_registration_settings_get_type
 </SECTION>
 
 <SECTION>
+<FILE>mm-network-rejection</FILE>
+<TITLE>Network rejection</TITLE>
+MMNetworkRejection
+<SUBSECTION GettersSetters>
+mm_network_rejection_get_error
+mm_network_rejection_get_operator_id
+mm_network_rejection_get_operator_name
+mm_network_rejection_get_access_technology
+<SUBSECTION Private>
+mm_network_rejection_get_dictionary
+mm_network_rejection_new
+mm_network_rejection_new_from_dictionary
+mm_network_rejection_set_access_technology
+mm_network_rejection_set_error
+mm_network_rejection_set_operator_id
+mm_network_rejection_set_operator_name
+<SUBSECTION Standard>
+MMNetworkRejectionClass
+MMNetworkRejectionPrivate
+MM_IS_NETWORK_REJECTION
+MM_IS_NETWORK_REJECTION_CLASS
+MM_NETWORK_REJECTION
+MM_NETWORK_REJECTION_CLASS
+MM_NETWORK_REJECTION_GET_CLASS
+MM_TYPE_NETWORK_REJECTION
+mm_network_rejection_get_type
+</SECTION>
+
+<SECTION>
 <FILE>mm-enums-types</FILE>
 <TITLE>Flags and Enumerations</TITLE>
 mm_bearer_type_get_string
 mm_bearer_ip_method_get_string
-mm_bearer_ip_family_get_string
+mm_bearer_ip_family_build_string_from_mask
 mm_bearer_allowed_auth_build_string_from_mask
 mm_bearer_multiplex_support_get_string
 mm_bearer_apn_type_build_string_from_mask
@@ -2047,6 +2092,8 @@ mm_call_direction_get_string
 mm_call_state_get_string
 mm_call_state_reason_get_string
 mm_cell_type_get_string
+mm_serving_cell_type_get_string
+mm_network_error_get_string
 <SUBSECTION Standard>
 MM_TYPE_BEARER_TYPE
 MM_TYPE_BEARER_IP_FAMILY
@@ -2102,6 +2149,8 @@ MM_TYPE_CALL_STATE
 MM_TYPE_CALL_STATE_REASON
 MM_TYPE_MODEM_FIRMWARE_UPDATE_METHOD
 MM_TYPE_CELL_TYPE
+MM_TYPE_SERVING_CELL_TYPE
+MM_TYPE_NETWORK_ERROR
 mm_bearer_type_get_type
 mm_bearer_ip_family_get_type
 mm_bearer_ip_method_get_type
@@ -2156,6 +2205,8 @@ mm_call_state_get_type
 mm_call_state_reason_get_type
 mm_modem_firmware_update_method_get_type
 mm_cell_type_get_type
+mm_serving_cell_type_get_type
+mm_network_error_get_type
 </SECTION>
 
 <SECTION>
@@ -2167,6 +2218,7 @@ mm_core_error_quark
 mm_message_error_quark
 mm_mobile_equipment_error_quark
 mm_serial_error_quark
+mm_carrier_lock_error_quark
 <SUBSECTION Standard>
 MM_CDMA_ACTIVATION_ERROR
 MM_CONNECTION_ERROR
@@ -2174,18 +2226,21 @@ MM_CORE_ERROR
 MM_MESSAGE_ERROR
 MM_MOBILE_EQUIPMENT_ERROR
 MM_SERIAL_ERROR
+MM_CARRIER_LOCK_ERROR
 MM_TYPE_CDMA_ACTIVATION_ERROR
 MM_TYPE_CONNECTION_ERROR
 MM_TYPE_CORE_ERROR
 MM_TYPE_MESSAGE_ERROR
 MM_TYPE_MOBILE_EQUIPMENT_ERROR
 MM_TYPE_SERIAL_ERROR
+MM_TYPE_CARRIER_LOCK_ERROR
 mm_cdma_activation_error_get_type
 mm_connection_error_get_type
 mm_core_error_get_type
 mm_message_error_get_type
 mm_mobile_equipment_error_get_type
 mm_serial_error_get_type
+mm_carrier_lock_error_get_type
 </SECTION>
 
 <SECTION>
@@ -2418,6 +2473,8 @@ mm_gdbus_modem3gpp_dup_initial_eps_bearer_settings
 mm_gdbus_modem3gpp_get_packet_service_state
 mm_gdbus_modem3gpp_dup_nr5g_registration_settings
 mm_gdbus_modem3gpp_get_nr5g_registration_settings
+mm_gdbus_modem3gpp_dup_network_rejection
+mm_gdbus_modem3gpp_get_network_rejection
 <SUBSECTION Methods>
 mm_gdbus_modem3gpp_call_register
 mm_gdbus_modem3gpp_call_register_finish
@@ -2451,6 +2508,7 @@ mm_gdbus_modem3gpp_complete_set_initial_eps_bearer_settings
 mm_gdbus_modem3gpp_complete_disable_facility_lock
 mm_gdbus_modem3gpp_complete_set_packet_service_state
 mm_gdbus_modem3gpp_complete_set_nr5g_registration_settings
+mm_gdbus_modem3gpp_complete_set_carrier_lock
 mm_gdbus_modem3gpp_interface_info
 mm_gdbus_modem3gpp_override_properties
 mm_gdbus_modem3gpp_set_enabled_facility_locks
@@ -2465,6 +2523,7 @@ mm_gdbus_modem3gpp_set_initial_eps_bearer
 mm_gdbus_modem3gpp_set_initial_eps_bearer_settings
 mm_gdbus_modem3gpp_set_packet_service_state
 mm_gdbus_modem3gpp_set_nr5g_registration_settings
+mm_gdbus_modem3gpp_set_network_rejection
 <SUBSECTION Standard>
 MM_GDBUS_IS_MODEM3GPP
 MM_GDBUS_MODEM3GPP
@@ -2811,6 +2870,7 @@ mm_gdbus_modem_set_supported_ip_families
 mm_gdbus_modem_set_supported_modes
 mm_gdbus_modem_set_unlock_required
 mm_gdbus_modem_set_unlock_retries
+mm_gdbus_modem_set_physdev
 mm_gdbus_modem_emit_state_changed
 mm_gdbus_modem_complete_command
 mm_gdbus_modem_complete_create_bearer
@@ -3081,6 +3141,9 @@ mm_gdbus_modem_messaging_call_delete_sync
 mm_gdbus_modem_messaging_call_list
 mm_gdbus_modem_messaging_call_list_finish
 mm_gdbus_modem_messaging_call_list_sync
+mm_gdbus_modem_messaging_call_set_default_storage
+mm_gdbus_modem_messaging_call_set_default_storage_finish
+mm_gdbus_modem_messaging_call_set_default_storage_sync
 <SUBSECTION Private>
 mm_gdbus_modem_messaging_set_messages
 mm_gdbus_modem_messaging_set_default_storage
@@ -3090,6 +3153,7 @@ mm_gdbus_modem_messaging_emit_deleted
 mm_gdbus_modem_messaging_complete_create
 mm_gdbus_modem_messaging_complete_delete
 mm_gdbus_modem_messaging_complete_list
+mm_gdbus_modem_messaging_complete_set_default_storage
 mm_gdbus_modem_messaging_interface_info
 mm_gdbus_modem_messaging_override_properties
 <SUBSECTION Standard>
