@@ -1245,7 +1245,7 @@ typedef enum { /*< underscore_name=mm_bearer_ip_family >*/
     MM_BEARER_IP_FAMILY_IPV6    = 1 << 1,
     MM_BEARER_IP_FAMILY_IPV4V6  = 1 << 2,
     MM_BEARER_IP_FAMILY_NON_IP  = 1 << 3,
-    MM_BEARER_IP_FAMILY_ANY     = 0xFFFFFFF7
+    MM_BEARER_IP_FAMILY_ANY     = 0xFFFFFFFF
 } MMBearerIpFamily;
 
 /**
