@@ -1989,7 +1989,6 @@ typedef enum { /*< underscore_name=mm_serving_cell_type >*/
  * @MM_NETWORK_ERROR_UNKNOWN_PDP_ADDRESS_OR_TYPE: Unknown PDP address or PDP type.
  * @MM_NETWORK_ERROR_USER_AUTHENTICATION_FAILED: User authentication failed.
  * @MM_NETWORK_ERROR_ACTIVATION_REJECTED_BY_GGSN_OR_GW: Activation rejected by GGSN, Serving GW or PDN GW.
- * @MM_NETWORK_ERROR_ACTIVATION_REJECTED_UNSPECIFIED: Activation rejected, unspecified.
  * @MM_NETWORK_ERROR_SERVICE_OPTION_NOT_SUPPORTED: Service option not supported.
  * @MM_NETWORK_ERROR_REQUESTED_SERVICE_OPTION_NOT_SUBSCRIBED: Requested service option not subscribed.
  * @MM_NETWORK_ERROR_SERVICE_OPTION_TEMPORARILY_OUT_OF_ORDER: Service option temporarily out of order.
