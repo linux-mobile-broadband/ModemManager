@@ -521,6 +521,7 @@ typedef enum { /*< underscore_name=mm_connection_error >*/
  * @MM_SERIAL_ERROR_NOT_OPEN: The serial port is not open.
  * @MM_SERIAL_ERROR_PARSE_FAILED: The serial port specific parsing failed.
  * @MM_SERIAL_ERROR_FRAME_NOT_FOUND: The serial port reported that the frame marker wasn't found (e.g. for QCDM). Since 1.6.
+ * @MM_SERIAL_ERROR_SEND_TIMEOUT: Could not write once again to the serial device.
  *
  * Serial errors that may be reported by ModemManager.
  *
@@ -536,6 +537,7 @@ typedef enum { /*< underscore_name=mm_serial_error >*/
     MM_SERIAL_ERROR_NOT_OPEN              = 6, /*< nick=NotOpen            >*/
     MM_SERIAL_ERROR_PARSE_FAILED          = 7, /*< nick=ParseFailed        >*/
     MM_SERIAL_ERROR_FRAME_NOT_FOUND       = 8, /*< nick=FrameNotFound      >*/
+    MM_SERIAL_ERROR_SEND_TIMEOUT          = 9, /*< nick=SendTimeout        >*/
 } MMSerialError;
 
 /**
