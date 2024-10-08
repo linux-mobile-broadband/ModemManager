@@ -120,6 +120,162 @@ static const MMStringUintMap port_subsys_map[] = {
 
 /*****************************************************************************/
 
+static const MMPortProbeAtCommand at_probing[] = {
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { NULL }
+};
+
+typedef struct {
+    MMPortSerialAt             *serial;
+    const MMPortProbeAtCommand *at_commands;
+    guint                       at_commands_limit;
+} EarlyAtProbeContext;
+
+static void
+early_at_probe_context_free (EarlyAtProbeContext *ctx)
+{
+    g_clear_object (&ctx->serial);
+    g_slice_free (EarlyAtProbeContext, ctx);
+}
+
+gboolean
+mm_port_probe_run_early_at_probe_finish (MMPortProbe   *self,
+                                         GAsyncResult  *result,
+                                         GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (result), error);
+}
+
+static void
+early_at_probe_parse_response (MMPortSerialAt *serial,
+                               GAsyncResult   *res,
+                               GTask          *task)
+{
+    g_autoptr(GVariant)  result = NULL;
+    g_autoptr(GError)    result_error = NULL;
+    g_autofree gchar    *response = NULL;
+    g_autoptr(GError)    command_error = NULL;
+    EarlyAtProbeContext *ctx;
+    MMPortProbe         *self;
+    gboolean             is_at = FALSE;
+
+    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+
+    /* If already cancelled, do nothing else */
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
+        return;
+    }
+
+    response = mm_port_serial_at_command_finish (serial, res, &command_error);
+    if (!ctx->at_commands->response_processor (ctx->at_commands->command,
+                                               response,
+                                               !!ctx->at_commands[1].command,
+                                               command_error,
+                                               &result,
+                                               &result_error)) {
+        /* Were we told to abort the whole probing? */
+        if (result_error) {
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_UNSUPPORTED,
+                                     "(%s/%s) error while probing AT features: %s",
+                                     mm_kernel_device_get_subsystem (self->priv->port),
+                                     mm_kernel_device_get_name (self->priv->port),
+                                     result_error->message);
+            g_object_unref (task);
+            return;
+        }
+
+        /* Go on to next command */
+        ctx->at_commands++;
+        ctx->at_commands_limit--;
+        if (ctx->at_commands->command && ctx->at_commands_limit > 0) {
+            /* More commands in the group? */
+            mm_port_serial_at_command (
+                ctx->serial,
+                ctx->at_commands->command,
+                ctx->at_commands->timeout,
+                FALSE, /* raw */
+                FALSE, /* allow_cached */
+                g_task_get_cancellable (task),
+                (GAsyncReadyCallback)early_at_probe_parse_response,
+                task);
+            return;
+        }
+
+        /* No more commands in the group; end probing; not AT */
+    } else if (result) {
+        /* If any result given, it must be a boolean */
+        g_assert (g_variant_is_of_type (result, G_VARIANT_TYPE_BOOLEAN));
+        is_at = g_variant_get_boolean (result);
+    }
+
+    mm_port_probe_set_result_at (self, is_at);
+    g_task_return_boolean (task, is_at);
+    g_object_unref (task);
+}
+
+gboolean
+mm_port_probe_run_early_at_probe (MMPortProbe         *self,
+                                  MMPortSerialAt      *serial,
+                                  GCancellable        *cancellable,
+                                  GAsyncReadyCallback  callback,
+                                  gpointer             user_data)
+{
+    GTask               *task;
+    EarlyAtProbeContext *ctx;
+    gint                 tries;
+
+    tries = mm_kernel_device_get_global_property_as_int (mm_port_probe_peek_port (self),
+                                                         ID_MM_TTY_AT_PROBE_TRIES);
+    if (tries == 0) {
+        /* Early probing not required */
+        return FALSE;
+    }
+
+    task = g_task_new (self, cancellable, callback, user_data);
+
+    ctx = g_slice_new0 (EarlyAtProbeContext);
+    ctx->serial                = g_object_ref (serial);
+    ctx->at_commands           = at_probing;
+    ctx->at_commands_limit     = CLAMP (tries, 1, (gint) G_N_ELEMENTS (at_probing));
+    g_task_set_task_data (task, ctx, (GDestroyNotify) early_at_probe_context_free);
+
+    mm_port_serial_at_command (
+        ctx->serial,
+        ctx->at_commands->command,
+        ctx->at_commands->timeout,
+        FALSE, /* raw */
+        FALSE, /* allow_cached */
+        g_task_get_cancellable (task),
+        (GAsyncReadyCallback)early_at_probe_parse_response,
+        task);
+    return TRUE;
+}
+
+/*****************************************************************************/
+
 static void
 mm_port_probe_clear (MMPortProbe *self)
 {
@@ -420,6 +576,8 @@ typedef struct {
     const MMPortProbeAtCommand *at_custom_probe;
     /* Current group of AT commands to be sent */
     const MMPortProbeAtCommand *at_commands;
+    /* Maximum number of at_commands to be sent */
+    guint at_commands_limit;
     /* Seconds between each AT command sent in the group */
     guint at_commands_wait_secs;
     /* Current AT Result processor */
@@ -1071,7 +1229,8 @@ probe_at_parse_response (MMPortSerialAt *port,
 
         /* Go on to next command */
         ctx->at_commands++;
-        if (!ctx->at_commands->command) {
+        ctx->at_commands_limit--;
+        if (!ctx->at_commands->command || ctx->at_commands_limit == 0) {
             /* Was it the last command in the group? If so,
              * end this partial probing */
             ctx->at_result_processor (self, NULL);
@@ -1128,16 +1287,6 @@ probe_at (MMPortProbe *self)
         self);
     return G_SOURCE_REMOVE;
 }
-
-static const MMPortProbeAtCommand at_probing[] = {
-    { "AT",  3, mm_port_probe_response_processor_is_at },
-    { "AT",  3, mm_port_probe_response_processor_is_at },
-    { "AT",  3, mm_port_probe_response_processor_is_at },
-    { "AT",  3, mm_port_probe_response_processor_is_at },
-    { "AT",  3, mm_port_probe_response_processor_is_at },
-    { "AT",  3, mm_port_probe_response_processor_is_at },
-    { NULL }
-};
 
 static const MMPortProbeAtCommand vendor_probing[] = {
     { "+CGMI", 3, mm_port_probe_response_processor_string },
@@ -1339,6 +1488,8 @@ serial_open_at (MMPortProbe *self)
                              MM_PORT_PROBE_AT_ICERA | \
                              MM_PORT_PROBE_AT_XMM)
 
+#define AT_PROBING_DEFAULT_TRIES 6
+
 static void
 probe_step (MMPortProbe *self)
 {
@@ -1355,6 +1506,7 @@ probe_step (MMPortProbe *self)
     ctx->at_result_processor   = NULL;
     ctx->at_commands           = NULL;
     ctx->at_commands_wait_secs = 0;
+    ctx->at_commands_limit     = G_MAXUINT; /* run all given AT probes */
 
     switch (ctx->step) {
     case PROBE_STEP_FIRST:
@@ -1411,7 +1563,20 @@ probe_step (MMPortProbe *self)
         if ((ctx->flags & MM_PORT_PROBE_AT) && !(self->priv->flags & MM_PORT_PROBE_AT)) {
             mm_obj_msg (self, "probe step: AT");
             /* Prepare AT probing */
-            ctx->at_commands = ctx->at_custom_probe ? ctx->at_custom_probe : at_probing;
+            if (ctx->at_custom_probe)
+                ctx->at_commands = ctx->at_custom_probe;
+            else {
+                gint at_probe_tries;
+
+                /* NOTE: update ID_MM_TTY_AT_PROBE_TRIES documentation when changing min/max/default */
+                at_probe_tries = mm_kernel_device_get_property_as_int (mm_port_probe_peek_port (self),
+                                                                       ID_MM_TTY_AT_PROBE_TRIES);
+                /* If no tag, use default number of tries */
+                if (at_probe_tries <= 0)
+                    at_probe_tries = AT_PROBING_DEFAULT_TRIES;
+                ctx->at_commands_limit = MIN (at_probe_tries, (gint) G_N_ELEMENTS (at_probing));
+                ctx->at_commands = at_probing;
+            }
             ctx->at_result_processor = probe_at_result_processor;
             ctx->source_id = g_idle_add ((GSourceFunc) probe_at, self);
             return;

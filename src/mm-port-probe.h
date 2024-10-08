@@ -128,6 +128,17 @@ gboolean mm_port_probe_run_finish (MMPortProbe *self,
 
 gboolean mm_port_probe_run_cancel_at_probing (MMPortProbe *self);
 
+/* Run early AT probes from plugin custom init hooks */
+gboolean mm_port_probe_run_early_at_probe (MMPortProbe         *self,
+                                           MMPortSerialAt      *serial,
+                                           GCancellable        *cancellable,
+                                           GAsyncReadyCallback  callback,
+                                           gpointer             user_data);
+
+gboolean mm_port_probe_run_early_at_probe_finish (MMPortProbe   *self,
+                                                  GAsyncResult  *result,
+                                                  GError       **error);
+
 /* Probing result getters */
 MMPortType    mm_port_probe_get_port_type    (MMPortProbe *self);
 gboolean      mm_port_probe_is_at            (MMPortProbe *self);

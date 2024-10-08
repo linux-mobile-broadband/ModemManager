@@ -44,7 +44,10 @@ mm_port_probe_response_processor_is_at (const gchar *command,
          * they will just go on to the next command. */
         if (g_error_matches (error,
                              MM_SERIAL_ERROR,
-                             MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
+                             MM_SERIAL_ERROR_RESPONSE_TIMEOUT) ||
+            g_error_matches (error,
+                             MM_SERIAL_ERROR,
+                             MM_SERIAL_ERROR_SEND_FAILED)) {
             return FALSE;
         }
 
