@@ -428,11 +428,9 @@ handle_set_default_storage_auth_ready (MMBaseModem                    *self,
         return;
     }
 
-    if (ctx->storage == MM_SMS_STORAGE_UNKNOWN) {
-        mm_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot set default storage: Unknown storage");
+    /* Check if the requested storage is supported or not */
+    if (!mm_iface_modem_messaging_is_storage_supported_for_storing (ctx->self, ctx->storage, &error)) {
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_default_storage_context_free (ctx);
         return;
     }
