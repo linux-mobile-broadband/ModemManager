@@ -1326,26 +1326,16 @@ device_context_port_added (MMPluginManager *self,
 }
 
 static gboolean
-device_context_cancel (DeviceContext *_device_context)
+device_context_cancel (DeviceContext *device_context)
 {
-    g_autoptr(DeviceContext)  device_context = NULL;
-    MMPluginManager          *self;
+    MMPluginManager *self;
 
-    /* The device context cancellation operation will also independently request cancellation
-     * of each port context. Depending on the probing task of the port, this may be completed
-     * asynchronously or in-place. Therefore we need to consider the case where the last port
-     * context cancellation also completes the device context operation in-place, so we must
-     * ensure the DeviceContext is valid throughout the whole method. */
-    device_context = device_context_ref (_device_context);
-
-    /* If cancelled already, do nothing */
-    if (g_cancellable_is_cancelled (device_context->cancellable))
-        return FALSE;
-
+    g_assert (device_context->task);
     self = g_task_get_source_object (device_context->task);
     mm_obj_dbg (self, "task %s: cancellation requested", device_context->name);
 
     /* The device context is cancelled now */
+    g_assert (!g_cancellable_is_cancelled (device_context->cancellable));
     g_cancellable_cancel (device_context->cancellable);
 
     /* Remove all port contexts in the waiting list. This will allow early cancellation
@@ -1379,8 +1369,7 @@ device_context_cancel (DeviceContext *_device_context)
     /* If the device context task is not yet completed, wakeup the device context
      * logic. If we were still waiting for the min probing time, this will complete
      * the device context. */
-    if (device_context->task)
-        device_context_continue (device_context);
+    device_context_continue (device_context);
     return TRUE;
 }
 
@@ -1500,6 +1489,19 @@ plugin_manager_peek_device_context (MMPluginManager *self,
 }
 
 static void
+plugin_manager_untrack_device_context (MMPluginManager *self,
+                                       DeviceContext   *device_context)
+{
+    GList *found;
+
+    found = g_list_find (self->priv->device_contexts, device_context);
+    if (found) {
+        self->priv->device_contexts = g_list_remove_link (self->priv->device_contexts, found);
+        g_list_free_full (found, (GDestroyNotify)device_context_unref);
+    }
+}
+
+static void
 device_context_run_ready (MMPluginManager    *self,
                           GAsyncResult       *res,
                           CommonAsyncContext *common)
@@ -1512,13 +1514,11 @@ device_context_run_ready (MMPluginManager    *self,
 
     /*
      * Once the task is finished, we can also remove it from the plugin manager
-     * list. We MUST have the device context in the list at this point, because
-     * we're going to dispose the reference, so assert if this is not true.
+     * list. If the device support task was early cancelled, e.g. if the last
+     * port of an existing device is removed, the device context may not exist
+     * in the list tracked by the plugin manager.
      */
-    g_assert (g_list_find (common->self->priv->device_contexts, common->device_context));
-    common->self->priv->device_contexts = g_list_remove (common->self->priv->device_contexts,
-                                                         common->device_context);
-    device_context_unref (common->device_context);
+    plugin_manager_untrack_device_context (self, common->device_context);
 
     /* Report result or error once removed from our internal list */
     if (!best_plugin)
@@ -1582,14 +1582,25 @@ gboolean
 mm_plugin_manager_device_support_check_cancel (MMPluginManager *self,
                                                MMDevice        *device)
 {
-    DeviceContext *device_context;
+    g_autoptr(DeviceContext) device_context = NULL;
 
-    /* If the device context isn't found, ignore the cancellation request. */
+    /* If the device context isn't found, ignore the cancellation request */
     device_context = plugin_manager_peek_device_context (self, device);
     if (!device_context)
         return FALSE;
 
-    /* Request cancellation, will be completed asynchronously */
+    /* The device context cancellation operation will also independently request cancellation
+     * of each port context. Depending on the probing task of the port, this may be completed
+     * asynchronously or in-place. Therefore we need to consider the case where the last port
+     * context cancellation also completes the device context operation in-place, so we must
+     * ensure the DeviceContext is valid throughout the whole cancellation. */
+    device_context = device_context_ref (device_context);
+
+    /* Remove from the tracked list of device contexts, so that we never add
+     * new ports to a device context being cancelled */
+    plugin_manager_untrack_device_context (self, device_context);
+
+    /* Request cancellation, will be completed asynchronously. */
     return device_context_cancel (device_context);
 }
 
