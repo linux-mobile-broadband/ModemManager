@@ -391,15 +391,6 @@ export_modem (MMDevice *self)
                                          G_DBUS_OBJECT_SKELETON (self->priv->modem));
 
     mm_obj_dbg (self, " exported modem at path '%s'", path);
-    mm_obj_dbg (self, "    plugin:  %s", mm_base_modem_get_plugin (self->priv->modem));
-    mm_obj_dbg (self, "    vid:pid: 0x%04X:0x%04X",
-                (mm_base_modem_get_vendor_id (self->priv->modem) & 0xFFFF),
-                (mm_base_modem_get_product_id (self->priv->modem) & 0xFFFF));
-    if (mm_base_modem_get_subsystem_vendor_id (self->priv->modem))
-        mm_obj_dbg (self, "    subsystem vid: 0x%04X",
-                    (mm_base_modem_get_subsystem_vendor_id (self->priv->modem) & 0xFFFF));
-    if (self->priv->virtual)
-        mm_obj_dbg (self, "    virtual");
 }
 
 /*****************************************************************************/
@@ -530,6 +521,8 @@ mm_device_create_modem (MMDevice  *self,
     }
 
     if (!self->priv->virtual) {
+        g_autofree gchar *device_id_info = NULL;
+
         if (!self->priv->port_probes) {
             g_set_error (error,
                          MM_CORE_ERROR,
@@ -538,9 +531,26 @@ mm_device_create_modem (MMDevice  *self,
             return FALSE;
         }
 
-        mm_obj_msg (self, "creating modem with plugin '%s' and '%u' ports",
+        /* PCI devices will have all subsystem vendor, vendor and product */
+        if (self->priv->subsystem_vendor) {
+            device_id_info = g_strdup_printf ("(%04x:%04x:%04x)",
+                                              self->priv->subsystem_vendor,
+                                              self->priv->vendor,
+                                              self->priv->product);
+        }
+        /* USB devices will have all vendor and product */
+        else if (self->priv->vendor || self->priv->product) {
+            device_id_info = g_strdup_printf ("(%04x:%04x)",
+                                              self->priv->vendor,
+                                              self->priv->product);
+        }
+        /* else, serial devices will not have any */
+
+        mm_obj_msg (self, "creating modem with plugin '%s' and '%u' ports %s",
                     mm_plugin_get_name (self->priv->plugin),
-                    g_list_length (self->priv->port_probes));
+                    g_list_length (self->priv->port_probes),
+                    device_id_info ? device_id_info : "");
+
     } else {
         if (!self->priv->virtual_ports) {
             g_set_error (error,
