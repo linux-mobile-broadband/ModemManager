@@ -386,7 +386,6 @@ export_modem (MMDevice *self)
                   "g-object-path", path,
                   MM_BASE_MODEM_CONNECTION, connection,
                   NULL);
-    g_object_unref (connection);
 
     g_dbus_object_manager_server_export (self->priv->object_manager,
                                          G_DBUS_OBJECT_SKELETON (self->priv->modem));
