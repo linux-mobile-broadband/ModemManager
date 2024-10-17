@@ -1041,16 +1041,25 @@ interface_enabling_step (GTask *task)
     case ENABLING_STEP_STORAGE_DEFAULTS: {
         MMSmsStorage default_storage;
 
-        /* Is there only one single storage supported? if so, we don't care if
-         * setting default storage is implemented or not. */
-        default_storage = get_single_default_sms_storage (self);
-        if (default_storage == MM_SMS_STORAGE_UNKNOWN)
-            default_storage = get_best_initial_default_sms_storage (self);
-
-        /* Already bound to the 'default-storage' property in the skeleton */
-        g_object_set (self,
-                      MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE, default_storage,
+        /* Get default storage that is set by init_current_storage */
+        g_object_get (self,
+                      MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE, &default_storage,
                       NULL);
+
+        /* if current_storage is set to unknown, get the best initial
+         * default_storage */
+        if (default_storage == MM_SMS_STORAGE_UNKNOWN) {
+            /* Is there only one single storage supported? if so, we don't care if
+             * setting default storage is implemented or not. */
+            default_storage = get_single_default_sms_storage (self);
+            if (default_storage == MM_SMS_STORAGE_UNKNOWN)
+                default_storage = get_best_initial_default_sms_storage (self);
+
+            /* Already bound to the 'default-storage' property in the skeleton */
+            g_object_set (self,
+                          MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE, default_storage,
+                          NULL);
+        }
 
         if (default_storage == MM_SMS_STORAGE_UNKNOWN)
             mm_obj_warn (self, "cannot set default storage, none of the suggested ones supported");
@@ -1300,15 +1309,21 @@ init_current_storages_ready (MMIfaceModemMessaging *self,
 {
     InitializationContext *ctx;
     GError *error = NULL;
+    MMSmsStorage current_storage = MM_SMS_STORAGE_UNKNOWN;
 
     if (!MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->init_current_storages_finish (
             self,
             res,
+            &current_storage,
             &error)) {
         mm_obj_dbg (self, "couldn't initialize current storages: %s", error->message);
         g_error_free (error);
-    } else
+    } else {
+        g_object_set (self,
+                      MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE, current_storage,
+                      NULL);
         mm_obj_dbg (self, "current storages initialized");
+    }
 
     /* Go on to next step */
     ctx = g_task_get_task_data (task);
