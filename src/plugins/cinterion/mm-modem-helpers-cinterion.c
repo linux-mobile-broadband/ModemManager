@@ -571,8 +571,8 @@ mm_cinterion_parse_scfg_sim_response (const gchar  *response,
     }
 
     if (!mm_get_uint_from_match_info (match_info, 1, active_slot)) {
-        g_prefix_error (&inner_error, "Could not parse SIM slot index: ");
-        g_propagate_error (error, inner_error);
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Could not parse SIM slot index in ^SCFG response");
         return FALSE;
     }
 
