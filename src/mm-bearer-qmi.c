@@ -429,15 +429,10 @@ load_connection_status (MMBaseBearer        *_self,
     task = g_task_new (self, NULL, callback, user_data);
 
     /* Connection status polling is an optional feature that must be
-     * enabled explicitly via udev tags. If not set, out as unsupported.
-     * Note that when connected via a muxed link, the udev tag should be
-     * checked on the main interface (lower device) */
-    if ((self->priv->data &&
-         !mm_kernel_device_get_global_property_as_boolean (mm_port_peek_kernel_device (self->priv->data),
-                                                           "ID_MM_QMI_CONNECTION_STATUS_POLLING_ENABLE")) ||
-        (self->priv->link &&
-         !mm_kernel_device_get_global_property_as_boolean (mm_kernel_device_peek_lower_device (mm_port_peek_kernel_device (self->priv->link)),
-                                                           "ID_MM_QMI_CONNECTION_STATUS_POLLING_ENABLE"))) {
+     * enabled explicitly via udev tags. If not set, out as unsupported. */
+    if (self->priv->qmi &&
+        !mm_kernel_device_get_global_property_as_boolean (mm_port_peek_kernel_device (MM_PORT (self->priv->qmi)),
+                                                          "ID_MM_QMI_CONNECTION_STATUS_POLLING_ENABLE")) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                  "Connection status polling not required");
         g_object_unref (task);
