@@ -327,6 +327,7 @@ plugins_options_reqs = {
   'altair-lte': {'available': true, 'shared': []},
   'anydata': {'available': true, 'shared': []},
   'broadmobi': {'available': true, 'shared': []},
+  'cellient': {'available': true, 'shared': []},
   'cinterion': {'available': true, 'shared': []},
   'dell': {'available': true, 'shared': dell_shared_reqs},
   'dlink': {'available': true, 'shared': []},

@@ -112,6 +112,14 @@ test_x22x (void)
 }
 #endif
 
+#if defined ENABLE_PLUGIN_CELLIENT
+static void
+test_cellient (void)
+{
+    common_test (TESTUDEVRULESDIR_CELLIENT);
+}
+#endif
+
 #if defined ENABLE_PLUGIN_CINTERION
 static void
 test_cinterion (void)
@@ -237,6 +245,9 @@ int main (int argc, char **argv)
 #endif
 #if defined ENABLE_PLUGIN_X22X
     g_test_add_func ("/MM/test-udev-rules/x22x", test_x22x);
+#endif
+#if defined ENABLE_PLUGIN_CELLIENT
+    g_test_add_func ("/MM/test-udev-rules/cellient", test_cellient);
 #endif
 #if defined ENABLE_PLUGIN_CINTERION
     g_test_add_func ("/MM/test-udev-rules/cinterion", test_cinterion);

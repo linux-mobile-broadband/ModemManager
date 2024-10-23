@@ -357,6 +357,23 @@ if plugins_options['broadmobi']
   plugins_udev_rules += files('broadmobi/77-mm-broadmobi-port-types.rules')
 endif
 
+# plugin: cellient
+if plugins_options['cellient']
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_CELLIENT="@0@"'.format(plugins_dir / 'cellient')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
+
+  sources = files(
+    'cellient/mm-plugin-cellient.c',
+  )
+
+  plugins += {'plugin-cellient': {
+    'plugin': true,
+    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="cellient"']},
+  }}
+
+  plugins_udev_rules += files('cellient/77-mm-cellient.rules')
+endif
+
 # plugin: cinterion (previously siemens)
 if plugins_options['cinterion']
   test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_CINTERION="@0@"'.format(plugins_dir / 'cinterion')]

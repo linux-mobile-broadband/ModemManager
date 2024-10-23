@@ -28,6 +28,9 @@ MMPlugin *mm_plugin_create_anydata (void);
 #if defined ENABLE_PLUGIN_BROADMOBI
 MMPlugin *mm_plugin_create_broadmobi (void);
 #endif
+#if defined ENABLE_PLUGIN_CELLIENT
+MMPlugin *mm_plugin_create_cellient (void);
+#endif
 #if defined ENABLE_PLUGIN_CINTERION
 MMPlugin *mm_plugin_create_cinterion (void);
 #endif
@@ -162,6 +165,9 @@ mm_builtin_plugins_load (void)
 #endif
 #if defined ENABLE_PLUGIN_BROADMOBI
     PREPEND_PLUGIN (broadmobi);
+#endif
+#if defined ENABLE_PLUGIN_CELLIENT
+    PREPEND_PLUGIN (cellient);
 #endif
 #if defined ENABLE_PLUGIN_CINTERION
     PREPEND_PLUGIN (cinterion);
