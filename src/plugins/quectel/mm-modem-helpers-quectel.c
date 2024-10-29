@@ -31,9 +31,10 @@ mm_quectel_parse_ctzu_test_response (const gchar  *response,
                                      gboolean     *supports_enable_update_rtc,
                                      GError      **error)
 {
-    g_auto(GStrv)     split = NULL;
-    g_autoptr(GArray) modes = NULL;
-    guint             i;
+    g_auto(GStrv)      split = NULL;
+    g_autoptr(GArray)  modes = NULL;
+    GError            *inner_error = NULL;
+    guint              i;
 
     /*
      * Response may be:
@@ -57,9 +58,14 @@ mm_quectel_parse_ctzu_test_response (const gchar  *response,
         return FALSE;
     }
 
-    modes = mm_parse_uint_list (split[0], error);
+    modes = mm_parse_uint_list (split[0], &inner_error);
+    if (inner_error) {
+        g_propagate_prefixed_error (error, inner_error, "Failed to parse integer list in +CTZU test response: ");
+        return FALSE;
+    }
     if (!modes) {
-        g_prefix_error (error, "Failed to parse integer list in +CTZU test response: ");
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Unexpected empty integer list in +CTZU test response: ");
         return FALSE;
     }
 

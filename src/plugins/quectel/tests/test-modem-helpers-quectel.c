@@ -34,18 +34,23 @@ typedef struct {
     gboolean     expect_supports_disable;
     gboolean     expect_supports_enable;
     gboolean     expect_supports_enable_update_rtc;
+    gboolean     expect_error;
 } TestCtzuResponse;
 
 static const TestCtzuResponse test_ctzu_response[] = {
-    { "+CTZU: (0,1)",   TRUE, TRUE, FALSE },
-    { "+CTZU: (0,1,3)", TRUE, TRUE, TRUE  },
+    { "+CTZU: ",        FALSE, FALSE, FALSE, TRUE  },
+    { "+CTZU: ()",      FALSE, FALSE, FALSE, TRUE  },
+    { "+CTZU: (,)",     FALSE, FALSE, FALSE, TRUE  },
+    { "+CTZU: (0,1)",   TRUE,  TRUE,  FALSE, FALSE },
+    { "+CTZU: (0,1,3)", TRUE,  TRUE,  TRUE,  FALSE },
 };
 
 static void
 common_test_ctzu (const gchar *response,
                   gboolean     expect_supports_disable,
                   gboolean     expect_supports_enable,
-                  gboolean     expect_supports_enable_update_rtc)
+                  gboolean     expect_supports_enable_update_rtc,
+                  gboolean     expect_error)
 {
     g_autoptr(GError) error = NULL;
     gboolean          res;
@@ -59,12 +64,17 @@ common_test_ctzu (const gchar *response,
                                                &supports_enable,
                                                &supports_enable_update_rtc,
                                                &error);
-    g_assert_no_error (error);
-    g_assert (res);
+    if (expect_error) {
+        g_assert (error);
+        g_assert (!res);
+    } else {
+        g_assert_no_error (error);
+        g_assert (res);
 
-    g_assert_cmpuint (expect_supports_disable,           ==, supports_disable);
-    g_assert_cmpuint (expect_supports_enable,            ==, supports_enable);
-    g_assert_cmpuint (expect_supports_enable_update_rtc, ==, supports_enable_update_rtc);
+        g_assert_cmpuint (expect_supports_disable,           ==, supports_disable);
+        g_assert_cmpuint (expect_supports_enable,            ==, supports_enable);
+        g_assert_cmpuint (expect_supports_enable_update_rtc, ==, supports_enable_update_rtc);
+    }
 }
 
 static void
@@ -76,7 +86,8 @@ test_ctzu (void)
         common_test_ctzu (test_ctzu_response[i].response,
                           test_ctzu_response[i].expect_supports_disable,
                           test_ctzu_response[i].expect_supports_enable,
-                          test_ctzu_response[i].expect_supports_enable_update_rtc);
+                          test_ctzu_response[i].expect_supports_enable_update_rtc,
+                          test_ctzu_response[i].expect_error);
 }
 
 /*****************************************************************************/
