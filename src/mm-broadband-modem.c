@@ -12295,7 +12295,6 @@ enabling_step (GTask *task)
         /* From now on, the failure to enable one of the mandatory interfaces
          * will trigger the implicit disabling process */
 
-        g_assert (self->priv->modem_dbus_skeleton != NULL);
         /* Enabling the Modem interface */
         mm_iface_modem_enable (MM_IFACE_MODEM (self),
                                g_task_get_cancellable (task),
