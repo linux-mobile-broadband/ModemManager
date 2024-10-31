@@ -3882,6 +3882,18 @@ mm_iface_modem_3gpp_shutdown (MMIfaceModem3gpp *self)
 
 /*****************************************************************************/
 
+gchar *
+mm_iface_modem_3gpp_get_manual_registration_operator_id (MMIfaceModem3gpp *self)
+{
+    Private *priv;
+
+    priv = get_private (self);
+
+    return g_strdup (priv->manual_registration_operator_id);
+}
+
+/*****************************************************************************/
+
 static void
 mm_iface_modem_3gpp_default_init (MMIfaceModem3gppInterface *iface)
 {

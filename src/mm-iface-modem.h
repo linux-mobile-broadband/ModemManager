@@ -451,6 +451,11 @@ gboolean     mm_iface_modem_get_carrier_config (MMIfaceModem  *self,
                                                 const gchar  **name,
                                                 const gchar  **revision);
 
+/* Helpers to query current modes */
+gboolean mm_iface_modem_get_current_modes (MMIfaceModem *self,
+                                           MMModemMode  *allowed,
+                                           MMModemMode  *preferred);
+
 /* Initialize Modem interface (async) */
 void     mm_iface_modem_initialize        (MMIfaceModem *self,
                                            GCancellable *cancellable,

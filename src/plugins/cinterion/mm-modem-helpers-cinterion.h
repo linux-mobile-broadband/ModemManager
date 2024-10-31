@@ -229,4 +229,12 @@ gchar *mm_cinterion_build_sxrat_set_command (MMModemMode allowed,
                                              MMModemMode preferred,
                                              GError **error);
 
+/*****************************************************************************/
+/* +COPS command helper */
+
+gboolean mm_cinterion_build_cops_set_command (MMModemMode   mode,
+                                              const gchar  *operator_code,
+                                              gchar       **out,
+                                              GError      **error);
+
 #endif  /* MM_MODEM_HELPERS_CINTERION_H */

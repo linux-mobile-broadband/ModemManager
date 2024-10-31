@@ -1111,6 +1111,85 @@ modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp    *self,
 }
 
 /*****************************************************************************/
+/* Register in network (3GPP interface) */
+
+static gboolean
+modem_3gpp_register_in_network_finish (MMIfaceModem3gpp  *self,
+                                       GAsyncResult      *res,
+                                       GError           **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+cops_set_ready (MMBaseModem  *self,
+                GAsyncResult *res,
+                GTask        *task)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_finish (self, res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static gboolean
+is_valid_mode_combination (MMIfaceModem *self,
+                           MMModemMode   allowed)
+{
+    return ((mm_iface_modem_is_4g (self) && allowed == MM_MODEM_MODE_4G) ||
+            (mm_iface_modem_is_3g (self) && allowed == MM_MODEM_MODE_3G) ||
+            (mm_iface_modem_is_2g (self) && allowed == MM_MODEM_MODE_2G) ||
+            allowed == MM_MODEM_MODE_ANY);
+}
+
+static void
+modem_3gpp_register_in_network (MMIfaceModem3gpp    *_self,
+                                const gchar         *operator_code,
+                                GCancellable        *cancellable,
+                                GAsyncReadyCallback  callback,
+                                gpointer             user_data)
+{
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    g_autofree gchar          *command = NULL;
+    g_autoptr(GError)          error = NULL;
+    MMModemMode                allowed = MM_MODEM_MODE_NONE;
+    MMModemMode                preferred = MM_MODEM_MODE_NONE;
+    GTask                     *task;
+
+    task = g_task_new (self, cancellable, callback, user_data);
+
+    if (!mm_iface_modem_get_current_modes (MM_IFACE_MODEM (self), &allowed, &preferred)) {
+        mm_obj_msg (self, "Could not get current modes, using any");
+        allowed = MM_MODEM_MODE_ANY;
+    } else if (!is_valid_mode_combination (MM_IFACE_MODEM (self), allowed)) {
+        mm_obj_msg (self, "Modem does not support mode '%s', using any",
+                    mm_modem_mode_build_string_from_mask (allowed));
+        allowed = MM_MODEM_MODE_ANY;
+    }
+
+    /* Build cops command with selected mode and operator */
+    if (!mm_cinterion_build_cops_set_command (allowed,
+                                              operator_code,
+                                              &command,
+                                              &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Set operator and mode using +COPS */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              command,
+                              120,
+                              FALSE,
+                              (GAsyncReadyCallback)cops_set_ready,
+                              task);
+}
+
+/*****************************************************************************/
 /* Common operation to load expected CID for the initial EPS bearer */
 
 static gint
@@ -1647,35 +1726,35 @@ cops_set_current_modes (MMBroadbandModemCinterion *self,
                         MMModemMode preferred,
                         GTask *task)
 {
-    gchar *command;
+    g_autofree gchar  *operator_id = NULL;
+    g_autofree gchar  *command = NULL;
+    g_autoptr(GError)  error = NULL;
 
     g_assert (preferred == MM_MODEM_MODE_NONE);
+
+    operator_id = mm_iface_modem_3gpp_get_manual_registration_operator_id (MM_IFACE_MODEM_3GPP (self));
 
     /* We will try to simulate the possible allowed modes here. The
      * Cinterion devices do not seem to allow setting preferred access
      * technology in devices, but they allow restricting to a given
-     * one:
-     * - 2G-only is forced by forcing GERAN RAT (AcT=0)
-     * - 3G-only is forced by forcing UTRAN RAT (AcT=2)
-     * - 4G-only is forced by forcing E-UTRAN RAT (AcT=7)
-     * - for the remaining ones, we default to automatic selection of RAT,
-     *   which is based on the quality of the connection.
+     * one.
      */
-
-    if (mm_iface_modem_is_4g (MM_IFACE_MODEM (self)) && allowed == MM_MODEM_MODE_4G)
-        command = g_strdup ("+COPS=,,,7");
-    else if (mm_iface_modem_is_3g (MM_IFACE_MODEM (self)) && allowed == MM_MODEM_MODE_3G)
-        command = g_strdup ("+COPS=,,,2");
-    else if (mm_iface_modem_is_2g (MM_IFACE_MODEM (self)) && allowed == MM_MODEM_MODE_2G)
-        command = g_strdup ("+COPS=,,,0");
-    else {
-        /* For any other combination (e.g. ANY or  no AcT given, defaults to Auto. For this case, we cannot provide
-         * AT+COPS=,,, (i.e. just without a last value). Instead, we need to
-         * re-run the last manual/automatic selection command which succeeded,
-         * (or auto by default if none was launched) */
+    if (!is_valid_mode_combination (MM_IFACE_MODEM (self), allowed)) {
+        /* Invalid device and mode combination. Default to automatic selection
+         * of RAT, which is based on the quality of the connection.
+         */
         mm_iface_modem_3gpp_reregister_in_network (MM_IFACE_MODEM_3GPP (self),
                                                    (GAsyncReadyCallback) set_current_modes_reregister_in_network_ready,
                                                    task);
+        return;
+    }
+
+    if (!mm_cinterion_build_cops_set_command (allowed,
+                                              operator_id,
+                                              &command,
+                                              &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -1686,8 +1765,6 @@ cops_set_current_modes (MMBroadbandModemCinterion *self,
         FALSE,
         (GAsyncReadyCallback)allowed_access_technology_update_ready,
         task);
-
-    g_free (command);
 }
 
 static void
@@ -3121,6 +3198,9 @@ iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
     iface->setup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = modem_3gpp_cleanup_unsolicited_events;
     iface->cleanup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
+
+    iface->register_in_network = modem_3gpp_register_in_network;
+    iface->register_in_network_finish = modem_3gpp_register_in_network_finish;
 
     iface->load_initial_eps_bearer_settings = modem_3gpp_load_initial_eps_bearer_settings;
     iface->load_initial_eps_bearer_settings_finish = modem_3gpp_load_initial_eps_bearer_settings_finish;

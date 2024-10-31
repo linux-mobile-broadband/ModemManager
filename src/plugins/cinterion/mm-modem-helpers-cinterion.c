@@ -1934,3 +1934,71 @@ mm_cinterion_build_sxrat_set_command (MMModemMode allowed,
 
     return g_string_free (command, FALSE);
 }
+
+static gboolean
+modem_mode_to_cops_uint (MMModemMode   mode,
+                         guint        *out,
+                         GError      **error)
+{
+    switch (mode) {
+        case MM_MODEM_MODE_2G:
+            /* 2G-only force GERAN RAT (AcT=0) */
+            *out = 0;
+            break;
+        case MM_MODEM_MODE_3G:
+            /* 3G-only force UTRAN RAT (AcT=2) */
+            *out = 2;
+            break;
+        case MM_MODEM_MODE_4G:
+            /* 4G-only force E-UTRAN RAT (AcT=7) */
+            *out = 7;
+            break;
+        case MM_MODEM_MODE_NONE:
+        case MM_MODEM_MODE_CS:
+        case MM_MODEM_MODE_5G:
+        case MM_MODEM_MODE_ANY:
+        default:
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Cannot use mode '%s' for COPS",
+                         mm_modem_mode_build_string_from_mask (mode));
+            return FALSE;
+    }
+
+    return TRUE;
+}
+
+gboolean
+mm_cinterion_build_cops_set_command (MMModemMode   mode,
+                                     const gchar  *operator_code,
+                                     gchar       **out,
+                                     GError      **error)
+{
+    GString *command;
+    guint    cops_mode;
+
+    command = g_string_new ("+COPS=");
+
+    if (!operator_code && mode == MM_MODEM_MODE_ANY) {
+        /* any operator, any mode */
+        g_string_append (command, "0");
+    } else {
+        /* append <mode>,<operator format>,<operator> */
+        if (!operator_code)
+            g_string_append (command, "0,,");
+        else
+            g_string_append_printf (command, "1,2,\"%s\"", operator_code);
+
+        if (mode != MM_MODEM_MODE_ANY) {
+            /* append <RaT> */
+            if (!modem_mode_to_cops_uint (mode, &cops_mode, error)) {
+                return FALSE;
+            }
+            g_string_append_printf (command, ",%u", cops_mode);
+        }
+    }
+
+    *out = g_string_free (command, FALSE);
+    return TRUE;
+}

@@ -323,6 +323,9 @@ gboolean mm_iface_modem_3gpp_sync_finish    (MMIfaceModem3gpp *self,
 /* Shutdown Modem 3GPP interface */
 void mm_iface_modem_3gpp_shutdown (MMIfaceModem3gpp *self);
 
+/* Helpers to query manual operator id */
+gchar *mm_iface_modem_3gpp_get_manual_registration_operator_id (MMIfaceModem3gpp *self);
+
 /* Objects implementing this interface can report new registration info,
  * access technologies and location.
  *

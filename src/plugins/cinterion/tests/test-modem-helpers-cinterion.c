@@ -1855,6 +1855,132 @@ test_sxrat_response_other (void)
     g_array_unref (expected_pref1);
 }
 
+static void
+test_cops_only_mode_2g (void)
+{
+    const gchar *operator = NULL;
+    MMModemMode mode = MM_MODEM_MODE_2G;
+    GError *error = NULL;
+    g_autofree gchar *cops_command = NULL;
+    gboolean res;
+
+    res = mm_cinterion_build_cops_set_command (mode,
+                                               operator,
+                                               &cops_command,
+                                               &error);
+    g_assert_no_error (error);
+    g_assert (res == TRUE);
+    g_assert_cmpstr (cops_command, ==, "+COPS=0,,,0");
+}
+
+static void
+test_cops_only_mode_3g (void)
+{
+    const gchar *operator = NULL;
+    MMModemMode mode = MM_MODEM_MODE_3G;
+    GError *error = NULL;
+    g_autofree gchar *cops_command = NULL;
+    gboolean res;
+
+    res = mm_cinterion_build_cops_set_command (mode,
+                                               operator,
+                                               &cops_command,
+                                               &error);
+    g_assert_no_error (error);
+    g_assert (res == TRUE);
+    g_assert_cmpstr (cops_command, ==, "+COPS=0,,,2");
+}
+
+static void
+test_cops_only_mode_4g (void)
+{
+    const gchar *operator = NULL;
+    MMModemMode mode = MM_MODEM_MODE_4G;
+    GError *error = NULL;
+    g_autofree gchar *cops_command = NULL;
+    gboolean res;
+
+    res = mm_cinterion_build_cops_set_command (mode,
+                                               operator,
+                                               &cops_command,
+                                               &error);
+    g_assert_no_error (error);
+    g_assert (res == TRUE);
+    g_assert_cmpstr (cops_command, ==, "+COPS=0,,,7");
+}
+
+static void
+test_cops_only_mode_other (void)
+{
+    const gchar *operator = NULL;
+    MMModemMode mode = MM_MODEM_MODE_5G;
+    GError *error = NULL;
+    gchar *cops_command = NULL;
+    gboolean res;
+
+    res = mm_cinterion_build_cops_set_command (mode,
+                                               operator,
+                                               &cops_command,
+                                               &error);
+    g_assert (res == FALSE);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
+    g_clear_error (&error);
+}
+
+static void
+test_cops_only_operator (void)
+{
+    const gchar *operator = "26201";
+    MMModemMode mode = MM_MODEM_MODE_ANY;
+    GError *error = NULL;
+    g_autofree gchar *cops_command = NULL;
+    gboolean res;
+
+    res = mm_cinterion_build_cops_set_command (mode,
+                                               operator,
+                                               &cops_command,
+                                               &error);
+    g_assert_no_error (error);
+    g_assert (res == TRUE);
+    g_assert_cmpstr (cops_command, ==, "+COPS=1,2,\"26201\"");
+}
+
+static void
+test_cops_operator_and_mode (void)
+{
+    const gchar *operator = "26202";
+    MMModemMode mode = MM_MODEM_MODE_2G;
+    GError *error = NULL;
+    g_autofree gchar *cops_command = NULL;
+    gboolean res;
+
+    res = mm_cinterion_build_cops_set_command (mode,
+                                               operator,
+                                               &cops_command,
+                                               &error);
+    g_assert_no_error (error);
+    g_assert (res == TRUE);
+    g_assert_cmpstr (cops_command, ==, "+COPS=1,2,\"26202\",0");
+}
+
+static void
+test_cops_any (void)
+{
+    const gchar *operator = NULL;
+    MMModemMode mode = MM_MODEM_MODE_ANY;
+    GError *error = NULL;
+    g_autofree gchar *cops_command = NULL;
+    gboolean res;
+
+    res = mm_cinterion_build_cops_set_command (mode,
+                                               operator,
+                                               &cops_command,
+                                               &error);
+    g_assert_no_error (error);
+    g_assert (res == TRUE);
+    g_assert_cmpstr (cops_command, ==, "+COPS=0");
+}
+
 typedef struct {
     const gchar *str;
     MMModemMode  allowed;
@@ -1962,6 +2088,13 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/cinterion/sxrat",                   test_sxrat);
     g_test_add_func ("/MM/cinterion/sxrat/response/els61",    test_sxrat_response_els61);
     g_test_add_func ("/MM/cinterion/sxrat/response/other",    test_sxrat_response_other);
+    g_test_add_func ("/MM/cinterion/cops/only-mode-2g",       test_cops_only_mode_2g);
+    g_test_add_func ("/MM/cinterion/cops/only-mode-3g",       test_cops_only_mode_3g);
+    g_test_add_func ("/MM/cinterion/cops/only-mode-4g",       test_cops_only_mode_4g);
+    g_test_add_func ("/MM/cinterion/cops/only-mode-other",    test_cops_only_mode_other);
+    g_test_add_func ("/MM/cinterion/cops/only-operator",      test_cops_only_operator);
+    g_test_add_func ("/MM/cinterion/cops/operator-and-mode",  test_cops_operator_and_mode);
+    g_test_add_func ("/MM/cinterion/cops/any",                test_cops_any);
 
     return g_test_run ();
 }
