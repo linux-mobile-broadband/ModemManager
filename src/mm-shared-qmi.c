@@ -6648,7 +6648,8 @@ loc_location_get_predicted_orbits_data_source_indication_cb (QmiClientLoc       
         }
         g_ptr_array_add (tmp, NULL);
 
-        g_assert (!priv->loc_assistance_data_servers);
+
+        g_strfreev (priv->loc_assistance_data_servers);
         priv->loc_assistance_data_servers = (gchar **) g_ptr_array_free (tmp, FALSE);
 
         supported = TRUE;
