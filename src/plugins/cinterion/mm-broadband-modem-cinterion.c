@@ -110,6 +110,7 @@ struct _MMBroadbandModemCinterionPrivate {
     FeatureSupport smoni_support;
     FeatureSupport sind_simstatus_support;
     FeatureSupport sxrat_support;
+    FeatureSupport ws46_support;
 
     /* Mode combination to apply if "any" requested */
     MMModemMode any_allowed;
@@ -1681,6 +1682,133 @@ load_supported_modes (MMIfaceModem *_self,
 }
 
 /*****************************************************************************/
+/* Load initial allowed/preferred modes (Modem interface) */
+
+typedef struct {
+    MMModemMode allowed;
+    MMModemMode preferred;
+} LoadCurrentModesResult;
+
+static gboolean
+load_current_modes_finish (MMIfaceModem  *self,
+                           GAsyncResult  *res,
+                           MMModemMode   *allowed,
+                           MMModemMode   *preferred,
+                           GError       **error)
+{
+    g_autofree LoadCurrentModesResult *result = NULL;
+
+    result = g_task_propagate_pointer (G_TASK (res), error);
+    if (!result)
+        return FALSE;
+
+    *allowed   = result->allowed;
+    *preferred = result->preferred;
+    return TRUE;
+}
+
+static void
+ws46_query_ready (MMBaseModem  *self,
+                  GAsyncResult *res,
+                  GTask        *task)
+{
+    g_autofree LoadCurrentModesResult *result = NULL;
+    g_autoptr(GError)                  error = NULL;
+    const gchar                       *response;
+
+    result = g_new0 (LoadCurrentModesResult, 1);
+    result->allowed = MM_MODEM_MODE_NONE;
+    result->preferred = MM_MODEM_MODE_NONE;
+
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+    if (!mm_cinterion_parse_ws46_response (response,
+                                           &(result->allowed),
+                                           &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    g_task_return_pointer (task, g_steal_pointer (&result), g_free);
+    g_object_unref (task);
+}
+
+static void
+ws46_test_ready (MMIfaceModem3gpp *_self,
+                 GAsyncResult     *res,
+                 GTask            *task)
+{
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    g_autoptr(GError)          error = NULL;
+    const gchar               *response;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM(self), res, &error);
+    if (!response) {
+        self->priv->ws46_support = FEATURE_NOT_SUPPORTED;
+        g_task_return_new_error (task,
+                                MM_CORE_ERROR,
+                                MM_CORE_ERROR_FAILED,
+                                "WS46 not supported");
+        g_object_unref (task);
+        return;
+    }
+
+    self->priv->ws46_support = FEATURE_SUPPORTED;
+
+    /* Use WS46 to query allowed modes */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+WS46?",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)ws46_query_ready,
+                              task);
+}
+
+static void
+load_current_modes (MMIfaceModem        *_self,
+                    GAsyncReadyCallback  callback,
+                    gpointer             user_data)
+{
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    GTask                     *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (self->priv->ws46_support == FEATURE_SUPPORT_UNKNOWN) {
+        mm_base_modem_at_command (
+            MM_BASE_MODEM (self),
+            "+WS46=?",
+            3,
+            TRUE,
+            (GAsyncReadyCallback)ws46_test_ready,
+            task);
+        return;
+    }
+    if (self->priv->ws46_support == FEATURE_SUPPORTED) {
+        mm_base_modem_at_command (
+            MM_BASE_MODEM (self),
+            "+WS46?",
+            3,
+            FALSE,
+            (GAsyncReadyCallback)ws46_query_ready,
+            task);
+        return;
+    }
+
+    /* +WS46 feature not supported */
+    g_task_return_new_error (task,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "Unable to load current modes: WS46 not supported");
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
 /* Set current modes (Modem interface) */
 
 static gboolean
@@ -2846,6 +2974,7 @@ mm_broadband_modem_cinterion_init (MMBroadbandModemCinterion *self)
     self->priv->smoni_support          = FEATURE_SUPPORT_UNKNOWN;
     self->priv->sind_simstatus_support = FEATURE_SUPPORT_UNKNOWN;
     self->priv->sxrat_support          = FEATURE_SUPPORT_UNKNOWN;
+    self->priv->ws46_support           = FEATURE_SUPPORT_UNKNOWN;
 
     self->priv->ciev_regex = g_regex_new ("\\r\\n\\+CIEV:\\s*([a-z]+),(\\d+)\\r\\n",
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
@@ -3140,6 +3269,8 @@ iface_modem_init (MMIfaceModemInterface *iface)
     iface->create_bearer_finish = cinterion_modem_create_bearer_finish;
     iface->load_supported_modes = load_supported_modes;
     iface->load_supported_modes_finish = load_supported_modes_finish;
+    iface->load_current_modes = load_current_modes;
+    iface->load_current_modes_finish = load_current_modes_finish;
     iface->set_current_modes = set_current_modes;
     iface->set_current_modes_finish = set_current_modes_finish;
     iface->load_supported_bands = load_supported_bands;

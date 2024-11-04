@@ -1993,6 +1993,7 @@ mm_cinterion_build_cops_set_command (MMModemMode   mode,
         if (mode != MM_MODEM_MODE_ANY) {
             /* append <RaT> */
             if (!modem_mode_to_cops_uint (mode, &cops_mode, error)) {
+                g_string_free (command, TRUE);
                 return FALSE;
             }
             g_string_append_printf (command, ",%u", cops_mode);
@@ -2000,5 +2001,65 @@ mm_cinterion_build_cops_set_command (MMModemMode   mode,
     }
 
     *out = g_string_free (command, FALSE);
+    return TRUE;
+}
+
+gboolean
+mm_cinterion_parse_ws46_response (const gchar  *response,
+                                  MMModemMode  *result,
+                                  GError      **error)
+{
+    g_autoptr(GRegex)     r = NULL;
+    g_autoptr(GMatchInfo) match_info = NULL;
+    guint                 mode_num;
+
+    r = g_regex_new ("\\+WS46:\\s*(\\d+)",
+                     G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (r != NULL);
+
+    if (!g_regex_match (r, response, 0, &match_info)) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Failed to parse WS46 response '%s'",
+                     response);
+        return FALSE;
+    }
+
+    if (!mm_get_uint_from_match_info (match_info, 1, &mode_num)) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Failed to get mode from WS46 response '%s'",
+                     response);
+        return FALSE;
+    }
+
+    switch (mode_num) {
+        case 12:
+            /* GSM digital cellular (GERAN only) */
+            *result = MM_MODEM_MODE_2G;
+            break;
+        case 22:
+            /* UTRAN only */
+            *result = MM_MODEM_MODE_3G;
+            break;
+        case 25:
+            /* GERAN, UTRAN and E-UTRAN */
+            *result = MM_MODEM_MODE_ANY;
+            break;
+        case 28:
+            /* E-UTRAN only */
+            *result = MM_MODEM_MODE_4G;
+            break;
+        default:
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Unknown WS46 mode '%u'",
+                         mode_num);
+            return FALSE;
+    }
+
     return TRUE;
 }

@@ -1981,6 +1981,96 @@ test_cops_any (void)
     g_assert_cmpstr (cops_command, ==, "+COPS=0");
 }
 
+static void
+test_ws46_response_2g (void)
+{
+    MMModemMode mode = MM_MODEM_MODE_NONE;
+    GError *error = NULL;
+    gboolean res;
+    const gchar *response =
+        "+WS46: 12\r\n"
+        "\r\n";
+
+    res = mm_cinterion_parse_ws46_response (response,
+                                            &mode,
+                                            &error);
+    g_assert_no_error (error);
+    g_assert (res == TRUE);
+    g_assert (mode == MM_MODEM_MODE_2G);
+}
+
+static void
+test_ws46_response_3g (void)
+{
+    MMModemMode mode = MM_MODEM_MODE_NONE;
+    GError *error = NULL;
+    gboolean res;
+    const gchar *response =
+        "+WS46: 22\r\n"
+        "\r\n";
+
+    res = mm_cinterion_parse_ws46_response (response,
+                                            &mode,
+                                            &error);
+    g_assert_no_error (error);
+    g_assert (res == TRUE);
+    g_assert (mode == MM_MODEM_MODE_3G);
+}
+
+static void
+test_ws46_response_4g (void)
+{
+    MMModemMode mode = MM_MODEM_MODE_NONE;
+    GError *error = NULL;
+    gboolean res;
+    const gchar *response =
+        "+WS46: 28\r\n"
+        "\r\n";
+
+    res = mm_cinterion_parse_ws46_response (response,
+                                            &mode,
+                                            &error);
+    g_assert_no_error (error);
+    g_assert (res == TRUE);
+    g_assert (mode == MM_MODEM_MODE_4G);
+}
+
+static void
+test_ws46_response_any (void)
+{
+    MMModemMode mode = MM_MODEM_MODE_NONE;
+    GError *error = NULL;
+    gboolean res;
+    const gchar *response =
+        "+WS46: 25\r\n"
+        "\r\n";
+
+    res = mm_cinterion_parse_ws46_response (response,
+                                            &mode,
+                                            &error);
+    g_assert_no_error (error);
+    g_assert (res == TRUE);
+    g_assert (mode == MM_MODEM_MODE_ANY);
+}
+
+static void
+test_ws46_response_other (void)
+{
+    MMModemMode mode = MM_MODEM_MODE_NONE;
+    GError *error = NULL;
+    gboolean res;
+    const gchar *response =
+        "+WS46: 8\r\n"
+        "\r\n";
+
+    res = mm_cinterion_parse_ws46_response (response,
+                                            &mode,
+                                            &error);
+    g_assert (res == FALSE);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
+    g_clear_error (&error);
+}
+
 typedef struct {
     const gchar *str;
     MMModemMode  allowed;
@@ -2095,6 +2185,11 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/cinterion/cops/only-operator",      test_cops_only_operator);
     g_test_add_func ("/MM/cinterion/cops/operator-and-mode",  test_cops_operator_and_mode);
     g_test_add_func ("/MM/cinterion/cops/any",                test_cops_any);
+    g_test_add_func ("/MM/cinterion/ws46/response/2g",        test_ws46_response_2g);
+    g_test_add_func ("/MM/cinterion/ws46/response/3g",        test_ws46_response_3g);
+    g_test_add_func ("/MM/cinterion/ws46/response/4g",        test_ws46_response_4g);
+    g_test_add_func ("/MM/cinterion/ws46/response/any",       test_ws46_response_any);
+    g_test_add_func ("/MM/cinterion/ws46/response/other",     test_ws46_response_other);
 
     return g_test_run ();
 }

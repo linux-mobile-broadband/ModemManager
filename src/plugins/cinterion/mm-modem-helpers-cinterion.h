@@ -237,4 +237,11 @@ gboolean mm_cinterion_build_cops_set_command (MMModemMode   mode,
                                               gchar       **out,
                                               GError      **error);
 
+/*****************************************************************************/
+/* +WS46 response parser */
+
+gboolean mm_cinterion_parse_ws46_response (const gchar  *response,
+                                           MMModemMode  *result,
+                                           GError      **error);
+
 #endif  /* MM_MODEM_HELPERS_CINTERION_H */
