@@ -1393,6 +1393,7 @@ typedef struct {
     MMPortSerialAt *primary;
     MMPortSerialAt *secondary;
     gboolean        primary_done;
+    gboolean        secondary_done;
 } EnableUnsolicitedEventsContext;
 
 static void
@@ -1442,7 +1443,8 @@ own_enable_unsolicited_events (GTask *task)
         g_assert (ctx->primary);
         mm_obj_dbg (self, "enabling telit-specific 3GPP unsolicited events in primary port");
         port = ctx->primary;
-    } else if (ctx->secondary) {
+    } else if (ctx->secondary && !ctx->secondary_done) {
+        ctx->secondary_done = TRUE;
         mm_obj_dbg (self, "enabling telit-specific 3GPP unsolicited events in secondary port");
         port = ctx->secondary;
     }
