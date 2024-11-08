@@ -2,6 +2,7 @@
 ACTION!="add|change|move|bind", GOTO="mm_fibocom_port_types_end"
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="2cb7", GOTO="mm_fibocom_port_types"
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="1782", GOTO="mm_fibocom_port_types"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="1508", GOTO="mm_fibocom_port_types"
 GOTO="mm_fibocom_port_types_end"
 
 LABEL="mm_fibocom_port_types"
@@ -86,6 +87,16 @@ ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="0106", ENV{.MM_USBIFNUM}=="02", SUBS
 #  ttyUSB2 (if #1): AT port
 ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="010a", ENV{.MM_USBIFNUM}=="00", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
 ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="010a", ENV{.MM_USBIFNUM}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+
+# Fibocom NL668-EAU
+#  ttyUSB0 (if #0): QCDM/DIAG port
+#  ttyUSB0 (if #1): AT port
+#  ttyUSB5 (if #2): AT port
+#  ttyUSB6 (if #3): AT port
+ATTRS{idVendor}=="1508", ATTRS{idProduct}=="1001", ENV{.MM_USBIFNUM}=="00", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_QCDM}="1"
+ATTRS{idVendor}=="1508", ATTRS{idProduct}=="1001", ENV{.MM_USBIFNUM}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="1508", ATTRS{idProduct}=="1001", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="1508", ATTRS{idProduct}=="1001", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 
 # Fibocom L610 (GTUSBMODE=31)
 #  ttyUSB0 (if #0): AT port
