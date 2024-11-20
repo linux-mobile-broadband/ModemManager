@@ -5408,7 +5408,7 @@ network_reject_indication_cb (QmiClientNas                        *client,
     guint16                    mcc = 0;
     guint16                    mnc = 0;
     guint32                    closed_subscriber_group = 0;
-    gboolean                   has_pcs_digit;
+    gboolean                   has_pcs_digit = FALSE;
 
     mm_obj_warn (self, "network reject indication received");
     if (qmi_indication_nas_network_reject_output_get_service_domain (output, &service_domain, NULL))
