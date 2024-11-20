@@ -5431,10 +5431,12 @@ network_reject_indication_cb (QmiClientNas                        *client,
 
         mm_nw_error = mm_modem_nw_error_from_qmi_nw_error (reject_cause);
         access_technology  = mm_modem_access_technology_from_qmi_radio_interface (radio_interface);
-        if (has_pcs_digit)
-            operator_id = g_strdup_printf ("%.3" G_GUINT16_FORMAT "%.3" G_GUINT16_FORMAT, mcc, mnc);
-        else
-            operator_id = g_strdup_printf ("%.3" G_GUINT16_FORMAT "%.2" G_GUINT16_FORMAT, mcc, mnc);
+        if (mcc) {
+            if (has_pcs_digit)
+                operator_id = g_strdup_printf ("%.3" G_GUINT16_FORMAT "%.3" G_GUINT16_FORMAT, mcc, mnc);
+            else
+                operator_id = g_strdup_printf ("%.3" G_GUINT16_FORMAT "%.2" G_GUINT16_FORMAT, mcc, mnc);
+        }
 
         mm_iface_modem_3gpp_update_network_rejection (MM_IFACE_MODEM_3GPP (self),
                                                       mm_nw_error, operator_id, NULL, access_technology);
