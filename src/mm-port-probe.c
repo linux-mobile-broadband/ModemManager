@@ -895,6 +895,13 @@ static const guint8 zerobuf[32] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 
+static const guint8 quectel_qcdm[] = {
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
+};
+
 static gboolean
 is_non_at_response (const guint8 *data, gsize len)
 {
@@ -907,6 +914,12 @@ is_non_at_response (const guint8 *data, gsize len)
      */
     for (i = 0; (len >= sizeof (zerobuf)) && (i < len - sizeof (zerobuf)); i++) {
         if (!memcmp (&data[i], zerobuf, sizeof (zerobuf)))
+            return TRUE;
+    }
+
+    /* Observed on a Quectel EG915Q Qualcomm-based device's DIAG port */
+    for (i = 0; (len >= sizeof (quectel_qcdm)) && (i < len - sizeof (quectel_qcdm)); i++) {
+        if (!memcmp (&data[i], quectel_qcdm, sizeof (quectel_qcdm)))
             return TRUE;
     }
 
