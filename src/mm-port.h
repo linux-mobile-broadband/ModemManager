@@ -34,6 +34,13 @@ typedef enum { /*< underscore_name=mm_port_subsys >*/
     MM_PORT_SUBSYS_LAST = MM_PORT_SUBSYS_WWAN /*< skip >*/
 } MMPortSubsys;
 
+typedef enum { /*< underscore_name=mm_port_group >*/
+    MM_PORT_GROUP_UNKNOWN = 0x0,
+    MM_PORT_GROUP_USED,
+    MM_PORT_GROUP_IGNORED,
+    MM_PORT_GROUP_LAST = MM_PORT_GROUP_IGNORED /*< skip >*/
+} MMPortGroup;
+
 typedef enum { /*< underscore_name=mm_port_type >*/
     MM_PORT_TYPE_UNKNOWN = 0x0,
     MM_PORT_TYPE_IGNORED,
@@ -57,6 +64,7 @@ typedef enum { /*< underscore_name=mm_port_type >*/
 
 #define MM_PORT_DEVICE        "device"
 #define MM_PORT_SUBSYS        "subsys"
+#define MM_PORT_GROUP         "group"
 #define MM_PORT_TYPE          "type"
 #define MM_PORT_CONNECTED     "connected"
 #define MM_PORT_KERNEL_DEVICE "kernel-device"
@@ -86,6 +94,7 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMPort, g_object_unref)
 
 const gchar    *mm_port_get_device         (MMPort *self);
 MMPortSubsys    mm_port_get_subsys         (MMPort *self);
+MMPortGroup     mm_port_get_port_group     (MMPort *self);
 MMPortType      mm_port_get_port_type      (MMPort *self);
 gboolean        mm_port_get_connected      (MMPort *self);
 void            mm_port_set_connected      (MMPort *self, gboolean connected);

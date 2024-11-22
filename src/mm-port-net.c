@@ -156,6 +156,7 @@ mm_port_net_new (const gchar *name)
     return MM_PORT_NET (g_object_new (MM_TYPE_PORT_NET,
                                       MM_PORT_DEVICE, name,
                                       MM_PORT_SUBSYS, MM_PORT_SUBSYS_NET,
+                                      MM_PORT_GROUP,  MM_PORT_GROUP_USED,
                                       MM_PORT_TYPE,   MM_PORT_TYPE_NET,
                                       NULL));
 }

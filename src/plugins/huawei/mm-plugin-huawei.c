@@ -693,6 +693,7 @@ grab_port (MMPlugin *self,
 
     return mm_base_modem_grab_port (modem,
                                     port,
+                                    mm_port_probe_get_port_group (probe),
                                     port_type,
                                     pflags,
                                     error);

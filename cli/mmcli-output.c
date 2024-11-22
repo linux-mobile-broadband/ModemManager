@@ -120,6 +120,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_SYSTEM_PLUGIN]                            = { "modem.generic.plugin",                            "plugin",                   MMC_S_MODEM_SYSTEM,               },
     [MMC_F_SYSTEM_PRIMARY_PORT]                      = { "modem.generic.primary-port",                      "primary port",             MMC_S_MODEM_SYSTEM,               },
     [MMC_F_SYSTEM_PORTS]                             = { "modem.generic.ports",                             "ports",                    MMC_S_MODEM_SYSTEM,               },
+    [MMC_F_SYSTEM_IGNORED_PORTS]                     = { "modem.generic.ignored-ports",                     "ignored ports",            MMC_S_MODEM_SYSTEM,               },
     [MMC_F_NUMBERS_OWN]                              = { "modem.generic.own-numbers",                       "own",                      MMC_S_MODEM_NUMBERS,              },
     [MMC_F_STATUS_LOCK]                              = { "modem.generic.unlock-required",                   "lock",                     MMC_S_MODEM_STATUS,               },
     [MMC_F_STATUS_UNLOCK_RETRIES]                    = { "modem.generic.unlock-retries",                    "unlock retries",           MMC_S_MODEM_STATUS,               },

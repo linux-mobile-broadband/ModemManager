@@ -140,6 +140,7 @@ gboolean mm_port_probe_run_early_at_probe_finish (MMPortProbe   *self,
                                                   GError       **error);
 
 /* Probing result getters */
+MMPortGroup   mm_port_probe_get_port_group   (MMPortProbe *self);
 MMPortType    mm_port_probe_get_port_type    (MMPortProbe *self);
 gboolean      mm_port_probe_is_at            (MMPortProbe *self);
 gboolean      mm_port_probe_is_qcdm          (MMPortProbe *self);
@@ -150,7 +151,6 @@ const gchar  *mm_port_probe_get_vendor       (MMPortProbe *self);
 const gchar  *mm_port_probe_get_product      (MMPortProbe *self);
 gboolean      mm_port_probe_is_icera         (MMPortProbe *self);
 gboolean      mm_port_probe_is_xmm           (MMPortProbe *self);
-gboolean      mm_port_probe_is_ignored       (MMPortProbe *self);
 
 /* Additional helpers */
 gboolean mm_port_probe_list_has_at_port     (GList *list);

@@ -31,6 +31,7 @@ enum {
     PROP_0,
     PROP_DEVICE,
     PROP_SUBSYS,
+    PROP_GROUP,
     PROP_TYPE,
     PROP_CONNECTED,
     PROP_KERNEL_DEVICE,
@@ -49,6 +50,7 @@ static guint signals[LAST_SIGNAL] = { 0 };
 struct _MMPortPrivate {
     gchar *device;
     MMPortSubsys subsys;
+    MMPortGroup pgroup;
     MMPortType ptype;
     gboolean connected;
     MMKernelDevice *kernel_device;
@@ -72,6 +74,15 @@ mm_port_get_subsys (MMPort *self)
     g_return_val_if_fail (MM_IS_PORT (self), MM_PORT_SUBSYS_UNKNOWN);
 
     return self->priv->subsys;
+}
+
+MMPortGroup
+mm_port_get_port_group (MMPort *self)
+{
+    g_return_val_if_fail (self != NULL, MM_PORT_GROUP_UNKNOWN);
+    g_return_val_if_fail (MM_IS_PORT (self), MM_PORT_GROUP_UNKNOWN);
+
+    return self->priv->pgroup;
 }
 
 MMPortType
@@ -151,6 +162,10 @@ set_property (GObject *object,
         /* Construct only */
         self->priv->subsys = g_value_get_uint (value);
         break;
+    case PROP_GROUP:
+        /* Construct only */
+        self->priv->pgroup = g_value_get_uint (value);
+        break;
     case PROP_TYPE:
         /* Construct only */
         self->priv->ptype = g_value_get_uint (value);
@@ -181,6 +196,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case PROP_SUBSYS:
         g_value_set_uint (value, self->priv->subsys);
+        break;
+    case PROP_GROUP:
+        g_value_set_uint (value, self->priv->pgroup);
         break;
     case PROP_TYPE:
         g_value_set_uint (value, self->priv->ptype);
@@ -252,6 +270,16 @@ mm_port_class_init (MMPortClass *klass)
                             MM_PORT_SUBSYS_UNKNOWN,
                             MM_PORT_SUBSYS_LAST,
                             MM_PORT_SUBSYS_UNKNOWN,
+                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_GROUP,
+         g_param_spec_uint (MM_PORT_GROUP,
+                            "Group",
+                            "Group",
+                            MM_PORT_GROUP_UNKNOWN,
+                            MM_PORT_GROUP_LAST,
+                            MM_PORT_GROUP_UNKNOWN,
                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property

@@ -1895,6 +1895,7 @@ mm_port_serial_new (const char *name, MMPortType ptype)
     return MM_PORT_SERIAL (g_object_new (MM_TYPE_PORT_SERIAL,
                                          MM_PORT_DEVICE, name,
                                          MM_PORT_SUBSYS, MM_PORT_SUBSYS_TTY,
+                                         MM_PORT_GROUP, MM_PORT_GROUP_USED,
                                          MM_PORT_TYPE, ptype,
                                          NULL));
 }

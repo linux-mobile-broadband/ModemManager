@@ -114,6 +114,7 @@ typedef enum {
     MMC_F_SYSTEM_PLUGIN,
     MMC_F_SYSTEM_PRIMARY_PORT,
     MMC_F_SYSTEM_PORTS,
+    MMC_F_SYSTEM_IGNORED_PORTS,
     /* Numbers section */
     MMC_F_NUMBERS_OWN,
     /* Status section */

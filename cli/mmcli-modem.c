@@ -316,8 +316,11 @@ print_modem_info (void)
     MMModemBand *bands = NULL;
     guint n_bands = 0;
     MMModemPortInfo *ports = NULL;
+    MMModemPortInfo *ignored_ports = NULL;
     guint n_ports = 0;
+    guint n_ignored_ports = 0;
     gchar *ports_string;
+    gchar *ignored_ports_string;
     MMUnlockRetries *unlock_retries;
     guint signal_quality = 0;
     gboolean signal_quality_recent = FALSE;
@@ -343,6 +346,8 @@ print_modem_info (void)
     g_free (bands);
     mm_modem_get_ports (ctx->modem, &ports, &n_ports);
     ports_string = mm_common_build_ports_string (ports, n_ports);
+    mm_modem_get_ignored_ports (ctx->modem, &ignored_ports, &n_ignored_ports);
+    ignored_ports_string = mm_common_build_ports_string (ignored_ports, n_ignored_ports);
     mm_modem_port_info_array_free (ports, n_ports);
     if (mm_modem_get_current_modes (ctx->modem, &allowed_modes, &preferred_mode)) {
         allowed_modes_string = mm_modem_mode_build_string_from_mask (allowed_modes);
@@ -376,6 +381,7 @@ print_modem_info (void)
     mmcli_output_string           (MMC_F_SYSTEM_PLUGIN,                   mm_modem_get_plugin (ctx->modem));
     mmcli_output_string           (MMC_F_SYSTEM_PRIMARY_PORT,             mm_modem_get_primary_port (ctx->modem));
     mmcli_output_string_list      (MMC_F_SYSTEM_PORTS,                    ports_string);
+    mmcli_output_string_list      (MMC_F_SYSTEM_IGNORED_PORTS,            ignored_ports_string);
 
     mmcli_output_string_array     (MMC_F_NUMBERS_OWN,                     (const gchar **) mm_modem_get_own_numbers (ctx->modem), FALSE);
 
@@ -540,6 +546,7 @@ print_modem_info (void)
     mmcli_output_dump ();
 
     g_free (ports_string);
+    g_free (ignored_ports_string);
     g_free (supported_ip_families_string);
     g_free (current_bands_string);
     g_free (supported_bands_string);

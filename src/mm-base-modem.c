@@ -190,11 +190,13 @@ port_timed_out_cb (MMPort       *port,
 
 static MMPort *
 base_modem_create_ignored_port (MMBaseModem *self,
+                                MMPortType   ptype,
                                 const gchar *name)
 {
     return MM_PORT (g_object_new (MM_TYPE_PORT,
                                   MM_PORT_DEVICE, name,
-                                  MM_PORT_TYPE,   MM_PORT_TYPE_IGNORED,
+                                  MM_PORT_GROUP,  MM_PORT_GROUP_IGNORED,
+                                  MM_PORT_TYPE,   ptype,
                                   NULL));
 }
 
@@ -326,6 +328,7 @@ base_modem_create_wwan_port (MMBaseModem *self,
         return MM_PORT (g_object_new (MM_TYPE_PORT,
                                       MM_PORT_DEVICE, name,
                                       MM_PORT_SUBSYS, MM_PORT_SUBSYS_WWAN,
+                                      MM_PORT_GROUP, MM_PORT_GROUP_USED,
                                       MM_PORT_TYPE, MM_PORT_TYPE_XMMRPC,
                                       NULL));
 
@@ -343,6 +346,7 @@ static MMPort *
 base_modem_internal_grab_port (MMBaseModem         *self,
                                MMKernelDevice      *kernel_device,
                                gboolean             link_port,
+                               MMPortGroup          pgroup,
                                MMPortType           ptype,
                                MMPortSerialAtFlag   at_pflags,
                                GError             **error)
@@ -377,8 +381,8 @@ base_modem_internal_grab_port (MMBaseModem         *self,
 
     /* Explicitly ignored ports, grab them but explicitly flag them as ignored
      * right away, all the same way (i.e. regardless of subsystem). */
-    if (ptype == MM_PORT_TYPE_IGNORED)
-        port = base_modem_create_ignored_port (self, name);
+    if (pgroup == MM_PORT_GROUP_IGNORED)
+        port = base_modem_create_ignored_port (self, ptype, name);
     else if (g_str_equal (subsys, "net"))
         port = base_modem_create_net_port (self, name);
     else if (g_str_equal (subsys, "tty"))
@@ -403,25 +407,27 @@ base_modem_internal_grab_port (MMBaseModem         *self,
     }
 
     /* Setup consecutive ports and removal watchers in all control ports */
-    if (MM_IS_PORT_SERIAL_AT (port)) {
-        mm_obj_dbg (port, "port monitoring enabled in AT port");
-        port_monitoring = TRUE;
-    } else if (MM_IS_PORT_SERIAL_QCDM (port)) {
-        mm_obj_dbg (port, "port monitoring enabled in QCDM port");
-        port_monitoring = TRUE;
-    }
+    if (pgroup == MM_PORT_GROUP_USED) {
+        if (MM_IS_PORT_SERIAL_AT (port)) {
+            mm_obj_dbg (port, "port monitoring enabled in AT port");
+            port_monitoring = TRUE;
+        } else if (MM_IS_PORT_SERIAL_QCDM (port)) {
+            mm_obj_dbg (port, "port monitoring enabled in QCDM port");
+            port_monitoring = TRUE;
+        }
 #if defined WITH_QMI
-    else if (MM_IS_PORT_QMI (port)) {
-        mm_obj_dbg (port, "port monitoring enabled in QMI port");
-        port_monitoring = TRUE;
-    }
+        else if (MM_IS_PORT_QMI (port)) {
+            mm_obj_dbg (port, "port monitoring enabled in QMI port");
+            port_monitoring = TRUE;
+        }
 #endif
 #if defined WITH_MBIM
-    else if (MM_IS_PORT_MBIM (port)) {
-        mm_obj_dbg (port, "port monitoring enabled in MBIM port");
-        port_monitoring = TRUE;
-    }
+        else if (MM_IS_PORT_MBIM (port)) {
+            mm_obj_dbg (port, "port monitoring enabled in MBIM port");
+            port_monitoring = TRUE;
+        }
 #endif
+    }
 
     if (port_monitoring) {
         if (self->priv->max_timeouts > 0)
@@ -487,13 +493,14 @@ base_modem_internal_grab_port (MMBaseModem         *self,
 gboolean
 mm_base_modem_grab_port (MMBaseModem         *self,
                          MMKernelDevice      *kernel_device,
+                         MMPortGroup          pgroup,
                          MMPortType           ptype,
                          MMPortSerialAtFlag   at_pflags,
                          GError             **error)
 {
     g_autoptr(GError) inner_error = NULL;
 
-    if (!base_modem_internal_grab_port (self, kernel_device, FALSE, ptype, at_pflags, &inner_error)) {
+    if (!base_modem_internal_grab_port (self, kernel_device, FALSE, pgroup, ptype, at_pflags, &inner_error)) {
         /* If the port was REQUIRED via udev tags and we failed to grab it, we will report
          * a fatal error. */
         if (mm_kernel_device_get_property_as_boolean (kernel_device, ID_MM_REQUIRED)) {
@@ -540,6 +547,7 @@ mm_base_modem_grab_link_port (MMBaseModem     *self,
     port = base_modem_internal_grab_port (self,
                                           kernel_device,
                                           TRUE,
+                                          MM_PORT_GROUP_USED,
                                           MM_PORT_TYPE_NET,
                                           MM_PORT_SERIAL_AT_FLAG_NONE,
                                           error);
@@ -1264,24 +1272,27 @@ port_info_cmp (const MMModemPortInfo *a,
     return g_strcmp0 (a->name, b->name);
 }
 
-MMModemPortInfo *
-mm_base_modem_get_port_infos (MMBaseModem *self,
-                              guint       *n_port_infos)
+static MMModemPortInfo *
+parse_port_infos (GHashTable *ports,
+                  guint      *n_port_infos,
+                  MMPortGroup pgroup_filter)
 {
     GHashTableIter  iter;
     GArray         *port_infos;
     MMPort         *port;
 
-    if (!self->priv->ports) {
+    if (!ports) {
         *n_port_infos = 0;
         return NULL;
     }
 
-    *n_port_infos = g_hash_table_size (self->priv->ports);
-    port_infos = g_array_sized_new (FALSE, FALSE, sizeof (MMModemPortInfo), *n_port_infos);
-    g_hash_table_iter_init (&iter, self->priv->ports);
+    port_infos = g_array_new (FALSE, FALSE, sizeof (MMModemPortInfo));
+    g_hash_table_iter_init (&iter, ports);
     while (g_hash_table_iter_next (&iter, NULL, (gpointer)&port)) {
         MMModemPortInfo port_info;
+
+        if (mm_port_get_port_group (port) != pgroup_filter)
+            continue;
 
         port_info.name = g_strdup (mm_port_get_device (port));
         switch (mm_port_get_port_type (port)) {
@@ -1321,9 +1332,23 @@ mm_base_modem_get_port_infos (MMBaseModem *self,
         g_array_append_val (port_infos, port_info);
     }
 
-    g_assert (*n_port_infos == port_infos->len);
+    *n_port_infos = port_infos->len;
     g_array_sort (port_infos, (GCompareFunc) port_info_cmp);
     return (MMModemPortInfo *) g_array_free (port_infos, FALSE);
+}
+
+MMModemPortInfo *
+mm_base_modem_get_port_infos (MMBaseModem *self,
+                              guint       *n_port_infos)
+{
+    return parse_port_infos (self->priv->ports, n_port_infos, MM_PORT_GROUP_USED);
+}
+
+MMModemPortInfo *
+mm_base_modem_get_ignored_port_infos (MMBaseModem *self,
+                                      guint       *n_port_infos)
+{
+    return parse_port_infos (self->priv->ports, n_port_infos, MM_PORT_GROUP_IGNORED);
 }
 
 static gint
@@ -1467,6 +1492,10 @@ mm_base_modem_organize_ports (MMBaseModem *self,
 
     g_hash_table_iter_init (&iter, self->priv->ports);
     while (g_hash_table_iter_next (&iter, NULL, (gpointer *) &candidate)) {
+        /* Skip ports that should not be used */
+        if (mm_port_get_port_group (candidate) != MM_PORT_GROUP_USED)
+            continue;
+
         switch (mm_port_get_port_type (candidate)) {
 
         case MM_PORT_TYPE_AT:
