@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2010 Red Hat, Inc.
+ * Copyright (C) 2024 JUCR GmbH
  */
 
 #include <glib.h>
@@ -3833,6 +3834,43 @@ static const CgcontrdpResponseTest cgcontrdp_response_tests[] = {
         .bearer_id = 5,
         .apn = "ibox.tim.it.mnc001.mcc222.gprs",
         .local_address = "2.197.17.49",
+    },
+    {
+        .str = "+CGCONTRDP: 1,5,\"internetipv6.mnc003.mcc260.gprs\",\"254.128.0.0.0.0.0.0.0.0.0.37.88.136.248.1\",\"\",\"42.1.23.0.0.2.255.255.0.0.0.0.0.0.159.1\",\"42.1.23.0.0.3.255.255.0.0.0.0.0.0.152.34\",\"\",\"\",0,0",
+        .cid = 1,
+        .bearer_id = 5,
+        .apn = "internetipv6.mnc003.mcc260.gprs",
+        .local_address = "fe80::25:5888:f801",
+        .dns_primary_address = "2a01:1700:2:ffff::9f01",
+        .dns_secondary_address = "2a01:1700:3:ffff::9822"
+    },
+    {
+        /* Quectel EG915Q */
+        .str = "+CGCONTRDP: 2,6,\"fast.t-mobile.com\",\"38.7.251.144.154.37.192.120.172.57.189.17.176.171.138.245\",,\"253.0.151.106.0.0.0.0.0.0.0.0.0.0.0.9\",\"253.0.151.106.0.0.0.0.0.0.0.0.0.0.0.16\"",
+        .cid = 2,
+        .bearer_id = 6,
+        .apn = "fast.t-mobile.com",
+        .local_address = "2607:fb90:9a25:c078:ac39:bd11:b0ab:8af5",
+        .dns_primary_address = "fd00:976a::9",
+        .dns_secondary_address = "fd00:976a::10",
+    },
+    {
+        .str = "+CGCONTRDP: 1,0,\"fast.t-mobile.com\",\"2607:FB90:B59A:02C1:0AD3:1B57:4FD4:21F4\",\"FE80:0000:0000:0000:B46D:57FF:FE45:4545\",\"fd00:976a::9\",\"fd00:976a::10\"",
+        .cid = 1,
+        .bearer_id = 0,
+        .apn = "fast.t-mobile.com",
+        .local_address = "2607:fb90:b59a:2c1:ad3:1b57:4fd4:21f4",
+        .gateway_address = "fe80::b46d:57ff:fe45:4545",
+        .dns_primary_address = "fd00:976a::9",
+        .dns_secondary_address = "fd00:976a::10",
+    },
+    {
+        .str = "+CGCONTRDP: 2,6,\"fast.t-mobile.com\",,,\"253.0.151.106.0.0.0.0.0.0.0.0.0.0.0.9\",\"253.0.151.106.0.0.0.0.0.0.0.0.0.0.0.16\"",
+        .cid = 2,
+        .bearer_id = 6,
+        .apn = "fast.t-mobile.com",
+        .dns_primary_address = "fd00:976a::9",
+        .dns_secondary_address = "fd00:976a::10",
     },
     /* Common */
     {
