@@ -49,6 +49,15 @@ gboolean mm_netlink_setlink_finish (MMNetlink            *self,
                                     GAsyncResult         *res,
                                     GError              **error);
 
+void        mm_netlink_get_hwaddr        (MMNetlink           *self,
+                                          guint                ifindex,
+                                          GCancellable        *cancellable,
+                                          GAsyncReadyCallback  callback,
+                                          gpointer             user_data);
+GByteArray *mm_netlink_get_hwaddr_finish (MMNetlink            *self,
+                                          GAsyncResult         *res,
+                                          GError              **error);
+
 G_END_DECLS
 
 #endif  /* MM_MODEM_HELPERS_NETLINK_H */
