@@ -318,6 +318,13 @@ gboolean mm_iface_modem_3gpp_sync_finish    (MMIfaceModem3gpp *self,
                                              GAsyncResult *res,
                                              GError **error);
 
+void     mm_iface_modem_3gpp_terse           (MMIfaceModem3gpp *self,
+                                             GAsyncReadyCallback callback,
+                                             gpointer user_data);
+gboolean mm_iface_modem_3gpp_terse_finish    (MMIfaceModem3gpp *self,
+                                             GAsyncResult *res,
+                                             GError **error);
+
 #endif
 
 /* Shutdown Modem 3GPP interface */

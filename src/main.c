@@ -93,9 +93,10 @@ sleeping_quick_cb (MMSleepMonitor *sleep_monitor,
                                      MM_BASE_MANAGER_CLEANUP_LOW_POWER,
                                  ctx);
     } else {
-        /* Don't need to wait for anything; just suspend */
-        mm_dbg ("leaving modem powered... (sleeping)");
-        mm_sleep_context_complete (ctx, NULL);
+        mm_dbg ("setting modem in terse mode... (only send important signals (call/text))");
+        mm_base_manager_cleanup (manager,
+                                 MM_BASE_MANAGER_CLEANUP_TERSE,
+                                 ctx);
     }
 }
 
