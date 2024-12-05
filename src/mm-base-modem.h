@@ -109,6 +109,15 @@ struct _MMBaseModemClass {
      * this method triggers a synchronization of all modem interfaces */
     StateOperation       sync;
     StateOperationFinish sync_finish;
+
+    /* Modem terse.
+     * When suspending in quick suspend/resume mode,
+     * this method disables unsolicited events on the 3GPP interface only.
+     * This is enough for phones to suspend properly, but it
+     * might be useful to extend it to all other interfaces
+     * that support it as well */
+    StateOperation       terse;
+    StateOperationFinish terse_finish;
 #endif
 
     /* Allow plugins to subclass port object creation as needed */
@@ -298,13 +307,20 @@ gboolean mm_base_modem_disable_finish    (MMBaseModem                   *self,
                                           GError                       **error);
 
 #if defined WITH_SUSPEND_RESUME
-void     mm_base_modem_sync              (MMBaseModem              *self,
-                                          MMBaseModemOperationLock  operation_lock,
-                                          GAsyncReadyCallback       callback,
-                                          gpointer                  user_data);
-gboolean mm_base_modem_sync_finish       (MMBaseModem              *self,
-                                          GAsyncResult             *res,
-                                          GError                  **error);
+void     mm_base_modem_sync              (MMBaseModem               *self,
+                                          MMBaseModemOperationLock   operation_lock,
+                                          GAsyncReadyCallback        callback,
+                                          gpointer                   user_data);
+gboolean mm_base_modem_sync_finish       (MMBaseModem               *self,
+                                          GAsyncResult              *res,
+                                          GError                   **error);
+void     mm_base_modem_terse             (MMBaseModem               *self,
+                                          MMBaseModemOperationLock   operation_lock,
+                                          GAsyncReadyCallback        callback,
+                                          gpointer                   user_data);
+gboolean mm_base_modem_terse_finish      (MMBaseModem               *self,
+                                          GAsyncResult              *res,
+                                          GError                   **error);
 #endif
 
 void     mm_base_modem_teardown_ports        (MMBaseModem         *self,

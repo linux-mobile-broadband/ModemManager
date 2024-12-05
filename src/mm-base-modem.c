@@ -730,6 +730,7 @@ typedef enum {
     STATE_OPERATION_TYPE_DISABLE,
 #if defined WITH_SUSPEND_RESUME
     STATE_OPERATION_TYPE_SYNC,
+    STATE_OPERATION_TYPE_TERSE,
 #endif
 } StateOperationType;
 
@@ -855,6 +856,12 @@ state_operation (MMBaseModem                  *self,
             ctx->operation        = MM_BASE_MODEM_GET_CLASS (self)->sync;
             ctx->operation_finish = MM_BASE_MODEM_GET_CLASS (self)->sync_finish;
             break;
+        case STATE_OPERATION_TYPE_TERSE:
+            operation_description = "terse";
+            optional = TRUE;
+            ctx->operation        = MM_BASE_MODEM_GET_CLASS (self)->terse;
+            ctx->operation_finish = MM_BASE_MODEM_GET_CLASS (self)->terse_finish;
+            break;
 #endif
         default:
             g_assert_not_reached ();
@@ -903,6 +910,28 @@ mm_base_modem_sync (MMBaseModem              *self,
 {
     state_operation (self,
                      STATE_OPERATION_TYPE_SYNC,
+                     operation_lock,
+                     MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
+                     callback,
+                     user_data);
+}
+
+gboolean
+mm_base_modem_terse_finish (MMBaseModem   *self,
+                            GAsyncResult  *res,
+                            GError       **error)
+{
+    return state_operation_finish (self, res, error);
+}
+
+void
+mm_base_modem_terse (MMBaseModem              *self,
+                     MMBaseModemOperationLock  operation_lock,
+                     GAsyncReadyCallback       callback,
+                     gpointer                  user_data)
+{
+    state_operation (self,
+                     STATE_OPERATION_TYPE_TERSE,
                      operation_lock,
                      MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
                      callback,

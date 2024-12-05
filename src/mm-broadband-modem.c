@@ -13158,6 +13158,103 @@ synchronize (MMBaseModem         *self,
     syncing_step (task);
 }
 
+typedef enum {
+    TERSE_STEP_FIRST,
+    TERSE_STEP_DISABLE_UNSOLICITED_EVENTS_3GPP,
+    TERSE_STEP_LAST,
+} TerseStep;
+
+typedef struct {
+    TerseStep step;
+} TerseContext;
+
+static void terse_step (GTask *task);
+
+static gboolean
+terse_finish (MMBaseModem   *self,
+              GAsyncResult  *res,
+              GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+iface_modem_3gpp_terse_ready (MMIfaceModem3gpp *self,
+                              GAsyncResult     *res,
+                              GTask            *task)
+{
+    TerseContext      *ctx;
+    g_autoptr(GError) error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!mm_iface_modem_3gpp_terse_finish (self, res, &error))
+        mm_obj_warn (self, "3GPP interface disable unsolicited events failed: %s", error->message);
+
+    /* Go on to next step */
+    ctx->step++;
+    terse_step (task);
+}
+
+static void
+terse_step (GTask *task)
+{
+    MMBroadbandModem *self;
+    TerseContext     *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    switch (ctx->step) {
+    case TERSE_STEP_FIRST:
+        ctx->step++;
+        /* fall through */
+
+    case TERSE_STEP_DISABLE_UNSOLICITED_EVENTS_3GPP:
+        if (self->priv->modem_3gpp_dbus_skeleton &&
+            (self->priv->modem_state >= MM_MODEM_STATE_ENABLED)) {
+            mm_obj_msg (self, "terse state (%d/%d): 3GPP interface disable unsolicited events",
+                        ctx->step, TERSE_STEP_LAST);
+            mm_iface_modem_3gpp_terse (MM_IFACE_MODEM_3GPP (self), (GAsyncReadyCallback)iface_modem_3gpp_terse_ready, task);
+            return;
+        }
+        ctx->step++;
+        /* fall through */
+
+    case TERSE_STEP_LAST:
+        mm_obj_msg (self, "setting terse state (%d/%d): all done",
+                    ctx->step, TERSE_STEP_LAST);
+        /* We are done without errors! */
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+
+    default:
+        break;
+    }
+
+    g_assert_not_reached ();
+}
+
+static void
+terse (MMBaseModem         *self,
+       GCancellable        *cancellable,
+       GAsyncReadyCallback  callback,
+       gpointer             user_data)
+{
+    TerseContext *ctx;
+    GTask        *task;
+
+    task = g_task_new (self, cancellable, callback, user_data);
+
+    /* Create TerseContext */
+    ctx = g_new0 (TerseContext, 1);
+    ctx->step = TERSE_STEP_FIRST;
+    g_task_set_task_data (task, ctx, (GDestroyNotify)g_free);
+
+    terse_step (task);
+}
+
 #endif
 
 /*****************************************************************************/
@@ -14645,6 +14742,8 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
 #if defined WITH_SUSPEND_RESUME
     base_modem_class->sync = synchronize;
     base_modem_class->sync_finish = synchronize_finish;
+    base_modem_class->terse = terse;
+    base_modem_class->terse_finish = terse_finish;
 #endif
 
     klass->setup_ports = setup_ports;
