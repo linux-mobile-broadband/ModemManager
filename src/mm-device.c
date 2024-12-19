@@ -698,6 +698,12 @@ mm_device_get_hotplugged (MMDevice *self)
     return self->priv->hotplugged;
 }
 
+void
+mm_device_reset_hotplugged (MMDevice *self)
+{
+    self->priv->hotplugged = FALSE;
+}
+
 gboolean
 mm_device_get_inhibited (MMDevice *self)
 {

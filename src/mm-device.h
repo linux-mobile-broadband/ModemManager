@@ -107,6 +107,7 @@ GObject         *mm_device_get_plugin           (MMDevice       *self);
 MMBaseModem     *mm_device_peek_modem           (MMDevice       *self);
 MMBaseModem     *mm_device_get_modem            (MMDevice       *self);
 gboolean         mm_device_get_hotplugged       (MMDevice       *self);
+void             mm_device_reset_hotplugged     (MMDevice       *self);
 gboolean         mm_device_get_inhibited        (MMDevice       *self);
 
 GObject         *mm_device_peek_port_probe       (MMDevice       *self,
