@@ -41,6 +41,7 @@
 #include "mm-iface-modem-3gpp-profile-manager.h"
 #include "mm-iface-modem-3gpp-ussd.h"
 #include "mm-iface-modem-location.h"
+#include "mm-iface-modem-firmware.h"
 #include "mm-iface-modem-messaging.h"
 #include "mm-iface-modem-signal.h"
 #include "mm-iface-modem-sar.h"
@@ -56,6 +57,7 @@ static void iface_modem_3gpp_init                 (MMIfaceModem3gppInterface    
 static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManagerInterface *iface);
 static void iface_modem_3gpp_ussd_init            (MMIfaceModem3gppUssdInterface           *iface);
 static void iface_modem_location_init             (MMIfaceModemLocationInterface           *iface);
+static void iface_modem_firmware_init             (MMIfaceModemFirmwareInterface           *iface);
 static void iface_modem_messaging_init            (MMIfaceModemMessagingInterface          *iface);
 static void iface_modem_signal_init               (MMIfaceModemSignalInterface             *iface);
 static void iface_modem_sar_init                  (MMIfaceModemSarInterface                *iface);
@@ -75,6 +77,7 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbim, mm_broadband_modem_mbim, MM_TYPE_B
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP_PROFILE_MANAGER, iface_modem_3gpp_profile_manager_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP_USSD, iface_modem_3gpp_ussd_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SIGNAL, iface_modem_signal_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SAR, iface_modem_sar_init)
@@ -10293,6 +10296,60 @@ modem_set_carrier_lock (MMIfaceModem3gpp    *_self,
 }
 
 /*****************************************************************************/
+/* Load update settings (Firmware interface) */
+
+static MMFirmwareUpdateSettings *
+modem_firmware_load_update_settings_finish (MMIfaceModemFirmware  *self,
+                                            GAsyncResult          *res,
+                                            GError               **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static gboolean
+modem_is_sahara_supported (MMBaseModem    *modem,
+                           MMKernelDevice *kernel_device)
+{
+    return mm_kernel_device_get_global_property_as_boolean (kernel_device, "ID_MM_QUALCOMM_SAHARA");
+}
+
+static gboolean
+modem_is_firehose_supported (MMBaseModem    *modem,
+                             MMKernelDevice *kernel_device)
+{
+    return mm_kernel_device_get_global_property_as_boolean (kernel_device, "ID_MM_QUALCOMM_FIREHOSE");
+}
+
+static void
+modem_firmware_load_update_settings (MMIfaceModemFirmware *self,
+                                     GAsyncReadyCallback   callback,
+                                     gpointer              user_data)
+{
+    GTask                               *task;
+    MMPortMbim                          *mbim_port;
+    MMKernelDevice                      *kernel_device;
+    MMModemFirmwareUpdateMethod          update_methods;
+    g_autoptr(MMFirmwareUpdateSettings)  update_settings = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    update_methods = MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE;
+    mbim_port = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self));
+    if (mbim_port) {
+        kernel_device = mm_port_peek_kernel_device (MM_PORT (mbim_port));
+
+        if (modem_is_firehose_supported (MM_BASE_MODEM (self), kernel_device))
+            update_methods |= MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE;
+        if (modem_is_sahara_supported (MM_BASE_MODEM (self), kernel_device))
+            update_methods |= MM_MODEM_FIRMWARE_UPDATE_METHOD_SAHARA;
+    }
+
+    update_settings = mm_firmware_update_settings_new (update_methods);
+    g_task_return_pointer (task, g_object_ref (update_settings), (GDestroyNotify)g_object_unref);
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemMbim *
 mm_broadband_modem_mbim_new (const gchar *device,
@@ -10624,6 +10681,13 @@ iface_modem_location_init (MMIfaceModemLocationInterface *iface)
     iface->enable_location_gathering = NULL;
     iface->enable_location_gathering_finish = NULL;
 #endif
+}
+
+static void
+iface_modem_firmware_init (MMIfaceModemFirmwareInterface *iface)
+{
+    iface->load_update_settings = modem_firmware_load_update_settings;
+    iface->load_update_settings_finish = modem_firmware_load_update_settings_finish;
 }
 
 static void

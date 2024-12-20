@@ -35,6 +35,7 @@ struct _MMSharedQuectelInterface {
     GTypeInterface g_iface;
     MMBaseModemClass              * (* peek_parent_class)                    (MMSharedQuectel *self);
     MMIfaceModemInterface         * (* peek_parent_modem_interface)          (MMSharedQuectel *self);
+    MMIfaceModemFirmwareInterface * (* peek_parent_modem_firmware_interface) (MMSharedQuectel *self);
     MMIfaceModemLocationInterface * (* peek_parent_modem_location_interface) (MMSharedQuectel *self);
 };
 

@@ -13105,6 +13105,60 @@ signal_setup_thresholds (MMIfaceModemSignal  *self,
 }
 
 /*****************************************************************************/
+/* Load update settings (Firmware interface) */
+
+static MMFirmwareUpdateSettings *
+modem_firmware_load_update_settings_finish (MMIfaceModemFirmware  *self,
+                                            GAsyncResult          *res,
+                                            GError               **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static gboolean
+modem_is_sahara_supported (MMBaseModem    *modem,
+                           MMKernelDevice *kernel_device)
+{
+    return mm_kernel_device_get_global_property_as_boolean (kernel_device, "ID_MM_QUALCOMM_SAHARA");
+}
+
+static gboolean
+modem_is_firehose_supported (MMBaseModem    *modem,
+                             MMKernelDevice *kernel_device)
+{
+    return mm_kernel_device_get_global_property_as_boolean (kernel_device, "ID_MM_QUALCOMM_FIREHOSE");
+}
+
+static void
+modem_firmware_load_update_settings (MMIfaceModemFirmware *self,
+                                     GAsyncReadyCallback   callback,
+                                     gpointer              user_data)
+{
+    GTask                               *task;
+    MMPortQmi                           *qmi_port;
+    MMKernelDevice                      *kernel_device;
+    MMModemFirmwareUpdateMethod          update_methods;
+    g_autoptr(MMFirmwareUpdateSettings)  update_settings = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    update_methods = MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE;
+    qmi_port = mm_broadband_modem_qmi_peek_port_qmi (MM_BROADBAND_MODEM_QMI (self));
+    if (qmi_port) {
+        kernel_device = mm_port_peek_kernel_device (MM_PORT (qmi_port));
+
+        if (modem_is_firehose_supported (MM_BASE_MODEM (self), kernel_device))
+            update_methods |= MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE;
+        if (modem_is_sahara_supported (MM_BASE_MODEM (self), kernel_device))
+            update_methods |= MM_MODEM_FIRMWARE_UPDATE_METHOD_SAHARA;
+    }
+
+    update_settings = mm_firmware_update_settings_new (update_methods);
+    g_task_return_pointer (task, g_object_ref (update_settings), (GDestroyNotify)g_object_unref);
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
 /* Reset data interfaces during initialization */
 
 typedef struct {
@@ -14050,6 +14104,8 @@ iface_modem_firmware_init (MMIfaceModemFirmwareInterface *iface)
     iface->load_current_finish = firmware_load_current_finish;
     iface->change_current = firmware_change_current;
     iface->change_current_finish = firmware_change_current_finish;
+    iface->load_update_settings = modem_firmware_load_update_settings;
+    iface->load_update_settings_finish = modem_firmware_load_update_settings_finish;
 }
 
 static MMIfaceModemLocationInterface *
