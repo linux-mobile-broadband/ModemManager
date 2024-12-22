@@ -381,7 +381,9 @@ typedef enum {
     PROBE_STEP_AT_PRODUCT,
     PROBE_STEP_AT_ICERA,
     PROBE_STEP_AT_XMM,
+    PROBE_STEP_AT_CLOSE_PORT,
     PROBE_STEP_QCDM,
+    PROBE_STEP_QCDM_CLOSE_PORT,
     PROBE_STEP_QMI,
     PROBE_STEP_MBIM,
     PROBE_STEP_LAST
@@ -1445,12 +1447,28 @@ probe_step (MMPortProbe *self)
         ctx->step++;
         /* Fall through */
 
+    case PROBE_STEP_AT_CLOSE_PORT:
+        if (ctx->serial) {
+            mm_obj_msg (self, "probe step: AT close port");
+            clear_probe_serial_port (ctx);
+        }
+        ctx->step++;
+        /* Fall through */
+
     case PROBE_STEP_QCDM:
         /* QCDM requested and not already probed? */
         if ((ctx->flags & MM_PORT_PROBE_QCDM) && !(self->priv->flags & MM_PORT_PROBE_QCDM)) {
             mm_obj_msg (self, "probe step: QCDM");
             ctx->source_id = g_idle_add ((GSourceFunc) probe_qcdm, self);
             return;
+        }
+        ctx->step++;
+        /* Fall through */
+
+    case PROBE_STEP_QCDM_CLOSE_PORT:
+        if (ctx->serial) {
+             mm_obj_msg (self, "probe step: QCDM close port");
+            clear_probe_serial_port (ctx);
         }
         ctx->step++;
         /* Fall through */
