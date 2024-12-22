@@ -373,8 +373,8 @@ mm_port_probe_set_result_mbim (MMPortProbe *self,
 
 typedef enum {
     PROBE_STEP_FIRST,
-    PROBE_STEP_CUSTOM_INIT_OPEN_PORT,
-    PROBE_STEP_CUSTOM_INIT,
+    PROBE_STEP_AT_CUSTOM_INIT_OPEN_PORT,
+    PROBE_STEP_AT_CUSTOM_INIT,
     PROBE_STEP_AT_OPEN_PORT,
     PROBE_STEP_AT,
     PROBE_STEP_AT_VENDOR,
@@ -1341,22 +1341,22 @@ probe_step (MMPortProbe *self)
         ctx->step++;
         /* Fall through */
 
-    case PROBE_STEP_CUSTOM_INIT_OPEN_PORT:
-        if (ctx->at_custom_init && ctx->at_custom_init_finish) {
-            mm_obj_msg (self, "probe step: custom init open port");
+    case PROBE_STEP_AT_CUSTOM_INIT_OPEN_PORT:
+        if ((ctx->flags & MM_PORT_PROBE_AT) && (ctx->at_custom_init && ctx->at_custom_init_finish)) {
+            mm_obj_msg (self, "probe step: AT custom init open port");
             ctx->source_id = g_idle_add ((GSourceFunc) serial_open_at, self);
             return;
         }
         ctx->step++;
         /* Fall through */
 
-    case PROBE_STEP_CUSTOM_INIT:
+    case PROBE_STEP_AT_CUSTOM_INIT:
         /* If we got some custom initialization setup requested, go on with it
          * first. We completely ignore the custom initialization if the serial port
          * that we receive in the context isn't an AT port (e.g. if it was flagged
          * as not being an AT port early) */
-        if (ctx->at_custom_init && ctx->at_custom_init_finish) {
-            mm_obj_msg (self, "probe step: custom init run");
+        if ((ctx->flags & MM_PORT_PROBE_AT) && (ctx->at_custom_init && ctx->at_custom_init_finish)) {
+            mm_obj_msg (self, "probe step: AT custom init run");
             g_assert (MM_IS_PORT_SERIAL_AT (ctx->serial));
             ctx->at_custom_init (self,
                                  MM_PORT_SERIAL_AT (ctx->serial),
