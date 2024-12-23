@@ -724,11 +724,11 @@ port_serial_got_response (MMPortSerial *self,
         if (task) {
             /* Complete the command context with the appropriate result */
             if (error) {
-		g_task_return_error (task, g_steal_pointer (&error));
-	    } else {
+                g_task_return_error (task, g_steal_pointer (&error));
+            } else {
                 CommandContext *ctx;
 
-		ctx = g_task_get_task_data (task);
+                ctx = g_task_get_task_data (task);
                 if (ctx->allow_cached)
                     port_serial_set_cached_reply (self, ctx->command, parsed_response);
                 g_task_return_pointer (task,
@@ -736,7 +736,7 @@ port_serial_got_response (MMPortSerial *self,
                                        (GDestroyNotify) g_byte_array_unref);
             }
 
-	    g_object_unref (task);
+            g_object_unref (task);
         }
 
         if (!g_queue_is_empty (self->priv->queue))
