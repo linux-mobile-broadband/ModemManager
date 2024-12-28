@@ -210,6 +210,9 @@ get_modem_ready (GObject      *source,
 
         g_debug ("Asynchronously connecting the modem...");
 
+        /* Setup operation timeout: 2 minutes (to match MM internal timeout) */
+        g_dbus_proxy_set_default_timeout (G_DBUS_PROXY (ctx->modem_simple), 2 * 60 * 1000);
+
         properties = mm_simple_connect_properties_new_from_string (connect_str, &error);
         if (!properties) {
             g_printerr ("Error parsing connect string: '%s'\n", error->message);
