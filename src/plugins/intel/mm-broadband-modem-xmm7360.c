@@ -36,6 +36,7 @@
 
 #include "mm-broadband-modem-xmm7360.h"
 #include "mm-broadband-modem-xmm7360-rpc.h"
+#include "mm-port-scheduler-rr.h"
 #include "mm-port-serial-xmmrpc-xmm7360.h"
 #include "mm-bearer-xmm7360.h"
 #include "mm-sim-xmm7360.h"
@@ -1108,6 +1109,8 @@ initialization_started (MMBroadbandModem    *modem,
     MMBroadbandModemXmm7360 *self = MM_BROADBAND_MODEM_XMM7360 (modem);
     InitializationStartedContext *ctx;
     GTask *task;
+    MMPortSerialAt *at_port;
+    g_autoptr(MMPortScheduler) sched = NULL;
 
     task = g_task_new (self,
                        NULL,
@@ -1119,6 +1122,14 @@ initialization_started (MMBroadbandModem    *modem,
     ctx->is_sim_initialized = FALSE;
     ctx->timeout_id = 0;
     g_task_set_task_data (task, ctx, (GDestroyNotify)initialization_started_context_free);
+
+    at_port = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    if (!at_port) {
+        g_task_return_new_error (task, G_IO_ERROR, G_IO_ERROR_NOT_INITIALIZED,
+                                 "no primary AT port");
+        g_object_unref (task);
+        return;
+    }
 
     /* Open XMMRPC port for initialization */
     if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->port), &error)) {
@@ -1133,6 +1144,13 @@ initialization_started (MMBroadbandModem    *modem,
         (MMPortSerialXmmrpcXmm7360UnsolicitedMsgFn)init_unsol_handler,
         task,
         NULL);
+
+    g_object_get (G_OBJECT (ctx->port), MM_PORT_SERIAL_SCHEDULER, &sched, NULL);
+    g_object_set (sched,
+                  MM_PORT_SCHEDULER_RR_INTER_PORT_DELAY,
+                  300,
+                  NULL);
+    g_object_set (G_OBJECT (at_port), MM_PORT_SERIAL_SCHEDULER, sched, NULL);
 
     mm_obj_dbg (self, "running init sequence...");
     mm_broadband_modem_xmm7360_rpc_sequence_full (MM_BROADBAND_MODEM_XMM7360 (self),
