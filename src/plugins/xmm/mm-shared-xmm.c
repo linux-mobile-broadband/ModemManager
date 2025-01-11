@@ -64,6 +64,7 @@ typedef struct {
     MMModemLocationSource          enabled_sources;
     GpsEngineState                 gps_engine_state;
     MMPortSerialAt                *gps_port;
+    gboolean                       gps_port_open;
     GRegex                        *xlsrstop_regex;
     GRegex                        *nmea_regex;
 
@@ -75,6 +76,13 @@ static void
 private_free (Private *priv)
 {
     g_assert (!priv->pending_gps_engine_stop_task);
+
+    if (priv->gps_port_open) {
+        g_assert (priv->gps_port);
+        mm_port_serial_close (MM_PORT_SERIAL (priv->gps_port));
+        priv->gps_port_open = FALSE;
+    }
+
     g_clear_object (&priv->gps_port);
     if (priv->supported_modes)
         g_array_unref (priv->supported_modes);
@@ -1029,6 +1037,7 @@ xlcslsr_ready (MMBaseModem  *self,
     const gchar            *response;
     GError                 *error = NULL;
     Private                *priv;
+    g_autoptr(GError)      reopen_error = NULL;
 
     priv = get_private (MM_SHARED_XMM (self));
     ctx = g_task_get_task_data (task);
@@ -1050,6 +1059,18 @@ xlcslsr_ready (MMBaseModem  *self,
                                                    self,
                                                    NULL);
     priv->gps_engine_state = ctx->state;
+
+    /*
+     * Keep GPS port open if would not be kept open otherwise
+     * (like with a locked/non-enabled modem).
+     */
+    g_assert (!priv->gps_port_open);
+    if (!mm_port_serial_open (MM_PORT_SERIAL (priv->gps_port), &reopen_error)) {
+        mm_obj_warn (self, "unexpected GPS port reopen error: %s",
+                     reopen_error->message);
+    } else {
+        priv->gps_port_open = TRUE;
+    }
 
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
@@ -1171,6 +1192,12 @@ gps_engine_stopped (GTask *task)
         priv->gps_port,
         priv->nmea_regex,
         NULL, NULL, NULL);
+
+    if (priv->gps_port_open) {
+        mm_port_serial_close (MM_PORT_SERIAL (priv->gps_port));
+        priv->gps_port_open = FALSE;
+    }
+
     g_clear_object (&priv->gps_port);
     priv->gps_engine_state = GPS_ENGINE_STATE_OFF;
 
@@ -1687,9 +1714,9 @@ mm_shared_xmm_setup_ports (MMBroadbandModem *self)
             NULL, NULL, NULL);
     }
 
-    /* Setup the GPS port */
+    /* Setup the GPS port and stop GPS if it is not supposed to be running */
     gps_port = shared_xmm_get_gps_control_port (MM_SHARED_XMM (self), NULL);
-    if (gps_port) {
+    if (gps_port && priv->gps_engine_state == GPS_ENGINE_STATE_OFF) {
         /* After running AT+XLSRSTOP we may get an unsolicited response
          * reporting its status, we just ignore it. */
         mm_port_serial_at_add_unsolicited_msg_handler (
