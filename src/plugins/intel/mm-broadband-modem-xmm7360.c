@@ -31,7 +31,6 @@
 #include "mm-log-object.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
-#include "mm-iface-modem-location.h"
 #include "mm-broadband-modem-xmm.h"
 
 #include "mm-broadband-modem-xmm7360.h"
@@ -43,14 +42,12 @@
 
 static void iface_modem_init (MMIfaceModemInterface *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface);
-static void iface_modem_location_init (MMIfaceModemLocationInterface *iface);
 
 static MMIfaceModemInterface *iface_modem_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemXmm7360, mm_broadband_modem_xmm7360, MM_TYPE_BROADBAND_MODEM_XMM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
 )
 
 struct _MMBroadbandModemXmm7360Private {
@@ -1220,16 +1217,6 @@ iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
 {
     iface->set_initial_eps_bearer_settings = modem_3gpp_set_initial_eps_bearer_settings;
     iface->set_initial_eps_bearer_settings_finish = modem_3gpp_set_initial_eps_bearer_settings_finish;
-}
-
-static void
-iface_modem_location_init (MMIfaceModemLocationInterface *iface)
-{
-    /* asking for location capabilities can destabilize the device */
-    iface->load_capabilities = NULL;
-    iface->load_capabilities_finish = NULL;
-    iface->enable_location_gathering = NULL;
-    iface->enable_location_gathering_finish = NULL;
 }
 
 static void
