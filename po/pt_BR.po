@@ -1,98 +1,108 @@
 # Brazilian Portuguese translation for ModemManager.
-# Copyright (C) 2019 ModemManager's COPYRIGHT HOLDER
+# Copyright (C) 2025 ModemManager's COPYRIGHT HOLDER
 # This file is distributed under the same license as the ModemManager package.
-# Rafael Fontenelle <rafaelff@gnome.org>, 2017-2019.
+# Rafael Fontenelle <rafaelff@gnome.org>, 2017-2025.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: ModemManager main\n"
 "Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
 "ModemManager/issues\n"
-"POT-Creation-Date: 2022-07-16 14:32+0200\n"
-"PO-Revision-Date: 2019-11-25 00:17-0300\n"
+"POT-Creation-Date: 2024-12-02 03:24+0000\n"
+"PO-Revision-Date: 2025-01-13 22:01-0300\n"
 "Last-Translator: Rafael Fontenelle <rafaelff@gnome.org>\n"
-"Language-Team: Brazilian Portuguese <gnome-pt_br-list@gnome.org>\n"
+"Language-Team: Brazilian Portuguese <https://br.gnome.org/traducao>\n"
 "Language: pt_BR\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n > 1)\n"
-"X-Generator: Gtranslator 3.32.0\n"
+"X-Generator: Gtranslator 47.1\n"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:13
+msgid "Enable and view Cell Broadcast messages"
+msgstr "Habilitar e visualizar mensagens de transmissão celular"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:14
+msgid "System policy prevents enabling or viewing this device's text messages."
+msgstr ""
+"A política de sistema impede de habilitar ou visualizar as mensagens de "
+"texto deste dispositivo."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:22
 msgid "Control the Modem Manager daemon"
 msgstr "Controlar o daemon do ModemManager"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:14
+#: data/org.freedesktop.ModemManager1.policy.in.in:23
 msgid "System policy prevents controlling the Modem Manager."
 msgstr "A política de sistema impede de controlar o ModemManager."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:22
+#: data/org.freedesktop.ModemManager1.policy.in.in:31
 msgid "Unlock and control a mobile broadband device"
 msgstr "Desbloquear e controlar um dispositivo de banda larga móvel"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:23
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
 msgid ""
 "System policy prevents unlocking or controlling the mobile broadband device."
 msgstr ""
 "A política de sistema impede de desbloquear ou controlar o dispositivo de "
 "banda larga móvel."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:31
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
 msgid "Add, modify, and delete mobile broadband contacts"
 msgstr "Adicionar, modificar e excluir contatos de banda larga móvel"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:32
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
 msgid ""
 "System policy prevents adding, modifying, or deleting this device's contacts."
 msgstr ""
 "A política de sistema impede de adicionar, modificar ou excluir os contatos "
 "deste dispositivo."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:40
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
 msgid "Send, save, modify, and delete text messages"
 msgstr "Enviar, salvar, modificar e excluir mensagens de texto"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:41
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
 msgid ""
 "System policy prevents sending or manipulating this device's text messages."
 msgstr ""
 "A política de sistema impede de enviar ou manipular as mensagens de texto "
 "deste dispositivo."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:49
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
 msgid "Accept incoming voice calls or start outgoing voice calls."
 msgstr "Aceitar chamadas de voz recebidas ou iniciar chamadas de voz de saída."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:50
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
 msgid "System policy prevents voice calls."
 msgstr "A política de sistema impede chamadas de voz."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:58
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
 msgid "Query network time and timezone information"
 msgstr "Consultar informações de hora e fuso horário da rede"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:59
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
 msgid "System policy prevents querying network time information."
 msgstr ""
 "A política de sistema impede de consultar informações de horário da rede."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:67
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
 msgid "Enable and view geographic location and positioning information"
 msgstr "Habilitar e ver informações de posicionamento e localização geográfica"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:68
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
 msgid ""
 "System policy prevents enabling or viewing geographic location information."
 msgstr ""
 "A política de sistema impede de habilitar ou ver informações de localização "
 "geográfica."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:76
+#: data/org.freedesktop.ModemManager1.policy.in.in:85
 msgid "Query and utilize network information and services"
 msgstr "Consultar ou utilizar serviços e informações de rede."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:77
+#: data/org.freedesktop.ModemManager1.policy.in.in:86
 msgid ""
 "System policy prevents querying or utilizing network information and "
 "services."
@@ -100,11 +110,11 @@ msgstr ""
 "A política de sistema impede de consultar ou utilizar serviços e informações "
 "de rede."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:85
+#: data/org.freedesktop.ModemManager1.policy.in.in:94
 msgid "Query and manage firmware on a mobile broadband device"
 msgstr "Consultar e gerenciar firmware em um dispositivo de banda larga móvel"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:86
+#: data/org.freedesktop.ModemManager1.policy.in.in:95
 msgid "System policy prevents querying or managing this device's firmware."
 msgstr ""
 "A política de sistema impede de consultar ou gerenciar o firmware do "
