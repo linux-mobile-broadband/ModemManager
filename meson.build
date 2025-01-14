@@ -63,6 +63,7 @@ build_root = meson.current_build_dir()
 build_aux_dir = source_root / 'build-aux'
 templates_dir = source_root / 'build-aux/templates'
 po_dir = source_root / 'po'
+data_dir = source_root / 'data'
 src_dir = source_root / 'src'
 plugins_dir = source_root / 'src/plugins'
 
