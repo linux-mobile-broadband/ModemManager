@@ -5372,7 +5372,7 @@ mm_sim_validate_mnc_length (const guint8  *bin,
 
     if (binlen < 4) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                     "SIM returned too short response of length %lu (should be 4)",
+                     "SIM returned too short response of length %" G_GSIZE_FORMAT " (should be 4)",
                      binlen);
         return 0;
     }
