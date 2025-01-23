@@ -4173,6 +4173,7 @@ typedef struct {
     QmiClientNas *client;
     gboolean enable; /* TRUE for enabling, FALSE for disabling */
     gboolean system_info_checked;
+    gboolean serving_system_disabled;
 } UnsolicitedRegistrationEventsContext;
 
 static void
@@ -4225,13 +4226,14 @@ ri_serving_system_or_system_info_ready (QmiClientNas *client,
     UnsolicitedRegistrationEventsContext              *ctx;
     g_autoptr(QmiMessageNasRegisterIndicationsOutput)  output = NULL;
     g_autoptr(GError)                                  error = NULL;
+    g_autoptr(QmiMessageNasRegisterIndicationsInput)   input = NULL;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data     (task);
 
     output = qmi_client_nas_register_indications_finish (client, res, &error);
     if (!output || !qmi_message_nas_register_indications_output_get_result (output, &error)) {
-        if (!ctx->system_info_checked) {
+        if (!ctx->system_info_checked && !ctx->serving_system_disabled) {
             mm_obj_dbg (self, "couldn't register system info indication: '%s', falling-back to serving system", error->message);
             ctx->system_info_checked = TRUE;
             common_enable_disable_unsolicited_registration_events_serving_system (task);
@@ -4245,7 +4247,25 @@ ri_serving_system_or_system_info_ready (QmiClientNas *client,
     }
 
     if (!ctx->system_info_checked) {
+        /* When enabling system info, serving system events are turned-off, since some
+         * modems have them active by default.
+         */
+        if (ctx->enable && !ctx->serving_system_disabled) {
+            input = qmi_message_nas_register_indications_input_new ();
+            qmi_message_nas_register_indications_input_set_serving_system_events (input, FALSE, NULL);
+            qmi_client_nas_register_indications (
+                ctx->client,
+                input,
+                5,
+                NULL,
+                (GAsyncReadyCallback)ri_serving_system_or_system_info_ready,
+                task);
+            ctx->serving_system_disabled = TRUE;
+            return;
+        }
+
         ctx->system_info_checked = TRUE;
+
         /* registered system info indications. now try to register for system status indications */
         if (self->priv->dsd_supported) {
             common_enable_disable_unsolicited_registration_events_system_status (task);
@@ -4349,11 +4369,6 @@ common_enable_disable_unsolicited_registration_events_system_info (GTask *task)
     ctx = g_task_get_task_data (task);
     input = qmi_message_nas_register_indications_input_new ();
     qmi_message_nas_register_indications_input_set_system_info (input, ctx->enable, NULL);
-    /* When enabling, serving system events are turned-off, since some modems have them
-     * active by default. They will be turned-on again if setting system info events fails
-     */
-    if (ctx->enable)
-        qmi_message_nas_register_indications_input_set_serving_system_events (input, FALSE, NULL);
     qmi_message_nas_register_indications_input_set_network_reject_information (input, ctx->enable, FALSE, NULL);
     qmi_client_nas_register_indications (
         ctx->client,
