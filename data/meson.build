@@ -58,6 +58,7 @@ if enable_polkit
     ),
     output: '@BASENAME@',
     po_dir: po_dir,
+    data_dirs: [data_dir],
     install: true,
     install_dir: polkit_gobject_policydir,
   )
