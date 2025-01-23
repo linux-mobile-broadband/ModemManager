@@ -114,7 +114,12 @@ inhibit_done (GObject      *source,
 static void
 take_inhibitor (MMSleepMonitor *self)
 {
-    g_assert (self->inhibit_fd == -1);
+    if (self->inhibit_fd != -1) {
+        // logind didn't send us a `PrepareForSleep(true)` so we didn't drop our previous inhibitor.
+        // Just reuse it.
+        mm_obj_warn (self, "logind did not send sleep notification! Taking over existing inhibitor.");
+        return;
+    }
 
     mm_obj_dbg (self, "taking systemd sleep inhibitor");
     g_dbus_proxy_call_with_unix_fd_list (self->sd_proxy,
