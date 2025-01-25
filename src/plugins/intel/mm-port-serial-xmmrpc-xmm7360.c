@@ -535,6 +535,12 @@ serial_command_ready (MMPortSerial *port,
         g_byte_array_remove_range (response_buffer, 0, response_buffer->len);
     g_byte_array_unref (response_buffer);
 
+    if (response &&
+        response->type == XMM7360_RPC_RESPONSE_TYPE_RESPONSE) {
+        xmm7360_byte_array_log (port, "", response->body);
+        xmm7360_rpc_msg_args_log (port, "", response->content);
+    }
+
     g_task_return_pointer (task, response, (GDestroyNotify) xmm7360_rpc_response_free);
     g_object_unref (task);
 }
@@ -569,9 +575,8 @@ mm_port_serial_xmmrpc_xmm7360_command (MMPortSerialXmmrpcXmm7360 *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
+    /* Body logged in debug_log() */
     mm_obj_dbg (self, "--> %s%s", is_async ? "(async) " : "", xmm_7360_rpc_call_id_get_string (callid));
-
-    xmm7360_byte_array_log (self, "", buf);
 
     mm_port_serial_command (MM_PORT_SERIAL (self),
                             buf,
@@ -656,8 +661,7 @@ parse_unsolicited (MMPortSerial *port, GByteArray *response_buffer)
 
     if (response->type == XMM7360_RPC_RESPONSE_TYPE_RESPONSE) {
         mm_obj_dbg (port, "<-- (response)");
-        xmm7360_byte_array_log (port, "", response->body);
-        xmm7360_rpc_msg_args_log (port, "", response->content);
+        /* Body logged in serial_command_ready() */
         return;
     }
 
@@ -690,6 +694,37 @@ parse_unsolicited (MMPortSerial *port, GByteArray *response_buffer)
 
     /* unhandled unsolicited message is discarded */
     g_byte_array_remove_range (response_buffer, 0, response_buffer->len);
+}
+
+static void
+debug_log (MMPortSerial *self,
+           const gchar  *prefix,
+           const gchar  *buf,
+           gsize         len)
+{
+    static GString *debug = NULL;
+    const  char    *s;
+
+    if (g_strcmp0 (prefix, "<--") == 0) {
+        /* Incoming data is already logged in parse functions */
+        return;
+    }
+
+    if (!debug)
+        debug = g_string_sized_new (256);
+
+    g_string_append (debug, prefix);
+    g_string_append (debug, " raw [");
+
+    s = buf;
+    while (len--) {
+        g_string_append_printf (debug, "%02x", (guint8)*s);
+        s++;
+    }
+
+    g_string_append_c (debug, ']');
+    mm_obj_dbg (self, "%s", debug->str);
+    g_string_truncate (debug, 0);
 }
 
 /*****************************************************************************/
@@ -747,4 +782,5 @@ mm_port_serial_xmmrpc_xmm7360_class_init (MMPortSerialXmmrpcXmm7360Class *klass)
 
     serial_class->parse_response = parse_response;
     serial_class->parse_unsolicited = parse_unsolicited;
+    serial_class->debug_log = debug_log;
 }
