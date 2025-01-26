@@ -1003,6 +1003,25 @@ nmea_received (MMPortSerialAt *port,
     g_free (trace);
 }
 
+static void
+nmea_parser_register (MMSharedXmm *self, MMPortSerialAt *gps_port,
+                      gboolean is_register)
+{
+    Private *priv = get_private (self);
+
+    if (is_register) {
+        mm_port_serial_at_add_unsolicited_msg_handler (gps_port,
+                                                       priv->nmea_regex,
+                                                       (MMPortSerialAtUnsolicitedMsgFn)nmea_received,
+                                                       self,
+                                                       NULL);
+    } else {
+        mm_port_serial_at_add_unsolicited_msg_handler (gps_port,
+                                                       priv->nmea_regex,
+                                                       NULL, NULL, NULL);
+    }
+}
+
 /*****************************************************************************/
 /* GPS engine state selection */
 
@@ -1053,11 +1072,10 @@ xlcslsr_ready (MMBaseModem  *self,
     mm_obj_dbg (self, "GPS engine started");
 
     g_assert (priv->gps_port);
-    mm_port_serial_at_add_unsolicited_msg_handler (priv->gps_port,
-                                                   priv->nmea_regex,
-                                                   (MMPortSerialAtUnsolicitedMsgFn)nmea_received,
-                                                   self,
-                                                   NULL);
+    MM_SHARED_XMM_GET_IFACE (self)->nmea_parser_register (MM_SHARED_XMM (self),
+                                                          priv->gps_port,
+                                                          TRUE);
+
     priv->gps_engine_state = ctx->state;
 
     /*
@@ -1188,10 +1206,8 @@ gps_engine_stopped (GTask *task)
     ctx  = g_task_get_task_data (task);
 
     g_assert (priv->gps_port);
-    mm_port_serial_at_add_unsolicited_msg_handler (
-        priv->gps_port,
-        priv->nmea_regex,
-        NULL, NULL, NULL);
+    MM_SHARED_XMM_GET_IFACE (self)->nmea_parser_register (self, priv->gps_port,
+                                                          FALSE);
 
     if (priv->gps_port_open) {
         mm_port_serial_close (MM_PORT_SERIAL (priv->gps_port));
@@ -1737,4 +1753,5 @@ mm_shared_xmm_setup_ports (MMBroadbandModem *self)
 static void
 mm_shared_xmm_default_init (MMSharedXmmInterface *iface)
 {
+    iface->nmea_parser_register = nmea_parser_register;
 }

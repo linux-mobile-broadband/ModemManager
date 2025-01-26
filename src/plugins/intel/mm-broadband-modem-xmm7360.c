@@ -38,20 +38,24 @@
 #include "mm-port-scheduler-rr.h"
 #include "mm-port-serial-xmmrpc-xmm7360.h"
 #include "mm-bearer-xmm7360.h"
+#include "mm-shared-xmm.h"
 #include "mm-sim-xmm7360.h"
 
 static void iface_modem_init (MMIfaceModemInterface *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface);
+static void iface_shared_xmm_init (MMSharedXmmInterface *iface);
 
 static MMIfaceModemInterface *iface_modem_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemXmm7360, mm_broadband_modem_xmm7360, MM_TYPE_BROADBAND_MODEM_XMM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_XMM, iface_shared_xmm_init)
 )
 
 struct _MMBroadbandModemXmm7360Private {
     MMUnlockRetries *unlock_retries;
+    GRegex *nmea_regex_full, *nmea_regex_trace;
 };
 
 /*****************************************************************************/
@@ -1160,6 +1164,56 @@ initialization_started (MMBroadbandModem    *modem,
 
 /*****************************************************************************/
 
+static void
+nmea_received (MMPortSerialAt *port,
+               GMatchInfo     *info_full,
+               MMBroadbandModemXmm7360 *self)
+{
+    g_autofree gchar *trace_full = NULL;
+    g_autoptr(GMatchInfo) info = NULL;
+
+    trace_full = g_match_info_fetch (info_full, 1);
+    if (!trace_full) {
+        return;
+    }
+
+    g_regex_match (self->priv->nmea_regex_trace, trace_full, 0, &info);
+    while (g_match_info_matches (info)) {
+        g_autofree gchar *trace = NULL;
+
+        trace = g_match_info_fetch (info, 1);
+        if (!trace) {
+            mm_obj_err (self, "fetching NMEA trace failed");
+        } else {
+            mm_iface_modem_location_gps_update (MM_IFACE_MODEM_LOCATION (self), trace);
+        }
+
+        g_match_info_next (info, NULL);
+    }
+}
+
+static void
+nmea_parser_register (MMSharedXmm *self_shared_xmm, MMPortSerialAt *gps_port,
+                      gboolean is_register)
+{
+    MMBroadbandModemXmm7360 *self = MM_BROADBAND_MODEM_XMM7360 (self_shared_xmm);
+
+    if (is_register) {
+        mm_port_serial_at_add_unsolicited_msg_handler (gps_port,
+                                                       self->priv->nmea_regex_full,
+                                                       (MMPortSerialAtUnsolicitedMsgFn)nmea_received,
+                                                       self,
+                                                       NULL);
+    } else {
+        mm_port_serial_at_add_unsolicited_msg_handler (gps_port,
+                                                       self->priv->nmea_regex_full,
+                                                       NULL, NULL, NULL);
+    }
+}
+
+
+/*****************************************************************************/
+
 MMBroadbandModemXmm7360 *
 mm_broadband_modem_xmm7360_new (const gchar  *device,
                                 const gchar  *physdev,
@@ -1187,6 +1241,13 @@ mm_broadband_modem_xmm7360_init (MMBroadbandModemXmm7360 *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BROADBAND_MODEM_XMM7360,
                                               MMBroadbandModemXmm7360Private);
+
+    self->priv->nmea_regex_full = g_regex_new ("(?:\\r\\n){2}((?:\\$G.*?\\r\\n)+)(?:\\r\\n){2}OK(?:\\r\\n)",
+                                               G_REGEX_RAW | G_REGEX_OPTIMIZE, 0,
+                                               NULL);
+    self->priv->nmea_regex_trace = g_regex_new ("(\\$G.*?)\\r\\n",
+                                                G_REGEX_RAW | G_REGEX_OPTIMIZE, 0,
+                                                NULL);
 }
 
 static void
@@ -1194,6 +1255,8 @@ dispose (GObject *object)
 {
     MMBroadbandModemXmm7360 *self = MM_BROADBAND_MODEM_XMM7360 (object);
 
+    g_clear_pointer (&self->priv->nmea_regex_trace, g_regex_unref);
+    g_clear_pointer (&self->priv->nmea_regex_full, g_regex_unref);
     g_clear_object (&self->priv->unlock_retries);
 
     G_OBJECT_CLASS (mm_broadband_modem_xmm7360_parent_class)->dispose (object);
@@ -1217,6 +1280,12 @@ iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
 {
     iface->set_initial_eps_bearer_settings = modem_3gpp_set_initial_eps_bearer_settings;
     iface->set_initial_eps_bearer_settings_finish = modem_3gpp_set_initial_eps_bearer_settings_finish;
+}
+
+static void
+iface_shared_xmm_init (MMSharedXmmInterface *iface)
+{
+    iface->nmea_parser_register = nmea_parser_register;
 }
 
 static void
