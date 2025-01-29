@@ -28,7 +28,7 @@ class ModemWatcher:
     The ModemWatcher class is responsible for monitoring ModemManager.
     """
 
-    def __init__(self):
+    def __init__(self, modem_cb):
         # Flag for initial logs
         self.initializing = True
         # Setup DBus monitoring
@@ -40,6 +40,7 @@ class ModemWatcher:
         # IDs for added/removed signals
         self.object_added_id = 0
         self.object_removed_id = 0
+        self.modem_callback = modem_cb
         # Follow availability of the ModemManager process
         self.available = False
         self.manager.connect('notify::name-owner', self.on_name_owner)
@@ -109,6 +110,8 @@ class ModemWatcher:
                   obj.get_object_path())
         else:
             modem.connect('state-changed', self.on_modem_state_updated)
+        if self.modem_callback != None:
+            self.modem_callback(obj, True)
 
     def on_object_removed(self, manager, obj):
         """
@@ -116,3 +119,6 @@ class ModemWatcher:
         """
         print('[ModemWatcher] %s: modem unmanaged by ModemManager' %
               obj.get_object_path())
+        if self.modem_callback != None:
+            self.modem_callback(obj, False)
+

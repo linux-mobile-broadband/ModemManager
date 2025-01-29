@@ -1,5 +1,5 @@
 
-The sms-python program makes use of the 'libmm-glib' library through
+The sms-send-python program makes use of the 'libmm-glib' library through
 GObject Introspection to talk to ModemManager.
 
 The program will:
@@ -11,7 +11,7 @@ The program will:
 
 The output will look like this:
 
-$ ./sms-python "+1234567890" "hello there, how are you?"
+$ ./sms-send-python "+1234567890" "hello there, how are you?"
 /org/freedesktop/ModemManager1/Modem/0: sms sent
 
 Note that the program requires ModemManager and libmm-glib to be installed in

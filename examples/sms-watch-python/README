@@ -1,0 +1,27 @@
+
+The sms-watch-python program makes use of the 'libmm-glib' library through
+GObject Introspection to talk to ModemManager.
+
+The program will:
+ * Detect whether ModemManager is found in the bus
+ * List all existing SMS messages stored in the modem
+ * Print details of all new SMS messages (either from the network or the host)
+
+The output will look like this:
+
+$ ./sms-watch-python
+[ModemWatcher] /org/freedesktop/ModemManager1/Modem/21: modem managed by ModemManager [862342010150533]: QUALCOMM INCORPORATED (0)
+[ModemWatcher] /org/freedesktop/ModemManager1/Modem/22: modem state updated: disabled -> enabling (user-requested)
+[SmsWatcher] PATH:                /org/freedesktop/ModemManager1/SMS/57
+[SmsWatcher] NUMBER:              78273
+[SmsWatcher] TEXT:                'Lieber Tchibo mobil Kunde, herzlich Willkommen in den USA. Sie k nnen hier wie gewohnt Ihre Mailbox einfach und bequem unter 333 erreichen.'
+[SmsWatcher] PDU-TYPE:            deliver
+[SmsWatcher] STATE:               received
+[SmsWatcher] STORAGE:             me
+[SmsWatcher] SMSC:                +491760000443
+[SmsWatcher] TIMESTAMP:           2014-05-07T04:35:19+02
+
+Note that the program requires ModemManager and libmm-glib to be installed in
+the system and the introspection typelibs available in the standard paths.
+
+Have fun!
