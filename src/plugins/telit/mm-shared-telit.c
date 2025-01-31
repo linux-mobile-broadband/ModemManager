@@ -694,7 +694,7 @@ load_revision_ready (MMBaseModem *self,
                      GAsyncResult *res,
                      GTask *task)
 {
-    GError *error;
+    GError *error = NULL;
     GVariant *result;
 
     result = mm_base_modem_at_sequence_finish (self, res, NULL, &error);
