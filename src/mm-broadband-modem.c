@@ -12660,8 +12660,12 @@ enable (MMBaseModem         *self,
     /* Check state before launching modem enabling */
     switch (MM_BROADBAND_MODEM (self)->priv->modem_state) {
     case MM_MODEM_STATE_UNKNOWN:
-        /* We should never have a UNKNOWN->ENABLED transition */
-        g_assert_not_reached ();
+        /* We may have a UNKNOWN->ENABLED transition here if the request
+         * comes after having flagged the modem as invalid. Just error out
+         * gracefully. */
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                 "Cannot enable modem: unknown state");
+        g_object_unref (task);
         break;
 
     case MM_MODEM_STATE_FAILED:
