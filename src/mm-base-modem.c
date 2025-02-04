@@ -60,6 +60,8 @@ enum {
     PROP_VENDOR_ID,
     PROP_PRODUCT_ID,
     PROP_SUBSYSTEM_VENDOR_ID,
+    PROP_SUBSYSTEM_DEVICE_ID,
+
     PROP_CONNECTION,
     PROP_REPROBE,
     PROP_DATA_NET_SUPPORTED,
@@ -94,6 +96,7 @@ struct _MMBaseModemPrivate {
     guint vendor_id;
     guint product_id;
     guint subsystem_vendor_id;
+    guint subsystem_device_id;
 
     gboolean hotplugged;
     gboolean valid;
@@ -2119,6 +2122,14 @@ mm_base_modem_get_subsystem_vendor_id (MMBaseModem *self)
     return self->priv->subsystem_vendor_id;
 }
 
+guint
+mm_base_modem_get_subsystem_device_id (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), 0);
+
+    return self->priv->subsystem_device_id;
+}
+
 /*****************************************************************************/
 
 static gboolean
@@ -2285,6 +2296,9 @@ set_property (GObject *object,
     case PROP_SUBSYSTEM_VENDOR_ID:
         self->priv->subsystem_vendor_id = g_value_get_uint (value);
         break;
+    case PROP_SUBSYSTEM_DEVICE_ID:
+        self->priv->subsystem_device_id = g_value_get_uint (value);
+        break;
     case PROP_CONNECTION:
         g_clear_object (&self->priv->connection);
         self->priv->connection = g_value_dup_object (value);
@@ -2339,6 +2353,9 @@ get_property (GObject *object,
         break;
     case PROP_SUBSYSTEM_VENDOR_ID:
         g_value_set_uint (value, self->priv->subsystem_vendor_id);
+        break;
+    case PROP_SUBSYSTEM_DEVICE_ID:
+        g_value_set_uint (value, self->priv->subsystem_device_id);
         break;
     case PROP_CONNECTION:
         g_value_set_object (value, self->priv->connection);
@@ -2511,6 +2528,14 @@ mm_base_modem_class_init (MMBaseModemClass *klass)
                            0, G_MAXUINT, 0,
                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
     g_object_class_install_property (object_class, PROP_SUBSYSTEM_VENDOR_ID, properties[PROP_SUBSYSTEM_VENDOR_ID]);
+
+    properties[PROP_SUBSYSTEM_DEVICE_ID] =
+        g_param_spec_uint (MM_BASE_MODEM_SUBSYSTEM_DEVICE_ID,
+                           "Hardware subsystem device ID",
+                           "Hardware subsystem device ID. Available for pci devices.",
+                           0, G_MAXUINT, 0,
+                           G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_SUBSYSTEM_DEVICE_ID, properties[PROP_SUBSYSTEM_DEVICE_ID]);
 
     properties[PROP_CONNECTION] =
         g_param_spec_object (MM_BASE_MODEM_CONNECTION,

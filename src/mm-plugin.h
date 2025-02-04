@@ -111,6 +111,7 @@ struct _MMPluginClass {
                                   guint16 vendor,
                                   guint16 product,
                                   guint16 subsystem_vendor,
+                                  guint16 subsystem_device,
                                   GList *probes,
                                   GError **error);
 
