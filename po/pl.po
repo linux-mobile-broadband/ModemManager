@@ -1,16 +1,16 @@
 # Polish translation for ModemManager.
-# Copyright © 2017-2019 the ModemManager authors.
+# Copyright © 2017-2025 the ModemManager authors.
 # This file is distributed under the same license as the ModemManager package.
-# Piotr Drąg <piotrdrag@gmail.com>, 2017-2019.
-# Aviary.pl <community-poland@mozilla.org>, 2017-2019.
+# Piotr Drąg <piotrdrag@gmail.com>, 2017-2025.
+# Aviary.pl <community-poland@mozilla.org>, 2017-2025.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: ModemManager\n"
 "Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
 "ModemManager/issues\n"
-"POT-Creation-Date: 2022-07-16 14:32+0200\n"
-"PO-Revision-Date: 2019-09-28 15:02+0200\n"
+"POT-Creation-Date: 2024-12-02 03:24+0000\n"
+"PO-Revision-Date: 2025-02-09 15:02+0100\n"
 "Last-Translator: Piotr Drąg <piotrdrag@gmail.com>\n"
 "Language-Team: Polish <community-poland@mozilla.org>\n"
 "Language: pl\n"
@@ -21,81 +21,91 @@ msgstr ""
 "|| n%100>=20) ? 1 : 2);\n"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:13
+msgid "Enable and view Cell Broadcast messages"
+msgstr "Włączenie i wyświetlanie wiadomości SMS"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:14
+msgid "System policy prevents enabling or viewing this device's text messages."
+msgstr ""
+"Ustawienia systemu uniemożliwiają włączanie lub wyświetlanie wiadomości SMS "
+"tego urządzenia."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:22
 msgid "Control the Modem Manager daemon"
 msgstr "Sterowanie usługą ModemManager"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:14
+#: data/org.freedesktop.ModemManager1.policy.in.in:23
 msgid "System policy prevents controlling the Modem Manager."
 msgstr "Ustawienia systemu uniemożliwiają sterowanie usługą ModemManager."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:22
+#: data/org.freedesktop.ModemManager1.policy.in.in:31
 msgid "Unlock and control a mobile broadband device"
 msgstr "Odblokowanie i sterowanie urządzeniem komórkowym"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:23
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
 msgid ""
 "System policy prevents unlocking or controlling the mobile broadband device."
 msgstr ""
 "Ustawienia systemu uniemożliwiają odblokowanie lub sterowanie urządzeniem "
 "komórkowym."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:31
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
 msgid "Add, modify, and delete mobile broadband contacts"
 msgstr "Dodawanie, modyfikowanie i usuwanie kontaktów urządzenia komórkowego"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:32
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
 msgid ""
 "System policy prevents adding, modifying, or deleting this device's contacts."
 msgstr ""
 "Ustawienia systemu uniemożliwiają dodawanie, modyfikowanie lub usuwanie "
 "kontaktów tego urządzenia."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:40
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
 msgid "Send, save, modify, and delete text messages"
 msgstr "Wysyłanie, zapisywanie, modyfikowanie i usuwanie wiadomości SMS"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:41
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
 msgid ""
 "System policy prevents sending or manipulating this device's text messages."
 msgstr ""
 "Ustawienia systemu uniemożliwiają wysyłanie lub manipulowanie wiadomościami "
 "SMS tego urządzenia."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:49
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
 msgid "Accept incoming voice calls or start outgoing voice calls."
 msgstr "Przyjmowanie połączeń przychodzących lub dzwonienie"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:50
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
 msgid "System policy prevents voice calls."
 msgstr "Ustawienia systemu uniemożliwiają dzwonienie."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:58
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
 msgid "Query network time and timezone information"
 msgstr "Odpytywanie informacji o czasie sieciowym i strefie czasowej"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:59
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
 msgid "System policy prevents querying network time information."
 msgstr ""
 "Ustawienia systemu uniemożliwiają odpytywanie informacji o czasie sieciowym."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:67
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
 msgid "Enable and view geographic location and positioning information"
 msgstr ""
 "Włączanie i wyświetlanie informacji o położeniu geograficznym "
 "i pozycjonowaniu"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:68
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
 msgid ""
 "System policy prevents enabling or viewing geographic location information."
 msgstr ""
 "Ustawienia systemu uniemożliwiają włączanie lub wyświetlanie informacji "
 "o położeniu geograficznym."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:76
+#: data/org.freedesktop.ModemManager1.policy.in.in:85
 msgid "Query and utilize network information and services"
 msgstr "Odpytywanie i używanie informacji i usług sieciowych"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:77
+#: data/org.freedesktop.ModemManager1.policy.in.in:86
 msgid ""
 "System policy prevents querying or utilizing network information and "
 "services."
@@ -103,12 +113,12 @@ msgstr ""
 "Ustawienia systemu uniemożliwiają odpytywanie lub używanie informacji "
 "i usług sieciowych."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:85
+#: data/org.freedesktop.ModemManager1.policy.in.in:94
 msgid "Query and manage firmware on a mobile broadband device"
 msgstr ""
 "Odpytywanie i zarządzanie oprogramowaniem sprzętowym urządzenia komórkowego"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:86
+#: data/org.freedesktop.ModemManager1.policy.in.in:95
 msgid "System policy prevents querying or managing this device's firmware."
 msgstr ""
 "Ustawienia systemu uniemożliwiają odpytywanie lub zarządzanie "
