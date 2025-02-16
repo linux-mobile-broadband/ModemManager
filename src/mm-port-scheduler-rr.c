@@ -39,8 +39,10 @@
  */
 
 static void mm_port_scheduler_iface_init (MMPortSchedulerInterface *iface);
+static void log_object_iface_init (MMLogObjectInterface *iface);
 
 struct _MMPortSchedulerRRPrivate {
+    guint      instance_id;
     GPtrArray *sources;
     guint      cur_source;
     gboolean   in_command;
@@ -58,11 +60,14 @@ enum {
 };
 
 static guint send_command_signal = 0;
+static guint instance_id_last = 0;
 
 G_DEFINE_TYPE_WITH_CODE (MMPortSchedulerRR, mm_port_scheduler_rr, G_TYPE_OBJECT,
                          G_ADD_PRIVATE (MMPortSchedulerRR)
                          G_IMPLEMENT_INTERFACE (MM_TYPE_PORT_SCHEDULER,
-                                                mm_port_scheduler_iface_init))
+                                                mm_port_scheduler_iface_init)
+                         G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT,
+                                                log_object_iface_init))
 
 /*****************************************************************************/
 
@@ -186,6 +191,10 @@ register_source (MMPortScheduler *scheduler,
         s->id = source_id;
         s->tag = g_strdup (tag);
         g_ptr_array_add (self->priv->sources, s);
+
+        g_assert_cmpint (self->priv->sources->len, <, UINT_MAX);
+        mm_obj_dbg (self, "[%s] source id %p registered", tag, source_id);
+        mm_log_object_reset_id (MM_LOG_OBJECT (self));
     }
 }
 
@@ -200,7 +209,9 @@ unregister_source (MMPortScheduler *scheduler, gpointer source_id)
 
     s = find_source (self, source_id, &idx);
     if (s) {
+        mm_obj_dbg (self, "[%s] source id %p unregistered", s->tag, s->id);
         g_ptr_array_remove_index (self->priv->sources, idx);
+        mm_log_object_reset_id (MM_LOG_OBJECT (self));
 
         /* If we just removed the current source, advance to the next one */
         if (self->priv->cur_source == idx)
@@ -244,9 +255,7 @@ notify_command_done (MMPortScheduler *scheduler,
 
     /* Only the current source gets to call this function */
     if (self->priv->cur_source != idx) {
-        mm_obj_warn (self,
-                     "source %p notified command-done but not active source",
-                     source_id);
+        mm_obj_warn (self, "[%s] notified command-done but not active source", s->tag);
         return;
     }
 
@@ -311,6 +320,32 @@ mm_port_scheduler_iface_init (MMPortSchedulerInterface *scheduler_iface)
                                            MM_TYPE_PORT_SCHEDULER);
 }
 
+static gchar *
+log_object_build_id (MMLogObject *_self)
+{
+    MMPortSchedulerRR  *self = MM_PORT_SCHEDULER_RR (_self);
+    g_autoptr(GString)  str;
+    guint               i;
+
+    str = g_string_sized_new (16);
+    for (i = 0; i < self->priv->sources->len; i++) {
+        Source *s;
+
+        s = g_ptr_array_index (self->priv->sources, i);
+        if (str->len)
+            g_string_append_c (str, ',');
+        g_string_append (str, s->tag);
+    }
+
+    return g_strdup_printf ("scheduler-%u (%s)", self->priv->instance_id, str->str);
+}
+
+static void
+log_object_iface_init (MMLogObjectInterface *iface)
+{
+    iface->build_id = log_object_build_id;
+}
+
 static void
 mm_port_scheduler_rr_init (MMPortSchedulerRR *self)
 {
@@ -319,6 +354,7 @@ mm_port_scheduler_rr_init (MMPortSchedulerRR *self)
                                               MMPortSchedulerRRPrivate);
     self->priv->sources = g_ptr_array_new_full (2, (GDestroyNotify) source_free);
     self->priv->cur_source = G_MAXUINT32;
+    self->priv->instance_id = instance_id_last++;
 }
 
 static void
