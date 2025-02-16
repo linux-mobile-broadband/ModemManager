@@ -44,6 +44,7 @@ typedef enum {
     GPS_ENGINE_STATE_STANDALONE,
     GPS_ENGINE_STATE_AGPS_MSA,
     GPS_ENGINE_STATE_AGPS_MSB,
+    GPS_ENGINE_STATE_UNKNOWN,
 } GpsEngineState;
 
 typedef struct {
@@ -105,7 +106,7 @@ get_private (MMSharedXmm *self)
     priv = g_object_get_qdata (G_OBJECT (self), private_quark);
     if (!priv) {
         priv = g_slice_new0 (Private);
-        priv->gps_engine_state = GPS_ENGINE_STATE_OFF;
+        priv->gps_engine_state = GPS_ENGINE_STATE_UNKNOWN;
 
         /* Setup regex for URCs */
         priv->xbipi_regex    = g_regex_new ("\\r\\n\\+XBIPI:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
@@ -1131,6 +1132,7 @@ gps_engine_start (GTask *task)
             pos_mode = 2;
             break;
         case GPS_ENGINE_STATE_OFF:
+        case GPS_ENGINE_STATE_UNKNOWN:
         default:
             g_assert_not_reached ();
             break;
@@ -1356,6 +1358,8 @@ gps_engine_state_select (MMSharedXmm         *self,
     GpsEngineSelectContext *ctx;
     GTask                  *task;
     Private                *priv;
+
+    g_assert (state != GPS_ENGINE_STATE_UNKNOWN);
 
     priv = get_private (self);
 
@@ -1706,7 +1710,6 @@ mm_shared_xmm_setup_ports (MMBroadbandModem *self)
 {
     Private                   *priv;
     MMPortSerialAt            *ports[2];
-    g_autoptr(MMPortSerialAt)  gps_port = NULL;
     guint                      i;
 
     mm_obj_dbg (self, "setting up ports in XMM modem...");
@@ -1729,23 +1732,136 @@ mm_shared_xmm_setup_ports (MMBroadbandModem *self)
             priv->xbipi_regex,
             NULL, NULL, NULL);
     }
+}
+
+gpointer
+mm_shared_xmm_initialization_started_finish (MMBroadbandModem *self,
+                                             GAsyncResult *res,
+                                             GError **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+initialization_started_done (GObject *source_object,
+                             GAsyncResult *res,
+                             gpointer user_data)
+{
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (source_object);
+    g_autoptr(GTask) task = user_data;
+    Private *priv = get_private (MM_SHARED_XMM (self));
+    g_autoptr(GError) error = NULL;
+    gpointer ret;
+
+    g_assert (priv->broadband_modem_class_parent);
+    g_assert (priv->broadband_modem_class_parent->initialization_started_finish);
+
+    ret = priv->broadband_modem_class_parent->initialization_started_finish (self,
+                                                                             res,
+                                                                             &error);
+    if (!ret) {
+        g_task_return_error (task, g_steal_pointer (&error));
+        return;
+    }
+
+    g_task_return_pointer (task, ret, NULL);
+}
+
+static void
+gps_init_stop_done (GObject *source_object,
+                    GAsyncResult *res,
+                    gpointer user_data)
+{
+    MMSharedXmm *self_xmm = MM_SHARED_XMM (source_object);
+    Private *priv = get_private (self_xmm);
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (source_object);
+    g_autoptr(GTask) task = user_data;
+    g_autoptr(GError) error = NULL;
+
+    if (!gps_engine_state_select_finish (self_xmm, res, &error)) {
+        mm_obj_dbg (self, "GPS stop at init failed: %s",
+                    error ? error->message : "(unknown");
+
+        /* assume GPS simply wasn't on in the modem in the first place */
+        if (priv->gps_port) {
+            MM_SHARED_XMM_GET_IFACE (self)->nmea_parser_register (self_xmm,
+                                                                  priv->gps_port,
+                                                                  FALSE);
+
+            if (priv->gps_port_open) {
+                mm_port_serial_close (MM_PORT_SERIAL (priv->gps_port));
+                priv->gps_port_open = FALSE;
+            }
+
+            g_clear_object (&priv->gps_port);
+        }
+
+        priv->gps_engine_state = GPS_ENGINE_STATE_OFF;
+    }
+
+    g_assert (priv->broadband_modem_class_parent);
+    g_assert (priv->broadband_modem_class_parent->initialization_started);
+
+    priv->broadband_modem_class_parent->initialization_started (self,
+                                                                initialization_started_done,
+                                                                g_steal_pointer (&task));
+}
+
+void
+mm_shared_xmm_initialization_started (MMBroadbandModem *self,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data)
+{
+    MMSharedXmm *self_xmm = MM_SHARED_XMM (self);
+    Private *priv = get_private (self_xmm);
+    g_autoptr(GTask) task = NULL;
+    g_autoptr(MMPortSerialAt) gps_port = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* Setup the GPS port and stop GPS if it is not supposed to be running */
-    gps_port = shared_xmm_get_gps_control_port (MM_SHARED_XMM (self), NULL);
-    if (gps_port && priv->gps_engine_state == GPS_ENGINE_STATE_OFF) {
-        /* After running AT+XLSRSTOP we may get an unsolicited response
-         * reporting its status, we just ignore it. */
-        mm_port_serial_at_add_unsolicited_msg_handler (
-            gps_port,
-            priv->xlsrstop_regex,
-            NULL, NULL, NULL);
+    gps_port = shared_xmm_get_gps_control_port (self_xmm, NULL);
+    if (gps_port && priv->gps_engine_state == GPS_ENGINE_STATE_UNKNOWN) {
+        g_autoptr(GError) gps_port_open_error = NULL;
+        g_autoptr(GError) gps_port_flush_error = NULL;
 
-        /* make sure GPS is stopped in case it was left enabled */
-        mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                       MM_IFACE_PORT_AT (gps_port),
-                                       "+XLSRSTOP",
-                                       3, FALSE, FALSE, NULL, NULL, NULL);
+        g_assert (!priv->gps_port);
+        priv->gps_port = g_steal_pointer (&gps_port);
+
+        MM_SHARED_XMM_GET_IFACE (self)->nmea_parser_register (self_xmm,
+                                                              priv->gps_port,
+                                                              TRUE);
+
+        g_assert (!priv->gps_port_open);
+        if (!mm_port_serial_open (MM_PORT_SERIAL (priv->gps_port),
+                                  &gps_port_open_error)) {
+            mm_obj_warn (self, "unexpected init GPS port open error: %s",
+                         gps_port_open_error->message);
+        } else {
+            priv->gps_port_open = TRUE;
+        }
+
+        mm_obj_dbg (self,
+                    "flushing pending data in GPS port");
+
+        if (!mm_port_serial_flush (MM_PORT_SERIAL (priv->gps_port),
+                                   MM_PORT_SERIAL_FLUSH_RX,
+                                   &gps_port_flush_error)) {
+            mm_obj_warn (self, "unexpected init GPS port flush error: %s",
+                         gps_port_flush_error->message);
+        }
+
+        gps_engine_state_select (self_xmm, GPS_ENGINE_STATE_OFF,
+                                 gps_init_stop_done, g_steal_pointer (&task));
+        return;
     }
+
+    g_assert (priv->broadband_modem_class_parent);
+    g_assert (priv->broadband_modem_class_parent->initialization_started);
+
+    priv->broadband_modem_class_parent->initialization_started (self,
+                                                                initialization_started_done,
+                                                                g_steal_pointer (&task));
 }
 
 /*****************************************************************************/
