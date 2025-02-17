@@ -11398,21 +11398,7 @@ modem_firmware_load_update_settings_finish (MMIfaceModemFirmware  *self,
                                             GAsyncResult          *res,
                                             GError               **error)
 {
-    return g_task_propagate_pointer (G_TASK (res), error);
-}
-
-static gboolean
-modem_is_sahara_supported (MMBaseModem    *modem,
-                           MMKernelDevice *kernel_device)
-{
-    return mm_kernel_device_get_global_property_as_boolean (kernel_device, "ID_MM_QUALCOMM_SAHARA");
-}
-
-static gboolean
-modem_is_firehose_supported (MMBaseModem    *modem,
-                             MMKernelDevice *kernel_device)
-{
-    return mm_kernel_device_get_global_property_as_boolean (kernel_device, "ID_MM_QUALCOMM_FIREHOSE");
+    return mm_iface_modem_firmware_load_update_settings_in_port_finish (self, res, error);
 }
 
 static void
@@ -11420,28 +11406,11 @@ modem_firmware_load_update_settings (MMIfaceModemFirmware *self,
                                      GAsyncReadyCallback   callback,
                                      gpointer              user_data)
 {
-    GTask                               *task;
-    MMIfacePortAt                       *at_port;
-    MMKernelDevice                      *kernel_device;
-    MMModemFirmwareUpdateMethod          update_methods;
-    g_autoptr(MMFirmwareUpdateSettings)  update_settings = NULL;
-
-    task = g_task_new (self, NULL, callback, user_data);
-
-    update_methods = MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE;
-    at_port = mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL);
-    if (at_port) {
-        kernel_device = mm_port_peek_kernel_device (MM_PORT (at_port));
-
-        if (modem_is_firehose_supported (MM_BASE_MODEM (self), kernel_device))
-            update_methods |= MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE;
-        if (modem_is_sahara_supported (MM_BASE_MODEM (self), kernel_device))
-            update_methods |= MM_MODEM_FIRMWARE_UPDATE_METHOD_SAHARA;
-    }
-
-    update_settings = mm_firmware_update_settings_new (update_methods);
-    g_task_return_pointer (task, g_object_ref (update_settings), (GDestroyNotify)g_object_unref);
-    g_object_unref (task);
+    mm_iface_modem_firmware_load_update_settings_in_port (
+        self,
+        MM_PORT (mm_base_modem_peek_port_primary (MM_BASE_MODEM (self))),
+        callback,
+        user_data);
 }
 
 /*****************************************************************************/
