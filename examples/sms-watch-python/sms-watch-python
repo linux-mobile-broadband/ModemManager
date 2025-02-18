@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+# -*- Mode: python; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
+#
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU Lesser General Public License as published by the Free
+# Software Foundation; either version 2 of the License, or (at your option) any
+# later version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Lesser General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc., 51
+# Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# Copyright (C) 2016 Aleksander Morgado <aleksander@aleksander.es>
+# Copyright (C) 2025 Dan Williams <dan@ioncontrol.co>
+#
+
+import os
+import signal
+import sys
+
+watchers = {}
+
+import gi
+gi.require_version('ModemManager', '1.0')
+from gi.repository import Gio, GLib, GObject, ModemManager
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'modem-watcher-python'))
+import ModemWatcher
+
+class SmsWatcher:
+    """
+    The SmsWatcher class watches for and prints complete SMS messages.
+    """
+
+    def __init__(self, sms):
+       self.sms = sms
+       # Connect to the SMS message's 'state' property to know when all parts
+       # have been received.
+       self.state_id = self.sms.connect('notify::state', self.on_state_changed)
+       self.on_state_changed(sms, sms.get_state())
+
+    def cleanup(self):
+        self.sms.disconnect(self.state_id)
+        self.state_id = 0
+
+    def on_state_changed(self, sms, prop):
+        # When all parts have been received, print the SMS
+        if sms.get_state() == ModemManager.SmsState.RECEIVED:
+            self.show()
+
+    def show(self):
+        print('[SmsWatcher] PATH:                %s' % self.sms.get_path())
+        print('[SmsWatcher] NUMBER:              %s' % self.sms.get_number())
+        print('[SmsWatcher] TEXT:                \'%s\'' % self.sms.get_text())
+        print('[SmsWatcher] PDU-TYPE:            %s' % ModemManager.SmsPduType.get_string(self.sms.get_pdu_type()))
+        print('[SmsWatcher] STATE:               %s' % ModemManager.SmsState.get_string(self.sms.get_state()))
+        if self.sms.get_validity_type() == ModemManager.SmsValidityType.RELATIVE:
+            print('[SmsWatcher] VALIDITY:            %u' % self.sms.get_validity_relative())
+        print('[SmsWatcher] STORAGE:             %s' % ModemManager.SmsStorage.get_string(self.sms.get_storage()))
+        print('[SmsWatcher] SMSC:                %s' % self.sms.get_smsc())
+        if self.sms.get_class() >= 0:
+            print('[SmsWatcher] STORAGE:             %d' % self.sms.get_class())
+        if self.sms.get_pdu_type() == ModemManager.SmsPduType.SUBMIT:
+            delivery_report = "not requested"
+            if self.sms.get_delivery_report_request():
+                delivery_report = "requested"
+            print('[SmsWatcher] DELIVERY-REPORT:     %s' % delivery_report)
+        if self.sms.get_message_reference() != 0:
+            print('[SmsWatcher] MSG-REFERENCE:       %u' % self.sms.get_message_reference())
+        print('[SmsWatcher] TIMESTAMP:           %s' % self.sms.get_timestamp())
+        if self.sms.get_delivery_state () != ModemManager.SmsDeliveryState.UNKNOWN:
+            print('[SmsWatcher] DELIVERY-STATE:      %s' % ModemManager.SmsDeliveryState.get_string_extended (self.sms.get_delivery_state()))
+        if self.sms.get_discharge_timestamp() is not None:
+            print('[SmsWatcher] DISCHARGE-TIMESTAMP: %s' % self.sms.get_discharge_timestamp())
+        print('')
+
+
+class MessagingWatcher:
+    """
+    The MessagingWatcher class monitors a modem's Messaging interface for SMS messages.
+    """
+
+    def __init__(self, messaging):
+        self.iface = messaging
+        # Connect to the messaging interface's added/removed signals to be
+        # notified when SMS messages are received or deleted
+        self.sms_added_id = self.iface.connect('added', self.on_sms_added)
+        self.sms_removed_id = self.iface.connect('deleted', self.on_sms_removed)
+
+        # List all existing messages
+        self.messages = {}
+        for sms in self.iface.list_sync():
+            self.messages[sms.get_path()] = SmsWatcher(sms)
+
+    def cleanup(self):
+        # We no longer care about signals; disconnect them
+        self.iface.disconnect(self.sms_added_id)
+        self.sms_added_id = 0
+        self.iface.disconnect(self.sms_removed_id)
+        self.sms_removed_id = 0
+        # Clean up each SMS we're tracking
+        for sms in self.messages.values():
+            sms.cleanup()
+        self.messages = {}
+
+    def on_sms_added(self, messaging, path, received):
+        # MM/libmm-glib do not yet provide a way to retrieve
+        # a single SMS object given its D-Bus path. List them
+        # and find the one we want.
+        for sms in self.iface.list_sync():
+            if sms.get_path() == path:
+                # Watch this SMS
+                self.messages[sms.get_path()] = SmsWatcher(sms)
+
+    def on_sms_removed(self, messaging, path):
+        try:
+            # Clean up the SMS and stop tracking it
+            sms_watcher = self.messages[path]
+            sms_watcher.cleanup()
+            del self.messages[path]
+        except KeyError:
+            pass
+
+
+def modem_callback(obj, added):
+    global watchers
+    if added:
+        # Get the messaging interface of this modem and start watching for SMSes
+        messaging = obj.get_modem_messaging()
+        if messaging is not None:
+            watchers[obj] = MessagingWatcher(messaging)
+    else:
+        try:
+            # Modem went away; clean up
+            watcher = watchers[obj]
+            watcher.cleanup()
+            del(watchers, obj)
+        except KeyError:
+            pass
+
+def signal_handler(loop):
+    """SIGHUP and SIGINT handler."""
+    loop.quit()
+
+def main():
+    """Main routine."""
+    modem_watcher = ModemWatcher.ModemWatcher(modem_callback)
+
+    # Main loop to watch for incoming SMSes
+    main_loop = GLib.MainLoop()
+    GLib.unix_signal_add(
+        GLib.PRIORITY_HIGH, signal.SIGHUP, signal_handler, main_loop)
+    GLib.unix_signal_add(
+        GLib.PRIORITY_HIGH, signal.SIGTERM, signal_handler, main_loop)
+    try:
+        main_loop.run()
+    except KeyboardInterrupt:
+        pass
+
+if __name__ == "__main__":
+    main()

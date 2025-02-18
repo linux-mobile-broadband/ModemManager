@@ -33,7 +33,7 @@ def signal_handler(loop):
 def main():
     """Main routine."""
     # Create modem watcher
-    ModemWatcher.ModemWatcher()
+    ModemWatcher.ModemWatcher(None)
 
     # Main loop
     main_loop = GLib.MainLoop()
