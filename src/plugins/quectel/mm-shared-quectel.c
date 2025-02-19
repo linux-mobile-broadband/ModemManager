@@ -26,6 +26,7 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-firmware.h"
 #include "mm-iface-modem-location.h"
+#include "mm-iface-modem-voice.h"
 #include "mm-base-modem.h"
 #include "mm-base-modem-at.h"
 #include "mm-shared-quectel.h"
@@ -56,6 +57,7 @@ typedef struct {
     MMModemLocationSource          provided_sources;
     MMModemLocationSource          enabled_sources;
     FeatureSupport                 qgps_supported;
+    GRegex                        *dtmf_regex;
     GRegex                        *qgpsurc_regex;
     GRegex                        *qlwurc_regex;
     GRegex                        *rdy_regex;
@@ -64,6 +66,7 @@ typedef struct {
 static void
 private_free (Private *priv)
 {
+    g_regex_unref (priv->dtmf_regex);
     g_regex_unref (priv->qgpsurc_regex);
     g_regex_unref (priv->qlwurc_regex);
     g_regex_unref (priv->rdy_regex);
@@ -85,10 +88,12 @@ get_private (MMSharedQuectel *self)
         priv->provided_sources  = MM_MODEM_LOCATION_SOURCE_NONE;
         priv->enabled_sources   = MM_MODEM_LOCATION_SOURCE_NONE;
         priv->qgps_supported    = FEATURE_SUPPORT_UNKNOWN;
+        priv->dtmf_regex        = g_regex_new ("\\r\\n\\+QTONEDET:\\s*(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         priv->qgpsurc_regex     = g_regex_new ("\\r\\n\\+QGPSURC:.*", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         priv->qlwurc_regex      = g_regex_new ("\\r\\n\\+QLWURC:.*", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         priv->rdy_regex         = g_regex_new ("\\r\\nRDY", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
+        g_assert (priv->dtmf_regex);
         g_assert (priv->qgpsurc_regex);
         g_assert (priv->qlwurc_regex);
         g_assert (priv->rdy_regex);
@@ -158,6 +163,21 @@ rdy_handler (MMPortSerialAt *port,
 }
 
 /*****************************************************************************/
+
+/* DTMF unsolicited event handler */
+static void
+dtmf_handler (MMPortSerialAt   *port,
+              GMatchInfo       *match_info,
+              MMBroadbandModem *self)
+{
+        g_autofree gchar *dtmf = NULL;
+        dtmf = g_match_info_fetch (match_info, 1);
+
+        mm_obj_dbg (self, "received DTMF: %s", dtmf);
+        mm_iface_modem_voice_received_dtmf (MM_IFACE_MODEM_VOICE (self), 0, dtmf);
+}
+
+/*****************************************************************************/
 /* Setup ports (Broadband modem class) */
 
 void
@@ -201,6 +221,14 @@ mm_shared_quectel_setup_ports (MMBroadbandModem *self)
             ports[i],
             priv->rdy_regex,
             (MMPortSerialAtUnsolicitedMsgFn)rdy_handler,
+            self,
+            NULL);
+
+        /* Handle DTMF */
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            ports[i],
+            priv->dtmf_regex,
+            (MMPortSerialAtUnsolicitedMsgFn)dtmf_handler,
             self,
             NULL);
     }
