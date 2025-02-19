@@ -5,6 +5,7 @@ include:
     - templates/ubuntu.yml
 
 stages:
+  - precheck
   - container prep
   - build
 
@@ -19,10 +20,27 @@ stages:
                                xsltproc dbus gettext gtk-doc-tools libglib2.0-doc
                                gobject-introspection python-is-python3 libsystemd-dev
                                libpolkit-gobject-1-dev valac libdbus-1-dev
-                               bash-completion udev policykit-1 help2man
+                               bash-completion udev policykit-1 help2man findutils
     LIBQMI_BRANCH: 'main'
     LIBQRTR_BRANCH: 'main'
     LIBMBIM_BRANCH: 'main'
+
+verify-dco:
+  stage: precheck
+  extends:
+  - .fdo.distribution-image@ubuntu
+  - .common_variables
+  only:
+    - main
+    - merge_requests
+    - tags
+    - schedules
+  script: |
+    export COMMITS=$(git log --no-merges --format="%H" ${CI_MERGE_REQUEST_DIFF_BASE_SHA}.. | xargs)
+    for c in "${COMMITS}"; do
+      echo "Checking commit ${c} for DCO Signed-off-by"
+      git log --format="%b" -1 ${c} | grep "Signed-off-by: .* <.*@.*>"
+    done
 
 build container:
   extends:
