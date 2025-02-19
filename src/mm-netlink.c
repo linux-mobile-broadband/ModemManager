@@ -15,8 +15,10 @@
  *   Copyright (C) 2020 Andrew Lassalle <andrewlassalle@chromium.org>
  *
  * Copyright (C) 2021 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2024 JUCR GmbH
  */
 
+#include <errno.h>
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <net/if.h>
@@ -160,6 +162,12 @@ netlink_message_new_setlink (guint    ifindex,
     return msg;
 }
 
+static NetlinkMessage *
+netlink_message_new_getlink (guint ifindex)
+{
+    return netlink_message_new (ifindex, RTM_GETLINK);
+}
+
 static void
 netlink_message_free (NetlinkMessage *msg)
 {
@@ -169,11 +177,14 @@ netlink_message_free (NetlinkMessage *msg)
 /*****************************************************************************/
 /* Netlink transactions */
 
+typedef gboolean (*MsgFunc) (GTask *, struct nlmsghdr *, GError **);
+
 typedef struct {
     MMNetlink *self;
     guint32    sequence_id;
     GSource   *timeout_source;
     GTask     *completion_task;
+    MsgFunc    completion_fn;
 } Transaction;
 
 static gboolean
@@ -212,8 +223,9 @@ transaction_complete_with_error (Transaction *tr,
 }
 
 static void
-transaction_complete (Transaction *tr,
-                      gint         saved_errno)
+transaction_complete (Transaction     *tr,
+                      struct nlmsghdr *hdr,
+                      gint             saved_errno)
 {
     GTask *task;
     guint32 sequence_id;
@@ -225,7 +237,10 @@ transaction_complete (Transaction *tr,
                          GUINT_TO_POINTER (tr->sequence_id));
 
     if (!saved_errno) {
-        g_task_return_boolean (task, TRUE);
+        GError *error = NULL;
+
+        if (!tr->completion_fn (task, hdr, &error))
+            g_task_return_error (task, error);
     } else {
         g_task_return_new_error (task, G_IO_ERROR, g_io_error_from_errno (saved_errno),
                                  "Netlink message with transaction %u failed",
@@ -248,7 +263,8 @@ static Transaction *
 transaction_new (MMNetlink      *self,
                  NetlinkMessage *msg,
                  guint           timeout,
-                 GTask          *task)
+                 GTask          *task,
+                 MsgFunc         completion_fn)
 {
     Transaction *tr;
 
@@ -266,6 +282,7 @@ transaction_new (MMNetlink      *self,
                          g_main_context_get_thread_default ());
     }
     tr->completion_task = g_object_ref (task);
+    tr->completion_fn = completion_fn;
 
     g_hash_table_insert (self->transactions,
                          GUINT_TO_POINTER (tr->sequence_id),
@@ -281,6 +298,14 @@ mm_netlink_setlink_finish (MMNetlink     *self,
                            GError       **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static gboolean
+setlink_complete (GTask *task, struct nlmsghdr *hdr, GError **error)
+{
+    /* Nothing to do here; errors are handled by transaction_complete() */
+    g_task_return_boolean (task, TRUE);
+    return TRUE;
 }
 
 void
@@ -310,7 +335,110 @@ mm_netlink_setlink (MMNetlink           *self,
     msg = netlink_message_new_setlink (ifindex, up, mtu);
 
     /* The task ownership is transferred to the transaction. */
-    tr = transaction_new (self, msg, 5, task);
+    tr = transaction_new (self, msg, 5, task, setlink_complete);
+
+    bytes_sent = g_socket_send (self->socket,
+                                (const gchar *) msg->data,
+                                msg->len,
+                                cancellable,
+                                &error);
+    netlink_message_free (msg);
+
+    if (bytes_sent < 0)
+        transaction_complete_with_error (tr, error);
+
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
+
+GByteArray *
+mm_netlink_get_hwaddr_finish (MMNetlink     *self,
+                              GAsyncResult  *res,
+                              GError       **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static gboolean
+get_hwaddr_complete (GTask *task, struct nlmsghdr *hdr, GError **error)
+{
+    const struct ifinfomsg *ifi;
+    GByteArray             *hwaddr = NULL;
+    struct rtattr          *rta;
+    int                     attr_len;
+
+    if (hdr->nlmsg_type != RTM_NEWLINK) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "unexpected GETLINK reply message type %d",
+                     hdr->nlmsg_type);
+        return FALSE;
+    }
+
+    ifi = NLMSG_DATA (hdr);
+    if (ifi->ifi_index <= 0) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "unexpected link index %d",
+                     ifi->ifi_index);
+        return FALSE;
+    }
+
+    attr_len = IFLA_PAYLOAD (hdr);
+    rta = IFLA_RTA (ifi);
+    for (; RTA_OK (rta, attr_len); rta = RTA_NEXT (rta, attr_len)) {
+        switch (rta->rta_type) {
+        case IFLA_ADDRESS:
+#define ETH_ADDR_LEN 6
+            if (rta->rta_len < ETH_ADDR_LEN) {
+                g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                             "invalid hardware address length %d",
+                             rta->rta_len);
+                return FALSE;
+            }
+            hwaddr = g_byte_array_sized_new (ETH_ADDR_LEN);
+            g_byte_array_append (hwaddr, RTA_DATA (rta), ETH_ADDR_LEN);
+            break;
+        default:
+            break;
+        }
+    }
+
+    if (!hwaddr) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "no hardware address found");
+        return FALSE;
+    }
+
+    g_task_return_pointer (task, hwaddr, (GDestroyNotify) g_byte_array_unref);
+    return TRUE;
+}
+
+void
+mm_netlink_get_hwaddr (MMNetlink           *self,
+                       guint                ifindex,
+                       GCancellable        *cancellable,
+                       GAsyncReadyCallback  callback,
+                       gpointer             user_data)
+{
+    GTask          *task;
+    NetlinkMessage *msg;
+    Transaction    *tr;
+    gssize          bytes_sent;
+    GError         *error = NULL;
+
+    task = g_task_new (self, cancellable, callback, user_data);
+
+    if (!self->socket) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "netlink support not available");
+        g_object_unref (task);
+        return;
+    }
+
+    msg = netlink_message_new_getlink (ifindex);
+
+    /* The task ownership is transferred to the transaction. */
+    tr = transaction_new (self, msg, 5, task, get_hwaddr_complete);
 
     bytes_sent = g_socket_send (self->socket,
                                 (const gchar *) msg->data,
@@ -328,25 +456,56 @@ mm_netlink_setlink (MMNetlink           *self,
 /*****************************************************************************/
 
 static gboolean
-netlink_message_cb (GSocket      *socket,
-                    GIOCondition  condition,
-                    MMNetlink    *self)
+netlink_messages_cb (GSocket      *socket,
+                     GIOCondition  condition,
+                     MMNetlink    *self)
 {
-    g_autoptr(GError) error = NULL;
-    gchar             buf[512];
-    gssize            bytes_received;
-    guint             buffer_len;
-    struct nlmsghdr  *hdr;
+    g_autoptr(GError)   error = NULL;
+    GInputVector        iv;
+    GSocketAddress     *addr = NULL;
+    struct sockaddr_nl  source_sockaddr;
+    gchar               buf[2048];
+    gssize              bytes_received;
+    guint               buffer_len;
+    struct nlmsghdr    *hdr;
 
     if (condition & G_IO_HUP || condition & G_IO_ERR) {
         mm_obj_warn (self, "socket connection closed");
         return G_SOURCE_REMOVE;
     }
 
-    bytes_received = g_socket_receive (socket, buf, sizeof (buf), NULL, &error);
+    iv.buffer = &buf;
+    iv.size = sizeof (buf);
+    bytes_received = g_socket_receive_message (self->socket,
+                                               &addr,
+                                               &iv,
+                                               1,
+                                               NULL,
+                                               NULL,
+                                               NULL,
+                                               NULL,
+                                               &error);
     if (bytes_received < 0) {
-        mm_obj_warn (self, "socket i/o failure: %s", error->message);
+        mm_obj_warn (self, "failed to read netlink message: %s", error->message);
         return G_SOURCE_REMOVE;
+    }
+
+    if (!g_socket_address_to_native (addr,
+                                     &source_sockaddr,
+                                     sizeof (source_sockaddr),
+                                     &error)) {
+        mm_obj_warn (self,
+                     "failed to read netlink message source address: %s",
+                     error->message);
+        return G_SOURCE_REMOVE;
+    }
+
+    /* Ensure the message is from the kernel */
+    if (source_sockaddr.nl_pid != 0) {
+        mm_obj_warn (self,
+                     "ignoring non-kernel netlink message from pid %d",
+                     source_sockaddr.nl_pid);
+        return G_SOURCE_CONTINUE;
     }
 
     buffer_len = (guint) bytes_received;
@@ -354,17 +513,26 @@ netlink_message_cb (GSocket      *socket,
          NLMSG_NEXT (hdr, buffer_len)) {
         Transaction     *tr;
         struct nlmsgerr *err;
-
-        if (hdr->nlmsg_type != NLMSG_ERROR)
-            continue;
+        gint             nlerr = 0;
 
         tr = g_hash_table_lookup (self->transactions,
                                   GUINT_TO_POINTER (hdr->nlmsg_seq));
         if (!tr)
             continue;
 
-        err = NLMSG_DATA (buf);
-        transaction_complete (tr, err->error);
+        switch (hdr->nlmsg_type) {
+        case NLMSG_ERROR:
+            err = NLMSG_DATA (buf);
+            nlerr = err->error;
+            break;
+        case RTM_NEWLINK:
+        case NLMSG_DONE:
+            break;
+        default:
+            continue;
+        }
+
+        transaction_complete (tr, hdr, nlerr);
     }
     return G_SOURCE_CONTINUE;
 }
@@ -375,7 +543,7 @@ setup_netlink_socket (MMNetlink  *self,
 {
     gint socket_fd;
 
-    socket_fd = socket (AF_NETLINK, SOCK_DGRAM, NETLINK_ROUTE);
+    socket_fd = socket (PF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
     if (socket_fd < 0) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "Failed to create netlink socket");
@@ -388,11 +556,19 @@ setup_netlink_socket (MMNetlink  *self,
         return FALSE;
     }
 
+    if (!g_socket_set_option (self->socket, SOL_SOCKET, SO_PASSCRED, TRUE, NULL)) {
+        int errsv = errno;
+        g_set_error (error, G_IO_ERROR, g_io_error_from_errno (errsv),
+                     "Could not set netlink socket options: %s",
+                     g_strerror (errsv));
+        return FALSE;
+    }
+
     self->source = g_socket_create_source (self->socket,
                                            G_IO_IN | G_IO_ERR | G_IO_HUP,
                                            NULL);
     g_source_set_callback (self->source,
-                           (GSourceFunc) netlink_message_cb,
+                           (GSourceFunc) netlink_messages_cb,
                            self,
                            NULL);
     g_source_attach (self->source, NULL);

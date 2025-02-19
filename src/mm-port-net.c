@@ -97,6 +97,59 @@ mm_port_net_link_setup (MMPortNet            *self,
 
 /*****************************************************************************/
 
+GByteArray *
+mm_port_net_get_hwaddress_finish (MMPortNet     *self,
+                                  GAsyncResult  *res,
+                                  GError       **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+netlink_get_hwaddress_ready (MMNetlink    *netlink,
+                             GAsyncResult *res,
+                             GTask        *task)
+{
+    GError     *error = NULL;
+    GByteArray *hwaddr;
+
+    hwaddr = mm_netlink_get_hwaddr_finish (netlink, res, &error);
+    if (!hwaddr) {
+        g_prefix_error (&error, "netlink operation failed: ");
+        g_task_return_error (task, error);
+    } else
+        g_task_return_pointer (task, hwaddr, (GDestroyNotify) g_byte_array_unref);
+    g_object_unref (task);
+}
+
+void
+mm_port_net_get_hwaddress (MMPortNet            *self,
+                           GCancellable         *cancellable,
+                           GAsyncReadyCallback   callback,
+                           gpointer              user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, cancellable, callback, user_data);
+
+    ensure_ifindex (self);
+    if (!self->priv->ifindex) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "no valid interface index found for %s",
+                                 mm_port_get_device (MM_PORT (self)));
+        g_object_unref (task);
+        return;
+    }
+
+    mm_netlink_get_hwaddr (mm_netlink_get (), /* singleton */
+                           self->priv->ifindex,
+                           cancellable,
+                           (GAsyncReadyCallback) netlink_get_hwaddress_ready,
+                           task);
+}
+
+/*****************************************************************************/
+
 MMPortNet *
 mm_port_net_new (const gchar *name)
 {

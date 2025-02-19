@@ -60,4 +60,12 @@ gboolean mm_port_net_link_setup_finish (MMPortNet            *self,
                                         GAsyncResult         *res,
                                         GError              **error);
 
+void        mm_port_net_get_hwaddress        (MMPortNet            *self,
+                                              GCancellable         *cancellable,
+                                              GAsyncReadyCallback   callback,
+                                              gpointer              user_data);
+GByteArray *mm_port_net_get_hwaddress_finish (MMPortNet            *self,
+                                              GAsyncResult         *res,
+                                              GError              **error);
+
 #endif /* MM_PORT_NET_H */
