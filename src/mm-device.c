@@ -72,6 +72,8 @@ struct _MMDevicePrivate {
     guint16 product;
     /* Subsystem vendor ID for PCI devices */
     guint16 subsystem_vendor;
+    /* Subsystem device ID for PCI devices */
+    guint16 subsystem_device;
 
     /* Kernel drivers managing this device */
     gchar **drivers;
@@ -268,6 +270,9 @@ mm_device_grab_port (MMDevice       *self,
 
     if (!self->priv->subsystem_vendor)
         self->priv->subsystem_vendor  = mm_kernel_device_get_physdev_subsystem_vid (kernel_port);
+
+    if (!self->priv->subsystem_device)
+        self->priv->subsystem_device  = mm_kernel_device_get_physdev_subsystem_pid (kernel_port);
 
     /* Add new port driver */
     add_port_driver (self, kernel_port);
@@ -613,6 +618,13 @@ mm_device_get_subsystem_vendor (MMDevice *self)
 {
     return self->priv->subsystem_vendor;
 }
+
+guint16
+mm_device_get_subsystem_device (MMDevice *self)
+{
+    return self->priv->subsystem_device;
+}
+
 
 void
 mm_device_set_plugin (MMDevice *self,

@@ -66,6 +66,7 @@ typedef struct _MMBaseModemPrivate MMBaseModemPrivate;
 #define MM_BASE_MODEM_VENDOR_ID           "base-modem-vendor-id"
 #define MM_BASE_MODEM_PRODUCT_ID          "base-modem-product-id"
 #define MM_BASE_MODEM_SUBSYSTEM_VENDOR_ID "base-modem-subsystem-vendor-id"
+#define MM_BASE_MODEM_SUBSYSTEM_DEVICE_ID "base-modem-subsystem-device-id"
 #define MM_BASE_MODEM_REPROBE             "base-modem-reprobe"
 #define MM_BASE_MODEM_DATA_NET_SUPPORTED  "base-modem-data-net-supported"
 #define MM_BASE_MODEM_DATA_TTY_SUPPORTED  "base-modem-data-tty-supported"
@@ -211,6 +212,7 @@ const gchar  *mm_base_modem_get_plugin  (MMBaseModem *self);
 guint mm_base_modem_get_vendor_id           (MMBaseModem *self);
 guint mm_base_modem_get_product_id          (MMBaseModem *self);
 guint mm_base_modem_get_subsystem_vendor_id (MMBaseModem *self);
+guint mm_base_modem_get_subsystem_device_id (MMBaseModem *self);
 
 GCancellable *mm_base_modem_peek_cancellable (MMBaseModem *self);
 
