@@ -40,6 +40,9 @@ struct _MMSharedCinterionInterface {
     /* Peek modem interface of the parent class of the object */
     MMIfaceModemInterface *  (* peek_parent_interface) (MMSharedCinterion *self);
 
+    /* Peek firmware interface of the parent class of the object */
+    MMIfaceModemFirmwareInterface *  (* peek_parent_firmware_interface) (MMSharedCinterion *self);
+
     /* Peek location interface of the parent class of the object */
     MMIfaceModemLocationInterface *  (* peek_parent_location_interface) (MMSharedCinterion *self);
 

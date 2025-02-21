@@ -11391,6 +11391,29 @@ modem_3gpp_profile_manager_store_profile (MMIfaceModem3gppProfileManager *self,
 }
 
 /*****************************************************************************/
+/* Load update settings (Firmware interface) */
+
+static MMFirmwareUpdateSettings *
+modem_firmware_load_update_settings_finish (MMIfaceModemFirmware  *self,
+                                            GAsyncResult          *res,
+                                            GError               **error)
+{
+    return mm_iface_modem_firmware_load_update_settings_in_port_finish (self, res, error);
+}
+
+static void
+modem_firmware_load_update_settings (MMIfaceModemFirmware *self,
+                                     GAsyncReadyCallback   callback,
+                                     gpointer              user_data)
+{
+    mm_iface_modem_firmware_load_update_settings_in_port (
+        self,
+        MM_PORT (mm_base_modem_peek_port_primary (MM_BASE_MODEM (self))),
+        callback,
+        user_data);
+}
+
+/*****************************************************************************/
 
 static const gchar *primary_init_sequence[] = {
     /* Ensure echo is off */
@@ -14347,6 +14370,8 @@ iface_modem_oma_init (MMIfaceModemOmaInterface *iface)
 static void
 iface_modem_firmware_init (MMIfaceModemFirmwareInterface *iface)
 {
+    iface->load_update_settings = modem_firmware_load_update_settings;
+    iface->load_update_settings_finish = modem_firmware_load_update_settings_finish;
 }
 
 static void

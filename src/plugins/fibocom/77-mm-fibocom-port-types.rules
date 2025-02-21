@@ -98,6 +98,10 @@ ATTRS{idVendor}=="1508", ATTRS{idProduct}=="1001", ENV{.MM_USBIFNUM}=="01", SUBS
 ATTRS{idVendor}=="1508", ATTRS{idProduct}=="1001", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 ATTRS{idVendor}=="1508", ATTRS{idProduct}=="1001", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 
+# Fibocom NL668-EAU with Sahara-Firehose support
+ATTRS{idVendor}=="1508", ATTRS{idProduct}=="1001", ENV{ID_MM_QUALCOMM_FIREHOSE}="1"
+ATTRS{idVendor}=="1508", ATTRS{idProduct}=="1001", ENV{ID_MM_QUALCOMM_SAHARA}="1"
+
 # Fibocom L610 (GTUSBMODE=31)
 #  ttyUSB0 (if #0): AT port
 #  ttyUSB1 (if #1): NV

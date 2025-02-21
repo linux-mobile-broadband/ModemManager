@@ -54,6 +54,7 @@ typedef struct {
     MMBaseModemClass              *class_parent;
     MMIfaceModemInterface         *iface_modem_parent;
     MMIfaceModemLocationInterface *iface_modem_location_parent;
+    MMIfaceModemFirmwareInterface *iface_modem_firmware_parent;
     MMModemLocationSource          provided_sources;
     MMModemLocationSource          enabled_sources;
     FeatureSupport                 qgps_supported;
@@ -100,6 +101,9 @@ get_private (MMSharedQuectel *self)
 
         g_assert (MM_SHARED_QUECTEL_GET_IFACE (self)->peek_parent_class);
         priv->class_parent = MM_SHARED_QUECTEL_GET_IFACE (self)->peek_parent_class (self);
+
+        g_assert (MM_SHARED_QUECTEL_GET_IFACE (self)->peek_parent_modem_firmware_interface);
+        priv->iface_modem_firmware_parent = MM_SHARED_QUECTEL_GET_IFACE (self)->peek_parent_modem_firmware_interface (self);
 
         g_assert (MM_SHARED_QUECTEL_GET_IFACE (self)->peek_parent_modem_location_interface);
         priv->iface_modem_location_parent = MM_SHARED_QUECTEL_GET_IFACE (self)->peek_parent_modem_location_interface (self);
@@ -259,20 +263,6 @@ mm_shared_quectel_firmware_load_update_settings_finish (MMIfaceModemFirmware  *s
 }
 
 static gboolean
-quectel_is_sahara_supported (MMBaseModem *modem,
-                             MMPort      *port)
-{
-    return mm_kernel_device_get_global_property_as_boolean (mm_port_peek_kernel_device (port), "ID_MM_QUECTEL_SAHARA");
-}
-
-static gboolean
-quectel_is_firehose_supported (MMBaseModem *modem,
-                               MMPort      *port)
-{
-    return mm_kernel_device_get_global_property_as_boolean (mm_port_peek_kernel_device (port), "ID_MM_QUECTEL_FIREHOSE");
-}
-
-static gboolean
 quectel_is_dfota_supported (MMBaseModem *modem,
                             MMPort      *port)
 {
@@ -287,14 +277,7 @@ quectel_get_firmware_update_methods (MMBaseModem *modem,
 
     update_methods = MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE;
 
-    if (quectel_is_firehose_supported (modem, port))
-        update_methods |= MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE;
-    if (quectel_is_sahara_supported (modem, port))
-        update_methods |= MM_MODEM_FIRMWARE_UPDATE_METHOD_SAHARA;
-
-    /* DFOTA should not be used in combination with any other update method. */
-    if (update_methods == MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE &&
-        quectel_is_dfota_supported (modem, port))
+    if (quectel_is_dfota_supported (modem, port))
         update_methods |= MM_MODEM_FIRMWARE_UPDATE_METHOD_DFOTA;
 
     return update_methods;
@@ -477,26 +460,41 @@ quectel_at_port_get_firmware_revision_ready (MMBaseModem  *self,
     }
 }
 
-void
-mm_shared_quectel_firmware_load_update_settings (MMIfaceModemFirmware *self,
-                                                 GAsyncReadyCallback   callback,
-                                                 gpointer              user_data)
+static void
+parent_load_update_settings_ready (MMIfaceModemFirmware *self,
+                                   GAsyncResult         *res,
+                                   GTask                *task)
 {
-    GTask                      *task;
-    MMIfacePortAt              *at_port;
-    MMModemFirmwareUpdateMethod update_methods;
-    LoadUpdateSettingsContext  *ctx;
+    Private                             *priv;
+    MMIfacePortAt                       *at_port;
+    LoadUpdateSettingsContext           *ctx;
+    MMModemFirmwareUpdateMethod          update_methods;
+    g_autoptr(GError)                    error = NULL;
+    g_autoptr(MMFirmwareUpdateSettings)  update_settings = NULL;
 
-    task = g_task_new (self, NULL, callback, user_data);
-    ctx = g_new0 (LoadUpdateSettingsContext, 1);
-    g_task_set_task_data (task, ctx, (GDestroyNotify)load_update_settings_context_free);
+    priv = get_private (MM_SHARED_QUECTEL (self));
+    update_settings = priv->iface_modem_firmware_parent->load_update_settings_finish (self, res, &error);
+    if (error) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
 
     /* Get the best at port to get firmware revision */
     at_port = mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL);
     if (at_port) {
-        update_methods = quectel_get_firmware_update_methods (MM_BASE_MODEM (self), MM_PORT (at_port));
-        ctx->update_settings = mm_firmware_update_settings_new (update_methods);
+        ctx = g_new0 (LoadUpdateSettingsContext, 1);
+        ctx->update_settings = g_object_ref (update_settings);
         ctx->get_firmware_maximum_retry_int = QUECTEL_STD_AP_FIRMWARE_INVALID_MAXIMUM_RETRY;
+        g_task_set_task_data (task, ctx, (GDestroyNotify)load_update_settings_context_free);
+
+        update_methods = mm_firmware_update_settings_get_method (ctx->update_settings);
+
+        /* Prefer any parent's update method */
+        if (update_methods == MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE) {
+            update_methods = quectel_get_firmware_update_methods (MM_BASE_MODEM (self), MM_PORT (at_port));
+            mm_firmware_update_settings_set_method (ctx->update_settings, update_methods);
+        }
 
         /* Fetch modem name by "ATI" command */
         mm_base_modem_at_command (MM_BASE_MODEM (self),
@@ -509,11 +507,29 @@ mm_shared_quectel_firmware_load_update_settings (MMIfaceModemFirmware *self,
         return;
     }
 
-    g_task_return_new_error (task,
-                             MM_CORE_ERROR,
-                             MM_CORE_ERROR_FAILED,
-                             "Couldn't find a port to fetch firmware info");
+    g_task_return_pointer (task, g_object_ref (update_settings), g_object_unref);
     g_object_unref (task);
+}
+
+void
+mm_shared_quectel_firmware_load_update_settings (MMIfaceModemFirmware *self,
+                                                 GAsyncReadyCallback   callback,
+                                                 gpointer              user_data)
+{
+    Private *priv;
+    GTask   *task;
+
+    priv = get_private (MM_SHARED_QUECTEL (self));
+    g_assert (priv->iface_modem_firmware_parent);
+    g_assert (priv->iface_modem_firmware_parent->load_update_settings);
+    g_assert (priv->iface_modem_firmware_parent->load_update_settings_finish);
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    priv->iface_modem_firmware_parent->load_update_settings (
+        self,
+        (GAsyncReadyCallback)parent_load_update_settings_ready,
+        task);
 }
 
 /*****************************************************************************/

@@ -13105,6 +13105,29 @@ signal_setup_thresholds (MMIfaceModemSignal  *self,
 }
 
 /*****************************************************************************/
+/* Load update settings (Firmware interface) */
+
+static MMFirmwareUpdateSettings *
+modem_firmware_load_update_settings_finish (MMIfaceModemFirmware  *self,
+                                            GAsyncResult          *res,
+                                            GError               **error)
+{
+    return mm_iface_modem_firmware_load_update_settings_in_port_finish (self, res, error);
+}
+
+static void
+modem_firmware_load_update_settings (MMIfaceModemFirmware *self,
+                                     GAsyncReadyCallback   callback,
+                                     gpointer              user_data)
+{
+    mm_iface_modem_firmware_load_update_settings_in_port (
+        self,
+        MM_PORT (mm_broadband_modem_qmi_peek_port_qmi (MM_BROADBAND_MODEM_QMI (self))),
+        callback,
+        user_data);
+}
+
+/*****************************************************************************/
 /* Reset data interfaces during initialization */
 
 typedef struct {
@@ -14050,6 +14073,8 @@ iface_modem_firmware_init (MMIfaceModemFirmwareInterface *iface)
     iface->load_current_finish = firmware_load_current_finish;
     iface->change_current = firmware_change_current;
     iface->change_current_finish = firmware_change_current_finish;
+    iface->load_update_settings = modem_firmware_load_update_settings;
+    iface->load_update_settings_finish = modem_firmware_load_update_settings_finish;
 }
 
 static MMIfaceModemLocationInterface *

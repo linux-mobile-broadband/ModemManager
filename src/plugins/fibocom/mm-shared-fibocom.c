@@ -42,6 +42,8 @@ static GQuark private_quark;
 typedef struct {
     /* Parent class */
     MMBaseModemClass *class_parent;
+    /* Firmware interface of parent class */
+    MMIfaceModemFirmwareInterface *iface_modem_firmware_parent;
     /* URCs to ignore */
     GRegex *sim_ready_regex;
 } Private;
@@ -71,6 +73,10 @@ get_private (MMSharedFibocom *self)
         /* Setup parent class */
         g_assert (MM_SHARED_FIBOCOM_GET_IFACE (self)->peek_parent_class);
         priv->class_parent = MM_SHARED_FIBOCOM_GET_IFACE (self)->peek_parent_class (self);
+
+        /* Setup firmware interface of parent class */
+        g_assert (MM_SHARED_FIBOCOM_GET_IFACE (self)->peek_parent_firmware_interface);
+        priv->iface_modem_firmware_parent = MM_SHARED_FIBOCOM_GET_IFACE (self)->peek_parent_firmware_interface (self);
 
         g_object_set_qdata_full (G_OBJECT (self), private_quark, priv, (GDestroyNotify)private_free);
     }
@@ -227,24 +233,37 @@ fibocom_at_port_get_firmware_version_ready (MMBaseModem  *self,
     g_object_unref (task);
 }
 
-void
-mm_shared_fibocom_firmware_load_update_settings (MMIfaceModemFirmware *self,
-                                                 GAsyncReadyCallback   callback,
-                                                 gpointer              user_data)
+static void
+parent_load_update_settings_ready (MMIfaceModemFirmware *self,
+                                   GAsyncResult         *res,
+                                   GTask                *task)
 {
-    GTask *task;
-    MMPortSerialAt *at_port;
-    MMModemFirmwareUpdateMethod update_methods;
-    MMFirmwareUpdateSettings *update_settings;
+    Private                             *priv;
+    MMPortSerialAt                      *at_port;
+    MMModemFirmwareUpdateMethod          update_methods;
+    g_autoptr(GError)                    error = NULL;
+    g_autoptr(MMFirmwareUpdateSettings)  update_settings;
 
-    task = g_task_new (self, NULL, callback, user_data);
+    priv = get_private (MM_SHARED_FIBOCOM (self));
+    update_settings = priv->iface_modem_firmware_parent->load_update_settings_finish (self, res, &error);
+    if (error) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    g_task_set_task_data (task, g_object_ref (update_settings), g_object_unref);
 
     /* We always report the primary port as the one to be used for FW upgrade */
     at_port = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
     if (at_port) {
-        update_methods = fibocom_get_firmware_update_methods (MM_BASE_MODEM (self), MM_PORT (at_port));
-        update_settings = mm_firmware_update_settings_new (update_methods);
-        g_task_set_task_data (task, update_settings, g_object_unref);
+        update_methods = mm_firmware_update_settings_get_method (update_settings);
+
+        /* Prefer any parent's update method */
+        if (update_methods == MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE) {
+            update_methods = fibocom_get_firmware_update_methods (MM_BASE_MODEM (self), MM_PORT (at_port));
+            mm_firmware_update_settings_set_method (update_settings, update_methods);
+        }
 
         /* Get modem version by AT */
         mm_base_modem_at_command (MM_BASE_MODEM (self),
@@ -257,11 +276,29 @@ mm_shared_fibocom_firmware_load_update_settings (MMIfaceModemFirmware *self,
         return;
     }
 
-    g_task_return_new_error (task,
-                             MM_CORE_ERROR,
-                             MM_CORE_ERROR_FAILED,
-                             "Couldn't find a port to fetch firmware info");
+    g_task_return_pointer (task, g_object_ref (update_settings), g_object_unref);
     g_object_unref (task);
+}
+
+void
+mm_shared_fibocom_firmware_load_update_settings (MMIfaceModemFirmware *self,
+                                                 GAsyncReadyCallback   callback,
+                                                 gpointer              user_data)
+{
+    GTask   *task;
+    Private *priv;
+
+    priv = get_private (MM_SHARED_FIBOCOM (self));
+    g_assert (priv->iface_modem_firmware_parent);
+    g_assert (priv->iface_modem_firmware_parent->load_update_settings);
+    g_assert (priv->iface_modem_firmware_parent->load_update_settings_finish);
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    priv->iface_modem_firmware_parent->load_update_settings (
+        self,
+        (GAsyncReadyCallback)parent_load_update_settings_ready,
+        task);
 }
 
 /*****************************************************************************/

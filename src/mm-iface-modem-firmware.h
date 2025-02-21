@@ -87,4 +87,15 @@ void mm_iface_modem_firmware_shutdown (MMIfaceModemFirmware *self);
 void mm_iface_modem_firmware_bind_simple_status (MMIfaceModemFirmware *self,
                                                  MMSimpleStatus *status);
 
+/* Helper to load common update settings on the primary port */
+void mm_iface_modem_firmware_load_update_settings_in_port (
+    MMIfaceModemFirmware *self,
+    MMPort               *port,
+    GAsyncReadyCallback   callback,
+    gpointer              user_data);
+MMFirmwareUpdateSettings *mm_iface_modem_firmware_load_update_settings_in_port_finish (
+    MMIfaceModemFirmware  *self,
+    GAsyncResult          *res,
+    GError               **error);
+
 #endif /* MM_IFACE_MODEM_FIRMWARE_H */

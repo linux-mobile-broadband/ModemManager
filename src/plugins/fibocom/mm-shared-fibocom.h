@@ -36,6 +36,9 @@ struct _MMSharedFibocomInterface {
 
     /* Peek parent class of the object */
     MMBaseModemClass * (* peek_parent_class) (MMSharedFibocom *self);
+
+    /* Peek firmware interface of the parent class of the object */
+    MMIfaceModemFirmwareInterface *  (* peek_parent_firmware_interface) (MMSharedFibocom *self);
 };
 
 void mm_shared_fibocom_setup_ports (MMBroadbandModem *self);
