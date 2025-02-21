@@ -52,6 +52,7 @@ typedef struct {
     FeatureSupport                 cgps_support;
     /* voice */
     MMIfaceModemVoiceInterface *iface_modem_voice_parent;
+    FeatureSupport              cpcmfrm_support;
     FeatureSupport              cpcmreg_support;
     FeatureSupport              clcc_urc_support;
     GRegex                     *clcc_urc_regex;
@@ -86,6 +87,7 @@ get_private (MMSharedSimtech *self)
         priv->supported_sources = MM_MODEM_LOCATION_SOURCE_NONE;
         priv->enabled_sources = MM_MODEM_LOCATION_SOURCE_NONE;
         priv->cgps_support = FEATURE_SUPPORT_UNKNOWN;
+        priv->cpcmfrm_support = FEATURE_SUPPORT_UNKNOWN;
         priv->cpcmreg_support = FEATURE_SUPPORT_UNKNOWN;
         priv->clcc_urc_support = FEATURE_SUPPORT_UNKNOWN;
         priv->clcc_urc_regex = mm_simtech_get_clcc_urc_regex ();
@@ -1104,6 +1106,9 @@ common_setup_cleanup_in_call_audio_channel (MMSharedSimtech     *self,
         return;
     }
 
+    /* Some models (like SIM7600) need to wait a bit before they can accept +CPCMREG */
+    g_usleep(100000);
+
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               setup ? "+CPCMREG=1" : "+CPCMREG=0",
                               3,
@@ -1140,6 +1145,47 @@ mm_shared_simtech_voice_check_support_finish (MMIfaceModemVoice  *self,
 }
 
 static void
+cpcmfrm_set_ready (MMBaseModem  *self,
+                   GAsyncResult *res,
+                   GTask        *task)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_finish (self, res, &error))
+        g_task_return_error (task, error);
+    else {
+        g_task_return_boolean (task, TRUE);
+        mm_obj_dbg (self, "USB audio 16k sample rate turned on");
+    }
+    g_object_unref (task);
+}
+
+static void
+cpcmfrm_format_check_and_set_ready (MMBroadbandModem *self,
+                            GAsyncResult     *res,
+                            GTask            *task)
+{
+    Private *priv;
+
+    priv = get_private (MM_SHARED_SIMTECH (self));
+
+    priv->cpcmfrm_support = (mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL) ?
+                             FEATURE_SUPPORTED : FEATURE_NOT_SUPPORTED);
+        
+    if (priv->cpcmfrm_support == FEATURE_SUPPORTED) {
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "+CPCMFRM=1",
+                                  3,
+                                  FALSE,
+                                  (GAsyncReadyCallback) cpcmfrm_set_ready,
+                                  task);
+    } else {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+    }
+}
+
+static void
 cpcmreg_format_check_ready (MMBroadbandModem *self,
                             GAsyncResult     *res,
                             GTask            *task)
@@ -1152,8 +1198,19 @@ cpcmreg_format_check_ready (MMBroadbandModem *self,
                              FEATURE_SUPPORTED : FEATURE_NOT_SUPPORTED);
     mm_obj_dbg (self, "modem %s USB audio control", (priv->cpcmreg_support == FEATURE_SUPPORTED) ? "supports" : "doesn't support");
 
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+    /* If USB Audio not supported, we won't check and set its formats */
+    if(priv->cpcmreg_support == FEATURE_SUPPORTED) {
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "+CPCMFRM=?",
+                                  3,
+                                  TRUE,
+                                  (GAsyncReadyCallback) cpcmfrm_format_check_and_set_ready,
+                                  task);
+    } else {
+        priv->cpcmfrm_support = FEATURE_NOT_SUPPORTED;
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+    }
 }
 
 static void
