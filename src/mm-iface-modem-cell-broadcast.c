@@ -42,6 +42,102 @@ mm_iface_modem_cell_broadcast_bind_simple_status (MMIfaceModemCellBroadcast *sel
 
 /*****************************************************************************/
 
+
+typedef struct {
+    MmGdbusModemCellBroadcast *skeleton;
+    GDBusMethodInvocation     *invocation;
+    MMIfaceModemCellBroadcast *self;
+    GArray                    *channels;
+} HandleSetChannelsCellBroadcastContext;
+
+static void
+handle_set_channels_context_free (HandleSetChannelsCellBroadcastContext *ctx)
+{
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_array_unref (ctx->channels);
+    g_slice_free (HandleSetChannelsCellBroadcastContext, ctx);
+}
+
+static void
+set_channels_ready (MMIfaceModemCellBroadcast             *self,
+                    GAsyncResult                          *res,
+                    HandleSetChannelsCellBroadcastContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_CELL_BROADCAST_GET_IFACE (self)->set_channels_finish (self, res, &error))
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
+    else {
+        mm_gdbus_modem_cell_broadcast_set_channels (ctx->skeleton,
+                                                    mm_common_cell_broadcast_channels_garray_to_variant (ctx->channels));
+        mm_gdbus_modem_cell_broadcast_complete_set_channels (ctx->skeleton, ctx->invocation);
+    }
+
+    handle_set_channels_context_free (ctx);
+}
+
+static void
+handle_set_channels_auth_ready (MMBaseModem                           *self,
+                                GAsyncResult                          *res,
+                                HandleSetChannelsCellBroadcastContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_set_channels_context_free (ctx);
+        return;
+    }
+
+    /* Validate channels (either number or range) */
+    if (!mm_validate_cbs_channels (ctx->channels, &error)) {
+        mm_dbus_method_invocation_return_gerror (ctx->invocation, error);
+        handle_set_channels_context_free (ctx);
+        return;
+    }
+
+    /* Check if plugin implements it */
+    if (!MM_IFACE_MODEM_CELL_BROADCAST_GET_IFACE (self)->set_channels ||
+        !MM_IFACE_MODEM_CELL_BROADCAST_GET_IFACE (self)->set_channels_finish) {
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                                        "Cannot set channels: not implemented");
+        handle_set_channels_context_free (ctx);
+        return;
+    }
+
+    /* Request to change channels */
+    mm_obj_info (self, "processing user request to set channels...");
+    MM_IFACE_MODEM_CELL_BROADCAST_GET_IFACE (self)->set_channels (ctx->self,
+                                                                  ctx->channels,
+                                                                  (GAsyncReadyCallback)set_channels_ready,
+                                                                  ctx);
+}
+
+static gboolean
+handle_set_channels (MmGdbusModemCellBroadcast *skeleton,
+                     GDBusMethodInvocation     *invocation,
+                     GVariant                  *channels,
+                     MMIfaceModemCellBroadcast *self)
+{
+    HandleSetChannelsCellBroadcastContext *ctx;
+
+    ctx = g_slice_new0 (HandleSetChannelsCellBroadcastContext);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+    ctx->channels = mm_common_cell_broadcast_channels_variant_to_garray (channels);
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)handle_set_channels_auth_ready,
+                             ctx);
+    return TRUE;
+}
+
+/*****************************************************************************/
+
 typedef struct {
     MmGdbusModemCellBroadcast *skeleton;
     GDBusMethodInvocation *invocation;
@@ -315,6 +411,12 @@ interface_initialization_step (GTask *task)
 
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
+
+        /* Handle method invocations */
+        g_signal_connect (ctx->skeleton,
+                          "handle-set-channels",
+                          G_CALLBACK (handle_set_channels),
+                          self);
         g_signal_connect (ctx->skeleton,
                           "handle-delete",
                           G_CALLBACK (handle_delete),

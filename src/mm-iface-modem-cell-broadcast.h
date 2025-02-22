@@ -76,6 +76,15 @@ struct _MMIfaceModemCellBroadcastInterface {
 
     /* Create Cbm objects */
     MMBaseCbm * (* create_cbm) (MMIfaceModemCellBroadcast *self);
+
+    /* Set channel list */
+    void (* set_channels) (MMIfaceModemCellBroadcast *self,
+                           GArray *channels,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data);
+    gboolean (* set_channels_finish) (MMIfaceModemCellBroadcast *self,
+                                      GAsyncResult *res,
+                                      GError **error);
 };
 
 /* Initialize CellBroadcast interface (async) */
