@@ -1086,18 +1086,43 @@ cpcmreg_set_ready (MMBaseModem  *self,
     g_object_unref (task);
 }
 
+static gboolean
+call_audio_channel_set (gpointer user_data)
+{
+    GTask        *task;
+    MMBaseModem  *modem;
+
+    task = G_TASK (user_data);
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
+        return G_SOURCE_REMOVE;
+    }
+
+    modem = g_task_get_source_object (task);
+    mm_base_modem_at_command (modem,
+                              setup ? "+CPCMREG=1" : "+CPCMREG=0",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback) cpcmreg_set_ready,
+                              task);
+    return G_SOURCE_REMOVE;
+}
+
+
 static void
 common_setup_cleanup_in_call_audio_channel (MMSharedSimtech     *self,
                                             gboolean             setup,
                                             GAsyncReadyCallback  callback,
                                             gpointer             user_data)
 {
-    GTask   *task;
-    Private *priv;
+    GTask        *task;
+    Private      *priv;
+    GCancellable *cancellable;
 
     priv = get_private (MM_SHARED_SIMTECH (self));
 
-    task = g_task_new (self, NULL, callback, user_data);
+    cancellable = mm_base_modem_peek_cancellable (MM_BASE_MODEM (self));
+    task = g_task_new (self, cancellable, callback, user_data);
 
     /* Do nothing if CPCMREG isn't supported */
     if (priv->cpcmreg_support != FEATURE_SUPPORTED) {
@@ -1107,14 +1132,7 @@ common_setup_cleanup_in_call_audio_channel (MMSharedSimtech     *self,
     }
 
     /* Some models (like SIM7600) need to wait a bit before they can accept +CPCMREG */
-    g_usleep(100000);
-
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              setup ? "+CPCMREG=1" : "+CPCMREG=0",
-                              3,
-                              FALSE,
-                              (GAsyncReadyCallback) cpcmreg_set_ready,
-                              task);
+    g_timeout_add (100, (GSourceFunc)call_audio_channel_set, task);
 }
 
 void
