@@ -81,6 +81,17 @@ mm_log_object_set_owner_id (MMLogObject *self,
     priv = get_private (self);
     g_free (priv->owner_id);
     priv->owner_id = g_strdup (owner_id);
+
+    mm_log_object_reset_id (self);
+}
+
+void
+mm_log_object_reset_id (MMLogObject *self)
+{
+    Private *priv;
+
+    priv = get_private (self);
+    g_clear_pointer (&priv->id, g_free);
 }
 
 static void
