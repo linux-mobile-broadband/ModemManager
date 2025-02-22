@@ -418,6 +418,8 @@ gboolean mm_3gpp_parse_ccwa_service_query_response (const gchar  *response,
                                                     gboolean     *status,
                                                     GError      **error);
 
+GArray *mm_3gpp_parse_cscb_response (const char *raw, GError **error);
+
 /* CGATT helpers */
 gchar *mm_3gpp_build_cgatt_set_request (MMModem3gppPacketServiceState state);
 
@@ -549,6 +551,9 @@ gboolean mm_parse_supl_address (const gchar  *supl,
                                 guint32      *out_ip,
                                 guint16      *out_port,
                                 GError      **error);
+
+gboolean mm_validate_cbs_channels (GArray   *channels,
+                                   GError  **error);
 
 /*****************************************************************************/
 /* SIM specific helpers and utilities */

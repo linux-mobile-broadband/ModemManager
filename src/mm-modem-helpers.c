@@ -2937,6 +2937,110 @@ out:
 }
 
 /*************************************************************************/
+
+#define CBS_MAX_CHANNEL G_MAXUINT16
+
+GArray *
+mm_3gpp_parse_cscb_response (const char *response, GError **error)
+{
+    g_autoptr(GRegex) r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError *inner_error = NULL;
+    gsize len;
+    g_autoptr (GArray) array = g_array_new (FALSE, FALSE, sizeof (MMCellBroadcastChannels));
+    g_autofree char *str = NULL;
+    g_auto (GStrv) intervals = NULL;
+    int i;
+
+    len = strlen (response);
+    if (!len) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS, "empty channel list");
+        goto out;
+    }
+
+    /*
+     * AT+CSCB=[0|1],"<channels>","<coding-scheme>"
+     */
+    r = g_regex_new ("\\+CSCB:\\s*"
+                     "(\\d),\\s*"         /* [0|1] */
+                     "\"([\\d,\\-]*)\","  /* channel list */
+                     "\"\"",              /* encodings */
+                     G_REGEX_NEWLINE_CRLF,
+                     0,
+                     NULL);
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, response, -1, 0, 0, &match_info, &inner_error);
+    if (inner_error)
+        goto out;
+
+    if (!g_match_info_matches (match_info)) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't match CSCB response");
+        goto out;
+    }
+
+    str = g_match_info_fetch (match_info, 1);
+    if (!g_str_equal (str, "0")) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                   "Couldn't match type of CSCB response: '%s'", str);
+        goto out;
+    }
+
+    str = g_match_info_fetch (match_info, 2);
+    intervals = g_strsplit (str, ",", -1);
+    for (i = 0; intervals[i]; i++) {
+        gchar *interval_separator;
+
+        g_strstrip (intervals[i]);
+        interval_separator = strstr (intervals[i], "-");
+        if (interval_separator) {
+            /* Add an interval */
+            gchar *end;
+            g_autofree gchar *start = NULL;
+            MMCellBroadcastChannels channels;
+
+            start = g_strdup (intervals[i]);
+            interval_separator = strstr (start, "-");
+            *(interval_separator++) = '\0';
+            end = interval_separator;
+
+            if (mm_get_uint_from_str (start, &channels.start) &&
+                mm_get_uint_from_str (end, &channels.end) &&
+                channels.start <= channels.end &&
+                channels.end <= CBS_MAX_CHANNEL)
+                g_array_append_val (array, channels);
+            else {
+                inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                           "Couldn't parse CSCB interval '%s'", intervals[i]);
+                goto out;
+            }
+        } else {
+            guint channel;
+
+            /* Add single value */
+            if (mm_get_uint_from_str (intervals[i], &channel)) {
+                MMCellBroadcastChannels channels = {
+                    .start = channel,
+                    .end = channel
+                };
+                g_array_append_val (array, channels);
+            } else {
+                inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                           "Couldn't parse CSCB value '%s'", intervals[i]);
+                goto out;
+            }
+        }
+    }
+
+    return g_steal_pointer (&array);
+
+ out:
+    g_assert (inner_error);
+    g_propagate_error (error, inner_error);
+    return NULL;
+}
+
+/*************************************************************************/
 /* CGATT helpers */
 
 gchar *
@@ -5196,6 +5300,38 @@ mm_parse_supl_address (const gchar  *supl,
 out:
     g_strfreev (split);
     return valid;
+}
+
+/*****************************************************************************/
+
+gboolean
+mm_validate_cbs_channels (GArray *channels, GError **error)
+{
+    guint i;
+
+    for (i = 0; i < channels->len; i++) {
+        MMCellBroadcastChannels ch = g_array_index (channels, MMCellBroadcastChannels, i);
+
+        if (ch.end < ch.start) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                         "Invalid channels: End channel smaller than start channel");
+            return FALSE;
+        }
+
+        if (ch.start > CBS_MAX_CHANNEL) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                         "Invalid channels: Start channel %u too large", ch.start);
+            return FALSE;
+        }
+
+        if (ch.end > CBS_MAX_CHANNEL) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                         "Invalid channels: End channel %u too large", ch.end);
+            return FALSE;
+        }
+    }
+
+    return TRUE;
 }
 
 /*****************************************************************************/
