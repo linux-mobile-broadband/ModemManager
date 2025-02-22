@@ -1093,6 +1093,8 @@ call_audio_channel_set (gpointer user_data)
     MMBaseModem  *modem;
 
     task = G_TASK (user_data);
+    gboolean setup = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(task), "setup"));
+
     if (g_task_return_error_if_cancelled (task)) {
         g_object_unref (task);
         return G_SOURCE_REMOVE;
@@ -1108,7 +1110,6 @@ call_audio_channel_set (gpointer user_data)
     return G_SOURCE_REMOVE;
 }
 
-
 static void
 common_setup_cleanup_in_call_audio_channel (MMSharedSimtech     *self,
                                             gboolean             setup,
@@ -1123,6 +1124,7 @@ common_setup_cleanup_in_call_audio_channel (MMSharedSimtech     *self,
 
     cancellable = mm_base_modem_peek_cancellable (MM_BASE_MODEM (self));
     task = g_task_new (self, cancellable, callback, user_data);
+    g_object_set_data(G_OBJECT(task), "setup", GINT_TO_POINTER(setup));
 
     /* Do nothing if CPCMREG isn't supported */
     if (priv->cpcmreg_support != FEATURE_SUPPORTED) {
