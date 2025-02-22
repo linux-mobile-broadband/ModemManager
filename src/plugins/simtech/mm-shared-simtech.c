@@ -1091,9 +1091,10 @@ call_audio_channel_set (gpointer user_data)
 {
     GTask        *task;
     MMBaseModem  *modem;
+    gboolean     setup;
 
     task = G_TASK (user_data);
-    gboolean setup = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(task), "setup"));
+    setup = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(task), "setup"));
 
     if (g_task_return_error_if_cancelled (task)) {
         g_object_unref (task);
