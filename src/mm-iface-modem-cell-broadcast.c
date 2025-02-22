@@ -527,6 +527,7 @@ typedef enum {
     ENABLING_STEP_FIRST,
     ENABLING_STEP_SETUP_UNSOLICITED_EVENTS,
     ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS,
+    ENABLING_STEP_GET_CHANNELS,
     ENABLING_STEP_LAST
 } EnablingStep;
 
@@ -593,6 +594,31 @@ enable_unsolicited_events_ready (MMIfaceModemCellBroadcast *self,
 }
 
 static void
+load_channels_ready (MMIfaceModemCellBroadcast *self,
+                     GAsyncResult *res,
+                     GTask *task)
+{
+    EnablingContext *ctx;
+    g_autoptr (GError) error = NULL;
+    g_autoptr (GArray) channels = NULL;
+
+    ctx = g_task_get_task_data (task);
+    channels = MM_IFACE_MODEM_CELL_BROADCAST_GET_IFACE (self)->load_channels_finish (self, res, &error);
+    if (channels) {
+        mm_gdbus_modem_cell_broadcast_set_channels (
+            ctx->skeleton,
+            mm_common_cell_broadcast_channels_garray_to_variant (channels));
+    } else {
+        /* Not critical! */
+        mm_obj_warn (self, "Couldn't load current channel list: %s", error->message);
+    }
+
+    /* Go on with next step */
+    ctx->step++;
+    interface_enabling_step (task);
+}
+
+static void
 interface_enabling_step (GTask *task)
 {
     MMIfaceModemCellBroadcast *self;
@@ -648,6 +674,19 @@ interface_enabling_step (GTask *task)
             MM_IFACE_MODEM_CELL_BROADCAST_GET_IFACE (self)->enable_unsolicited_events (
                 self,
                 (GAsyncReadyCallback)enable_unsolicited_events_ready,
+                task);
+            return;
+        }
+        ctx->step++;
+        /* fall through */
+
+    case ENABLING_STEP_GET_CHANNELS:
+        /* Read current channel list */
+        if (MM_IFACE_MODEM_CELL_BROADCAST_GET_IFACE (self)->load_channels &&
+            MM_IFACE_MODEM_CELL_BROADCAST_GET_IFACE (self)->load_channels_finish) {
+            MM_IFACE_MODEM_CELL_BROADCAST_GET_IFACE (self)->load_channels (
+                self,
+                (GAsyncReadyCallback)load_channels_ready,
                 task);
             return;
         }

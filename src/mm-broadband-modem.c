@@ -10500,6 +10500,65 @@ modem_cdma_register_in_network (MMIfaceModemCdma *_self,
 }
 
 /*****************************************************************************/
+/* Load currently active channels (CellBroadcast interface) */
+
+static GArray *
+modem_cell_broadcast_load_channels_finish (MMIfaceModemCellBroadcast *self,
+                                           GAsyncResult *res,
+                                           GError **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+cscb_channels_format_check_ready (MMBroadbandModem *self,
+                                  GAsyncResult *res,
+                                  GTask *task)
+{
+    const gchar *response;
+    GError *error = NULL;
+    GArray *result;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Parse reply */
+    result = mm_3gpp_parse_cscb_response (response, &error);
+    if (!result) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    g_task_return_pointer (task,
+                           result,
+                           (GDestroyNotify)g_array_unref);
+    g_object_unref (task);
+}
+
+static void
+modem_cell_broadcast_load_channels (MMIfaceModemCellBroadcast *self,
+                                    GAsyncReadyCallback callback,
+                                    gpointer user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Load configured channels */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CSCB?",
+                              3,
+                              TRUE,
+                              (GAsyncReadyCallback)cscb_channels_format_check_ready,
+                              task);
+}
+
+/*****************************************************************************/
 
 static gboolean
 modem_cell_broadcast_setup_cleanup_unsolicited_events_finish (MMIfaceModemCellBroadcast *self,
@@ -14402,6 +14461,8 @@ iface_modem_cell_broadcast_init (MMIfaceModemCellBroadcastInterface *iface)
     iface->check_support_finish = modem_cell_broadcast_check_support_finish;
     iface->setup_unsolicited_events = modem_cell_broadcast_setup_unsolicited_events;
     iface->setup_unsolicited_events_finish = modem_cell_broadcast_setup_cleanup_unsolicited_events_finish;
+    iface->load_channels = modem_cell_broadcast_load_channels;
+    iface->load_channels_finish = modem_cell_broadcast_load_channels_finish;
     iface->cleanup_unsolicited_events = modem_cell_broadcast_cleanup_unsolicited_events;
     iface->cleanup_unsolicited_events_finish = modem_cell_broadcast_setup_cleanup_unsolicited_events_finish;
     iface->set_channels = modem_cell_broadcast_set_channels;
