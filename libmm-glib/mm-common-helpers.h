@@ -164,6 +164,13 @@ GVariant *mm_common_oma_pending_network_initiated_sessions_array_to_variant  (co
 GVariant *mm_common_oma_pending_network_initiated_sessions_garray_to_variant (GArray                                    *array);
 GVariant *mm_common_build_oma_pending_network_initiated_sessions_default     (void);
 
+/* MMModemCellbroadcastChannel array management */
+GArray   *mm_common_cell_broadcast_channels_variant_to_garray (GVariant                      *variant);
+GVariant *mm_common_cell_broadcast_channels_array_to_variant  (const MMCellBroadcastChannels *channels,
+                                                               guint                          n_sessions);
+GVariant *mm_common_cell_broadcast_channels_garray_to_variant (GArray *array);
+GVariant *mm_common_build_cell_broadcast_channels_default     (void);
+
 /******************************************************************************/
 
 const gchar *mm_common_str_boolean          (gboolean     value);
