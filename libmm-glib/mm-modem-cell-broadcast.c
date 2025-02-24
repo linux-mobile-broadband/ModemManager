@@ -55,7 +55,7 @@ struct _MMModemCellBroadcastPrivate {
  *
  * Returns: (transfer none): The DBus path of the #MMObject object.
  *
- * Since: 1.0
+ * Since: 1.24
  */
 const gchar *
 mm_modem_cell_broadcast_get_path (MMModemCellBroadcast *self)
@@ -76,7 +76,7 @@ mm_modem_cell_broadcast_get_path (MMModemCellBroadcast *self)
  * Returns: (transfer full): The DBus path of the #MMObject. The returned value
  * should be freed with g_free().
  *
- * Since: 1.0
+ * Since: 1.24
  */
 gchar *
 mm_modem_cell_broadcast_dup_path (MMModemCellBroadcast *self)
@@ -127,7 +127,7 @@ list_cbm_context_free (ListCbmContext *ctx)
  * should be freed with g_list_free_full() using g_object_unref() as
  * #GDestroyNotify function.
  *
- * Since: 1.0
+ * Since: 1.24
  */
 GList *
 mm_modem_cell_broadcast_list_finish (MMModemCellBroadcast *self,
@@ -220,7 +220,7 @@ create_next_cbm (GTask *task)
  * See mm_modem_cell_broadcast_list_sync() for the synchronous, blocking version of
  * this method.
  *
- * Since: 1.0
+ * Since: 1.24
  */
 void
 mm_modem_cell_broadcast_list (MMModemCellBroadcast *self,
@@ -267,7 +267,7 @@ mm_modem_cell_broadcast_list (MMModemCellBroadcast *self,
  * should be freed with g_list_free_full() using g_object_unref() as
  * #GDestroyNotify function.
  *
- * Since: 1.0
+ * Since: 1.24
  */
 GList *
 mm_modem_cell_broadcast_list_sync (MMModemCellBroadcast *self,
