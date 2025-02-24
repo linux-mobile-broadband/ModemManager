@@ -388,6 +388,8 @@ mm_iface_firmware_build_generic_device_ids (MMIfaceModemFirmware  *self,
     static const gchar   *supported_subsystems[] = { "USB", "PCI" };
     guint16               vid;
     guint16               pid;
+    guint16               subsystem_vid;
+    guint16               subsystem_pid;
     guint16               rid;
     MMPort               *primary = NULL;
     const gchar          *subsystem;
@@ -398,6 +400,8 @@ mm_iface_firmware_build_generic_device_ids (MMIfaceModemFirmware  *self,
 
     vid = mm_base_modem_get_vendor_id (MM_BASE_MODEM (self));
     pid = mm_base_modem_get_product_id (MM_BASE_MODEM (self));
+    subsystem_vid = mm_base_modem_get_subsystem_vendor_id (MM_BASE_MODEM (self));
+    subsystem_pid = mm_base_modem_get_subsystem_device_id (MM_BASE_MODEM (self));
 
 #if defined WITH_QMI
     if (MM_IS_BROADBAND_MODEM_QMI (self))
@@ -447,6 +451,13 @@ mm_iface_firmware_build_generic_device_ids (MMIfaceModemFirmware  *self,
         g_autofree gchar *carrier = NULL;
 
         carrier = g_ascii_strup (carrier_config, -1);
+
+        /* Expect non-zero values for PCI devices only */
+        if (subsystem_vid && subsystem_pid)
+            g_ptr_array_add (ids, g_strdup_printf ("%s\\SSVID_%04X&SSPID_%04X&REV_%04X&CARRIER_%s",
+                                                    supported_subsystems[i], subsystem_vid,
+                                                    subsystem_pid, rid, carrier));
+
         g_ptr_array_add (ids, g_strdup_printf ("%s\\VID_%04X&PID_%04X&REV_%04X&CARRIER_%s",
                                                supported_subsystems[i], vid, pid, rid, carrier));
     }
