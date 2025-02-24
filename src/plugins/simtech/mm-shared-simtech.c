@@ -1094,7 +1094,7 @@ call_audio_channel_set (gpointer user_data)
     gboolean     setup;
 
     task = G_TASK (user_data);
-    setup = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(task), "setup"));
+    setup = GPOINTER_TO_INT (g_object_get_data (G_OBJECT (task), "setup"));
 
     if (g_task_return_error_if_cancelled (task)) {
         g_object_unref (task);
@@ -1125,7 +1125,7 @@ common_setup_cleanup_in_call_audio_channel (MMSharedSimtech     *self,
 
     cancellable = mm_base_modem_peek_cancellable (MM_BASE_MODEM (self));
     task = g_task_new (self, cancellable, callback, user_data);
-    g_object_set_data(G_OBJECT(task), "setup", GINT_TO_POINTER(setup));
+    g_object_set_data (G_OBJECT (task), "setup", GINT_TO_POINTER (setup));
 
     /* Do nothing if CPCMREG isn't supported */
     if (priv->cpcmreg_support != FEATURE_SUPPORTED) {
@@ -1183,8 +1183,8 @@ cpcmfrm_set_ready (MMBaseModem  *self,
 
 static void
 cpcmfrm_format_check_and_set_ready (MMBroadbandModem *self,
-                            GAsyncResult     *res,
-                            GTask            *task)
+                                    GAsyncResult     *res,
+                                    GTask            *task)
 {
     Private *priv;
 
@@ -1220,7 +1220,7 @@ cpcmreg_format_check_ready (MMBroadbandModem *self,
     mm_obj_dbg (self, "modem %s USB audio control", (priv->cpcmreg_support == FEATURE_SUPPORTED) ? "supports" : "doesn't support");
 
     /* If USB Audio not supported, we won't check and set its formats */
-    if(priv->cpcmreg_support == FEATURE_SUPPORTED) {
+    if (priv->cpcmreg_support == FEATURE_SUPPORTED) {
         mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "+CPCMFRM=?",
                                   3,
