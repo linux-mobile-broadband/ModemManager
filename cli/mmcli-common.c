@@ -1893,7 +1893,7 @@ static GOptionEntry entries[] = {
       "Specify Call by path or index. Shows Call information if no action specified.",
       "[PATH|INDEX]"
     },
-    { "cbm", 'o', 0, G_OPTION_ARG_STRING, &cbm_str,
+    { "cbm", 'c', 0, G_OPTION_ARG_STRING, &cbm_str,
       "Specify CBM by path or index. Shows Cbm information if no action specified.",
       "[PATH|INDEX]"
     },
