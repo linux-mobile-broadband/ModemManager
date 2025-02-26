@@ -36,8 +36,10 @@ verify-dco:
     if [[ -n "${CI_MERGE_REQUEST_DIFF_BASE_SHA}" ]]; then
       export COMMITS=$(git log --no-merges --format="%H" ${CI_MERGE_REQUEST_DIFF_BASE_SHA}.. | xargs)
       for c in "${COMMITS}"; do
-        echo "Checking commit ${c} for DCO Signed-off-by"
-        git log --format="%b" -1 ${c} | grep "Signed-off-by: .* <.*@.*>"
+        $(git log --format="%b" -1 ${c} | grep -q "^Signed-off-by: .* <.*@.*>") && rc="$?" || rc="$?"
+        if [[ rc -eq 1 ]]; then
+          echo "Commit ${c} failed DCO Signed-off-by check"
+        fi
       done
     fi
 
