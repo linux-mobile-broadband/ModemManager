@@ -66,6 +66,7 @@ struct _MMIfaceModemMessagingInterface {
                                     gpointer user_data);
     gboolean (*init_current_storages_finish) (MMIfaceModemMessaging *self,
                                               GAsyncResult *res,
+                                              MMSmsStorage *current_storage,
                                               GError **error);
 
     /* Set default storage (async) */

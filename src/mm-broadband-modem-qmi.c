@@ -7617,6 +7617,104 @@ messaging_load_supported_storages (MMIfaceModemMessaging *_self,
 }
 
 /*****************************************************************************/
+/* Init current SMS storages (Messaging interface) */
+
+static gboolean
+messaging_init_current_storages_finish (MMIfaceModemMessaging *_self,
+                                        GAsyncResult          *res,
+                                        MMSmsStorage          *current_storage,
+                                        GError                **error)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    gssize result;
+
+    /* Handle AT URC only fallback */
+    if (self->priv->messaging_fallback_at_only) {
+        return iface_modem_messaging_parent->init_current_storages_finish (_self, res, current_storage, error);
+    }
+
+    result = g_task_propagate_int (G_TASK (res), error);
+    if (result < 0)
+        return FALSE;
+
+    if (current_storage)
+        *current_storage = (MMSmsStorage)result;
+    return TRUE;
+}
+
+static void
+wms_get_routes_ready (QmiClientWms *client,
+                      GAsyncResult *res,
+                      GTask *task)
+{
+    g_autoptr(QmiMessageWmsGetRoutesOutput) output = NULL;
+    GError *error = NULL;
+    GArray *route_list;
+    guint i;
+    MMSmsStorage storage = MM_SMS_STORAGE_UNKNOWN;
+    MMBroadbandModemQmi *self;
+
+    self = g_task_get_source_object (task);
+
+    output = qmi_client_wms_get_routes_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_wms_get_routes_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get SMS routes: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_wms_get_routes_output_get_route_list (output, &route_list, &error)) {
+        g_prefix_error (&error, "got invalid SMS routes: ");
+        g_task_return_error (task, error);
+    } else {
+        for (i = 0; i < route_list->len; i++) {
+            QmiMessageWmsGetRoutesOutputRouteListElement *route;
+
+            route = &g_array_index (route_list, QmiMessageWmsGetRoutesOutputRouteListElement, i);
+
+            if ((route->message_class == QMI_WMS_MESSAGE_CLASS_0 ||
+                 route->message_class == QMI_WMS_MESSAGE_CLASS_1) &&
+                 (route->receipt_action == QMI_WMS_RECEIPT_ACTION_STORE_AND_NOTIFY)) {
+                storage = mm_sms_storage_from_qmi_storage_type (route->storage);
+            }
+            mm_obj_dbg (self, "Default route defined for SMS Messaging is set to store at: %s",
+                        mm_sms_storage_get_string (storage));
+        }
+        g_task_return_int (task, storage);
+    }
+
+    g_object_unref (task);
+}
+
+static void
+messaging_init_current_storages (MMIfaceModemMessaging *_self,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    QmiClient *client = NULL;
+
+    /* Handle AT URC only fallback */
+    if (self->priv->messaging_fallback_at_only) {
+        iface_modem_messaging_parent->init_current_storages (_self, callback, user_data);
+        return;
+    }
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_WMS, &client,
+                                      callback, user_data))
+        return;
+
+    mm_obj_dbg (self, "getting default messaging routes...");
+    qmi_client_wms_get_routes (QMI_CLIENT_WMS (client),
+                               NULL,
+                               5,
+                               NULL,
+                               (GAsyncReadyCallback)wms_get_routes_ready,
+                               g_task_new (self, NULL, callback, user_data));
+}
+
+/*****************************************************************************/
 /* Setup SMS format (Messaging interface) */
 
 static gboolean
@@ -13987,6 +14085,8 @@ iface_modem_messaging_init (MMIfaceModemMessagingInterface *iface)
     iface->disable_unsolicited_events = messaging_disable_unsolicited_events;
     iface->disable_unsolicited_events_finish = messaging_disable_unsolicited_events_finish;
     iface->create_sms = messaging_create_sms;
+    iface->init_current_storages = messaging_init_current_storages;
+    iface->init_current_storages_finish = messaging_init_current_storages_finish;
 }
 
 static void

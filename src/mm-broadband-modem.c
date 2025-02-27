@@ -6981,9 +6981,18 @@ modem_messaging_load_supported_storages (MMIfaceModemMessaging *self,
 static gboolean
 modem_messaging_init_current_storages_finish (MMIfaceModemMessaging *_self,
                                               GAsyncResult *res,
+                                              MMSmsStorage *current_storage,
                                               GError **error)
 {
-    return g_task_propagate_boolean (G_TASK (res), error);
+    gssize result;
+
+    result = g_task_propagate_int (G_TASK (res), error);
+    if (result < 0)
+        return FALSE;
+
+    if (current_storage)
+        *current_storage = (MMSmsStorage)result;
+    return TRUE;
 }
 
 static void
@@ -7025,7 +7034,7 @@ cpms_query_ready (MMBroadbandModem *self,
         mm_obj_dbg (self, "  mem2 (write/send) storages:       '%s'", aux);
         g_free (aux);
 
-        g_task_return_boolean (task, TRUE);
+        g_task_return_int (task, mem2);
     }
     g_object_unref (task);
 }
