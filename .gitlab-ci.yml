@@ -5,8 +5,8 @@ include:
     - templates/ubuntu.yml
 
 stages:
-  - precheck
   - container prep
+  - precheck
   - build
 
 .common_variables:
@@ -24,22 +24,6 @@ stages:
     LIBQMI_BRANCH: 'main'
     LIBQRTR_BRANCH: 'main'
     LIBMBIM_BRANCH: 'main'
-
-verify-dco:
-  stage: precheck
-  extends:
-  - .fdo.distribution-image@ubuntu
-  - .common_variables
-  only:
-    - merge_requests
-  script: |
-    if [[ -n "${CI_MERGE_REQUEST_DIFF_BASE_SHA}" ]]; then
-      export COMMITS=$(git log --no-merges --format="%H" ${CI_MERGE_REQUEST_DIFF_BASE_SHA}.. | xargs)
-      for c in "${COMMITS}"; do
-        echo "Checking commit ${c} for DCO Signed-off-by"
-        git log --format="%b" -1 ${c} | grep "Signed-off-by: .* <.*@.*>"
-      done
-    fi
 
 build container:
   extends:
@@ -85,6 +69,24 @@ before_script:
         ninja -C build install
         popd
       fi
+
+verify-dco:
+  stage: precheck
+  extends:
+  - .fdo.distribution-image@ubuntu
+  - .common_variables
+  only:
+    - merge_requests
+  script: |
+    if [[ -n "${CI_MERGE_REQUEST_DIFF_BASE_SHA}" ]]; then
+      export COMMITS=$(git log --no-merges --format="%H" ${CI_MERGE_REQUEST_DIFF_BASE_SHA}.. | xargs)
+      for c in "${COMMITS}"; do
+        $(git log --format="%b" -1 ${c} | grep -q "^Signed-off-by: .* <.*@.*>") && rc="$?" || rc="$?"
+        if [[ rc -eq 1 ]]; then
+          echo "Commit ${c} failed DCO Signed-off-by check"
+        fi
+      done
+    fi
 
 build-no-qmi:
   stage: build
