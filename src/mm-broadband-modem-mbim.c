@@ -717,7 +717,7 @@ load_supported_capabilities_mbim (GTask *task)
 
     if (!supported)
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                 "Couldn't load supported capabilities: no previously catched current capabilities");
+                                 "Couldn't load supported capabilities: no previously cached current capabilities");
     else
         g_task_return_pointer (task, supported, (GDestroyNotify) g_array_unref);
     g_object_unref (task);
