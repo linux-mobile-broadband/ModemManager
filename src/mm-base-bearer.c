@@ -519,7 +519,7 @@ bearer_update_status (MMBaseBearer *self,
     if (self->priv->status == MM_BEARER_STATUS_DISCONNECTED) {
         g_autoptr(GString) report = NULL;
 
-        /* Report disconnection via dispatcher scripts, before reseting the interface */
+        /* Report disconnection via dispatcher scripts, before resetting the interface */
         bearer_run_dispatcher_scripts (self, FALSE);
 
         bearer_reset_interface_status (self);

@@ -3612,7 +3612,7 @@ initialization_reset_ports (GTask *task)
 
     self = g_task_get_source_object (task);
 
-    /* reseting the data interfaces is really only needed if the device
+    /* resetting the data interfaces is really only needed if the device
      * hasn't been hotplugged */
     if (mm_base_modem_get_hotplugged (MM_BASE_MODEM (self))) {
         mm_obj_dbg (self, "not running data interface reset procedure: device is hotplugged");

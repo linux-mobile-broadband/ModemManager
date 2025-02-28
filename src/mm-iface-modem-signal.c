@@ -214,7 +214,7 @@ check_interface_reset (MMIfaceModemSignal *self)
     priv = get_private (self);
 
     if (!priv->enabled || (!priv->rate && !priv->rssi_threshold && !priv->error_rate_threshold)) {
-        mm_obj_dbg (self, "reseting extended signal information...");
+        mm_obj_dbg (self, "resetting extended signal information...");
         internal_signal_update (self, NULL, NULL, NULL, NULL, NULL, NULL);
     }
 }
