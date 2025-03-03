@@ -11846,6 +11846,230 @@ modem_3gpp_load_initial_eps_bearer_settings (MMIfaceModem3gpp    *_self,
 }
 
 /*****************************************************************************/
+/* UE mode of operation for EPS loading (3GPP interface) */
+
+static MMModem3gppEpsUeModeOperation
+modem_3gpp_load_eps_ue_mode_operation_finish (MMIfaceModem3gpp  *self,
+                                              GAsyncResult      *res,
+                                              GError          **error)
+{
+    GError *inner_error = NULL;
+    gssize uemode;
+
+    uemode = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_UNKNOWN;
+    }
+
+    return (MMModem3gppEpsUeModeOperation)uemode;
+}
+
+static MMModem3gppEpsUeModeOperation
+qmi_uemode_find (QmiNasServiceDomainPreference service_domain_preference,
+                 QmiNasUsagePreference usage_preference)
+{
+    switch (service_domain_preference) {
+    case QMI_NAS_SERVICE_DOMAIN_PREFERENCE_PS_ONLY:
+        if (usage_preference == QMI_NAS_USAGE_PREFERENCE_VOICE_CENTRIC)
+            return MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_PS_1;
+        else
+            return MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_PS_2;
+    case QMI_NAS_SERVICE_DOMAIN_PREFERENCE_CS_PS:
+        if (usage_preference == QMI_NAS_USAGE_PREFERENCE_VOICE_CENTRIC)
+            return MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_CSPS_1;
+        else
+            return MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_CSPS_2;
+    case QMI_NAS_SERVICE_DOMAIN_PREFERENCE_CS_ONLY:
+    case QMI_NAS_SERVICE_DOMAIN_PREFERENCE_PS_ATTACH:
+    case QMI_NAS_SERVICE_DOMAIN_PREFERENCE_PS_DETACH:
+    default:
+        return MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_UNKNOWN;
+    }
+}
+
+static void
+get_uemode_ready (QmiClientNas *client,
+                  GAsyncResult *res,
+                  GTask *task)
+{
+    g_autoptr(QmiMessageNasGetSystemSelectionPreferenceOutput) output = NULL;
+    QmiNasServiceDomainPreference service_domain_preference = QMI_NAS_SERVICE_DOMAIN_PREFERENCE_CS_ONLY;
+    QmiNasUsagePreference usage_preference = QMI_NAS_USAGE_PREFERENCE_UNKNOWN;
+    MMBroadbandModemQmi *self;
+    GError *error = NULL;
+
+    self = g_task_get_source_object (task);
+
+    output = qmi_client_nas_get_system_selection_preference_finish (client, res, &error);
+    if (!output) {
+        mm_obj_warn (self, "couldn't get system selection preference: '%s'", error->message);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!qmi_message_nas_get_system_selection_preference_output_get_result (output, &error)) {
+        mm_obj_warn (self, "couldn't get system selection preference: '%s'", error->message);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!qmi_message_nas_get_system_selection_preference_output_get_service_domain_preference (
+        output,
+        &service_domain_preference,
+        &error)) {
+            mm_obj_warn (self, "couldn't get service domain preference: '%s'", error->message);
+            g_task_return_error (task, error);
+            g_object_unref (task);
+            return;
+    }
+
+    if (!qmi_message_nas_get_system_selection_preference_output_get_usage_preference (
+        output,
+        &usage_preference,
+        &error)) {
+            mm_obj_warn (self, "couldn't get usage domain preference: '%s'", error->message);
+            g_task_return_error (task, error);
+            g_object_unref (task);
+            return;
+    }
+
+    g_task_return_int (task, qmi_uemode_find (service_domain_preference, usage_preference));
+
+    g_object_unref (task);
+}
+
+static void
+modem_3gpp_load_eps_ue_mode_operation (MMIfaceModem3gpp    *_self,
+                                       GAsyncReadyCallback  callback,
+                                       gpointer             user_data)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    QmiClient *client = NULL;
+    GTask *task;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_NAS, &client,
+                                      callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    mm_obj_dbg (self, "loading UE mode of operation for EPS via QMI...");
+    qmi_client_nas_get_system_selection_preference (QMI_CLIENT_NAS (client),
+                                                    NULL,
+                                                    10,
+                                                    NULL,
+                                                    (GAsyncReadyCallback)get_uemode_ready,
+                                                    task);
+}
+
+/*****************************************************************************/
+/* UE mode of operation for EPS setting (3GPP interface) */
+
+static gboolean
+modem_3gpp_set_eps_ue_mode_operation_finish (MMIfaceModem3gpp  *self,
+                                             GAsyncResult      *res,
+                                             GError          **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+set_uemode_ready (QmiClientNas *client,
+                  GAsyncResult *res,
+                  GTask *task)
+{
+    g_autoptr(QmiMessageNasSetSystemSelectionPreferenceOutput) output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_nas_set_system_selection_preference_finish (client, res, &error);
+    if (!output || !qmi_message_nas_set_system_selection_preference_output_get_result (output, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+
+    g_object_unref (task);
+}
+
+static void
+qmi_uemode_build (MMModem3gppEpsUeModeOperation mode,
+                  QmiMessageNasSetSystemSelectionPreferenceInput *input)
+{
+    QmiNasServiceDomainPreference service_domain_preference;
+    QmiNasUsagePreference usage_preference;
+
+    g_return_if_fail (mode != MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_UNKNOWN);
+
+    switch (mode) {
+    case MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_PS_1:
+        service_domain_preference = QMI_NAS_SERVICE_DOMAIN_PREFERENCE_PS_ONLY;
+        usage_preference = QMI_NAS_USAGE_PREFERENCE_VOICE_CENTRIC;
+        break;
+    case MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_PS_2:
+        service_domain_preference = QMI_NAS_SERVICE_DOMAIN_PREFERENCE_PS_ONLY;
+        usage_preference = QMI_NAS_USAGE_PREFERENCE_DATA_CENTRIC;
+        break;
+    case MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_CSPS_1:
+        service_domain_preference = QMI_NAS_SERVICE_DOMAIN_PREFERENCE_CS_PS;
+        usage_preference = QMI_NAS_USAGE_PREFERENCE_VOICE_CENTRIC;
+        break;
+    case MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_CSPS_2:
+        service_domain_preference = QMI_NAS_SERVICE_DOMAIN_PREFERENCE_CS_PS;
+        usage_preference = QMI_NAS_USAGE_PREFERENCE_DATA_CENTRIC;
+        break;
+    case MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_UNKNOWN:
+    default:
+        return;
+    }
+
+    qmi_message_nas_set_system_selection_preference_input_set_usage_preference (
+        input,
+        usage_preference,
+        NULL);
+    qmi_message_nas_set_system_selection_preference_input_set_service_domain_preference (
+        input,
+        service_domain_preference,
+        NULL);
+}
+
+static void
+modem_3gpp_set_eps_ue_mode_operation (MMIfaceModem3gpp              *_self,
+                                      MMModem3gppEpsUeModeOperation  mode,
+                                      GAsyncReadyCallback            callback,
+                                      gpointer                       user_data)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    QmiMessageNasSetSystemSelectionPreferenceInput *input;
+    QmiClient *client = NULL;
+    GTask *task;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_NAS, &client,
+                                      callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    mm_obj_dbg (self, "updating UE mode of operation for EPS via QMI...");
+
+    input = qmi_message_nas_set_system_selection_preference_input_new ();
+
+    qmi_uemode_build (mode, input);
+
+    qmi_client_nas_set_system_selection_preference (
+        QMI_CLIENT_NAS (client),
+        input,
+        10,
+        NULL,
+        (GAsyncReadyCallback)set_uemode_ready,
+        task);
+
+    qmi_message_nas_set_system_selection_preference_input_unref (input);
+}
+
+/*****************************************************************************/
 /* Check firmware support (Firmware interface) */
 
 typedef struct {
@@ -13935,6 +14159,10 @@ iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
     iface->disable_facility_lock_finish = modem_3gpp_disable_facility_lock_finish;
     iface->set_packet_service_state = mm_shared_qmi_set_packet_service_state;
     iface->set_packet_service_state_finish = mm_shared_qmi_set_packet_service_state_finish;
+    iface->load_eps_ue_mode_operation = modem_3gpp_load_eps_ue_mode_operation;
+    iface->load_eps_ue_mode_operation_finish = modem_3gpp_load_eps_ue_mode_operation_finish;
+    iface->set_eps_ue_mode_operation = modem_3gpp_set_eps_ue_mode_operation;
+    iface->set_eps_ue_mode_operation_finish = modem_3gpp_set_eps_ue_mode_operation_finish;
 }
 
 static void
