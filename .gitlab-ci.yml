@@ -84,6 +84,7 @@ verify-dco:
         $(git log --format="%b" -1 ${c} | grep -q "^Signed-off-by: .* <.*@.*>") && rc="$?" || rc="$?"
         if [[ rc -eq 1 ]]; then
           echo "Commit ${c} failed DCO Signed-off-by check"
+          exit ${rc}
         fi
       done
     fi
