@@ -5317,7 +5317,7 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
 {
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+COPS=?",
-                              300,
+                              315,
                               FALSE,
                               callback,
                               user_data);
