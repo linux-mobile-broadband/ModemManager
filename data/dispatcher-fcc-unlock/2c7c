@@ -9,7 +9,10 @@
 #  EM05-G,                  2c7c:030a
 #  EM05-G (GR),             2c7c:0313
 #  EM05-G (RS),             2c7c:0314
+#  RM520N,                  2c7c:0801
 #  EM120,                   1eac:1001
+#  RM520N (HP shipped),     1eac:1004
+#  RM520N (Lenovo shipped), 1eac:1007
 #
 
 # require program name and at least 2 arguments
