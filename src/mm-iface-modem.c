@@ -2608,7 +2608,7 @@ handle_reset_auth_ready (MMBaseModem        *self,
         return;
     }
 
-    /* If reseting is not implemented, report an error */
+    /* If resetting is not implemented, report an error */
     if (!MM_IFACE_MODEM_GET_IFACE (self)->reset || !MM_IFACE_MODEM_GET_IFACE (self)->reset_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Operation not supported");
@@ -2701,7 +2701,7 @@ handle_factory_reset_auth_ready (MMBaseModem               *self,
         return;
     }
 
-    /* If reseting is not implemented, report an error */
+    /* If resetting is not implemented, report an error */
     if (!MM_IFACE_MODEM_GET_IFACE (self)->factory_reset || !MM_IFACE_MODEM_GET_IFACE (self)->factory_reset_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Operation not supported");

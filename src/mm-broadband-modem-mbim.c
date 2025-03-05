@@ -717,7 +717,7 @@ load_supported_capabilities_mbim (GTask *task)
 
     if (!supported)
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                 "Couldn't load supported capabilities: no previously catched current capabilities");
+                                 "Couldn't load supported capabilities: no previously cached current capabilities");
     else
         g_task_return_pointer (task, supported, (GDestroyNotify) g_array_unref);
     g_object_unref (task);
@@ -3612,7 +3612,7 @@ initialization_reset_ports (GTask *task)
 
     self = g_task_get_source_object (task);
 
-    /* reseting the data interfaces is really only needed if the device
+    /* resetting the data interfaces is really only needed if the device
      * hasn't been hotplugged */
     if (mm_base_modem_get_hotplugged (MM_BASE_MODEM (self))) {
         mm_obj_dbg (self, "not running data interface reset procedure: device is hotplugged");
