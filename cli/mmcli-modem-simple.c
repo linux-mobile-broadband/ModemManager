@@ -144,7 +144,7 @@ connect_process_reply (MMBearer *result,
         exit (EXIT_FAILURE);
     }
 
-    g_print ("successfully connected the modem\n");
+    g_print ("successfully connected the modem at bearer %s\n", mm_bearer_get_path (result));
     g_object_unref (result);
 }
 
