@@ -6722,6 +6722,14 @@ modem_3gpp_profile_manager_list_profiles_finish (MMIfaceModem3gppProfileManager 
 
 static void get_next_profile_settings (GTask *task);
 
+static QmiMessageWdsGetProfileListOutputProfileListProfile *
+get_current_qmi_profile_from_list (ListProfilesContext *ctx)
+{
+    return &g_array_index (ctx->qmi_profiles,
+                           QmiMessageWdsGetProfileListOutputProfileListProfile,
+                           ctx->i);
+}
+
 static void
 get_next_profile_settings_ready (MMIfaceModem3gppProfileManager *self,
                                  GAsyncResult                   *res,
@@ -6735,7 +6743,12 @@ get_next_profile_settings_ready (MMIfaceModem3gppProfileManager *self,
 
     profile = modem_3gpp_profile_manager_get_profile_finish (self, res, &error);
     if (!profile) {
-        g_prefix_error (&error, "Couldn't load settings from profile index %u: ", ctx->i);
+        QmiMessageWdsGetProfileListOutputProfileListProfile *current;
+
+        current = get_current_qmi_profile_from_list (ctx);
+        g_prefix_error (&error,
+                        "Couldn't load settings from profile index %u: ",
+                        current->profile_index);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -6765,7 +6778,7 @@ get_next_profile_settings (GTask *task)
         return;
     }
 
-    current = &g_array_index (ctx->qmi_profiles, QmiMessageWdsGetProfileListOutputProfileListProfile, ctx->i);
+    current = get_current_qmi_profile_from_list (ctx);
     modem_3gpp_profile_manager_get_profile (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self),
                                             current->profile_index,
                                             (GAsyncReadyCallback)get_next_profile_settings_ready,
