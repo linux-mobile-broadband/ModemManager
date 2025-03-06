@@ -6582,12 +6582,17 @@ wds_profile_settings_to_3gpp_profile (MMBroadbandModemQmi                    *se
     QmiWdsPdpType             pdp_type;
     QmiWdsAuthentication      auth;
     QmiWdsApnTypeMask         apn_type;
+    gboolean                  profile_disabled;
 
     profile = mm_3gpp_profile_new ();
 
     /* On 3GPP modems, the modem seems to force profile-index = pdp-context-number,
      * and so, we're just going to rely on the profile-index ourselves.*/
     mm_3gpp_profile_set_profile_id (profile, (gint) profile_index);
+    mm_3gpp_profile_set_enabled (profile, TRUE);
+
+    if (qmi_message_wds_get_profile_settings_output_get_apn_disabled_flag (output, &profile_disabled, NULL))
+        mm_3gpp_profile_set_enabled (profile, !profile_disabled);
 
     if (qmi_message_wds_get_profile_settings_output_get_apn_name (output, &str, NULL))
         mm_3gpp_profile_set_apn (profile, str);
@@ -6627,7 +6632,6 @@ get_profile_settings_ready (QmiClientWds *client,
     MMBroadbandModemQmi *self;
     GError              *error = NULL;
     gint                 profile_id;
-    gboolean             profile_disabled = FALSE;
     MM3gppProfile       *profile;
     g_autoptr(QmiMessageWdsGetProfileSettingsOutput) output = NULL;
 
@@ -6638,15 +6642,6 @@ get_profile_settings_ready (QmiClientWds *client,
     if (!output || !qmi_message_wds_get_profile_settings_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't load settings from profile index %u: ", profile_id);
         g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
-    /* just ignore the profile if it's disabled */
-    qmi_message_wds_get_profile_settings_output_get_apn_disabled_flag (output, &profile_disabled, NULL);
-    if (profile_disabled) {
-        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                 "Profile '%d' is internally disabled", profile_id);
         g_object_unref (task);
         return;
     }
@@ -6850,6 +6845,7 @@ typedef struct {
     QmiWdsApnTypeMask     qmi_apn_type;
     QmiWdsAuthentication  qmi_auth;
     QmiWdsPdpType         qmi_pdp_type;
+    gboolean              apn_disabled_flag;
 } StoreProfileContext;
 
 static void
@@ -6990,6 +6986,7 @@ store_profile_run (GTask *task)
         qmi_message_wds_create_profile_input_set_authentication (input, ctx->qmi_auth, NULL);
         qmi_message_wds_create_profile_input_set_username (input, ctx->user, NULL);
         qmi_message_wds_create_profile_input_set_password (input, ctx->password, NULL);
+        qmi_message_wds_create_profile_input_set_apn_disabled_flag (input, ctx->apn_disabled_flag, NULL);
         if (!self->priv->apn_type_not_supported)
             qmi_message_wds_create_profile_input_set_apn_type_mask (input, ctx->qmi_apn_type, NULL);
 
@@ -7010,6 +7007,7 @@ store_profile_run (GTask *task)
         qmi_message_wds_modify_profile_input_set_authentication (input, ctx->qmi_auth, NULL);
         qmi_message_wds_modify_profile_input_set_username (input, ctx->user, NULL);
         qmi_message_wds_modify_profile_input_set_password (input, ctx->password, NULL);
+        qmi_message_wds_modify_profile_input_set_apn_disabled_flag (input, ctx->apn_disabled_flag, NULL);
         if (!self->priv->apn_type_not_supported)
             qmi_message_wds_modify_profile_input_set_apn_type_mask (input, ctx->qmi_apn_type, NULL);
 
@@ -7082,6 +7080,8 @@ modem_3gpp_profile_manager_store_profile (MMIfaceModem3gppProfileManager *self,
         g_object_unref (task);
         return;
     }
+
+    ctx->apn_disabled_flag = !mm_3gpp_profile_get_enabled (profile);
 
     store_profile_run (task);
 }
