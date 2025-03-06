@@ -1677,6 +1677,12 @@ mm_3gpp_profile_list_find_best (GList                  *profile_list,
             continue;
         }
 
+        /* Never select disabled profiles */
+        if (!mm_3gpp_profile_get_enabled (iter_profile)) {
+            mm_obj_dbg (log_object, "skipping context at profile %d: disabled", iter_profile_id);
+            continue;
+        }
+
         /* Always prefer an exact match; compare all supported fields except for profile id */
         if (mm_3gpp_profile_cmp (iter_profile, requested, cmp_apn, cmp_flags)) {
             mm_obj_dbg (log_object, "found exact context at profile %d", iter_profile_id);
