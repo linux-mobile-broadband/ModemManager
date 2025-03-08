@@ -101,6 +101,7 @@ struct _MMBaseModemPrivate {
     gboolean hotplugged;
     gboolean valid;
     gboolean reprobe;
+    gboolean torn_down;
 
     guint max_timeouts;
 
@@ -2189,9 +2190,107 @@ setup_ports_table (GHashTable **ht)
     *ht = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
 }
 
+typedef struct {
+    volatile gint  refcount;
+    GError        *error;
+    /* The Context owns the GTask so that we can ensure the Task returns only
+     * when all ports are closed. The reference count tracks open ports and
+     * the context will return the Task when it reaches zero (indicating all
+     * outstanding operations are complete and ports are closed).
+     */
+    GTask         *task;
+} TeardownContext;
+
+static TeardownContext *
+teardown_context_new (GObject             *source_object,
+                      GAsyncReadyCallback  callback,
+                      gpointer             user_data)
+{
+    TeardownContext *ctx;
+
+    ctx = g_slice_new0 (TeardownContext);
+    ctx->refcount = 1;
+    ctx->task = g_task_new (source_object, NULL, callback, user_data);
+    return ctx;
+}
+
 static void
-cleanup_modem_port (MMBaseModem *self,
-                    MMPort      *port)
+teardown_context_ref (TeardownContext *ctx)
+{
+    g_atomic_int_inc (&ctx->refcount);
+}
+
+static void
+teardown_context_unref (TeardownContext *ctx)
+{
+    if (g_atomic_int_dec_and_test (&ctx->refcount)) {
+        if (ctx->error)
+            g_task_return_error (ctx->task, g_steal_pointer (&ctx->error));
+        else
+            g_task_return_boolean (ctx->task, TRUE);
+        g_clear_object (&ctx->task);
+        g_slice_free (TeardownContext, ctx);
+    }
+}
+
+#if defined (WITH_MBIM) || defined (WITH_QMI)
+
+static void
+teardown_context_add_error (TeardownContext *ctx,
+                            MMPort          *port,
+                            GError          *error)
+{
+    if (!ctx->error) {
+        ctx->error = g_error_copy (error);
+        g_prefix_error (&ctx->error,
+                        "[%s] teardown error: ",
+                        mm_port_get_device (port));
+    } else {
+        g_prefix_error (&ctx->error,
+                        "[%s] teardown error: %s; ",
+                        mm_port_get_device (port),
+                        error->message);
+    }
+}
+
+#endif
+
+#if defined WITH_MBIM
+
+static void
+mbim_port_close_ready (MMPortMbim      *port,
+                       GAsyncResult    *res,
+                       TeardownContext *ctx)
+{
+    g_autoptr(GError) error = NULL;
+
+    if (!mm_port_mbim_close_finish (port, res, &error))
+        teardown_context_add_error (ctx, MM_PORT (port), error);
+    teardown_context_unref (ctx);
+}
+
+#endif
+
+#if defined WITH_QMI
+
+static void
+qmi_port_close_ready (MMPortQmi       *port,
+                      GAsyncResult    *res,
+                      TeardownContext *ctx)
+{
+    g_autoptr(GError) error = NULL;
+
+    if (!mm_port_qmi_close_finish (port, res, &error))
+        teardown_context_add_error (ctx, MM_PORT (port), error);
+    teardown_context_unref (ctx);
+}
+
+#endif
+
+static void
+cleanup_modem_port (MMBaseModem     *self,
+                    MMPort          *port,
+                    TeardownContext *ctx)
 {
     mm_obj_dbg (self, "cleaning up port '%s/%s'...",
                 mm_port_subsys_get_string (mm_port_get_subsys (MM_PORT (port))),
@@ -2201,10 +2300,15 @@ cleanup_modem_port (MMBaseModem *self,
     g_signal_handlers_disconnect_by_func (port, port_timed_out_cb, self);
     g_signal_handlers_disconnect_by_func (port, port_removed_cb, self);
 
+    if (ctx)
+        teardown_context_ref (ctx);
+
 #if defined WITH_MBIM
     /* We need to close the MBIM port cleanly when disposing the modem object */
     if (MM_IS_PORT_MBIM (port)) {
-        mm_port_mbim_close (MM_PORT_MBIM (port), NULL, NULL);
+        mm_port_mbim_close (MM_PORT_MBIM (port),
+                            ctx ? (GAsyncReadyCallback)mbim_port_close_ready : NULL,
+                            ctx);
         return;
     }
 #endif
@@ -2215,27 +2319,61 @@ cleanup_modem_port (MMBaseModem *self,
      * allocating too many newer allocations will fail with client-ids-exhausted
      * errors. */
     if (MM_IS_PORT_QMI (port)) {
-        mm_port_qmi_close (MM_PORT_QMI (port), NULL, NULL);
+        mm_port_qmi_close (MM_PORT_QMI (port),
+                           ctx ? (GAsyncReadyCallback)qmi_port_close_ready : NULL,
+                           ctx);
         return;
     }
 #endif
+
+    if (ctx)
+        teardown_context_unref (ctx);
 }
 
 static void
-teardown_ports_table (MMBaseModem  *self,
-                      GHashTable  **ht)
+teardown_ports_tables (MMBaseModem     *self,
+                       TeardownContext *ctx)
 {
+    GHashTable **tables[2] = {
+        &self->priv->link_ports,
+        &self->priv->ports,
+    };
     GHashTableIter iter;
     gpointer       value;
     gpointer       key;
+    guint          i;
 
-    if (!*ht)
-        return;
+    for (i = 0; i < G_N_ELEMENTS (tables); i++) {
+        if (*tables[i]) {
+            g_hash_table_iter_init (&iter, *tables[i]);
+            while (g_hash_table_iter_next (&iter, &key, &value))
+                cleanup_modem_port (self, MM_PORT (value), ctx);
+            g_hash_table_destroy (*tables[i]);
+            *tables[i] = NULL;
+        }
+    }
+}
 
-    g_hash_table_iter_init (&iter, *ht);
-    while (g_hash_table_iter_next (&iter, &key, &value))
-        cleanup_modem_port (self, MM_PORT (value));
-    g_hash_table_destroy (g_steal_pointer (ht));
+gboolean
+mm_base_modem_teardown_ports_finish (MMBaseModem   *self,
+                                     GAsyncResult  *res,
+                                     GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+void
+mm_base_modem_teardown_ports (MMBaseModem         *self,
+                              GAsyncReadyCallback  callback,
+                              gpointer             user_data)
+{
+    TeardownContext *ctx;
+
+    self->priv->torn_down = TRUE;
+
+    ctx = teardown_context_new (G_OBJECT (self), callback, user_data);
+    teardown_ports_tables (self, ctx);
+    teardown_context_unref (ctx);
 }
 
 /*****************************************************************************/
@@ -2455,8 +2593,9 @@ dispose (GObject *object)
     g_list_free_full (g_steal_pointer (&self->priv->mbim), g_object_unref);
 #endif
 
-    teardown_ports_table (self, &self->priv->link_ports);
-    teardown_ports_table (self, &self->priv->ports);
+    if (!self->priv->torn_down)
+        mm_obj_warn (self, "teardown not called before dispose");
+    teardown_ports_tables (self, NULL);
 
     g_clear_object (&self->priv->connection);
 
