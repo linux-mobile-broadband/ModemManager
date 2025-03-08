@@ -59,14 +59,15 @@ quit_cb (gpointer user_data)
 #if defined WITH_SUSPEND_RESUME
 
 static void
-sleeping_cb (MMSleepMonitor *sleep_monitor)
+sleeping_cb (MMSleepMonitor *sleep_monitor,
+             MMSleepContext *ctx)
 {
     if (mm_context_get_test_low_power_suspend_resume ()) {
         mm_dbg ("removing devices and setting them in low power mode... (sleeping)");
-        mm_base_manager_shutdown (manager, TRUE, TRUE, TRUE);
+        mm_base_manager_shutdown (manager, TRUE, TRUE, TRUE, ctx);
     } else {
         mm_dbg ("removing devices... (sleeping)");
-        mm_base_manager_shutdown (manager, FALSE, FALSE, TRUE);
+        mm_base_manager_shutdown (manager, FALSE, FALSE, TRUE, ctx);
     }
 }
 
@@ -78,11 +79,16 @@ resuming_cb (MMSleepMonitor *sleep_monitor)
 }
 
 static void
-sleeping_quick_cb (MMSleepMonitor *sleep_monitor)
+sleeping_quick_cb (MMSleepMonitor *sleep_monitor,
+                   MMSleepContext *ctx)
 {
     if (mm_context_get_test_low_power_suspend_resume ()) {
         mm_dbg ("setting modem in low power mode... (sleeping)");
-        mm_base_manager_shutdown (manager, TRUE, TRUE, FALSE);
+        mm_base_manager_shutdown (manager, TRUE, TRUE, FALSE, ctx);
+    } else {
+        /* Don't need to wait for anything; just suspend */
+        mm_dbg ("leaving modem powered... (sleeping)");
+        mm_sleep_context_complete (ctx, NULL);
     }
 }
 
@@ -168,6 +174,18 @@ register_dbus_errors (void)
     g_dbus_error_register_error   (G_IO_ERROR,    G_IO_ERROR_CANCELLED,    MM_CORE_ERROR_DBUS_PREFIX ".Cancelled");
 }
 
+static void
+shutdown_done (MMSleepContext *sleep_ctx,
+               GError         *error,
+               GMainLoop      *quit_loop)
+{
+    if (error)
+        mm_warn ("shutdown failed: %s", error->message);
+    else
+        mm_msg ("shutdown complete");
+    g_main_loop_quit (quit_loop);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -241,28 +259,31 @@ main (int argc, char *argv[])
     loop = NULL;
 
     if (manager) {
-        GTimer *timer;
+        MMSleepContext *ctx;
+        guint           sleep_done_id;
 
-        mm_base_manager_shutdown (manager, TRUE, FALSE, TRUE);
+        ctx = mm_sleep_context_new (MAX_SHUTDOWN_TIME_SECS);
+        sleep_done_id = g_signal_connect (ctx,
+                                          MM_SLEEP_CONTEXT_DONE,
+                                          (GCallback)shutdown_done,
+                                          inner);
+
+        mm_base_manager_shutdown (manager, TRUE, FALSE, TRUE, ctx);
 
         /* Wait for all modems to be disabled and removed, but don't wait
          * forever: if disabling the modems takes longer than 20s, just
          * shutdown anyway. */
-        timer = g_timer_new ();
-        while (mm_base_manager_num_modems (manager) &&
-               g_timer_elapsed (timer, NULL) < (gdouble)MAX_SHUTDOWN_TIME_SECS) {
-            GMainContext *ctx = g_main_loop_get_context (inner);
+        while (mm_base_manager_num_modems (manager))
+            g_main_loop_run (inner);
 
-            g_main_context_iteration (ctx, FALSE);
-            g_usleep (50);
-        }
+        g_signal_handler_disconnect (ctx, sleep_done_id);
+        g_object_unref (ctx);
 
         if (mm_base_manager_num_modems (manager))
             mm_warn ("disabling modems took too long, shutting down with %u modems around",
                      mm_base_manager_num_modems (manager));
 
         g_object_unref (manager);
-        g_timer_destroy (timer);
     }
 
     g_main_loop_unref (inner);

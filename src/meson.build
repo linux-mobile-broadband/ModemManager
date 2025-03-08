@@ -299,6 +299,7 @@ sources = files(
   'mm-port-probe-at.c',
   'mm-private-boxed-types.c',
   'mm-sms-list.c',
+  'mm-sleep-context.c',
 )
 
 sources += daemon_enums_sources

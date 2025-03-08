@@ -367,7 +367,7 @@ device_removed (MMBaseManager *self,
 
         /* The device may have already been removed from the tracking HT, we
          * just try to remove it and if it fails, we ignore it */
-        mm_device_remove_modem (device);
+        mm_device_remove_modem_quick (device);
         g_hash_table_remove (self->priv->devices, mm_device_get_uid (device));
     }
 }
@@ -456,6 +456,19 @@ existing_port (MMBaseManager  *self,
 }
 
 static void
+additional_port_modem_remove_ready (MMDevice      *device,
+                                    GAsyncResult  *res,
+                                    MMBaseManager *self)
+{
+    g_autoptr(GError) error = NULL;
+
+    if (!mm_device_remove_modem_finish (device, res, &error))
+        mm_obj_warn (device, "removing modem failed: %s", error->message);
+    device_support_check_add_all_ports (self, device);
+    g_object_unref (self);
+}
+
+static void
 additional_port (MMBaseManager  *self,
                  MMDevice       *device,
                  MMKernelDevice *port)
@@ -501,8 +514,9 @@ additional_port (MMBaseManager  *self,
 
     mm_obj_info (self, "last modem object creation in device '%s' succeeded, but we have a new port addition, will retry", uid);
     g_cancellable_cancel (mm_base_modem_peek_cancellable (modem));
-    mm_device_remove_modem (device);
-    device_support_check_add_all_ports (self, device);
+    mm_device_remove_modem (device,
+                            (GAsyncReadyCallback)additional_port_modem_remove_ready,
+                            g_object_ref (self));
 }
 
 static void
@@ -874,54 +888,111 @@ mm_base_manager_start (MMBaseManager *self,
 /*****************************************************************************/
 
 typedef struct {
-    MMBaseManager *self;
-    gboolean       low_power;
-    gboolean       remove;
-} DisableContext;
+    MMBaseManager  *self;
 
-static void
-disable_context_free (DisableContext *ctx)
+    volatile gint   refcount;
+    gboolean        low_power;
+    gboolean        remove;
+    MMSleepContext *sleep_ctx;
+} ShutdownContext;
+
+static ShutdownContext *
+shutdown_context_new (MMBaseManager *self,
+                     gboolean        low_power,
+                     gboolean        remove,
+                     MMSleepContext *sleep_ctx)
 {
-    g_object_unref (ctx->self);
-    g_slice_free (DisableContext, ctx);
+    ShutdownContext *ctx;
+
+    ctx = g_slice_new0 (ShutdownContext);
+    ctx->refcount = 1;
+    ctx->self = g_object_ref (self);
+    ctx->low_power = low_power;
+    ctx->remove = remove;
+    ctx->sleep_ctx = g_object_ref (sleep_ctx);
+    return ctx;
 }
 
 static void
-remove_device_after_disable (MMBaseModem    *modem,
-                             DisableContext *ctx)
+shutdown_context_ref (ShutdownContext *ctx)
 {
-    MMDevice *device;
+    g_atomic_int_inc (&ctx->refcount);
+}
 
-    device = find_device_by_modem (ctx->self, modem);
-    if (device) {
-        g_cancellable_cancel (mm_base_modem_peek_cancellable (modem));
-        mm_device_remove_modem (device);
-        g_hash_table_remove (ctx->self->priv->devices, mm_device_get_uid (device));
+static void
+shutdown_context_unref (ShutdownContext *ctx)
+{
+    if (g_atomic_int_dec_and_test (&ctx->refcount)) {
+        mm_obj_dbg (ctx->self, "shutdown complete");
+        mm_sleep_context_complete (ctx->sleep_ctx, NULL);
+        g_object_unref (ctx->sleep_ctx);
+        g_object_unref (ctx->self);
+        g_slice_free (ShutdownContext, ctx);
+    }
+}
+
+static void
+modem_remove_ready (MMDevice        *device,
+                    GAsyncResult    *res,
+                    ShutdownContext *ctx)
+{
+    g_autoptr(GError) error = NULL;
+
+    if (!mm_device_remove_modem_finish (device, res, &error))
+        mm_obj_warn (ctx->self, "removing modem failed: %s", error->message);
+
+    g_hash_table_remove (ctx->self->priv->devices, mm_device_get_uid (device));
+    /* balance foreach_remove() and remove_device_after_disable() */
+    g_object_unref (device);
+
+    shutdown_context_unref (ctx);
+}
+
+static void
+shutdown_remove_device (MMDevice        *device,
+                        MMBaseModem     *modem,
+                        ShutdownContext *ctx)
+{
+    if (!device) {
+        g_assert (modem);
+        device = find_device_by_modem (ctx->self, modem);
     }
 
-    disable_context_free (ctx);
+    if (device) {
+        mm_obj_dbg (ctx->self, "removing modem device %s", mm_device_get_uid (device));
+        if (modem)
+            g_cancellable_cancel (mm_base_modem_peek_cancellable (modem));
+        mm_device_remove_modem (g_object_ref (device), /* keep alive over removal */
+                                (GAsyncReadyCallback)modem_remove_ready,
+                                ctx);
+        return;
+    }
+
+    shutdown_context_unref (ctx);
 }
 
 static void
-shutdown_low_power_ready (MMIfaceModem   *modem,
-                          GAsyncResult   *res,
-                          DisableContext *ctx)
+shutdown_low_power_ready (MMIfaceModem    *modem,
+                          GAsyncResult    *res,
+                          ShutdownContext *ctx)
 {
     g_autoptr(GError) error = NULL;
 
     if (!mm_iface_modem_set_power_state_finish (modem, res, NULL, &error))
         mm_obj_info (ctx->self, "changing to low power state failed: %s", error->message);
 
-    if (ctx->remove)
-        remove_device_after_disable (MM_BASE_MODEM (modem), ctx);
-    else
-        disable_context_free (ctx);
+    if (ctx->remove) {
+        shutdown_remove_device (NULL, MM_BASE_MODEM (modem), ctx);
+        return;
+    }
+
+    shutdown_context_unref (ctx);
 }
 
 static void
-shutdown_disable_ready (MMBaseModem    *modem,
-                        GAsyncResult   *res,
-                        DisableContext *ctx)
+shutdown_disable_ready (MMBaseModem     *modem,
+                        GAsyncResult    *res,
+                        ShutdownContext *ctx)
 {
     g_autoptr(GError) error = NULL;
 
@@ -931,6 +1002,9 @@ shutdown_disable_ready (MMBaseModem    *modem,
     }
     /* Bring the modem to low power mode if requested */
     else if (ctx->low_power) {
+        mm_obj_dbg (ctx->self,
+                    "setting modem%d to low-power state",
+                    mm_base_modem_get_dbus_id (modem));
         mm_iface_modem_set_power_state (MM_IFACE_MODEM (modem),
                                         MM_MODEM_POWER_STATE_LOW,
                                         (GAsyncReadyCallback)shutdown_low_power_ready,
@@ -938,81 +1012,87 @@ shutdown_disable_ready (MMBaseModem    *modem,
         return;
     }
 
-    if (ctx->remove)
-        remove_device_after_disable (modem, ctx);
-    else
-        disable_context_free (ctx);
+    if (ctx->remove) {
+        shutdown_remove_device (NULL, modem, ctx);
+        return;
+    }
+
+    shutdown_context_unref (ctx);
 }
 
 static void
-foreach_disable (gpointer        key,
-                 MMDevice       *device,
-                 DisableContext *foreach_ctx)
+foreach_disable (gpointer         key,
+                 MMDevice        *device,
+                 ShutdownContext *ctx)
 {
-    MMBaseModem    *modem;
-    DisableContext *ctx;
+    MMBaseModem *modem;
 
     modem = mm_device_peek_modem (device);
-    if (!modem)
-        return;
-
-    ctx = g_slice_new0 (DisableContext);
-    ctx->self = g_object_ref (foreach_ctx->self);
-    ctx->low_power = foreach_ctx->low_power;
-    ctx->remove = foreach_ctx->remove;
-
-    mm_base_modem_disable (modem,
-                           MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
-                           MM_BASE_MODEM_OPERATION_PRIORITY_OVERRIDE,
-                           (GAsyncReadyCallback)shutdown_disable_ready,
-                           ctx);
+    if (modem) {
+        mm_obj_dbg (ctx->self, "disabling modem%d", mm_base_modem_get_dbus_id (modem));
+        shutdown_context_ref (ctx);
+        mm_base_modem_disable (modem,
+                               MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
+                               MM_BASE_MODEM_OPERATION_PRIORITY_OVERRIDE,
+                               (GAsyncReadyCallback)shutdown_disable_ready,
+                               ctx);
+    }
 }
 
 static gboolean
-foreach_remove (gpointer       key,
-                MMDevice      *device,
-                MMBaseManager *self)
+foreach_remove (gpointer         key,
+                MMDevice        *device,
+                ShutdownContext *ctx)
 {
     MMBaseModem *modem;
 
     modem = mm_device_peek_modem (device);
     if (modem)
         g_cancellable_cancel (mm_base_modem_peek_cancellable (modem));
-    mm_device_remove_modem (device);
+
+    shutdown_context_ref (ctx);
+    shutdown_remove_device (device, NULL, ctx);
     return TRUE;
 }
 
 void
-mm_base_manager_shutdown (MMBaseManager *self,
-                          gboolean       disable,
-                          gboolean       low_power,
-                          gboolean       remove)
+mm_base_manager_shutdown (MMBaseManager  *self,
+                          gboolean        disable,
+                          gboolean        low_power,
+                          gboolean        remove,
+                          MMSleepContext *sleep_ctx)
 {
+    ShutdownContext *ctx;
+
     g_return_if_fail (self != NULL);
     g_return_if_fail (MM_IS_BASE_MANAGER (self));
+
+    ctx = shutdown_context_new (self, low_power, remove, sleep_ctx);
 
     /* Cancel all ongoing auth requests */
     g_cancellable_cancel (self->priv->authp_cancellable);
 
+    mm_obj_dbg (self,
+                "manager shutting down... (%s%s%s%s%s)",
+                disable ? "disable" : "",
+                disable && (low_power || remove) ? "," : "",
+                low_power ? "low-power" : "",
+                (low_power && remove) ? "," : "",
+                remove ? "remove" : "");
+
     if (disable) {
-        DisableContext foreach_ctx = {
-            .self = self,
-            .low_power = low_power,
-            .remove = remove,
-        };
-        g_hash_table_foreach (self->priv->devices, (GHFunc)foreach_disable, &foreach_ctx);
-
-        /* Disabling may take a few iterations of the mainloop, so the caller
-         * has to iterate the mainloop until all devices have been disabled and
-         * removed.
-         */
-        return;
+        mm_obj_dbg (self,
+                    "shutdown disabling %d devices",
+                    g_hash_table_size (self->priv->devices));
+        g_hash_table_foreach (self->priv->devices, (GHFunc)foreach_disable, ctx);
+    } else if (remove) {
+        mm_obj_dbg (self,
+                    "shutdown removing %d devices",
+                    g_hash_table_size (self->priv->devices));
+        g_hash_table_foreach_remove (self->priv->devices, (GHRFunc)foreach_remove, ctx);
     }
 
-    if (remove) {
-        /* Otherwise, just remove directly */
-        g_hash_table_foreach_remove (self->priv->devices, (GHRFunc)foreach_remove, self);
-    }
+    shutdown_context_unref (ctx);
 }
 
 guint32
@@ -1713,7 +1793,7 @@ handle_set_profile (MmGdbusTest *skeleton,
 out:
 
     if (error) {
-        mm_device_remove_modem (device);
+        mm_device_remove_modem_quick (device);
         g_hash_table_remove (self->priv->devices, mm_device_get_uid (device));
         mm_dbus_method_invocation_return_gerror (invocation, error);
         g_error_free (error);

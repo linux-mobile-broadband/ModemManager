@@ -459,14 +459,65 @@ clear_modem (MMDevice *self)
     }
 }
 
-void
-mm_device_remove_modem (MMDevice  *self)
+gboolean
+mm_device_remove_modem_finish (MMDevice        *self,
+                               GAsyncResult    *res,
+                               GError         **error)
 {
-    if (!self->priv->modem)
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+teardown_ports_ready (MMBaseModem  *modem,
+                      GAsyncResult *res,
+                      GTask        *task)
+{
+    MMDevice *self;
+    GError   *error = NULL;
+    gboolean  success;
+
+    self = g_task_get_source_object (task);
+
+    success = mm_base_modem_teardown_ports_finish (modem, res, &error);
+    clear_modem (self);
+
+    if (!success)
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+void
+mm_device_remove_modem (MMDevice            *self,
+                        GAsyncReadyCallback  callback,
+                        gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    if (!self->priv->modem) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
+    }
 
     unexport_modem (self);
-    clear_modem (self);
+    mm_base_modem_teardown_ports (self->priv->modem,
+                                  (GAsyncReadyCallback)teardown_ports_ready,
+                                  task);
+}
+
+/* Should only be used from testing code or when the hardware is no longer
+ * present and cannot be gracefully cleaned up.
+ */
+void
+mm_device_remove_modem_quick (MMDevice *self)
+{
+    if (self->priv->modem) {
+        unexport_modem (self);
+        clear_modem (self);
+    }
 }
 
 /*****************************************************************************/
@@ -492,15 +543,34 @@ reprobe (MMDevice *self)
 }
 
 static void
+modem_valid_remove_ready (MMDevice     *self,
+                          GAsyncResult *res,
+                          MMBaseModem  *modem)
+{
+    g_autoptr(GError) error = NULL;
+
+    if (!mm_device_remove_modem_finish (self, res, &error))
+        mm_obj_warn (self, "removing modem failed: %s", error->message);
+
+    if (mm_base_modem_get_reprobe (modem)) {
+        if (self->priv->reprobe_id)
+            g_source_remove (self->priv->reprobe_id);
+        self->priv->reprobe_id = g_timeout_add_seconds (REPROBE_SECS, (GSourceFunc)reprobe, self);
+    }
+
+    g_object_unref (modem);
+}
+
+static void
 modem_valid (MMBaseModem *modem,
              GParamSpec  *pspec,
              MMDevice    *self)
 {
     if (!mm_base_modem_get_valid (modem)) {
         /* Modem no longer valid */
-        mm_device_remove_modem (self);
-        if (mm_base_modem_get_reprobe (modem))
-            self->priv->reprobe_id = g_timeout_add_seconds (REPROBE_SECS, (GSourceFunc)reprobe, self);
+        mm_device_remove_modem (self,
+                                (GAsyncReadyCallback)modem_valid_remove_ready,
+                                g_object_ref (modem));
     } else {
         /* Modem now valid, export it, but only if we really have it around.
          * It may happen that the initialization sequence fails because the
@@ -733,6 +803,19 @@ mm_device_inhibit_finish (MMDevice      *self,
 }
 
 static void
+inhibit_disable_modem_remove_ready (MMDevice      *self,
+                                    GAsyncResult  *res,
+                                    GTask         *task)
+{
+    g_autoptr(GError) error = NULL;
+
+    if (!mm_device_remove_modem_finish (self, res, &error))
+        mm_obj_warn (self, "removing modem failed: %s", error->message);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
 inhibit_disable_ready (MMBaseModem  *modem,
                        GAsyncResult *res,
                        GTask        *task)
@@ -742,14 +825,16 @@ inhibit_disable_ready (MMBaseModem  *modem,
 
     self = g_task_get_source_object (task);
 
-    if (!mm_base_modem_disable_finish (modem, res, &error))
+    if (!mm_base_modem_disable_finish (modem, res, &error)) {
         g_task_return_error (task, error);
-    else {
-        g_cancellable_cancel (mm_base_modem_peek_cancellable (modem));
-        mm_device_remove_modem (self);
-        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
     }
-    g_object_unref (task);
+
+    g_cancellable_cancel (mm_base_modem_peek_cancellable (modem));
+    mm_device_remove_modem (self,
+                            (GAsyncReadyCallback)inhibit_disable_modem_remove_ready,
+                            task);
 }
 
 void
@@ -899,7 +984,7 @@ set_property (GObject *object,
         self->priv->plugin = g_value_dup_object (value);
         break;
     case PROP_MODEM:
-        clear_modem (self);
+        g_assert (self->priv->modem == NULL);
         self->priv->modem = g_value_dup_object (value);
         break;
     case PROP_HOTPLUGGED:
