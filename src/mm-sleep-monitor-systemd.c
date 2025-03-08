@@ -29,6 +29,7 @@
 #include "mm-log-object.h"
 #include "mm-utils.h"
 #include "mm-sleep-monitor.h"
+#include "mm-sleep-context.h"
 
 #define SD_NAME              "org.freedesktop.login1"
 #define SD_PATH              "/org/freedesktop/login1"
@@ -37,14 +38,16 @@
 struct _MMSleepMonitor {
     GObject parent_instance;
 
-    GDBusProxy *sd_proxy;
-    gint inhibit_fd;
+    GDBusProxy     *sd_proxy;
+    gint            inhibit_fd;
+    MMSleepContext *sleep_ctx;
+    guint           sleep_done_id;
 };
 
 struct _MMSleepMonitorClass {
     GObjectClass parent_class;
 
-    void (*sleeping) (MMSleepMonitor *monitor);
+    void (*sleeping) (MMSleepMonitor *monitor, MMSleepContext *ctx);
     void (*resuming) (MMSleepMonitor *monitor);
 };
 
@@ -138,6 +141,27 @@ take_inhibitor (MMSleepMonitor *self)
 }
 
 static void
+cleanup_sleep_context (MMSleepMonitor *self)
+{
+    if (self->sleep_ctx && self->sleep_done_id)
+        g_signal_handler_disconnect (self->sleep_ctx, self->sleep_done_id);
+    self->sleep_done_id = 0;
+    g_clear_object (&self->sleep_ctx);
+}
+
+static void
+sleep_context_done (MMSleepContext *sleep_ctx,
+                    GError         *error,
+                    MMSleepMonitor *self)
+{
+    if (error)
+        mm_obj_warn (self, "sleep context failed: %s", error->message);
+    mm_obj_msg (self, "ready to sleep; dropping inhibitor");
+    drop_inhibitor (self);
+    cleanup_sleep_context (self);
+}
+
+static void
 signal_cb (GDBusProxy  *proxy,
            const gchar *sendername,
            const gchar *signalname,
@@ -154,8 +178,17 @@ signal_cb (GDBusProxy  *proxy,
 
     if (is_about_to_suspend) {
         mm_obj_msg (self, "system is about to suspend");
-        g_signal_emit (self, signals[SLEEPING], 0);
-        drop_inhibitor (self);
+
+        if (self->sleep_ctx || self->sleep_done_id) {
+            mm_obj_warn (self, "clearing unfinished sleep context...");
+            cleanup_sleep_context (self);
+        }
+        self->sleep_ctx = mm_sleep_context_new (5);
+        self->sleep_done_id = g_signal_connect (self->sleep_ctx,
+                                                MM_SLEEP_CONTEXT_DONE,
+                                                (GCallback)sleep_context_done,
+                                                self);
+        g_signal_emit (self, signals[SLEEPING], 0, self->sleep_ctx);
     } else {
         mm_obj_msg (self, "system is resuming");
         take_inhibitor (self);
@@ -220,16 +253,24 @@ mm_sleep_monitor_init (MMSleepMonitor *self)
 }
 
 static void
+dispose (GObject *object)
+{
+    MMSleepMonitor *self = MM_SLEEP_MONITOR (object);
+
+    cleanup_sleep_context (self);
+    g_clear_object (&self->sd_proxy);
+
+    G_OBJECT_CLASS (mm_sleep_monitor_parent_class)->dispose (object);
+}
+
+static void
 finalize (GObject *object)
 {
     MMSleepMonitor *self = MM_SLEEP_MONITOR (object);
 
     drop_inhibitor (self);
-    if (self->sd_proxy)
-        g_object_unref (self->sd_proxy);
 
-    if (G_OBJECT_CLASS (mm_sleep_monitor_parent_class)->finalize != NULL)
-        G_OBJECT_CLASS (mm_sleep_monitor_parent_class)->finalize (object);
+    G_OBJECT_CLASS (mm_sleep_monitor_parent_class)->finalize (object);
 }
 
 static void
@@ -245,6 +286,7 @@ mm_sleep_monitor_class_init (MMSleepMonitorClass *klass)
 
     gobject_class = G_OBJECT_CLASS (klass);
 
+    gobject_class->dispose = dispose;
     gobject_class->finalize = finalize;
 
     signals[SLEEPING] = g_signal_new (MM_SLEEP_MONITOR_SLEEPING,
@@ -253,8 +295,8 @@ mm_sleep_monitor_class_init (MMSleepMonitorClass *klass)
                                       G_STRUCT_OFFSET (MMSleepMonitorClass, sleeping),
                                       NULL,                   /* accumulator      */
                                       NULL,                   /* accumulator data */
-                                      g_cclosure_marshal_VOID__VOID,
-                                      G_TYPE_NONE, 0);
+                                      g_cclosure_marshal_VOID__OBJECT,
+                                      G_TYPE_NONE, 1, MM_TYPE_SLEEP_CONTEXT);
     signals[RESUMING] = g_signal_new (MM_SLEEP_MONITOR_RESUMING,
                                       MM_TYPE_SLEEP_MONITOR,
                                       G_SIGNAL_RUN_LAST,
