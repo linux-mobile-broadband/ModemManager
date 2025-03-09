@@ -1333,6 +1333,12 @@ serial_open_at (MMPortProbe *self)
     return G_SOURCE_REMOVE;
 }
 
+#define PROBE_FLAGS_AT_MASK (MM_PORT_PROBE_AT | \
+                             MM_PORT_PROBE_AT_VENDOR | \
+                             MM_PORT_PROBE_AT_PRODUCT | \
+                             MM_PORT_PROBE_AT_ICERA | \
+                             MM_PORT_PROBE_AT_XMM)
+
 static void
 probe_step (MMPortProbe *self)
 {
@@ -1384,7 +1390,11 @@ probe_step (MMPortProbe *self)
         /* Fall through */
 
     case PROBE_STEP_AT_OPEN_PORT:
-        if ((ctx->flags & MM_PORT_PROBE_AT) && !(self->priv->flags & MM_PORT_PROBE_AT)) {
+        /* If the port has AT probes, but at least one of the AT probes hasn't
+         * completed yet, open the serial port.
+         */
+        if ((ctx->flags & PROBE_FLAGS_AT_MASK) &&
+            ((ctx->flags & PROBE_FLAGS_AT_MASK) != (self->priv->flags & PROBE_FLAGS_AT_MASK))) {
             mm_obj_msg (self, "probe step: AT open port");
             /* We might end up back here after later probe types fail, so make
              * sure we have a usable AT port.
@@ -1695,11 +1705,7 @@ mm_port_probe_run (MMPortProbe                *self,
     mm_obj_dbg (self, "launching port probing: '%s'", probe_list_str);
     g_free (probe_list_str);
 
-    if (ctx->flags & MM_PORT_PROBE_AT ||
-        ctx->flags & MM_PORT_PROBE_AT_VENDOR ||
-        ctx->flags & MM_PORT_PROBE_AT_PRODUCT ||
-        ctx->flags & MM_PORT_PROBE_AT_ICERA ||
-        ctx->flags & MM_PORT_PROBE_AT_XMM) {
+    if (ctx->flags & PROBE_FLAGS_AT_MASK) {
         ctx->at_probing_cancellable = g_cancellable_new ();
         /* If the main cancellable is cancelled, so will be the at-probing one */
         if (cancellable)
