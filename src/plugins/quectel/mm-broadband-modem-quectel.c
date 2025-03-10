@@ -274,7 +274,7 @@ common_modem_power_operation (MMBroadbandModemQuectel  *self,
 {
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               command,
-                              30,
+                              15,
                               FALSE,
                               callback,
                               user_data);
