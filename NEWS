@@ -1,3 +1,147 @@
+ModemManager 1.24.0
+-------------------------------------------
+This is a new stable release of ModemManager.
+
+The following notes are directed to package maintainers:
+
+ * This version now requires:
+   ** libmbim >= 1.32.0 (for the optional MBIM support)
+   ** libqmi >= 1.36.0 (for the optional QMI support)
+
+The most important features and changes in this release are the following:
+
+ * API:
+   ** Add new TIMEOUT, PROTOCOL, and THROTTLED core errors
+   ** Add new MMCarrierLockError errors
+   ** Add new Messaging interface SetDefaultStorage method
+   ** Fix MM_BEARER_IP_FAMILY_ANY ABI break introduced in 1.20
+   ** Add new Cell Broadcast API
+   ** Report sub-system vendor and product IDs in Firmware device IDs
+
+ * Core:
+   ** Improved handling of odd +CGDCONT responses
+   ** Add support for putting modems in low-power mode during suspend
+   ** Retry AT+CNUM a couple times if the SIM is busy
+   ** Fix probing of modems that only expect a single AT port
+   ** Reprobe modems on late port additions; ensures modems use the optimal
+      control channel regardless of kernel/udev timing
+   ** Ignore FASTBOOT ports during probing
+   ** Better logging of user requests
+   ** Fix probing of single-port devices by starting support check on first port
+      addition
+   ** Don't crash as often due to assumption that a primary modem port always
+      exists
+   ** Add support for loading and setting initial EPS bearer settings
+   ** Quite a few memory leak fixes
+   ** Lay groundwork for Intel XMM7xxx RPC-based devices
+   ** restart AT probing if a port is stuck in PPP mode when modem is detected
+   ** Serialize core modem operations to prevent multiple D-Bus clients from
+      interrupting each other's operations
+   ** Work around elogind sometimes not sending the PrepareForSleep signal
+   ** Add generic Qualcomm Firehose and Sahara firmware update support
+
+ * Translations:
+   ** Updated Brazilian Portuguese and Polish translations
+
+ * Modem interface:
+   ** Logic to detect SIM swaps has been improved
+   ** Do not set up carrier configs if the eSIM has no profiles
+   ** Add delay between consecutive power state transitions for reliability
+   ** Allow low-power state change while modem is enabled
+
+ * 3GPP interface:
+   ** Add 'NetworkRejection' property reporting errors during network
+      registration
+
+ * Location interface:
+   ** Allow enabling the interface without a SIM
+
+ * Profile Manager interface:
+   ** Throttle updates from the modem to once every two seconds
+
+ * Messaging interface:
+   ** Validate supported storages
+   ** Load default storage at initialization time
+
+ * Bearer:
+   ** Add new 'force' property to set EPS initial bearer settings
+
+ * udev:
+   ** Always ignore Qualcomm recovery layout devices (05c6:9008)
+   ** Add ID_MM_QMI_PREALLOCATED_LINKS tag for NET ports
+   ** Add ID_MM_QMI_PCO_DISABLED tag to disable PCO
+
+ * mmcli:
+   ** Higher long-running operation timeouts to avoid exiting before MM is done
+   ** Print bearer D-Bus path after connection
+
+ * libmm-glib:
+   ** 3gpp-profile: fix loading roaming allowance and profile source
+
+ * SMS:
+   ** Ensure send/store always uses the same modem port
+   ** Better re-assemble multi-part messages using both number and reference
+
+ * Dispatcher:
+   ** New 'setup' dispatcher runs after port probing but before ModemManager
+      takes control
+
+ * qrtr-bus-watcher:
+   ** Increase wait time after probing to more reliably detect modems
+
+ * MBIM:
+   ** Improvements to SIM hot-swap detection and handling
+   ** Fix re-opening MBIM ports if modem drops off the bus while being probed
+   ** Don't die if ICCID is missing from the Subscriber Ready response
+   ** Detect changes in carrier lock state
+   ** Default to IPV4V6 dual-stack when IP type is unspecified
+   ** Fix handling IP types from Provisioned Context Element V2 objects
+   ** Don't ignore 'none' type profiles
+   ** Use MBIMEx to list profiles if we can
+   ** Detect SLAAC configuration updates to handle IPv6 connectivity on modems
+      that take longer to run SLAAC themselves
+   ** Add support for MS extensions device reset
+   ** Update all attach settings (home/partner/non-partner) to the same values
+      so that roaming attach uses same settings as home
+   ** Read operator name from SIM EF files rather than from the network
+
+ * QMI:
+   ** Report specific IP version disallowed rather than just "IP version
+      mismatch" errors
+   ** Fix re-opening QMI ports if modem drops off the bus while being probed
+   ** Add support for preallocated multiplexed links
+   ** Don't prematurely finish power operations until the modem is really done
+   ** Change operator description priority to prefer long name, short name, then
+      service name. This better matches expected IoT SIM behavior.
+   ** Implement Cell Info for GSM
+   ** Reload operator description on network changes
+   ** Map DUN APN type to MM Tethering type
+   ** Fix enabling Serving System indications if the modem doesn't support
+      System Info
+   ** Implement getting/setting UE mode
+
+ * Plugins:
+   ** Allow plugins to match on PCI subsystem device ID property
+   ** quectel: added support for RM520N; support AT-based location and SIM hot-
+      swap for MBIM devices; support AT-over-MBIM; support DFOTA firmware update
+      method; support power operations for AT-based devices; add FCC unlock
+      for more devices; DTMF notification support;
+   ** mtk-legacy: renamed from 'mtk'; add support for MT6229 (eg CAT B100)
+   ** mtk: new plugin with MBIM support for t7xx devices (eg FM350, L850, etc)
+   ** fibocom: add support for firmware update settings; add support for
+      FM135 devices
+   ** cinterion: switch primary and secondary port for PLS8; use PPP on
+      secondary port; default to no authentication with no user/password;
+      fix runtime PDP context reading; increase COPS timeout; implement FDL
+      update method; implement loading current modes
+   ** mbm: keep GPS interface running over reinitialization if needed
+   ** huawei: support loading/setting of LTE bands; add support for IPv6
+   ** simtech: add support for A760x devices; fix USB audio handling
+   ** rolling: new plugin with support for Rolling Wireless (ex-Fibocom) devices
+   ** netprisma: new plugin with support for Netprisma (ex-Quectel) devices
+   ** cellient: new plugin for Cellient devices
+   ** telit: fix loop enabling events on secondary ports
+
 
 ModemManager 1.22.0
 -------------------------------------------

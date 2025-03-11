@@ -25,7 +25,7 @@ The ModemManager releases are generated using meson.
     $ ninja -C build
 
 3) Run the test suite and install locally:
-    $ ninja -C build test
+    $ ninja -C build dist
     $ sudo ninja -C build install
 
 4) Create directories for the manpages and gtk-doc documentation in
