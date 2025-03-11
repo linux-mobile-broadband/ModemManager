@@ -183,7 +183,7 @@ int main (int argc, char **argv)
     g_unix_signal_add (SIGHUP,  (GSourceFunc) signals_handler, NULL);
     g_unix_signal_add (SIGTERM, (GSourceFunc) signals_handler, NULL);
 
-    /* Setup main loop and shedule start in idle */
+    /* Setup main loop and schedule start in idle */
     loop = g_main_loop_new (NULL, FALSE);
     g_main_loop_run (loop);
 

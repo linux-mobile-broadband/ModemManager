@@ -303,7 +303,7 @@ create_socket_service (TestPortContext *self)
 
     /* And store both the service and the socket.
      * Since GLib 2.42 the socket may not be explicitly closed when the
-     * listener is diposed, so we'll do it ourselves. */
+     * listener is disposed, so we'll do it ourselves. */
     self->socket_service = service;
     self->socket = socket;
 

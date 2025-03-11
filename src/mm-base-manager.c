@@ -359,7 +359,7 @@ device_removed (MMBaseManager *self,
     mm_obj_msg (self, "port %s released by device '%s'", name, mm_device_get_uid (device));
     mm_device_release_port_name (device, subsystem, name);
 
-    /* If port probe list gets empty, remove the device object iself */
+    /* If port probe list gets empty, remove the device object itself */
     if (!mm_device_peek_port_probe_list (device)) {
         mm_obj_dbg (self, "removing empty device '%s'", mm_device_get_uid (device));
         if (mm_plugin_manager_device_support_check_cancel (self->priv->plugin_manager, device))

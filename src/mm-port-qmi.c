@@ -2369,7 +2369,7 @@ qmi_device_open_second_ready (QmiDevice    *qmi_device,
         /* Otherwise, fatal */
         ctx->error = g_steal_pointer (&error);
     } else {
-        /* If the open with CTL data format is sucessful, update all settings
+        /* If the open with CTL data format is successful, update all settings
          * that we would have received with the internal setup data format
          * process */
         self->priv->kernel_data_modes = ctx->kernel_data_modes;

@@ -597,7 +597,7 @@ mm_register_error_mapping (GQuark input_error_domain,
     input->error_code   = input_error_code;
 
     /* ensure no other error is registered with the same hash, we don't want or
-     * expect dupicates*/
+     * expect duplicates*/
     g_assert (!g_hash_table_lookup (error_mappings, input));
 
     output = g_slice_new0 (DomainCodePair);

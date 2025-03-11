@@ -5074,7 +5074,7 @@ modem_3gpp_load_eps_ue_mode_operation (MMIfaceModem3gpp    *self,
 }
 
 /*****************************************************************************/
-/* UE mode of operation for EPS settin (3GPP interface) */
+/* UE mode of operation for EPS setting (3GPP interface) */
 
 static gboolean
 modem_3gpp_set_eps_ue_mode_operation_finish (MMIfaceModem3gpp  *self,

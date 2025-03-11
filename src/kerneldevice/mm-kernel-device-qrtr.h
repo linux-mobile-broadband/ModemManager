@@ -28,7 +28,7 @@
 /* Driver string reported for all QRTR nodes; not really a kernel driver */
 #define MM_KERNEL_DEVICE_QRTR_DRIVER "qrtr"
 
-/* Subsytem string reported for all QRTR nodes; not really a kernel subsystem */
+/* Subsystem string reported for all QRTR nodes; not really a kernel subsystem */
 #define MM_KERNEL_DEVICE_QRTR_SUBSYSTEM "qrtr"
 
 /* Physical device UID string reported for all QRTR nodes; equal to the UID

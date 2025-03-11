@@ -1776,7 +1776,7 @@ static int
 check_log_config_respose (const char *buf, size_t len, uint32_t op)
 {
     DMCmdLogConfigRsp *rsp = (DMCmdLogConfigRsp *) buf;
-    size_t minlen = 16; /* minimum valid resposne */
+    size_t minlen = 16; /* minimum valid response */
     int err;
 
     /* Ensure size is at least enough for the command header */

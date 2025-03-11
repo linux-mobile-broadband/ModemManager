@@ -87,7 +87,7 @@ load_operator_name (MMIfaceModem3gpp    *self,
 }
 
 /*****************************************************************************/
-/* Load supported modes (Modem inteface) */
+/* Load supported modes (Modem interface) */
 
 static GArray *
 load_supported_modes_finish (MMIfaceModem  *self,

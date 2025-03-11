@@ -277,7 +277,7 @@ mm_create_device_identifier (guint        vid,
     if (ati)
         g_string_append (devid, ati);
     if (ati1) {
-        /* Only append "ATI1" if it's differnet than "ATI" */
+        /* Only append "ATI1" if it's different than "ATI" */
         if (!ati || (strcmp (ati, ati1) != 0))
             g_string_append (devid, ati1);
     }
@@ -1261,7 +1261,7 @@ mm_3gpp_parse_cops_test_response (const gchar     *reply,
 
     /* Cell access technology (GSM, UTRAN, etc) got added later and not all
      * modems implement it.  Some modesm have quirks that make it hard to
-     * use one regular experession for matching both pre-UMTS and UMTS
+     * use one regular expression for matching both pre-UMTS and UMTS
      * responses.  So try UMTS-format first and fall back to pre-UMTS if
      * we get no UMTS-formst matches.
      */

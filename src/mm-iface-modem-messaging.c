@@ -435,7 +435,7 @@ handle_set_default_storage_auth_ready (MMBaseModem                    *self,
         return;
     }
 
-    mm_obj_info (self, "procesing user request to set default storage '%s'...",
+    mm_obj_info (self, "processing user request to set default storage '%s'...",
                  mm_sms_storage_get_string (ctx->storage));
 
     if (!(MM_IFACE_MODEM_MESSAGING_GET_IFACE (ctx->self)->set_default_storage) ||

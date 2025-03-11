@@ -29,7 +29,7 @@
         ModemManager is a DBus system bus activated service (meaning it's started
         automatically when a request arrives). It is written in C, using glib and gio.
         Several GInterfaces specify different features that the modems support,
-        including the generic MMIfaceModem3gpp and MMIfaceModemCdma which provice basic
+        including the generic MMIfaceModem3gpp and MMIfaceModemCdma which provide basic
         operations for 3GPP (GSM, UMTS, LTE) or CDMA (CDMA1x, EV-DO) modems. If a given
         feature is not available in the modem, the specific interface will not be
         exported in DBus.
@@ -63,7 +63,7 @@
         marked with the <emphasis>ID_MM_CANDIDATE</emphasis> tag in udev.
       </para>
       <para>
-        Aditionally, users of RS232-based devices may need to request additional manual
+        Additionally, users of RS232-based devices may need to request additional manual
         scans via DBus, in order to detect modems that may have been connected to
         RS232 to USB adapters. In this case, udev just knows about the USB adapter being
         connected, not about the RS232 modem connected to the adapter, if any.

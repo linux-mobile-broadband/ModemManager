@@ -69,7 +69,7 @@ static MMFirmwareProperties *firmware_properties_new_empty (void);
  * mm_firmware_properties_get_unique_id:
  * @self: A #MMFirmwareProperties.
  *
- * Gets the unique ID of the firmare image.
+ * Gets the unique ID of the firmware image.
  *
  * Returns: (transfer none): The ID of the image. Do not free the returned
  * value, it is owned by @self.
@@ -90,7 +90,7 @@ mm_firmware_properties_get_unique_id (MMFirmwareProperties *self)
  * mm_firmware_properties_get_image_type:
  * @self: A #MMFirmwareProperties.
  *
- * Gets the type of the firmare image.
+ * Gets the type of the firmware image.
  *
  * Returns: A #MMFirmwareImageType specifying The type of the image.
  *

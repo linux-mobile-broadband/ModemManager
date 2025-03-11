@@ -89,7 +89,7 @@ parse_qcdm (GByteArray *response,
     /* Get the offset into the buffer of where the QCDM frame starts */
     if (!find_qcdm_start (response, &start)) {
         /* As a special case detect \r\nNO CARRIER\r\n which happens when a port
-         * is in PPP mode and QCDM attemps to send QCDM requests. The modem will
+         * is in PPP mode and QCDM attempts to send QCDM requests. The modem will
          * often terminate PPP when it receives the bogus frame.
          */
         if (response->len >= sizeof (no_carrier) && memcmp (response->data, no_carrier, sizeof (no_carrier)) == 0) {

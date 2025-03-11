@@ -325,7 +325,7 @@ connect_3gpp_context_step (GTask *task)
         /* Clear task */
         self->priv->connect_pending = NULL;
 
-        /* If we already sent the connetion command, send the disconnection one */
+        /* If we already sent the connection command, send the disconnection one */
         if (ctx->step > CONNECT_3GPP_CONTEXT_STEP_NDISDUP)
             mm_base_modem_at_command_full (ctx->modem,
                                            MM_IFACE_PORT_AT (ctx->primary),

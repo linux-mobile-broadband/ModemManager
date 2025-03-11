@@ -1565,7 +1565,7 @@ mm_modem_3gpp_set_nr5g_registration_settings_sync (MMModem3gpp                 *
  *
  * Finishes an operation started with mm_modem_3gpp_set_carrier_lock().
  *
- * Returns: (skip): %TRUE if the call succeded, %FALSE if @error is set.
+ * Returns: (skip): %TRUE if the call succeeded, %FALSE if @error is set.
  * Since: 1.22
  */
 gboolean

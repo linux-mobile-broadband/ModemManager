@@ -319,7 +319,7 @@ class Modem(ExportedObj):
         pass
 
     @dbus.service.method(dbus_interface=IFACE_MODEM, in_signature='u', out_signature='')
-    def SetCurrentCapabilities(self, capabilites):
+    def SetCurrentCapabilities(self, capabilities):
         pass
 
     @dbus.service.method(dbus_interface=IFACE_MODEM, in_signature='(uu)', out_signature='')

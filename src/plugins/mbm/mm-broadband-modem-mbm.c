@@ -1458,7 +1458,7 @@ setup_ports (MMBroadbandModem *_self)
         if (!(self->priv->enabled_sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
                                              MM_MODEM_LOCATION_SOURCE_GPS_RAW |
                                              MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED))) {
-            /* make sure GPS is stopped incase it was left enabled */
+            /* make sure GPS is stopped in case it was left enabled */
             mm_base_modem_at_command (MM_BASE_MODEM (self), "AT*E2GPSCTL=0", 3, FALSE, NULL, NULL);
             /* Add handler for the NMEA traces */
             mm_port_serial_gps_add_trace_handler (gps_data_port,

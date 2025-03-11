@@ -469,7 +469,7 @@ uim_get_imsi_ready (QmiClientUim *client,
                                  MM_CORE_ERROR_FAILED,
                                  "IMSI is malformed");
     else {
-        /* EFimsi contains a length byte, follwed by a nibble for parity,
+        /* EFimsi contains a length byte, followed by a nibble for parity,
          * and then followed by the actual IMSI in BCD. After converting
          * the BCD into a decimal string, we simply skip the first 3
          * decimal digits to obtain the IMSI. */

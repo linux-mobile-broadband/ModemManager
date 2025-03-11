@@ -243,7 +243,7 @@ mm_cdma_manual_activation_properties_set_mdn (MMCdmaManualActivationProperties *
  * mm_cdma_manual_activation_properties_get_min:
  * @self: A #MMCdmaManualActivationProperties.
  *
- * Gets the Mobile Indentification Number.
+ * Gets the Mobile Identification Number.
  *
  * Returns: (transfer none): The MIN. Do not free the returned value, it is
  * owned by @self.

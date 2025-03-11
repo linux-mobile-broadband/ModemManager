@@ -1072,7 +1072,7 @@ mm_shared_qmi_load_current_capabilities (MMIfaceModem        *self,
      *  "mode preference" TLV to select currently enabled capabilities.
      *  b) If the device supports NAS Technology Preference (older devices),
      *  we use this method to select currently enabled capabilities.
-     *  c) If none of those messages is supported we don't allow swiching
+     *  c) If none of those messages is supported we don't allow switching
      *  capabilities.
      */
 

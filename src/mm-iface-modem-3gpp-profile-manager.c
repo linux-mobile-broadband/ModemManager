@@ -544,7 +544,7 @@ set_profile_step_select_profile_exact (GTask *task)
         mm_obj_dbg (self, "reusing profile '%s'", ctx->index_field_value_str);
         ctx->stored = g_object_ref (existing);
     } else
-        mm_obj_dbg (self, "overwritting profile '%s'", ctx->index_field_value_str);
+        mm_obj_dbg (self, "overwriting profile '%s'", ctx->index_field_value_str);
 
     ctx->step++;
     set_profile_step (task);
