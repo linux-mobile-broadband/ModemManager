@@ -31,7 +31,7 @@
 G_DEFINE_INTERFACE (MMSharedOption, mm_shared_option, MM_TYPE_IFACE_MODEM)
 
 /*****************************************************************************/
-/* Create SIM (Modem inteface) */
+/* Create SIM (Modem interface) */
 
 MMBaseSim *
 mm_shared_option_create_sim_finish (MMIfaceModem  *self,

@@ -1875,7 +1875,7 @@ mm_base_sms_multipart_new (MMBaseModem *modem,
     if (!mm_base_sms_multipart_take_part (self, first_part, error))
         g_clear_object (&self);
 
-    /* We do export uncomplete multipart messages, in order to be able to
+    /* We do export incomplete multipart messages, in order to be able to
      *  request removal of all parts of those multipart SMS that will never
      *  get completed.
      * Only the STATE of the SMS object will be valid in the exported DBus

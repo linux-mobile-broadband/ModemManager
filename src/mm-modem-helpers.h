@@ -590,11 +590,11 @@ guint mm_sim_validate_mnc_length (const guint8  *bin,
 /*****************************************************************************/
 /* Signal quality percentage from different sources */
 
-/* Limit the value betweeen [-113,-51] and scale it to a percentage */
+/* Limit the value between [-113,-51] and scale it to a percentage */
 #define MM_RSSI_TO_QUALITY(rssi)                                   \
     (guint8)(100 - ((CLAMP (rssi, -113, -51) + 51) * 100 / (-113 + 51)))
 
-/* Limit the value betweeen [-110,-60] and scale it to a percentage */
+/* Limit the value between [-110,-60] and scale it to a percentage */
 #define MM_RSRP_TO_QUALITY(rsrp)                                   \
     (guint8)(100 - ((CLAMP (rsrp, -110, -60) + 60) * 100 / (-110 + 60)))
 

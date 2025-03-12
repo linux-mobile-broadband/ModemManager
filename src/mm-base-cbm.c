@@ -354,9 +354,9 @@ mm_base_cbm_new_with_part (MMBaseModem *modem,
     if (!mm_base_cbm_take_part (self, first_part, error))
         g_clear_object (&self);
 
-    /* We do export uncomplete multipart messages, so clients can make use of it
+    /* We do export incomplete multipart messages, so clients can make use of it
      * Only the STATE of the CBM object will be valid in the exported DBus
-     * interface intially.*/
+     * interface initially.*/
     if (self)
         mm_base_cbm_export (self);
 

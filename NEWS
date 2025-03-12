@@ -229,7 +229,7 @@ The most important features and changes in this release are the following:
 
  * New udev tags:
    ** The 'ID_MM_REQUIRED' port-specific udev tag allows users to specify that
-      the modem must be able to succesfully probe and use the given control
+      the modem must be able to successfully probe and use the given control
       port.
    ** The 'ID_MM_MAX_MULTIPLEXED_LINKS' udev tag allows user to specify the
       maximum amount of multiplexed links the modem supports. This tag may be
@@ -1429,7 +1429,7 @@ This version comes with the following new features:
    ** Implemented support for devices which only work in "raw IP" mode, like
       the Sierra MC7455.
    ** Implemented support for SIM related operations using the UIM service, as
-      newer modems with multi-SIM capabilities don't suppor the legacy DMS UIM
+      newer modems with multi-SIM capabilities don't support the legacy DMS UIM
       operations.
    ** Implemented support for detecting network-initiated disconnections.
 

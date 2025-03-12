@@ -651,7 +651,7 @@ mm_modem_messaging_delete_sync (MMModemMessaging *self,
  *
  * Finishes an operation started with mm_modem_messaging_set_default_storage().
  *
- * Returns: %TRUE if set default storage is sucess, %FALSE if @error is set.
+ * Returns: %TRUE if set default storage is success, %FALSE if @error is set.
  *
  * Since: 1.24
  */
@@ -676,7 +676,7 @@ mm_modem_messaging_set_default_storage_finish (MMModemMessaging *self,
  *  %NULL
  * @user_data: User data to pass to @callback.
  *
- * Asynchronously set deafult #MMSmsStorage in the modem.
+ * Asynchronously set default #MMSmsStorage in the modem.
  *
  * When the operation is finished, @callback will be invoked in the
  * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
@@ -711,12 +711,12 @@ mm_modem_messaging_set_default_storage (MMModemMessaging *self,
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
- * Synchronously set deafult #MMSmsStorage in the modem.
+ * Synchronously set default #MMSmsStorage in the modem.
  *
  * The calling thread is blocked until a reply is received. See
  * mm_modem_messaging_set_default_storage() for the asynchronous version of this method.
  *
- * Returns: %TRUE if set default storage is sucess, %FALSE if @error is set.
+ * Returns: %TRUE if set default storage is success, %FALSE if @error is set.
  *
  * Since: 1.24
  */

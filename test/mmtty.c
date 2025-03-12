@@ -332,7 +332,7 @@ int main (int argc, char **argv)
     signal (SIGHUP, signals_handler);
     signal (SIGTERM, signals_handler);
 
-    /* Setup main loop and shedule start in idle */
+    /* Setup main loop and schedule start in idle */
     loop = g_main_loop_new (NULL, FALSE);
     g_idle_add ((GSourceFunc)start_cb, NULL);
     g_main_loop_run (loop);

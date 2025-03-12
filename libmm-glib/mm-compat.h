@@ -46,7 +46,7 @@
  *
  * These types and methods are flagged as deprecated and therefore
  * shouldn't be used in newly written code. They are provided to avoid
- * innecessary API/ABI breaks, for compatibility purposes only.
+ * unnecessary API/ABI breaks, for compatibility purposes only.
  */
 
 /*****************************************************************************/

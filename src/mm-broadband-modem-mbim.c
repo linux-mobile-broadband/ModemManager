@@ -647,7 +647,7 @@ qmi_load_current_capabilities_ready (MMIfaceModem *self,
 
     ctx->current_qmi = mm_shared_qmi_load_current_capabilities_finish (self, res, &error);
     if (error) {
-        mm_obj_dbg (self, "couldn't load currrent capabilities using QMI over MBIM: %s", error->message);
+        mm_obj_dbg (self, "couldn't load current capabilities using QMI over MBIM: %s", error->message);
         g_clear_error (&error);
     }
 
@@ -2094,7 +2094,7 @@ radio_state_set_up_ready (MbimDevice   *device,
     }
 
     /* The SDX55 returns "Operation not allowed", but not really sure about other
-     * older devices. The original logic in the MBIM implemetation triggered a retry
+     * older devices. The original logic in the MBIM implementation triggered a retry
      * for any kind of error, so let's do the same for now. */
     mm_obj_warn (self, "%s", error->message);
     g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_RETRY, "Invalid transition");
@@ -2833,7 +2833,7 @@ base_stations_info_query_ready (MbimDevice   *device,
                 next = g_list_next (l);
 
                 data = (MMRfInfo *)(l->data);
-                /* Comparing the derived frequncy value from NRARFCN with received center frequency data to map the NR CELL */
+                /* Comparing the derived frequency value from NRARFCN with received center frequency data to map the NR CELL */
                 if (fabs (mm_nrarfcn_to_frequency (nr_serving_cells[i]->nrarfcn, self) - data->center_frequency) < FREQUENCY_TOLERANCE_HZ) {
                     mm_obj_dbg (self, "Merging radio frequency data with 5gnr serving cell info");
                     CELL_INFO_SET_UINT (data->serving_cell_type, MM_SERVING_CELL_TYPE_INVALID, nr5g_set_serving_cell_type, MM_CELL_INFO_NR5G);
@@ -7183,7 +7183,7 @@ register_state_set_ready (MbimDevice   *device,
              * not "No error", making it unsuitable as condition for registration check.
              * Still, there are certain modems (e.g. Fibocom NL668) that will
              * report Failure+NwError=0 even after the modem has already reported a
-             * succesful registration via indications after the set operation. If
+             * successful registration via indications after the set operation. If
              * that is the case, log about it and ignore the error; we are anyway
              * reloading the registration info after the set, so it should not be
              * a big issue. */
@@ -8389,7 +8389,7 @@ modem_3gpp_ussd_check_support (MMIfaceModem3gppUssd *self,
 }
 
 /*****************************************************************************/
-/* USSD encoding/deconding helpers
+/* USSD encoding/decoding helpers
  *
  * Note: we don't care about subclassing the ussd_encode/decode methods in the
  * interface, as we're going to use this methods just here.
@@ -9954,7 +9954,7 @@ set_device_slot_mappings_ready (MbimDevice   *device,
                                          "SIM slot switch to '%u' failed", slot_number);
             } else {
                 /* Keep pending_sim_slot_switch_action flag TRUE to cleanly ignore SIM related indications
-                 * during slot swithing, We don't want SIM related indications received trigger the update
+                 * during slot switching, We don't want SIM related indications received trigger the update
                  * of SimSlots property, which may not be what we want as the modem object is being shutdown */
                 self->priv->active_slot_index = slot_number + 1;
                 g_task_return_boolean (task, TRUE);

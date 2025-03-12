@@ -411,7 +411,7 @@ mm_modem_location_inject_assistance_data_finish (MMModemLocation  *self,
  *  %NULL.
  * @user_data: User data to pass to @callback.
  *
- * Aynchronously injects assistance data to the GNSS module.
+ * Asynchronously injects assistance data to the GNSS module.
  *
  * When the operation is finished, @callback will be invoked in the
  * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>

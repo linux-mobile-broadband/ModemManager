@@ -15,7 +15,7 @@ actual device (Generic AT, vendor-specific AT, QCDM, QMI, MBIM...).
 ## Getting Started
 
 ModemManager uses the meson build system. Meson is likely available as a
-package from your Linux distrubtion, but if not please refer to the [Meson
+package from your Linux distribution, but if not please refer to the [Meson
 project](https://mesonbuild.com/Quick-guide.html) for installation instructions. Once you have Meson installed you'll
 probably want to install [libmbim](https://gitlab.freedesktop.org/mobile-broadband/libmbim) and [libqmi](https://gitlab.freedesktop.org/mobile-broadband/libqmi) which most modems require.
 

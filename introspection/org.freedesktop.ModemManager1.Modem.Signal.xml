@@ -21,7 +21,7 @@
       used.
 
       There are two different ways defined to use the interface: either enabling
-      peridic polling (with the Setup() method), or configuring the device with
+      periodic polling (with the Setup() method), or configuring the device with
       thresholds so that it reports the value updates automatically (with the
       SetupThresholds() method, since 1.20).
 

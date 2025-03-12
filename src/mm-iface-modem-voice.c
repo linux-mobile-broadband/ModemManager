@@ -1091,7 +1091,7 @@ prepare_hangup_all_foreach (MMBaseCall             *call,
      *
      * The 3GPP TS27.007 spec for +CHUP states that the "Execution command causes
      * the TA to hangup the current call of the MT." This sentence leaves a bit of open
-     * interpretation to the implementors, because a current call can be considered only
+     * interpretation to the implementers, because a current call can be considered only
      * the active ones, or otherwise any call (active, held or waiting).
      *
      * And so, the u-blox TOBY-L4 takes one interpretation and "In case of multiple

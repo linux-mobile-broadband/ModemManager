@@ -39,7 +39,7 @@
  * @MM_MODEM_CAPABILITY_LTE: Modem has LTE data capability.
  * @MM_MODEM_CAPABILITY_IRIDIUM: Modem has Iridium capabilities.
  * @MM_MODEM_CAPABILITY_5GNR: Modem has 5GNR capabilities. Since 1.14.
- * @MM_MODEM_CAPABILITY_TDS: Modem has TDS capabilties. Since 1.20.
+ * @MM_MODEM_CAPABILITY_TDS: Modem has TDS capabilities. Since 1.20.
  * @MM_MODEM_CAPABILITY_ANY: Mask specifying all capabilities.
  *
  * Flags describing one or more of the general access technology families that a
@@ -1199,7 +1199,7 @@ typedef enum { /*< underscore_name=mm_modem_contacts_storage >*/
  * defined by the user of the API.
  * @MM_BEARER_TYPE_DEFAULT_ATTACH: The initial default bearer established
  * during LTE attach procedure, automatically connected as long as the device is
- * regitered in the LTE network.
+ * registered in the LTE network.
  * @MM_BEARER_TYPE_DEDICATED: Secondary context (2G/3G) or dedicated bearer
  * (4G), defined by the user of the API. These bearers use the same IP address
  * used by a primary context or default bearer and provide a dedicated flow for
@@ -1805,7 +1805,7 @@ typedef enum { /*< underscore_name=mm_modem_3gpp_packet_service_state >*/
 /**
  * MMSimType:
  * @MM_SIM_TYPE_UNKNOWN: SIM type is not known.
- * @MM_SIM_TYPE_PHYSICAL: SIM is a pysical SIM.
+ * @MM_SIM_TYPE_PHYSICAL: SIM is a physical SIM.
  * @MM_SIM_TYPE_ESIM: SIM is a ESIM.
  *
  * SIM type indicating whether ESIM or not
@@ -1840,7 +1840,7 @@ typedef enum { /*< underscore_name=mm_sim_esim_status >*/
  * @MM_SIM_REMOVABILITY_REMOVABLE: SIM is a removable SIM.
  * @MM_SIM_REMOVABILITY_NOT_REMOVABLE: SIM is not a removable SIM.
  *
- * Respresents SIM removability of the current SIM.
+ * Represents SIM removability of the current SIM.
  *
  * Since: 1.20
  */

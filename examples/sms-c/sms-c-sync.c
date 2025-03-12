@@ -127,7 +127,7 @@ int main (int argc, char **argv)
      * the events scheduled in the main context would never be fully released.
      * This is obviously not a problem in this example as it will just exit, but
      * it can serve as guideline for others integrating sync-only libmm-glib
-     * opertions in other programs. By creating an ephimeral main loop here and
+     * operations in other programs. By creating an ephimeral main loop here and
      * appending an idle task (that will be run after all the other idle tasks
      * that may have been already scheduled), we make sure all are processed and
      * removed before exiting.*/

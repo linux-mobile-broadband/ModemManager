@@ -221,7 +221,7 @@ setup_flow_control (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Load supported modes (Modem inteface) */
+/* Load supported modes (Modem interface) */
 
 static GArray *
 load_supported_modes_finish (MMIfaceModem *self,
@@ -254,7 +254,7 @@ load_supported_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Create SIM (Modem inteface) */
+/* Create SIM (Modem interface) */
 
 static MMBaseSim *
 create_sim_finish (MMIfaceModem *self,

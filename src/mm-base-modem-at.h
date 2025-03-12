@@ -164,7 +164,7 @@ MMBaseModemAtResponseProcessorResult mm_base_modem_response_processor_continue_o
                                                                                          GError       **result_error);
 
 /*
- * Response processor for commands that are partialy treated as OPTIONAL, where
+ * Response processor for commands that are partially treated as OPTIONAL, where
  * a failure in the command triggers a failure in the sequence only for non-AT
  * generic errors. If successful, it finishes the sequence with the response of
  * the command which didn't fail.
