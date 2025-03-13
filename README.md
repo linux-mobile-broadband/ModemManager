@@ -61,8 +61,9 @@ and need to add or change some public method, feel free to suggest it!
 
 ## License
 
-The ModemManager and mmcli binaries are both GPLv2+.
-The libmm-glib library is LGPLv2+.
+The ModemManager and mmcli binaries are both GPLv2+ (See COPYING).
+The libmm-glib library and the ModemManager API headers are LGPLv2+ (See
+COPYING.LIB).
 
 ## Code of Conduct
 
