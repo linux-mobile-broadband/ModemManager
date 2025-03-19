@@ -503,6 +503,7 @@ mm_device_remove_modem (MMDevice            *self,
     }
 
     unexport_modem (self);
+    g_cancellable_cancel (mm_base_modem_peek_cancellable (self->priv->modem));
     mm_base_modem_teardown_ports (self->priv->modem,
                                   (GAsyncReadyCallback)teardown_ports_ready,
                                   task);
@@ -831,7 +832,6 @@ inhibit_disable_ready (MMBaseModem  *modem,
         return;
     }
 
-    g_cancellable_cancel (mm_base_modem_peek_cancellable (modem));
     mm_device_remove_modem (self,
                             (GAsyncReadyCallback)inhibit_disable_modem_remove_ready,
                             task);
