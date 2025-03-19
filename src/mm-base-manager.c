@@ -513,7 +513,6 @@ additional_port (MMBaseManager  *self,
     }
 
     mm_obj_info (self, "last modem object creation in device '%s' succeeded, but we have a new port addition, will retry", uid);
-    g_cancellable_cancel (mm_base_modem_peek_cancellable (modem));
     mm_device_remove_modem (device,
                             (GAsyncReadyCallback)additional_port_modem_remove_ready,
                             g_object_ref (self));
@@ -960,8 +959,6 @@ shutdown_remove_device (MMDevice        *device,
 
     if (device) {
         mm_obj_dbg (ctx->self, "removing modem device %s", mm_device_get_uid (device));
-        if (modem)
-            g_cancellable_cancel (mm_base_modem_peek_cancellable (modem));
         mm_device_remove_modem (g_object_ref (device), /* keep alive over removal */
                                 (GAsyncReadyCallback)modem_remove_ready,
                                 ctx);
@@ -1044,12 +1041,6 @@ foreach_remove (gpointer         key,
                 MMDevice        *device,
                 ShutdownContext *ctx)
 {
-    MMBaseModem *modem;
-
-    modem = mm_device_peek_modem (device);
-    if (modem)
-        g_cancellable_cancel (mm_base_modem_peek_cancellable (modem));
-
     shutdown_context_ref (ctx);
     shutdown_remove_device (device, NULL, ctx);
     return TRUE;
