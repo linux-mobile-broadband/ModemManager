@@ -4545,6 +4545,8 @@ complete_sim_swap_check (GTask       *task,
     SimSwapContext   *ctx;
     const gchar      *cached;
     const gchar      *str;
+    gboolean          ignore_sim_event = FALSE;
+    gboolean          same;
 
     self = MM_BROADBAND_MODEM (g_task_get_source_object (task));
     ctx = g_task_get_task_data (task);
@@ -4557,20 +4559,30 @@ complete_sim_swap_check (GTask       *task,
         ctx->imsi_check_done = TRUE;
         cached = mm_gdbus_sim_get_imsi (MM_GDBUS_SIM (ctx->sim));
         str = "imsi";
+
+        /* If the modem is locked and we couldn't previously read the IMSI
+         * (because it was locked) then the IMSI change is probably not a swap.
+         */
+        ignore_sim_event = (self->priv->modem_state == MM_MODEM_STATE_LOCKED && !cached);
     } else
         g_assert_not_reached();
 
-    if (g_strcmp0 (current, cached) != 0) {
+    same = (g_strcmp0 (current, cached) == 0);
+    if (same) {
+        mm_obj_info (self, "SIM %s has not changed: %s",
+                     str, mm_log_str_personal_info (current));
+    } else {
         mm_obj_msg (self, "SIM %s has changed: '%s' -> '%s'",
                     str,
                     mm_log_str_personal_info (cached ? cached : ""),
                     mm_log_str_personal_info (current ? current : ""));
+    }
+
+    if (same || ignore_sim_event) {
+        ctx->step++;
+    } else {
         mm_iface_modem_process_sim_event (MM_IFACE_MODEM (self));
         ctx->step = SIM_SWAP_CHECK_STEP_LAST;
-    } else {
-        mm_obj_info (self, "SIM %s has not changed: %s",
-                     str, mm_log_str_personal_info (current));
-        ctx->step++;
     }
 
     sim_swap_check_step (task);
