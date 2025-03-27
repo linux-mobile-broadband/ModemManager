@@ -307,6 +307,22 @@
  */
 #define ID_MM_MAX_MULTIPLEXED_LINKS "ID_MM_MAX_MULTIPLEXED_LINKS"
 
+/**
+ * ID_MM_TTY_AT_PROBE_TRIES:
+ *
+ * For ports that require a longer time to become ready to respond to AT
+ * commands, this tag specifies maximum number of AT probes to try as an
+ * integer between 1 and 20 (inclusive). Each probe attempt has a three-second
+ * timeout before the next probe is tried. Values outside the allowed range
+ * will be clamped to the min/max.
+ *
+ * Plugins implementing custom initialization without opting into this tag
+ * will ignore it.
+ *
+ * Since: 1.24
+ */
+#define ID_MM_TTY_AT_PROBE_TRIES "ID_MM_TTY_AT_PROBE_TRIES"
+
 /*
  * The following symbols are deprecated. We don't add them to -compat
  * because this -tags file is not really part of the installed API.

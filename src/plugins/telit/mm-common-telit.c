@@ -277,34 +277,6 @@ out:
     g_object_unref (task);
 }
 
-static void at_ready (MMPortSerialAt *port,
-                      GAsyncResult   *res,
-                      GTask          *task);
-
-static void
-wait_for_ready (GTask *task)
-{
-    TelitCustomInitContext *ctx;
-
-    ctx = g_task_get_task_data (task);
-
-    if (ctx->port_responsive_retries == 0) {
-        telit_custom_init_step (task);
-        return;
-    }
-    ctx->port_responsive_retries--;
-
-    mm_port_serial_at_command (
-        ctx->port,
-        "AT",
-        5,
-        FALSE, /* raw */
-        FALSE, /* allow_cached */
-        g_task_get_cancellable (task),
-        (GAsyncReadyCallback)at_ready,
-        task);
-}
-
 static void
 at_ready (MMPortSerialAt *port,
           GAsyncResult   *res,
@@ -315,26 +287,17 @@ at_ready (MMPortSerialAt *port,
 
     probe = g_task_get_source_object (task);
 
-    mm_port_serial_at_command_finish (port, res, &error);
-    if (error) {
-        /* On a timeout or send error, wait */
-        if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT) ||
-            g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED)) {
-            wait_for_ready (task);
-            return;
-        }
-        /* On an unknown error, make it fatal */
-        if (!mm_serial_parser_v1_is_known_error (error)) {
+    if (!mm_port_probe_run_early_at_probe_finish (probe, res, &error)) {
+        /* Not a usable AT port or an error occurred */
+        if (error)
             mm_obj_warn (probe, "custom port initialization logic failed: %s", error->message);
-            g_task_return_boolean (task, TRUE);
-            g_object_unref (task);
-            return;
-        }
+        g_task_return_boolean (task, TRUE); /* continue with probing */
+        g_object_unref (task);
+        return;
     }
 
     /* When successful mark the port as AT and continue checking #PORTCFG */
     mm_obj_dbg (probe, "port is AT");
-    mm_port_probe_set_result_at (probe, TRUE);
     telit_custom_init_step (task);
 }
 
@@ -347,13 +310,11 @@ telit_custom_init (MMPortProbe *probe,
 {
     TelitCustomInitContext *ctx;
     GTask *task;
-    gboolean wait_needed;
 
     ctx = g_slice_new (TelitCustomInitContext);
     ctx->port = g_object_ref (port);
     ctx->getportcfg_done = FALSE;
     ctx->getportcfg_retries = 3;
-    ctx->port_responsive_retries = TELIT_PORT_CHECK_RETRIES;
     task = g_task_new (probe, cancellable, callback, user_data);
     g_task_set_check_cancellable (task, FALSE);
     g_task_set_task_data (task, ctx, (GDestroyNotify)telit_custom_init_context_free);
@@ -361,11 +322,12 @@ telit_custom_init (MMPortProbe *probe,
     /* Some Telit modems require an initial delay for the ports to be responsive
      * If no explicit tag is present, the modem does not need this step
      * and can directly look for #PORTCFG support */
-    wait_needed = mm_kernel_device_get_global_property_as_boolean (mm_port_probe_peek_port (probe),
-                                                                   "ID_MM_TELIT_PORT_DELAY");
-    if (wait_needed) {
+    if (mm_port_probe_run_early_at_probe (probe,
+                                          port,
+                                          cancellable,
+                                          (GAsyncReadyCallback) at_ready,
+                                          task)) {
         mm_obj_dbg (probe, "Start polling for port responsiveness");
-        wait_for_ready (task);
         return;
     }
 

@@ -149,26 +149,26 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="7011", ENV{.MM_USBIFNUM}=="03", SUBS
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="7011", ENV{.MM_USBIFNUM}=="04", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
 
 # LM940/960 initial port delay
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{ID_MM_TELIT_PORT_DELAY}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1041", ENV{ID_MM_TELIT_PORT_DELAY}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1042", ENV{ID_MM_TELIT_PORT_DELAY}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1043", ENV{ID_MM_TELIT_PORT_DELAY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{ID_MM_TTY_AT_PROBE_TRIES}="14"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1041", ENV{ID_MM_TTY_AT_PROBE_TRIES}="14"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1042", ENV{ID_MM_TTY_AT_PROBE_TRIES}="14"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1043", ENV{ID_MM_TTY_AT_PROBE_TRIES}="14"
 
 # FN980 initial port delay
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1050", ENV{ID_MM_TELIT_PORT_DELAY}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1051", ENV{ID_MM_TELIT_PORT_DELAY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1050", ENV{ID_MM_TTY_AT_PROBE_TRIES}="14"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1051", ENV{ID_MM_TTY_AT_PROBE_TRIES}="14"
 
 # LN920 initial port delay
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1060", ENV{ID_MM_TELIT_PORT_DELAY}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1061", ENV{ID_MM_TELIT_PORT_DELAY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1060", ENV{ID_MM_TTY_AT_PROBE_TRIES}="14"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1061", ENV{ID_MM_TTY_AT_PROBE_TRIES}="14"
 
 # FN990 initial port delay
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1070", ENV{ID_MM_TELIT_PORT_DELAY}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1071", ENV{ID_MM_TELIT_PORT_DELAY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1070", ENV{ID_MM_TTY_AT_PROBE_TRIES}="14"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1071", ENV{ID_MM_TTY_AT_PROBE_TRIES}="14"
 
 # FN912C04 initial port delay
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="3000", ENV{ID_MM_TELIT_PORT_DELAY}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="3001", ENV{ID_MM_TELIT_PORT_DELAY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="3000", ENV{ID_MM_TTY_AT_PROBE_TRIES}="14"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="3001", ENV{ID_MM_TTY_AT_PROBE_TRIES}="14"
 
 GOTO="mm_telit_end"
 
