@@ -1730,6 +1730,8 @@ typedef struct {
     gboolean run_cnti;
     gboolean run_ws46;
     gboolean run_gcap;
+    gboolean run_cereg;
+    gboolean run_c5greg;
 } LoadSupportedModesContext;
 
 static GArray *
@@ -1758,6 +1760,42 @@ modem_load_supported_modes_finish (MMIfaceModem *self,
 }
 
 static void load_supported_modes_step (GTask *task);
+
+static void
+supported_modes_c5greg_ready (MMBaseModem *_self,
+                              GAsyncResult *res,
+                              GTask *task)
+{
+    LoadSupportedModesContext *ctx;
+    g_autoptr(GError)          error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    mm_base_modem_at_command_finish (_self, res, &error);
+    if (!error)
+        ctx->mode |= MM_MODEM_MODE_5G;
+
+    ctx->run_c5greg = FALSE;
+    load_supported_modes_step (task);
+}
+
+static void
+supported_modes_cereg_ready (MMBaseModem *_self,
+                             GAsyncResult *res,
+                             GTask *task)
+{
+    LoadSupportedModesContext *ctx;
+    g_autoptr(GError)          error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    mm_base_modem_at_command_finish (_self, res, &error);
+    if (!error)
+        ctx->mode |= MM_MODEM_MODE_4G;
+
+    ctx->run_cereg = FALSE;
+    load_supported_modes_step (task);
+}
 
 static void
 supported_modes_gcap_ready (MMBaseModem *_self,
@@ -1974,6 +2012,28 @@ load_supported_modes_step (GTask *task)
         return;
     }
 
+    if (ctx->run_cereg) {
+        mm_base_modem_at_command (
+            MM_BASE_MODEM (self),
+            "+CEREG=?",
+            3,
+            TRUE, /* allow caching */
+            (GAsyncReadyCallback)supported_modes_cereg_ready,
+            task);
+        return;
+    }
+
+    if (ctx->run_c5greg) {
+        mm_base_modem_at_command (
+            MM_BASE_MODEM (self),
+            "+C5GREG=?",
+            3,
+            TRUE, /* allow caching */
+            (GAsyncReadyCallback)supported_modes_c5greg_ready,
+            task);
+        return;
+    }
+
     /* All done.
      * If no mode found, error */
     if (ctx->mode == MM_MODEM_MODE_NONE)
@@ -2003,6 +2063,8 @@ modem_load_supported_modes (MMIfaceModem *self,
         /* Run +WS46=? and *CNTI=2 */
         ctx->run_ws46 = TRUE;
         ctx->run_cnti = TRUE;
+        ctx->run_cereg = TRUE;
+        ctx->run_c5greg = TRUE;
     }
 
     if (mm_iface_modem_is_cdma (self)) {
