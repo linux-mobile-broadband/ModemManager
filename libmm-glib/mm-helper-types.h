@@ -80,4 +80,20 @@ struct _MMOmaPendingNetworkInitiatedSession {
     guint session_id;
 };
 
+/**
+ * MMCellBroadcastChannels:
+ * @start: The first channel
+ * @end: The last channel
+ *
+ * #MMCellBroadcastChannels is a simple struct specifying the start and end
+ * of a channel interval.
+ *
+ * Since: 1.24
+ */
+typedef struct _MMCellBroadcastChannels MMCellBroadcastChannels;
+struct _MMCellBroadcastChannels {
+    guint start;
+    guint end;
+};
+
 #endif /* _MM_HELPER_TYPES_H_ */

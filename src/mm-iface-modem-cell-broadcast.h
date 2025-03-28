@@ -74,8 +74,26 @@ struct _MMIfaceModemCellBroadcastInterface {
                                                     GAsyncResult *res,
                                                     GError **error);
 
+    /* Asynchronous loading of channel list */
+    GArray * (*load_channels_finish) (MMIfaceModemCellBroadcast *self,
+                                      GAsyncResult *res,
+                                      GError **error);
+
+    void (*load_channels) (MMIfaceModemCellBroadcast *self,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data);
+
     /* Create Cbm objects */
     MMBaseCbm * (* create_cbm) (MMIfaceModemCellBroadcast *self);
+
+    /* Set channel list */
+    void (* set_channels) (MMIfaceModemCellBroadcast *self,
+                           GArray *channels,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data);
+    gboolean (* set_channels_finish) (MMIfaceModemCellBroadcast *self,
+                                      GAsyncResult *res,
+                                      GError **error);
 };
 
 /* Initialize CellBroadcast interface (async) */

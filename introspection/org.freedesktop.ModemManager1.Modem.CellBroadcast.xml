@@ -87,5 +87,27 @@
     -->
     <property name="CellBroadcasts" type="ao" access="read" />
 
+    <!--
+        SetChannels:
+        @channels: The list of channels
+
+        Set the list of channels to receive Cell Broadcasts for.
+
+        Since: 1.24
+    -->
+    <method name="SetChannels">
+      <arg name="channels" type="a(uu)" direction="in" />
+    </method>
+
+    <!--
+        Channels:
+
+        The list of channels that cell broadcast messages are
+        received for.
+
+        Since: 1.24
+    -->
+    <property name="Channels" type="a(uu)" access="read" />
+
   </interface>
 </node>

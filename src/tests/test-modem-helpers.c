@@ -4278,6 +4278,100 @@ test_ccwa_response (void)
 }
 
 /*****************************************************************************/
+/* Test +CSCB channel lists */
+
+typedef struct {
+    const gchar *response;
+    const MMCellBroadcastChannels *channels;
+    guint len;
+    gboolean error;
+} TestCscb;
+
+static void
+common_test_cscb_response (const gchar *response, TestCscb *expected)
+{
+    GError   *error = NULL;
+    GArray   *result;
+
+    g_debug ("Testing '%s'", response);
+    result = mm_3gpp_parse_cscb_response (response, &error);
+
+    if (expected->error) {
+        g_assert (!result);
+        g_assert_nonnull (error);
+        g_error_free (error);
+    } else {
+        guint i;
+
+        g_assert_no_error (error);
+        g_assert (result);
+        g_assert_cmpint (result->len, ==, expected->len);
+        for (i = 0; i < expected->len; i++) {
+            MMCellBroadcastChannels ch = g_array_index (result, MMCellBroadcastChannels, i);
+
+            g_assert_cmpuint (ch.start, ==, expected->channels[i].start);
+            g_assert_cmpuint (ch.end, ==, expected->channels[i].end);
+        }
+    }
+}
+
+static const MMCellBroadcastChannels cscb_one_channel[] = {
+    { .start = 0, .end = 0 },
+};
+
+static const MMCellBroadcastChannels cscb_all_channels[] = {
+    { .start = 0, .end = 65535 },
+};
+
+static const MMCellBroadcastChannels cscb_interval_channels[] = {
+    { .start = 0, .end = 1 },
+    { .start = 100, .end = 200 },
+};
+
+static const MMCellBroadcastChannels cscb_dell5821e_channels[] = {
+    { .start = 4383, .end = 4383 },
+    { .start = 4400, .end = 4400 },
+    { .start = 4370, .end = 4370 },
+    { .start = 4371, .end = 4378 },
+    { .start = 4384, .end = 4391 },
+    { .start = 4396, .end = 4397 },
+};
+
+static TestCscb test_cscb[] = {
+    { "\r\n+CSCB: 0, \"0\",\"\"\r\n\r\nOK\r\n", /* one channel */
+      cscb_one_channel,
+      G_N_ELEMENTS (cscb_all_channels),
+      FALSE },
+    { "+CSCB: 0,\"0-65535\",\"\"\r\n", /* all channels */
+      cscb_all_channels,
+      G_N_ELEMENTS (cscb_all_channels),
+      FALSE },
+    { "+CSCB: 0,\"0-1,100-200\",\"\"\r\n",  /* intervals */
+      cscb_interval_channels,
+      G_N_ELEMENTS (cscb_interval_channels),
+      FALSE },
+    /* Dell 5821e/T77W968 defaults */
+    { "+CSCB: 0, \"4383,4400,4370,4371-4378,4384-4391,4396-4397\",\"\"",
+      cscb_dell5821e_channels,
+      G_N_ELEMENTS (cscb_dell5821e_channels),
+      FALSE },
+    { "+CSCB: 0,\"0-\",\"\"\r\n",  /* broken interval */
+      NULL,
+      0,
+      TRUE },
+};
+
+static void
+test_cscb_response (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (test_cscb); i++)
+        common_test_cscb_response (test_cscb[i].response, &test_cscb[i]);
+}
+
+
+/*****************************************************************************/
 /* Test +CLCC URCs */
 
 static void
@@ -4993,6 +5087,8 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_clip_indication, NULL));
     g_test_suite_add (suite, TESTCASE (test_ccwa_indication, NULL));
     g_test_suite_add (suite, TESTCASE (test_ccwa_response, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_cscb_response, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_clcc_response_empty, NULL));
     g_test_suite_add (suite, TESTCASE (test_clcc_response_single, NULL));

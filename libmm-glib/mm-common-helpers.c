@@ -1281,6 +1281,77 @@ mm_common_build_oma_pending_network_initiated_sessions_default (void)
 }
 
 /******************************************************************************/
+/* MMModemCellbroadcastChannel array management */
+
+GArray *
+mm_common_cell_broadcast_channels_variant_to_garray (GVariant *variant)
+{
+    GArray *array = NULL;
+
+    if (variant) {
+        GVariantIter iter;
+        guint n;
+
+        g_variant_iter_init (&iter, variant);
+        n = g_variant_iter_n_children (&iter);
+
+        if (n > 0) {
+            MMCellBroadcastChannels channels;
+
+            array = g_array_sized_new (FALSE, FALSE, sizeof (MMCellBroadcastChannels), n);
+            while (g_variant_iter_loop (&iter, "(uu)", &channels.start, &channels.end))
+                g_array_append_val (array, channels);
+        }
+    }
+
+    /* If nothing set, fallback to empty */
+    if (!array)
+        array = g_array_new (FALSE, FALSE, sizeof (MMCellBroadcastChannels));
+
+    return array;
+}
+
+GVariant *
+mm_common_cell_broadcast_channels_array_to_variant (const MMCellBroadcastChannels *channels,
+                                                    guint                          n_sessions)
+{
+    if (n_sessions > 0) {
+        GVariantBuilder builder;
+        guint i;
+
+        g_variant_builder_init (&builder, G_VARIANT_TYPE ("a(uu)"));
+
+        for (i = 0; i < n_sessions; i++)
+            g_variant_builder_add_value (&builder,
+                                         g_variant_new ("(uu)",
+                                                        ((guint32)channels[i].start),
+                                                        ((guint32)channels[i].end)));
+        return g_variant_builder_end (&builder);
+    }
+
+    return mm_common_build_cell_broadcast_channels_default ();
+}
+
+GVariant *
+mm_common_cell_broadcast_channels_garray_to_variant (GArray *array)
+{
+    if (array)
+        return mm_common_cell_broadcast_channels_array_to_variant ((const MMCellBroadcastChannels *)array->data,
+                                                                   array->len);
+
+    return mm_common_cell_broadcast_channels_array_to_variant (NULL, 0);
+}
+
+GVariant *
+mm_common_build_cell_broadcast_channels_default (void)
+{
+    GVariantBuilder builder;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("a(uu)"));
+    return g_variant_builder_end (&builder);
+}
+
+/******************************************************************************/
 /* Common parsers */
 
 /* Expecting input as:
