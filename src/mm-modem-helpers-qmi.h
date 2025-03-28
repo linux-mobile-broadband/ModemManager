@@ -217,8 +217,9 @@ typedef struct {
     MMModemCapability current_capabilities;
 } MMQmiSupportedModesContext;
 
-GArray *mm_supported_modes_from_qmi_supported_modes_context (MMQmiSupportedModesContext *ctx,
-                                                             gpointer                    log_object);
+GArray *mm_supported_modes_from_qmi_supported_modes_context (MMQmiSupportedModesContext  *ctx,
+                                                             gpointer                     log_object,
+                                                             GError                     **error);
 
 /*****************************************************************************/
 /* QMI unique id manipulation */
