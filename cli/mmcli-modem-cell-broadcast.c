@@ -49,6 +49,7 @@ static Context *ctx;
 static gboolean status_flag;
 static gboolean list_flag;
 static gchar *delete_str;
+static gchar *channels_str;
 
 static GOptionEntry entries[] = {
     { "cell-broadcast-status", 0, 0, G_OPTION_ARG_NONE, &status_flag,
@@ -62,6 +63,10 @@ static GOptionEntry entries[] = {
     { "cell-broadcast-delete-cbm", 0, 0, G_OPTION_ARG_STRING, &delete_str,
       "Delete a cell broadcast message from a given modem",
       "[PATH|INDEX]"
+    },
+    { "cell-broadcast-set-channels", 0, 0, G_OPTION_ARG_STRING, &channels_str,
+      "Set the channel list",
+      "[FIRST_CHANNEL-LAST_CHANNEL,FIRST_CHANNEL-LAST_CHANNEL...]"
     },
     { NULL }
 };
@@ -92,7 +97,8 @@ mmcli_modem_cell_broadcast_options_enabled (void)
 
     n_actions = (status_flag +
                  list_flag +
-                 !!delete_str);
+                 !!delete_str +
+                 !!channels_str);
 
     if (n_actions > 1) {
         g_printerr ("error: too many Cell Broadcast actions requested\n");
@@ -258,6 +264,50 @@ get_cbm_to_delete_ready (GDBusConnection *connection,
 }
 
 static void
+set_channels_process_reply (gboolean      result,
+                            const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't set channels: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully set channels in the modem\n");
+}
+
+static void
+set_channels_ready (MMModemCellBroadcast *cell_broadcast,
+                    GAsyncResult         *result,
+                    gpointer              nothing)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_cell_broadcast_set_channels_finish (cell_broadcast, result, &error);
+    set_channels_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
+parse_channels (MMCellBroadcastChannels **channels,
+                guint                    *n_channels)
+{
+    GError *error = NULL;
+
+    mm_common_get_cell_broadcast_channels_from_string (channels_str,
+                                                       channels,
+                                                       n_channels,
+                                                       &error);
+    if (error) {
+        g_printerr ("error: couldn't parse list of channels: '%s'\n",
+                    error->message);
+        exit (EXIT_FAILURE);
+    }
+}
+
+static void
 get_modem_ready (GObject      *source,
                  GAsyncResult *result,
                  gpointer      none)
@@ -291,6 +341,21 @@ get_modem_ready (GObject      *source,
                        ctx->cancellable,
                        (GAsyncReadyCallback)get_cbm_to_delete_ready,
                        NULL);
+        return;
+    }
+
+    if (channels_str) {
+        g_autofree MMCellBroadcastChannels *channels = NULL;
+        guint n_channels;
+
+        parse_channels (&channels, &n_channels);
+        g_debug ("Asynchronously setting channels...");
+        mm_modem_cell_broadcast_set_channels (ctx->modem_cell_broadcast,
+                                              channels,
+                                              n_channels,
+                                              ctx->cancellable,
+                                              (GAsyncReadyCallback)set_channels_ready,
+                                              NULL);
         return;
     }
 
@@ -375,6 +440,23 @@ mmcli_modem_cell_broadcast_run_synchronous (GDBusConnection *connection)
         g_object_unref (obj);
 
         delete_process_reply (result, error);
+        return;
+    }
+
+    /* Set channels */
+    if (channels_str) {
+        gboolean result;
+        g_autofree MMCellBroadcastChannels *channels = NULL;
+        guint n_channels;
+
+        parse_channels (&channels, &n_channels);
+        g_debug ("Synchronously setting channels...");
+        result = mm_modem_cell_broadcast_set_channels_sync (ctx->modem_cell_broadcast,
+                                                            channels,
+                                                            n_channels,
+                                                            NULL,
+                                                            &error);
+        set_channels_process_reply (result, error);
         return;
     }
 
