@@ -762,6 +762,28 @@ sms_storages_to_string (void)
 }
 
 static void
+cell_broadcast_channels_to_string (void)
+{
+    gchar *channels_str = NULL;
+    MMCellBroadcastChannels channels[] = {
+        { .start = 4383, .end = 4383 },
+        { .start = 4380, .end = 4382 }
+    };
+
+    channels_str = mm_common_build_channels_string (NULL, 0);
+    g_assert_cmpstr (channels_str, ==, "none");
+    g_clear_pointer (&channels_str, g_free);
+
+    channels_str = mm_common_build_channels_string (channels, 1);
+    g_assert_cmpstr (channels_str, ==, "4383");
+    g_clear_pointer (&channels_str, g_free);
+
+    channels_str = mm_common_build_channels_string (channels, 2);
+    g_assert_cmpstr (channels_str, ==, "4383,4380-4382");
+    g_clear_pointer (&channels_str, g_free);
+}
+
+static void
 capabilities_from_string (void)
 {
     MMModemCapability capability = MM_MODEM_CAPABILITY_ANY;
@@ -1275,6 +1297,68 @@ profile_source_from_string (void)
     g_assert (profile_source == MM_BEARER_PROFILE_SOURCE_MODEM);
 }
 
+static void
+cell_broadcast_channels_from_string (void)
+{
+    MMCellBroadcastChannels *channels = NULL;
+    guint n_channels = 0;
+    gboolean ret = FALSE;
+    GError *error = NULL;
+
+    ret = mm_common_get_cell_broadcast_channels_from_string ("not found", &channels, &n_channels, &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert_false (ret);
+    g_assert_cmpuint (n_channels, ==, 0);
+    g_assert_null (channels);
+    g_clear_error (&error);
+
+    ret = mm_common_get_cell_broadcast_channels_from_string ("4370", &channels, &n_channels, &error);
+    g_assert_no_error (error);
+    g_assert_true (ret);
+    g_assert_cmpuint (n_channels, ==, 1);
+    g_assert_cmpuint (channels[0].start, ==, 4370);
+    g_assert_cmpuint (channels[0].end, ==, 4370);
+    g_clear_pointer(&channels, g_free);
+
+    ret = mm_common_get_cell_broadcast_channels_from_string ("4370,4371-abc", &channels, &n_channels, &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert_false (ret);
+    g_assert_cmpuint (n_channels, ==, 0);
+    g_assert_null (channels);
+    g_clear_error (&error);
+
+    ret = mm_common_get_cell_broadcast_channels_from_string ("4370,,4371-5000", &channels, &n_channels, &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert_false (ret);
+    g_assert_cmpuint (n_channels, ==, 0);
+    g_assert_null (channels);
+    g_clear_error (&error);
+
+    ret = mm_common_get_cell_broadcast_channels_from_string ("4370,,-5000", &channels, &n_channels, &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert_false (ret);
+    g_assert_cmpuint (n_channels, ==, 0);
+    g_assert_null (channels);
+    g_clear_error (&error);
+
+    ret = mm_common_get_cell_broadcast_channels_from_string ("65537", &channels, &n_channels, &error);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_assert_false (ret);
+    g_assert_cmpuint (n_channels, ==, 0);
+    g_assert_null (channels);
+    g_clear_error (&error);
+
+    ret = mm_common_get_cell_broadcast_channels_from_string ("4370,4371-5000", &channels, &n_channels, &error);
+    g_assert_no_error (error);
+    g_assert_true (ret);
+    g_assert_cmpuint (n_channels, ==, 2);
+    g_assert_cmpuint (channels[0].start, ==, 4370);
+    g_assert_cmpuint (channels[0].end, ==, 4370);
+    g_assert_cmpuint (channels[1].start, ==, 4371);
+    g_assert_cmpuint (channels[1].end, ==, 5000);
+    g_clear_pointer(&channels, g_free);
+}
+
 /**************************************************************/
 
 int main (int argc, char **argv)
@@ -1328,6 +1412,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/Common/StrConvTo/mode-combinations", mode_combinations_to_string);
     g_test_add_func ("/MM/Common/StrConvTo/ports",             ports_to_string);
     g_test_add_func ("/MM/Common/StrConvTo/sms-storages",      sms_storages_to_string);
+    g_test_add_func ("/MM/Common/StrConvTo/cb-channels",       cell_broadcast_channels_to_string);
 
     g_test_add_func ("/MM/Common/StrConvFrom/capabilities",              capabilities_from_string);
     g_test_add_func ("/MM/Common/StrConvFrom/modes",                     modes_from_string);
@@ -1354,6 +1439,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/Common/StrConvFrom/3gpp_drx_cycle",            _3gpp_drx_cycle_from_string);
     g_test_add_func ("/MM/Common/StrConvFrom/access_type",               access_type_preference_from_string);
     g_test_add_func ("/MM/Common/StrConvFrom/profile_source",            profile_source_from_string);
+    g_test_add_func ("/MM/Common/StrConvFrom/cb_channels",               cell_broadcast_channels_from_string);
 
     return g_test_run ();
 }
