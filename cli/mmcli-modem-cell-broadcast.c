@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * Copyright (C) 2024 Guido Günther <agx@sigxcpu.org>
+ * Copyright (C) 2024-2025 Guido Günther <agx@sigxcpu.org>
  */
 
 #include "config.h"
@@ -51,6 +51,10 @@ static gboolean list_flag;
 static gchar *delete_str;
 
 static GOptionEntry entries[] = {
+    { "cell-broadcast-status", 0, 0, G_OPTION_ARG_NONE, &status_flag,
+      "Show cell broadcast status",
+      NULL
+    },
     { "cell-broadcast-list-cbm", 0, 0, G_OPTION_ARG_NONE, &list_flag,
       "List cell broadcast messages available in a given modem",
       NULL
@@ -86,7 +90,8 @@ mmcli_modem_cell_broadcast_options_enabled (void)
     if (checked)
         return !!n_actions;
 
-    n_actions = (list_flag +
+    n_actions = (status_flag +
+                 list_flag +
                  !!delete_str);
 
     if (n_actions > 1) {
@@ -153,6 +158,21 @@ output_cbm_info (MMCbm *cbm)
                            mm_cbm_get_path (cbm),
                            extra);
     g_free (extra);
+}
+
+static void
+print_cell_broadcast_status (void)
+{
+    g_autofree MMCellBroadcastChannels *channels = NULL;
+    guint channels_len = 0;
+    gchar *str = NULL;
+
+    mm_modem_cell_broadcast_get_channels (ctx->modem_cell_broadcast, &channels, &channels_len);
+    if (channels)
+        str = mm_common_build_channels_string (channels, channels_len);
+
+    mmcli_output_string_take (MMC_F_CELL_BROADCAST_CHANNELS, str);
+    mmcli_output_dump ();
 }
 
 static void
@@ -312,6 +332,13 @@ mmcli_modem_cell_broadcast_run_synchronous (GDBusConnection *connection)
         mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->modem_cell_broadcast));
 
     ensure_modem_cell_broadcast ();
+
+    /* Request to get cell broadcst status? */
+    if (status_flag) {
+        g_debug ("Printing cell broadcast status...");
+        print_cell_broadcast_status ();
+        return;
+    }
 
     /* Request to list the CBM? */
     if (list_flag) {
