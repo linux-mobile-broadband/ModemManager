@@ -43,6 +43,8 @@ G_DEFINE_TYPE (MMModemCellBroadcast, mm_modem_cell_broadcast, MM_GDBUS_TYPE_MODE
 struct _MMModemCellBroadcastPrivate {
     /* Common mutex to sync access */
     GMutex mutex;
+
+    PROPERTY_ARRAY_DECLARE (channels)
 };
 
 /*****************************************************************************/
@@ -90,6 +92,11 @@ mm_modem_cell_broadcast_dup_path (MMModemCellBroadcast *self)
                   NULL);
     RETURN_NON_EMPTY_STRING (value);
 }
+
+PROPERTY_ARRAY_DEFINE (channels,
+                       ModemCellBroadcast, modem_cell_broadcast, MODEM_CELL_BROADCAST,
+                       MMCellBroadcastChannels,
+                       mm_common_cell_broadcast_channels_variant_to_garray)
 
 /*****************************************************************************/
 
@@ -411,6 +418,8 @@ mm_modem_cell_broadcast_init (MMModemCellBroadcast *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_MODEM_CELL_BROADCAST, MMModemCellBroadcastPrivate);
     g_mutex_init (&self->priv->mutex);
+
+    PROPERTY_INITIALIZE (channels, "channels")
 }
 
 static void
@@ -419,6 +428,8 @@ finalize (GObject *object)
     MMModemCellBroadcast *self = MM_MODEM_CELL_BROADCAST (object);
 
     g_mutex_clear (&self->priv->mutex);
+
+    PROPERTY_ARRAY_FINALIZE (channels)
 
     G_OBJECT_CLASS (mm_modem_cell_broadcast_parent_class)->finalize (object);
 }

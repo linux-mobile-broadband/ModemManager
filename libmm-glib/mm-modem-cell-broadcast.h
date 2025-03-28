@@ -68,6 +68,13 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMModemCellBroadcast, g_object_unref)
 const gchar *mm_modem_cell_broadcast_get_path (MMModemCellBroadcast *self);
 gchar       *mm_modem_cell_broadcast_dup_path (MMModemCellBroadcast *self);
 
+gboolean     mm_modem_cell_broadcast_get_channels  (MMModemCellBroadcast *self,
+                                                    MMCellBroadcastChannels **channels,
+                                                    guint *n_storages);
+gboolean     mm_modem_cell_broadcast_peek_channels (MMModemCellBroadcast *self,
+                                                    const MMCellBroadcastChannels **channels,
+                                                    guint *n_storages);
+
 void   mm_modem_cell_broadcast_list        (MMModemCellBroadcast *self,
                                             GCancellable *cancellable,
                                             GAsyncReadyCallback callback,
