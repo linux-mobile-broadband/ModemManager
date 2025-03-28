@@ -1012,7 +1012,7 @@ call_direction_from_string (void)
 
     call_direction = mm_common_get_call_direction_from_string ("incoming", &error);
     g_assert_no_error (error);
-    g_assert (call_direction == MM_CALL_DIRECTION_INCOMING); 
+    g_assert (call_direction == MM_CALL_DIRECTION_INCOMING);
 }
 
 static void
@@ -1256,7 +1256,7 @@ access_type_preference_from_string (void)
 
     access_type_preference = mm_common_get_access_type_preference_from_string ("3gpp-preferred", &error);
     g_assert_no_error (error);
-    g_assert (access_type_preference == MM_BEARER_ACCESS_TYPE_PREFERENCE_3GPP_PREFERRED);   
+    g_assert (access_type_preference == MM_BEARER_ACCESS_TYPE_PREFERENCE_3GPP_PREFERRED);
 }
 
 static void
