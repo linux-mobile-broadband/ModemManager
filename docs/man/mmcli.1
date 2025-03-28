@@ -740,6 +740,24 @@ Use \fBSECONDS\fR for the timeout when performing operations with this
 command. This option is useful when executing long running operations, like
 \fB\-\-3gpp\-scan\fR.
 
+.SH CELL BROADCAST OPTIONS
+
+All cell broadcast options must be used with \fB\-\-modem\fR or \fB\-m\fR.
+
+.TP
+.B \-\-cell\-broadcast\-status
+Show the status of the cell broadcast support.
+.TP
+.B \-\-cell\-broadcast\-list\-cbm
+List cell broadcast messages available on a given modem.
+.TP
+.B \-\-cell\-broadcast\-delete\-cbm=[PATH|INDEX]
+Delete cell broadcast message at the given path or index
+.TP
+.B \-\-cell\-broadcast\-set\-channels=[CHANNELS]
+Set the list of channels on which cell broadcasts are received (e.g. \fB5370,5371-5372\fR)
+.RS 9
+
 .SH EXAMPLES
 .SS Send the PIN to the SIM card
 
@@ -986,6 +1004,16 @@ XTRA assistance data is usually valid for several days.
 
     $ sudo mmcli -m 0 --location-enable-gps-raw
     successfully setup location gathering
+.Ed
+
+.SS Setting the Cell Broadcast channel list
+
+The channel list can be set as a comma separated list of channels or channel intervals:
+
+.Bd -literal -compact
+    $ sudo mmcli -m 0 \\
+                 --cell-broadcast-set-channels=5370,5371,5373-5000
+    successfully set channels in the modem
 .Ed
 
 .SS Key-Value output
