@@ -99,6 +99,23 @@ gboolean mm_modem_cell_broadcast_delete_sync   (MMModemCellBroadcast *self,
                                                 GCancellable *cancellable,
                                                 GError **error);
 
+gboolean mm_modem_cell_broadcast_set_channels_finish (MMModemCellBroadcast *self,
+                                                      GAsyncResult *res,
+                                                      GError **error);
+
+void     mm_modem_cell_broadcast_set_channels (MMModemCellBroadcast *self,
+                                               const MMCellBroadcastChannels *channels,
+                                               guint n_channels,
+                                               GCancellable *cancellable,
+                                               GAsyncReadyCallback callback,
+                                               gpointer user_data);
+
+gboolean mm_modem_cell_broadcast_set_channels_sync (MMModemCellBroadcast *self,
+                                                    const MMCellBroadcastChannels *channels,
+                                                    guint n_channels,
+                                                    GCancellable *cancellable,
+                                                    GError **error);
+
 G_END_DECLS
 
 #endif /* _MM_MODEM_CELL_BROADCAST_H_ */
