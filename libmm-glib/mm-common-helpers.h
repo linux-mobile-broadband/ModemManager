@@ -46,6 +46,8 @@ gchar *mm_common_build_sms_storages_string      (const MMSmsStorage           *s
                                                  guint                         n_storages);
 gchar *mm_common_build_mode_combinations_string (const MMModemModeCombination *modes,
                                                  guint                         n_modes);
+gchar *mm_common_build_channels_string          (const MMCellBroadcastChannels *channels,
+                                                 guint                          n_channels);
 
 /******************************************************************************/
 /* String to enums/flags parsers */
@@ -101,6 +103,10 @@ MMModem3gppDrxCycle           mm_common_get_3gpp_drx_cycle_from_string          
 MMBearerAccessTypePreference  mm_common_get_access_type_preference_from_string    (const gchar  *str,
                                                                                    GError      **error);
 MMBearerProfileSource         mm_common_get_profile_source_from_string            (const gchar  *str,
+                                                                                   GError      **error);
+gboolean                      mm_common_get_cell_broadcast_channels_from_string   (const gchar  *str,
+                                                                                   MMCellBroadcastChannels **channels,
+                                                                                   guint        *n_channels,
                                                                                    GError      **error);
 
 /******************************************************************************/
