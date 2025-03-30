@@ -130,7 +130,7 @@ struct _MMBroadbandModemMbimPrivate {
     /* Queried and cached capabilities */
     MbimCellularClass caps_cellular_class;
     MbimDataClass caps_data_class;
-    gchar *caps_custom_data_class;
+    MbimDataClass caps_custom_data_class;
     MbimSmsCaps caps_sms;
     guint caps_max_sessions;
     gchar *caps_device_id;
@@ -518,6 +518,8 @@ device_caps_query_ready (MbimDevice   *device,
     MMBroadbandModemMbim           *self;
     GError                         *error = NULL;
     LoadCurrentCapabilitiesContext *ctx;
+    MbimDataClass                   caps_data_class = MBIM_DATA_CLASS_NONE;
+    g_autofree gchar               *caps_custom_data_class_str;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
@@ -550,7 +552,7 @@ device_caps_query_ready (MbimDevice   *device,
                 NULL, /* lte_band_class_array */
                 NULL, /* nr_band_class_array_size */
                 NULL, /* nr_band_class_array */
-                &self->priv->caps_custom_data_class,
+                &caps_custom_data_class_str,
                 &self->priv->caps_device_id,
                 &self->priv->caps_firmware_info,
                 &self->priv->caps_hardware_info,
@@ -560,7 +562,7 @@ device_caps_query_ready (MbimDevice   *device,
             return;
         }
         /* Translate data class v3 to standard data class to simplify further usage of the field */
-        self->priv->caps_data_class = mm_mbim_data_class_from_mbim_data_class_v3_and_subclass (data_class_v3, data_subclass);
+        caps_data_class = mm_mbim_data_class_from_mbim_data_class_v3_and_subclass (data_class_v3, data_subclass);
     } else if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
         if (!mbim_message_ms_basic_connect_extensions_device_caps_response_parse (
                 response,
@@ -568,11 +570,11 @@ device_caps_query_ready (MbimDevice   *device,
                 &self->priv->caps_cellular_class,
                 NULL, /* voice_class */
                 NULL, /* sim_class */
-                &self->priv->caps_data_class,
+                &caps_data_class,
                 &self->priv->caps_sms,
                 NULL, /* ctrl_caps */
                 &self->priv->caps_max_sessions,
-                &self->priv->caps_custom_data_class,
+                &caps_custom_data_class_str,
                 &self->priv->caps_device_id,
                 &self->priv->caps_firmware_info,
                 &self->priv->caps_hardware_info,
@@ -589,11 +591,11 @@ device_caps_query_ready (MbimDevice   *device,
                 &self->priv->caps_cellular_class,
                 NULL, /* voice_class */
                 NULL, /* sim_class */
-                &self->priv->caps_data_class,
+                &caps_data_class,
                 &self->priv->caps_sms,
                 NULL, /* ctrl_caps */
                 &self->priv->caps_max_sessions,
-                &self->priv->caps_custom_data_class,
+                &caps_custom_data_class_str,
                 &self->priv->caps_device_id,
                 &self->priv->caps_firmware_info,
                 &self->priv->caps_hardware_info,
@@ -604,9 +606,14 @@ device_caps_query_ready (MbimDevice   *device,
         }
     }
 
+    /* Normalize data class capabilities to include any custom data class */
+    self->priv->caps_custom_data_class = mm_mbim_data_class_from_custom_caps (caps_data_class,
+                                                                              caps_custom_data_class_str);
+    self->priv->caps_data_class = mm_modem_mbim_normalize_data_class_mask (caps_data_class,
+                                                                           self->priv->caps_custom_data_class);
+
     ctx->current_mbim = mm_modem_capability_from_mbim_device_caps (self->priv->caps_cellular_class,
-                                                                   self->priv->caps_data_class,
-                                                                   self->priv->caps_custom_data_class);
+                                                                   self->priv->caps_data_class);
     complete_current_capabilities (task);
 }
 
@@ -708,8 +715,7 @@ load_supported_capabilities_mbim (GTask *task)
 
     /* Current capabilities should have been cached already, just assume them */
     current = mm_modem_capability_from_mbim_device_caps (self->priv->caps_cellular_class,
-                                                         self->priv->caps_data_class,
-                                                         self->priv->caps_custom_data_class);
+                                                         self->priv->caps_data_class);
     if (current != 0) {
         supported = g_array_sized_new (FALSE, FALSE, sizeof (MMModemCapability), 1);
         g_array_append_val (supported, current);
@@ -1067,7 +1073,7 @@ load_supported_modes_mbim (GTask      *task,
     }
 
     /* Build all */
-    mask_all = mm_modem_mode_from_mbim_data_class (self->priv->caps_data_class, self->priv->caps_custom_data_class);
+    mask_all = mm_modem_mode_from_mbim_data_class (self->priv->caps_data_class);
     mode.allowed = mask_all;
     mode.preferred = MM_MODEM_MODE_NONE;
     all = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
@@ -1188,10 +1194,13 @@ register_state_current_modes_query_ready (MbimDevice   *device,
                                           GAsyncResult *res,
                                           GTask        *task)
 {
+    MMBroadbandModemMbim   *self;
     g_autoptr(MbimMessage)  response = NULL;
     MMModemModeCombination *mode = NULL;
     GError                 *error = NULL;
     MbimDataClass           preferred_data_classes;
+
+    self = g_task_get_source_object (task);
 
     response = mbim_device_command_finish (device, res, &error);
     if (!response ||
@@ -1214,8 +1223,12 @@ register_state_current_modes_query_ready (MbimDevice   *device,
         return;
     }
 
+    /* Normalize preferred data class to include any custom data class */
+    preferred_data_classes = mm_modem_mbim_normalize_data_class_mask (preferred_data_classes,
+                                                                      self->priv->caps_custom_data_class);
+
     mode = g_new0 (MMModemModeCombination, 1);
-    mode->allowed = mm_modem_mode_from_mbim_data_class (preferred_data_classes, NULL);
+    mode->allowed = mm_modem_mode_from_mbim_data_class (preferred_data_classes);
     mode->preferred = MM_MODEM_MODE_NONE;
     g_task_return_pointer (task, mode, (GDestroyNotify)g_free);
     g_object_unref (task);
@@ -1301,9 +1314,17 @@ complete_pending_allowed_modes_action (MMBroadbandModemMbim *self,
     if (!self->priv->pending_allowed_modes_action)
         return;
 
+    /* requested_data_classes is de-normalized (since we just sent it to the modem) */
     requested_data_classes = (MbimDataClass) GPOINTER_TO_UINT (g_task_get_task_data (self->priv->pending_allowed_modes_action));
-    requested_modes = mm_modem_mode_from_mbim_data_class (requested_data_classes, NULL);
-    preferred_modes = mm_modem_mode_from_mbim_data_class (preferred_data_classes, NULL);
+    requested_modes = mm_modem_mode_from_mbim_data_class (requested_data_classes);
+
+    /* But preferred_data_classes is normalized (since we just pulled it out of
+     * an MBIM message). De-normalize preferred_data_classes so we can compare
+     * it to requested_data_classes.
+     */
+    preferred_data_classes = mm_modem_mbim_normalize_data_class_mask (preferred_data_classes,
+                                                                      self->priv->caps_custom_data_class);
+    preferred_modes = mm_modem_mode_from_mbim_data_class (preferred_data_classes);
 
     /* only early complete on success, as we don't know if they're going to be
      * intermediate indications emitted before the preference change is valid */
@@ -1367,8 +1388,8 @@ register_state_current_modes_set_ready (MbimDevice   *device,
         return;
     }
 
-    requested_modes = mm_modem_mode_from_mbim_data_class (requested_data_classes, NULL);
-    preferred_modes = mm_modem_mode_from_mbim_data_class (preferred_data_classes, NULL);
+    requested_modes = mm_modem_mode_from_mbim_data_class (requested_data_classes);
+    preferred_modes = mm_modem_mode_from_mbim_data_class (preferred_data_classes);
 
     if (requested_modes != preferred_modes) {
         g_autofree gchar *requested_modes_str = NULL;
@@ -1422,6 +1443,7 @@ modem_set_current_modes (MMIfaceModem        *_self,
     GTask                   *task;
     MbimDevice              *device;
     g_autoptr(GCancellable)  cancellable = NULL;
+    MbimDataClass            normalized_class;
 
     if (!peek_device (self, &device, callback, user_data))
         return;
@@ -1445,11 +1467,17 @@ modem_set_current_modes (MMIfaceModem        *_self,
 
         /* Limit ANY to the currently supported modes */
         if (allowed == MM_MODEM_MODE_ANY)
-            allowed = mm_modem_mode_from_mbim_data_class (self->priv->caps_data_class, self->priv->caps_custom_data_class);
+            allowed = mm_modem_mode_from_mbim_data_class (self->priv->caps_data_class);
 
-        self->priv->requested_data_class = mm_mbim_data_class_from_modem_mode (allowed,
-                                                                               mm_iface_modem_is_3gpp (_self),
-                                                                               mm_iface_modem_is_cdma (_self));
+        normalized_class = mm_mbim_data_class_from_modem_mode (allowed,
+                                                               mm_iface_modem_is_3gpp (_self),
+                                                               mm_iface_modem_is_cdma (_self));
+
+        /* Replace any normalized data class with MBIM_DATA_CLASS_CUSTOM
+         * before sending back to the modem.
+         */
+        self->priv->requested_data_class = mm_modem_mbim_denormalize_data_class_mask (normalized_class,
+                                                                                      self->priv->caps_custom_data_class);
 
         /* Store the ongoing allowed modes action, so that we can finish the
          * operation early via indications, instead of waiting for the modem
@@ -5271,6 +5299,13 @@ common_process_register_state (MMBroadbandModemMbim  *self,
         }
     }
 
+    /* Normalize preferred and available data classes to include any custom data class */
+    preferred_data_classes = mm_modem_mbim_normalize_data_class_mask (preferred_data_classes,
+                                                                      self->priv->caps_custom_data_class);
+    available_data_classes = mm_modem_mbim_normalize_data_class_mask (available_data_classes,
+                                                                      self->priv->caps_custom_data_class);
+
+
     nw_error = mm_broadband_modem_mbim_normalize_nw_error (self, nw_error);
     nw_error_str = mbim_nw_error_get_string (nw_error);
     available_data_classes_str = mbim_data_class_build_string_from_mask (available_data_classes);
@@ -5753,9 +5788,12 @@ common_process_packet_service (MMBroadbandModemMbim     *self,
 
     if (packet_service_state == MBIM_PACKET_SERVICE_STATE_ATTACHED) {
         if (data_class_v3)
-            self->priv->enabled_cache.highest_available_data_class = mm_mbim_data_class_from_mbim_data_class_v3_and_subclass (data_class_v3, data_subclass);
-        else
-            self->priv->enabled_cache.highest_available_data_class = data_class;
+            data_class = mm_mbim_data_class_from_mbim_data_class_v3_and_subclass (data_class_v3, data_subclass);
+
+        /* Normalize data class to include any custom data class */
+        data_class = mm_modem_mbim_normalize_data_class_mask (data_class,
+                                                              self->priv->caps_custom_data_class);
+        self->priv->enabled_cache.highest_available_data_class = data_class;
     } else if (packet_service_state == MBIM_PACKET_SERVICE_STATE_DETACHED) {
         self->priv->enabled_cache.highest_available_data_class = 0;
     }
@@ -10393,7 +10431,6 @@ finalize (GObject *object)
 {
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (object);
 
-    g_free (self->priv->caps_custom_data_class);
     g_free (self->priv->caps_device_id);
     g_free (self->priv->caps_firmware_info);
     g_free (self->priv->caps_hardware_info);
