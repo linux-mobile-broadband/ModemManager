@@ -87,6 +87,7 @@ struct _MMBaseModemPrivate {
      * should be done by the modem. */
     GCancellable *cancellable;
     gulong invalid_if_cancelled;
+    guint  invalid_from_idle;
 
     gchar *device;
     gchar *physdev;
@@ -2133,13 +2134,22 @@ mm_base_modem_get_subsystem_device_id (MMBaseModem *self)
 
 /*****************************************************************************/
 
+static void
+clear_invalid_from_idle (MMBaseModem *self)
+{
+    if (self->priv->invalid_from_idle)
+        g_source_remove (self->priv->invalid_from_idle);
+    self->priv->invalid_from_idle = 0;
+}
+
 static gboolean
 base_modem_invalid_idle (MMBaseModem *self)
 {
+    clear_invalid_from_idle (self);
+
     /* Ensure the modem is set invalid if we get the modem-wide cancellable
      * cancelled */
     mm_base_modem_set_valid (self, FALSE);
-    g_object_unref (self);
     return G_SOURCE_REMOVE;
 }
 
@@ -2147,9 +2157,14 @@ static void
 base_modem_cancelled (GCancellable *cancellable,
                       MMBaseModem *self)
 {
+    clear_invalid_from_idle (self);
+
     /* NOTE: Don't call set_valid() directly here, do it in an idle, and ensure
      * that we pass a valid reference of the modem object as context. */
-    g_idle_add ((GSourceFunc)base_modem_invalid_idle, g_object_ref (self));
+    self->priv->invalid_from_idle = g_idle_add_full (G_PRIORITY_DEFAULT_IDLE,
+                                                     (GSourceFunc)base_modem_invalid_idle,
+                                                     g_object_ref (self),
+                                                     (GDestroyNotify) g_object_unref);
 }
 
 /*****************************************************************************/
@@ -2554,6 +2569,8 @@ dispose (GObject *object)
                               self->priv->invalid_if_cancelled);
     g_cancellable_cancel (self->priv->cancellable);
     g_clear_object (&self->priv->cancellable);
+
+    clear_invalid_from_idle (self);
 
     g_clear_object (&self->priv->primary);
     g_clear_object (&self->priv->secondary);
