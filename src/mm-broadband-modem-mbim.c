@@ -2211,6 +2211,18 @@ modem_power_down (MMIfaceModem *self,
 /*****************************************************************************/
 /* Signal quality loading (Modem interface) */
 
+static MbimDataClass
+enabled_cache_best_available_data_class (MMBroadbandModemMbim *self)
+{
+    MbimDataClass data_class;
+
+    /* Best guess of current data class */
+    data_class = self->priv->enabled_cache.highest_available_data_class;
+    if (data_class == 0)
+        data_class = self->priv->enabled_cache.available_data_classes;
+    return data_class;
+}
+
 static guint
 modem_load_signal_quality_finish (MMIfaceModem *self,
                                   GAsyncResult *res,
@@ -2283,10 +2295,7 @@ signal_state_query_ready (MbimDevice   *device,
     if (error)
         g_task_return_error (task, error);
     else {
-        /* Best guess of current data class */
-        data_class = self->priv->enabled_cache.highest_available_data_class;
-        if (data_class == 0)
-            data_class = self->priv->enabled_cache.available_data_classes;
+        data_class = enabled_cache_best_available_data_class (self);
         if (mm_signal_from_mbim_signal_state (data_class, rssi, error_rate, rsrp_snr, rsrp_snr_count,
                                               self, &cdma, &evdo, &gsm, &umts, &lte, &nr5g))
             mm_iface_modem_signal_update (MM_IFACE_MODEM_SIGNAL (self), cdma, evdo, gsm, umts, lte, nr5g);
@@ -4942,11 +4951,7 @@ basic_connect_notification_signal_state (MMBroadbandModemMbim *self,
     quality = mm_signal_quality_from_mbim_signal_state (coded_rssi, rsrp_snr, rsrp_snr_count, self);
     mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
 
-    /* Best guess of current data class */
-    data_class = self->priv->enabled_cache.highest_available_data_class;
-    if (data_class == 0)
-        data_class = self->priv->enabled_cache.available_data_classes;
-
+    data_class = enabled_cache_best_available_data_class (self);
     if (mm_signal_from_mbim_signal_state (data_class, coded_rssi, coded_error_rate, rsrp_snr, rsrp_snr_count,
                                           self, &cdma, &evdo, &gsm, &umts, &lte, &nr5g))
         mm_iface_modem_signal_update (MM_IFACE_MODEM_SIGNAL (self), cdma, evdo, gsm, umts, lte, nr5g);
@@ -5009,11 +5014,10 @@ static void
 update_access_technologies (MMBroadbandModemMbim *self)
 {
     MMModemAccessTechnology act;
+    MbimDataClass           data_class;
 
-    act = mm_modem_access_technology_from_mbim_data_class (self->priv->enabled_cache.highest_available_data_class);
-    if (act == MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN)
-        act = mm_modem_access_technology_from_mbim_data_class (self->priv->enabled_cache.available_data_classes);
-
+    data_class = enabled_cache_best_available_data_class (self);
+    act = mm_modem_access_technology_from_mbim_data_class (data_class);
     mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), act);
 }
 
@@ -7570,10 +7574,7 @@ mbimexv2_signal_state_query_ready (MbimDevice   *device,
 
     result = g_slice_new0 (SignalLoadValuesResult);
 
-    /* Best guess of current data class */
-    data_class = self->priv->enabled_cache.highest_available_data_class;
-    if (data_class == 0)
-        data_class = self->priv->enabled_cache.available_data_classes;
+    data_class = enabled_cache_best_available_data_class (self);
     if (!mm_signal_from_mbim_signal_state (
             data_class, rssi, error_rate, rsrp_snr, rsrp_snr_count, self,
             NULL, NULL, &result->gsm, &result->umts, &result->lte, &result->nr5g)) {
