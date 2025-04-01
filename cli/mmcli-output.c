@@ -202,6 +202,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_SIGNAL_LTE_RSRP]                          = { "modem.signal.lte.rsrp",                           "rsrp",                     MMC_S_MODEM_SIGNAL_LTE,           },
     [MMC_F_SIGNAL_LTE_SNR]                           = { "modem.signal.lte.snr",                            "s/n",                      MMC_S_MODEM_SIGNAL_LTE,           },
     [MMC_F_SIGNAL_LTE_ERROR_RATE]                    = { "modem.signal.lte.error-rate",                     "error rate",               MMC_S_MODEM_SIGNAL_LTE,           },
+    [MMC_F_SIGNAL_5G_RSSI]                           = { "modem.signal.5g.rssi",                            "rssi",                     MMC_S_MODEM_SIGNAL_5G,            },
     [MMC_F_SIGNAL_5G_RSRQ]                           = { "modem.signal.5g.rsrq",                            "rsrq",                     MMC_S_MODEM_SIGNAL_5G,            },
     [MMC_F_SIGNAL_5G_RSRP]                           = { "modem.signal.5g.rsrp",                            "rsrp",                     MMC_S_MODEM_SIGNAL_5G,            },
     [MMC_F_SIGNAL_5G_SNR]                            = { "modem.signal.5g.snr",                             "s/n",                      MMC_S_MODEM_SIGNAL_5G,            },
