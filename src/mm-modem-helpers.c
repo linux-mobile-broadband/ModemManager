@@ -1218,8 +1218,9 @@ get_mm_access_tech_from_etsi_access_tech (guint    val,
         return MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
     case 6:
         return MM_MODEM_ACCESS_TECHNOLOGY_HSPA;
-    case 7:  /* E-UTRAN */
     case 9:  /* E-UTRAN (NB-S1) */
+        return MM_MODEM_ACCESS_TECHNOLOGY_LTE_NB_IOT;
+    case 7:  /* E-UTRAN */
     case 10: /* E-UTRA connected to a 5GCN */
         return MM_MODEM_ACCESS_TECHNOLOGY_LTE;
     case 11: /* NR connected to a 5G CN */
