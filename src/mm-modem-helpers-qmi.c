@@ -2251,6 +2251,22 @@ mm_sms_state_from_qmi_message_tag (QmiWmsMessageTagType tag)
 
 /*****************************************************************************/
 
+MMCbmState
+mm_cbm_state_from_qmi_message_tag (QmiWmsMessageTagType tag)
+{
+    switch (tag) {
+    case QMI_WMS_MESSAGE_TAG_TYPE_MT_READ:
+    case QMI_WMS_MESSAGE_TAG_TYPE_MT_NOT_READ:
+        return MM_CBM_STATE_RECEIVED;
+    case QMI_WMS_MESSAGE_TAG_TYPE_MO_SENT:
+    case QMI_WMS_MESSAGE_TAG_TYPE_MO_NOT_SENT:
+    default:
+        return MM_CBM_STATE_UNKNOWN;
+    }
+}
+
+/*****************************************************************************/
+
 QmiWdsAuthentication
 mm_bearer_allowed_auth_to_qmi_authentication (MMBearerAllowedAuth   auth,
                                               gpointer              log_object,

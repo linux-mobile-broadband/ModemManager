@@ -36,6 +36,7 @@
 #include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-3gpp-profile-manager.h"
 #include "mm-iface-modem-3gpp-ussd.h"
+#include "mm-iface-modem-cell-broadcast.h"
 #include "mm-iface-modem-voice.h"
 #include "mm-iface-modem-cdma.h"
 #include "mm-iface-modem-messaging.h"
@@ -58,6 +59,7 @@ static void iface_modem_3gpp_init                 (MMIfaceModem3gppInterface    
 static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManagerInterface *iface);
 static void iface_modem_3gpp_ussd_init            (MMIfaceModem3gppUssdInterface           *iface);
 static void iface_modem_voice_init                (MMIfaceModemVoiceInterface              *iface);
+static void iface_modem_cell_broadcast_init       (MMIfaceModemCellBroadcastInterface      *iface);
 static void iface_modem_cdma_init                 (MMIfaceModemCdmaInterface               *iface);
 static void iface_modem_messaging_init            (MMIfaceModemMessagingInterface          *iface);
 static void iface_modem_location_init             (MMIfaceModemLocationInterface           *iface);
@@ -67,15 +69,17 @@ static void iface_modem_sar_init                  (MMIfaceModemSarInterface     
 static void iface_modem_signal_init               (MMIfaceModemSignalInterface             *iface);
 static void shared_qmi_init                       (MMSharedQmi                             *iface);
 
-static MMIfaceModemLocationInterface  *iface_modem_location_parent;
-static MMIfaceModemMessagingInterface *iface_modem_messaging_parent;
-static MMIfaceModemVoiceInterface     *iface_modem_voice_parent;
+static MMIfaceModemCellBroadcastInterface *iface_modem_cell_broadcast_parent;
+static MMIfaceModemLocationInterface      *iface_modem_location_parent;
+static MMIfaceModemMessagingInterface     *iface_modem_messaging_parent;
+static MMIfaceModemVoiceInterface         *iface_modem_voice_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmi, mm_broadband_modem_qmi, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP_PROFILE_MANAGER, iface_modem_3gpp_profile_manager_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP_USSD, iface_modem_3gpp_ussd_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CELL_BROADCAST, iface_modem_cell_broadcast_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_VOICE, iface_modem_voice_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init)
@@ -163,6 +167,11 @@ struct _MMBroadbandModemQmiPrivate {
     gboolean firmware_list_preloaded;
     GList *firmware_list;
     MMFirmwareProperties *current_firmware;
+
+    /* Cell Broadcast helpers */
+    gboolean cell_broadcast_fallback_at_only;
+    guint cell_broadcast_event_report_indication_id;
+    gboolean cell_broadcast_unsolicited_events_setup;
 
     /* For notifying when the qmi-proxy connection is dead */
     guint qmi_device_removed_id;
@@ -10533,6 +10542,433 @@ modem_3gpp_ussd_cancel (MMIfaceModem3gppUssd *_self,
 }
 
 /*****************************************************************************/
+/* Check support (CellBroadcast interface) */
+
+static gboolean
+cell_broadcast_check_support_finish (MMIfaceModemCellBroadcast *self,
+                                     GAsyncResult              *res,
+                                     GError                   **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+parent_cell_broadcast_check_support_ready (MMIfaceModemCellBroadcast *_self,
+                                           GAsyncResult              *res,
+                                           GTask                     *task)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
+    self->priv->cell_broadcast_fallback_at_only = iface_modem_cell_broadcast_parent->check_support_finish (_self, res, NULL);
+
+    g_task_return_boolean (task, self->priv->cell_broadcast_fallback_at_only);
+    g_object_unref (task);
+}
+
+static void
+cell_broadcast_check_support (MMIfaceModemCellBroadcast *self,
+                              GAsyncReadyCallback        callback,
+                              gpointer                   user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* If we have support for the WMS client, cell_broadcast is supported */
+    if (!mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
+                                    QMI_SERVICE_WMS,
+                                    MM_PORT_QMI_FLAG_DEFAULT,
+                                    NULL)) {
+        /* Try to fallback to AT support */
+        iface_modem_cell_broadcast_parent->check_support (
+                                                          self,
+                                                          (GAsyncReadyCallback)parent_cell_broadcast_check_support_ready,
+                                                          task);
+        return;
+    }
+
+    mm_obj_dbg (self, "Cell Broadcast capabilities supported");
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
+/* Common setup/cleanup unsolicited event handlers (CellBroadcast interface) */
+
+typedef struct {
+    MMBroadbandModemQmi *self;
+    QmiClientWms *client;
+    QmiWmsStorageType storage;
+    guint32 memory_index;
+    QmiWmsMessageMode message_mode;
+} CbsIndicationRawReadContext;
+
+static void
+cbs_indication_raw_read_context_free (CbsIndicationRawReadContext *ctx)
+{
+    g_object_unref (ctx->client);
+    g_object_unref (ctx->self);
+    g_slice_free (CbsIndicationRawReadContext, ctx);
+}
+
+static void
+add_new_read_cbm_part (MMIfaceModemCellBroadcast *self,
+                       QmiWmsMessageTagType       tag,
+                       QmiWmsMessageFormat        format,
+                       gboolean                   transfer_route,
+                       GArray                    *data)
+{
+    MMCbmPart *part = NULL;
+    GError *error = NULL;
+
+    switch (format) {
+        /* Cell Broadcasts need to be broadcast messages */
+    case QMI_WMS_MESSAGE_FORMAT_GSM_WCDMA_BROADCAST:
+        part = mm_cbm_part_new_from_binary_pdu ((guint8 *)data->data,
+                                                data->len,
+                                                self,
+                                                &error);
+        break;
+    case QMI_WMS_MESSAGE_FORMAT_MWI:
+    case QMI_WMS_MESSAGE_FORMAT_GSM_WCDMA_POINT_TO_POINT:
+    case QMI_WMS_MESSAGE_FORMAT_CDMA:
+    default:
+        mm_obj_dbg (self, "unhandled message format '%u'", format);
+        break;
+    }
+
+    if (part) {
+        mm_obj_dbg (self, "correctly parsed PDU");
+        mm_iface_modem_cell_broadcast_take_part (self,
+                                                 part,
+                                                 mm_cbm_state_from_qmi_message_tag (tag));
+    } else if (error) {
+        /* Don't treat the error as critical */
+        mm_obj_dbg (self, "error parsing PDU: %s", error->message);
+        g_error_free (error);
+    }
+}
+
+static void
+cbs_wms_indication_raw_read_ready (QmiClientWms                *client,
+                                   GAsyncResult                *res,
+                                   CbsIndicationRawReadContext *ctx)
+{
+    QmiMessageWmsRawReadOutput *output = NULL;
+    GError *error = NULL;
+
+    /* Ignore errors */
+
+    output = qmi_client_wms_raw_read_finish (client, res, &error);
+    if (!output) {
+        mm_obj_dbg (ctx->self, "QMI operation failed: %s", error->message);
+        g_error_free (error);
+    } else if (!qmi_message_wms_raw_read_output_get_result (output, &error)) {
+        mm_obj_dbg (ctx->self, "couldn't read raw message: %s", error->message);
+        g_error_free (error);
+    } else {
+        QmiWmsMessageTagType tag;
+        QmiWmsMessageFormat format;
+        GArray *data;
+
+        qmi_message_wms_raw_read_output_get_raw_message_data (
+                                                              output,
+                                                              &tag,
+                                                              &format,
+                                                              &data,
+                                                              NULL);
+        add_new_read_cbm_part (MM_IFACE_MODEM_CELL_BROADCAST (ctx->self),
+                               tag,
+                               format,
+                               FALSE,
+                               data);
+    }
+
+    if (output)
+        qmi_message_wms_raw_read_output_unref (output);
+
+    cbs_indication_raw_read_context_free (ctx);
+}
+
+static void
+cbs_wms_send_ack_ready (QmiClientWms *client,
+                        GAsyncResult *res,
+                        MMBroadbandModemQmi *self)
+{
+    g_autoptr(QmiMessageWmsSendAckOutput) output = NULL;
+    g_autoptr(GError) error= NULL;
+
+    output = qmi_client_wms_send_ack_finish (client, res, &error);
+    if (!output) {
+        mm_obj_dbg (self, "QMI operation failed: '%s'", error->message);
+    }
+    g_object_unref (self);
+}
+
+static void
+cell_broadcast_event_report_indication_cb (QmiClientNas                      *client,
+                                           QmiIndicationWmsEventReportOutput *output,
+                                           MMBroadbandModemQmi               *self)
+{
+    QmiWmsStorageType storage;
+    guint32 memory_index;
+    QmiWmsAckIndicator ack_ind;
+    guint32 transaction_id;
+    QmiWmsMessageFormat msg_format;
+    QmiWmsMessageTagType tag;
+    GArray *raw_data = NULL;
+
+    /* Handle transfer-route MT messages */
+    if (qmi_indication_wms_event_report_output_get_transfer_route_mt_message (output,
+                                                                              &ack_ind,
+                                                                              &transaction_id,
+                                                                              &msg_format,
+                                                                              &raw_data,
+                                                                              NULL)) {
+        mm_obj_dbg (self, "Got transfer-route MT message");
+        /* If this is the first of a multi-part message, send an ACK to get the
+         * second part */
+        if (ack_ind == QMI_WMS_ACK_INDICATOR_SEND) {
+            g_autoptr(QmiMessageWmsSendAckInput) ack_input = NULL;
+            QmiWmsMessageProtocol message_protocol;
+            /* Need to ack message */
+            mm_obj_dbg (self, "Need to ACK indicator");
+            switch (msg_format) {
+            case QMI_WMS_MESSAGE_FORMAT_CDMA:
+                message_protocol = QMI_WMS_MESSAGE_PROTOCOL_CDMA;
+                break;
+            case QMI_WMS_MESSAGE_FORMAT_MWI:
+            case QMI_WMS_MESSAGE_FORMAT_GSM_WCDMA_POINT_TO_POINT:
+            case QMI_WMS_MESSAGE_FORMAT_GSM_WCDMA_BROADCAST:
+            default:
+                message_protocol = QMI_WMS_MESSAGE_PROTOCOL_WCDMA;
+                break;
+            }
+            ack_input = qmi_message_wms_send_ack_input_new();
+            qmi_message_wms_send_ack_input_set_information (ack_input,
+                                                            transaction_id,
+                                                            message_protocol,
+                                                            TRUE,
+                                                            NULL);
+            qmi_client_wms_send_ack (QMI_CLIENT_WMS (client),
+                                     ack_input,
+                                     MM_BASE_SMS_DEFAULT_SEND_TIMEOUT,
+                                     NULL,
+                                     (GAsyncReadyCallback)cbs_wms_send_ack_ready,
+                                     g_object_ref (self));
+        }
+
+        /* Defaults for transfer-route messages, which are not stored anywhere */
+        storage = QMI_WMS_STORAGE_TYPE_NONE;
+        tag = QMI_WMS_MESSAGE_TAG_TYPE_MT_NOT_READ;
+        add_new_read_cbm_part (MM_IFACE_MODEM_CELL_BROADCAST (self),
+                               tag,
+                               msg_format,
+                               TRUE,
+                               raw_data);
+        return;
+    }
+
+    if (qmi_indication_wms_event_report_output_get_mt_message (
+                                                               output,
+                                                               &storage,
+                                                               &memory_index,
+                                                               NULL)) {
+        CbsIndicationRawReadContext *ctx;
+        QmiMessageWmsRawReadInput *input;
+
+        ctx = g_slice_new (CbsIndicationRawReadContext);
+        ctx->self = g_object_ref (self);
+        ctx->client = QMI_CLIENT_WMS (g_object_ref (client));
+        ctx->storage = storage;
+        ctx->memory_index = memory_index;
+
+        input = qmi_message_wms_raw_read_input_new ();
+        qmi_message_wms_raw_read_input_set_message_memory_storage_id (
+                                                                      input,
+                                                                      storage,
+                                                                      memory_index,
+                                                                      NULL);
+
+        /* Default to 3GPP message mode if none given */
+        if (!qmi_indication_wms_event_report_output_get_message_mode (
+                                                                      output,
+                                                                      &ctx->message_mode,
+                                                                      NULL))
+            ctx->message_mode = QMI_WMS_MESSAGE_MODE_GSM_WCDMA;
+        qmi_message_wms_raw_read_input_set_message_mode (
+                                                         input,
+                                                         ctx->message_mode,
+                                                         NULL);
+
+        qmi_client_wms_raw_read (QMI_CLIENT_WMS (client),
+                                 input,
+                                 3,
+                                 NULL,
+                                 (GAsyncReadyCallback)cbs_wms_indication_raw_read_ready,
+                                 ctx);
+        qmi_message_wms_raw_read_input_unref (input);
+    }
+}
+
+static gboolean
+common_setup_cleanup_cell_broadcast_unsolicited_events (MMBroadbandModemQmi  *self,
+                                                        gboolean              enable,
+                                                        GError              **error)
+{
+    QmiClient *client = NULL;
+
+    client = mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
+                                        QMI_SERVICE_WMS,
+                                        MM_PORT_QMI_FLAG_DEFAULT,
+                                        error);
+    if (!client)
+        return FALSE;
+
+    if (enable == self->priv->cell_broadcast_unsolicited_events_setup) {
+        mm_obj_dbg (self, "cell broadcast unsolicited events already %s; skipping",
+                    enable ? "setup" : "cleanup");
+        return TRUE;
+    }
+
+    /* Store new state */
+    self->priv->cell_broadcast_unsolicited_events_setup = enable;
+
+    /* Connect/Disconnect "Event Report" indications */
+    if (enable) {
+        g_assert (self->priv->cell_broadcast_event_report_indication_id == 0);
+        self->priv->cell_broadcast_event_report_indication_id =
+            g_signal_connect (client,
+                              "event-report",
+                              G_CALLBACK (cell_broadcast_event_report_indication_cb),
+                              self);
+    } else {
+        g_assert (self->priv->cell_broadcast_event_report_indication_id != 0);
+        g_signal_handler_disconnect (client, self->priv->cell_broadcast_event_report_indication_id);
+        self->priv->cell_broadcast_event_report_indication_id = 0;
+    }
+
+    return TRUE;
+}
+
+/*****************************************************************************/
+/* Cleanup unsolicited event handlers (CellBroadcast interface) */
+
+static gboolean
+cell_broadcast_cleanup_unsolicited_events_finish (MMIfaceModemCellBroadcast  *self,
+                                                  GAsyncResult               *res,
+                                                  GError                    **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+parent_cell_broadcast_cleanup_unsolicited_events_ready (MMIfaceModemCellBroadcast *_self,
+                                                        GAsyncResult              *res,
+                                                        GTask                     *task)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_cell_broadcast_parent->cleanup_unsolicited_events_finish (_self, res, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+cell_broadcast_cleanup_unsolicited_events (MMIfaceModemCellBroadcast *_self,
+                                           GAsyncReadyCallback        callback,
+                                           gpointer                   user_data)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    GTask *task = g_task_new (self, NULL, callback, user_data);
+    GError *error = NULL;
+
+    if (self->priv->cell_broadcast_fallback_at_only) {
+        iface_modem_cell_broadcast_parent->cleanup_unsolicited_events (
+                                                                       _self,
+                                                                       (GAsyncReadyCallback)parent_cell_broadcast_cleanup_unsolicited_events_ready,
+                                                                       task);
+    } else {
+        if (!common_setup_cleanup_cell_broadcast_unsolicited_events (self, FALSE, &error))
+            g_task_return_error (task, error);
+        else
+            g_task_return_boolean (task, TRUE);
+    }
+}
+
+/*****************************************************************************/
+/* Setup unsolicited event handlers (CellBroadcast interface) */
+
+static gboolean
+cell_broadcast_setup_unsolicited_events_finish (MMIfaceModemCellBroadcast  *self,
+                                                GAsyncResult               *res,
+                                                GError                    **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+parent_cell_broadcast_setup_unsolicited_events_ready (MMIfaceModemCellBroadcast *_self,
+                                                      GAsyncResult              *res,
+                                                      GTask                     *task)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_cell_broadcast_parent->setup_unsolicited_events_finish (_self, res, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+cell_broadcast_setup_unsolicited_events (MMIfaceModemCellBroadcast *_self,
+                                         GAsyncReadyCallback        callback,
+                                         gpointer                   user_data)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    GTask *task = g_task_new (self, NULL, callback, user_data);
+    GError *error = NULL;
+
+    /* Handle AT URC only fallback */
+    if (self->priv->cell_broadcast_fallback_at_only) {
+        iface_modem_cell_broadcast_parent->setup_unsolicited_events (_self,
+                                                                     (GAsyncReadyCallback)parent_cell_broadcast_setup_unsolicited_events_ready,
+                                                                     task);
+    } else {
+        /* Enable QMI indications */
+        if (!common_setup_cleanup_cell_broadcast_unsolicited_events (self, TRUE, &error))
+            g_task_return_error (task, error);
+        else
+            g_task_return_boolean (task, TRUE);
+    }
+}
+
+/*****************************************************************************/
+/* Create CBM (CellBroadcast interface) */
+
+static MMBaseCbm *
+cell_broadcast_create_cbm (MMIfaceModemCellBroadcast *_self)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
+    /* Handle AT URC only fallback */
+    if (self->priv->cell_broadcast_fallback_at_only) {
+        return iface_modem_cell_broadcast_parent->create_cbm (_self);
+    }
+
+    return mm_base_cbm_new (MM_BASE_MODEM (self));
+}
+
+/*****************************************************************************/
 /* Check support (Voice interface) */
 
 static gboolean
@@ -14287,6 +14723,20 @@ iface_modem_cdma_init (MMIfaceModemCdmaInterface *iface)
     iface->activate_finish = modem_cdma_activate_finish;
     iface->activate_manual = modem_cdma_activate_manual;
     iface->activate_manual_finish = modem_cdma_activate_manual_finish;
+}
+
+static void
+iface_modem_cell_broadcast_init (MMIfaceModemCellBroadcastInterface *iface)
+{
+    iface_modem_cell_broadcast_parent = g_type_interface_peek_parent (iface);
+
+    iface->check_support = cell_broadcast_check_support;
+    iface->check_support_finish = cell_broadcast_check_support_finish;
+    iface->setup_unsolicited_events = cell_broadcast_setup_unsolicited_events;
+    iface->setup_unsolicited_events_finish = cell_broadcast_setup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events = cell_broadcast_cleanup_unsolicited_events;
+    iface->cleanup_unsolicited_events_finish = cell_broadcast_cleanup_unsolicited_events_finish;
+    iface->create_cbm = cell_broadcast_create_cbm;
 }
 
 static void
