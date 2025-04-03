@@ -10952,6 +10952,90 @@ cell_broadcast_setup_unsolicited_events (MMIfaceModemCellBroadcast *_self,
     }
 }
 
+/***********************************************************************************/
+/* Get channels (CellBroadcast interface) */
+
+static gboolean
+cell_broadcast_set_channels_finish (MMIfaceModemCellBroadcast *_self,
+                                    GAsyncResult              *res,
+                                    GError                   **error)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
+    /* Handle AT URC only fallback */
+    if (self->priv->cell_broadcast_fallback_at_only) {
+        return iface_modem_cell_broadcast_parent->set_channels_finish (_self, res, error);
+    }
+
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+cell_broadcast_set_broadcast_config_ready (QmiClientWms *client,
+                                           GAsyncResult *res,
+                                           gpointer     *user_data)
+{
+    g_autoptr(QmiMessageWmsSetBroadcastConfigOutput) output = NULL;
+    g_autoptr(GTask) task = G_TASK (user_data);
+    GError *error = NULL;
+
+    output = qmi_client_wms_set_broadcast_config_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_wms_set_broadcast_config_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't set cbs channels: ");
+        g_task_return_error (task, error);
+    } else
+        g_task_return_boolean (task, TRUE);
+}
+
+static void
+cell_broadcast_set_channels (MMIfaceModemCellBroadcast *_self,
+                             GArray                    *channels,
+                             GAsyncReadyCallback        callback,
+                             gpointer                   user_data)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    QmiClient *client = NULL;
+    g_autoptr(GArray) channels_array = NULL;
+    g_autoptr(QmiMessageWmsSetBroadcastConfigInput) input = NULL;
+    guint i;
+
+    /* Handle AT URC only fallback */
+    if (self->priv->cell_broadcast_fallback_at_only) {
+        iface_modem_cell_broadcast_parent->set_channels (_self, channels, callback, user_data);
+        return;
+    }
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_WMS, &client,
+                                      callback, user_data))
+        return;
+
+    channels_array = g_array_new (FALSE, FALSE, sizeof (QmiMessageWmsSetBroadcastConfigInputChannelsElement));
+    for (i = 0; i < channels->len; i++) {
+        QmiMessageWmsSetBroadcastConfigInputChannelsElement elem;
+        MMCellBroadcastChannels ch = g_array_index (channels, MMCellBroadcastChannels, i);
+
+        elem.start = ch.start;
+        elem.end = ch.end;
+        elem.selected = TRUE;
+        g_array_append_val (channels_array, elem);
+    }
+
+    mm_obj_dbg (self, "Setting channels...");
+    input = qmi_message_wms_set_broadcast_config_input_new ();
+    qmi_message_wms_set_broadcast_config_input_set_message_mode (input, QMI_WMS_MESSAGE_MODE_GSM_WCDMA, NULL);
+    qmi_message_wms_set_broadcast_config_input_set_channels (input, channels_array, NULL);
+    qmi_client_wms_set_broadcast_config (QMI_CLIENT_WMS (client),
+                                         input,
+                                         5,
+                                         NULL,
+                                         (GAsyncReadyCallback)cell_broadcast_set_broadcast_config_ready,
+                                         g_task_new (self, NULL, callback, user_data));
+}
+
 /*****************************************************************************/
 /* Create CBM (CellBroadcast interface) */
 
@@ -14736,6 +14820,8 @@ iface_modem_cell_broadcast_init (MMIfaceModemCellBroadcastInterface *iface)
     iface->setup_unsolicited_events_finish = cell_broadcast_setup_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = cell_broadcast_cleanup_unsolicited_events;
     iface->cleanup_unsolicited_events_finish = cell_broadcast_cleanup_unsolicited_events_finish;
+    iface->set_channels = cell_broadcast_set_channels;
+    iface->set_channels_finish = cell_broadcast_set_channels_finish;
     iface->create_cbm = cell_broadcast_create_cbm;
 }
 
