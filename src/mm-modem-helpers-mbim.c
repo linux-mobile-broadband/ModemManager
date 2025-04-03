@@ -25,10 +25,77 @@
 
 /*****************************************************************************/
 
+typedef struct {
+    const gchar         *custom_class;
+    const MbimDataClass  primary_data_class;
+    const MbimDataClass  secondary_data_class;
+} CustomDataClass;
+
+static const CustomDataClass custom_data_classes[] = {
+    /* "5GSA/TDS": Quectel RM502Q */
+    { "5GSA",    MBIM_DATA_CLASS_5G_SA,                        MBIM_DATA_CLASS_NONE },
+    /* "5G/TDS": Telit FN990, Quectel RM502Q, Gosuncn GM800
+     * "5G":     Dell Snapdragon X55/Foxconn T99W175
+     */
+    { "5G",    MBIM_DATA_CLASS_5G_NSA,                        MBIM_DATA_CLASS_5G_SA },
+    /* "HSPA+": Dell DW5821e/Foxconn T77W968, Huawei EM820W */
+    { "HSPA+", MBIM_DATA_CLASS_HSDPA | MBIM_DATA_CLASS_HSUPA, MBIM_DATA_CLASS_NONE },
+};
+
+MbimDataClass
+mm_mbim_data_class_from_custom_caps (MbimDataClass  orig_data_class,
+                                     const gchar   *custom_data_class)
+{
+    guint i;
+
+    if (orig_data_class & MBIM_DATA_CLASS_CUSTOM) {
+        for (i = 0; i < G_N_ELEMENTS (custom_data_classes); i++) {
+            if (strstr (custom_data_class, custom_data_classes[i].custom_class)) {
+                /* If the original data class already includes the primary custom
+                 * class add the secondary instead. Devices sometimes report a variant
+                 * of the custom class depending on MBIMex version.
+                 *
+                 * For example, Foxconn X55 supports SA but reports "...,lte,custom"
+                 * with MBIMex1 and "...,lte,5g-nsa,custom" with MBIMex2. Fix that
+                 * up with the highest level we can be sure the device supports.
+                 */
+                if (orig_data_class & custom_data_classes[i].primary_data_class)
+                    return custom_data_classes[i].secondary_data_class;
+                else
+                    return custom_data_classes[i].primary_data_class;
+            }
+        }
+    }
+    return MBIM_DATA_CLASS_NONE;
+}
+
+MbimDataClass
+mm_modem_mbim_normalize_data_class_mask (MbimDataClass orig_data_class,
+                                         MbimDataClass custom_data_class)
+{
+    if (orig_data_class & MBIM_DATA_CLASS_CUSTOM) {
+        orig_data_class |= custom_data_class;
+        orig_data_class &= ~MBIM_DATA_CLASS_CUSTOM;
+    }
+    return orig_data_class;
+}
+
+MbimDataClass
+mm_modem_mbim_denormalize_data_class_mask (MbimDataClass orig_data_class,
+                                           MbimDataClass custom_data_class)
+{
+    if (orig_data_class & custom_data_class) {
+        orig_data_class &= ~custom_data_class;
+        orig_data_class |= MBIM_DATA_CLASS_CUSTOM;
+    }
+    return orig_data_class;
+}
+
+/*****************************************************************************/
+
 MMModemCapability
 mm_modem_capability_from_mbim_device_caps (MbimCellularClass  caps_cellular_class,
-                                           MbimDataClass      caps_data_class,
-                                           const gchar       *caps_custom_data_class)
+                                           MbimDataClass      caps_data_class)
 {
     MMModemCapability mask = 0;
 
@@ -42,12 +109,6 @@ mm_modem_capability_from_mbim_device_caps (MbimCellularClass  caps_cellular_clas
 
     if (caps_data_class & MBIM_DATA_CLASS_LTE)
         mask |= MM_MODEM_CAPABILITY_LTE;
-
-    /* e.g. Gosuncn GM800 reports MBIM custom data class "5G/TDS" */
-    if ((caps_data_class & MBIM_DATA_CLASS_CUSTOM) && caps_custom_data_class) {
-        if (strstr (caps_custom_data_class, "5G"))
-            mask |= MM_MODEM_CAPABILITY_5GNR;
-    }
 
     /* Support for devices with Microsoft extensions */
     if (caps_data_class & (MBIM_DATA_CLASS_5G_NSA | MBIM_DATA_CLASS_5G_SA))
@@ -148,8 +209,7 @@ mm_modem_3gpp_packet_service_state_from_mbim_packet_service_state (MbimPacketSer
 /*****************************************************************************/
 
 MMModemMode
-mm_modem_mode_from_mbim_data_class (MbimDataClass  data_class,
-                                    const gchar   *caps_custom_data_class)
+mm_modem_mode_from_mbim_data_class (MbimDataClass  data_class)
 {
     MMModemMode mask = MM_MODEM_MODE_NONE;
 
@@ -166,11 +226,6 @@ mm_modem_mode_from_mbim_data_class (MbimDataClass  data_class,
     if (data_class & (MBIM_DATA_CLASS_5G_NSA |
                       MBIM_DATA_CLASS_5G_SA))
         mask |= MM_MODEM_MODE_5G;
-    /* Some modems (e.g. Telit FN990) reports MBIM custom data class "5G/TDS" */
-    if ((data_class & MBIM_DATA_CLASS_CUSTOM) && caps_custom_data_class) {
-        if (strstr (caps_custom_data_class, "5G"))
-            mask |= MM_MODEM_MODE_5G;
-    }
 
     /* 3GPP2... */
     if (data_class & MBIM_DATA_CLASS_1XRTT)

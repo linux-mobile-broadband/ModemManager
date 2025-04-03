@@ -27,9 +27,17 @@
 /*****************************************************************************/
 /* MBIM/BasicConnect to MM translations */
 
-MMModemCapability mm_modem_capability_from_mbim_device_caps (MbimCellularClass  caps_cellular_class,
-                                                             MbimDataClass      caps_data_class,
-                                                             const gchar       *caps_custom_data_class);
+MbimDataClass mm_mbim_data_class_from_custom_caps (MbimDataClass  orig_data_class,
+                                                   const gchar   *custom_data_class);
+
+MbimDataClass mm_modem_mbim_normalize_data_class_mask (MbimDataClass orig_data_class,
+                                                       MbimDataClass custom_data_class);
+
+MbimDataClass mm_modem_mbim_denormalize_data_class_mask (MbimDataClass orig_data_class,
+                                                         MbimDataClass custom_data_class);
+
+MMModemCapability mm_modem_capability_from_mbim_device_caps (MbimCellularClass caps_cellular_class,
+                                                             MbimDataClass     caps_data_class);
 
 MMModemLock mm_modem_lock_from_mbim_pin_type (MbimPinType pin_type);
 
@@ -40,8 +48,7 @@ MMModem3gppPacketServiceState mm_modem_3gpp_packet_service_state_from_mbim_packe
 MbimDataClass mm_mbim_data_class_from_mbim_data_class_v3_and_subclass (MbimDataClassV3  data_class_v3,
                                                                        MbimDataSubclass data_subclass);
 
-MMModemMode mm_modem_mode_from_mbim_data_class (MbimDataClass  data_class,
-                                                const gchar   *caps_custom_data_class);
+MMModemMode mm_modem_mode_from_mbim_data_class (MbimDataClass data_class);
 
 MbimDataClass mm_mbim_data_class_from_modem_mode (MMModemMode modem_mode,
                                                   gboolean    is_3gpp,

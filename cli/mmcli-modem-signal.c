@@ -166,6 +166,7 @@ print_signal_info (void)
     gchar    *lte_rsrq = NULL;
     gchar    *lte_snr = NULL;
     gchar    *lte_error_rate = NULL;
+    gchar    *nr5g_rssi = NULL;
     gchar    *nr5g_rsrp = NULL;
     gchar    *nr5g_rsrq = NULL;
     gchar    *nr5g_snr = NULL;
@@ -235,6 +236,8 @@ print_signal_info (void)
 
     signal = mm_modem_signal_peek_nr5g (ctx->modem_signal);
     if (signal) {
+        if ((value = mm_signal_get_rssi (signal)) != MM_SIGNAL_UNKNOWN)
+            nr5g_rssi = g_strdup_printf ("%.2lf", value);
         if ((value = mm_signal_get_rsrq (signal)) != MM_SIGNAL_UNKNOWN)
             nr5g_rsrq = g_strdup_printf ("%.2lf", value);
         if ((value = mm_signal_get_rsrp (signal)) != MM_SIGNAL_UNKNOWN)
@@ -267,6 +270,7 @@ print_signal_info (void)
     mmcli_output_string_take_typed (MMC_F_SIGNAL_LTE_RSRP,             lte_rsrp,             "dBm");
     mmcli_output_string_take_typed (MMC_F_SIGNAL_LTE_SNR,              lte_snr,              "dB");
     mmcli_output_string_take_typed (MMC_F_SIGNAL_LTE_ERROR_RATE,       lte_error_rate,       "%%");
+    mmcli_output_string_take_typed (MMC_F_SIGNAL_5G_RSSI,              nr5g_rssi,            "dBm");
     mmcli_output_string_take_typed (MMC_F_SIGNAL_5G_RSRQ,              nr5g_rsrq,            "dB");
     mmcli_output_string_take_typed (MMC_F_SIGNAL_5G_RSRP,              nr5g_rsrp,            "dBm");
     mmcli_output_string_take_typed (MMC_F_SIGNAL_5G_SNR,               nr5g_snr,             "dB");

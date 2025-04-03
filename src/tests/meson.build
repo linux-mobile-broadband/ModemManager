@@ -25,6 +25,10 @@ if enable_qmi
   test_units += {'modem-helpers-qmi': libkerneldevice_dep}
 endif
 
+if enable_mbim
+  test_units += {'modem-helpers-mbim': libkerneldevice_dep}
+endif
+
 foreach test_unit, test_deps: test_units
   test_name = 'test-' + test_unit
 
