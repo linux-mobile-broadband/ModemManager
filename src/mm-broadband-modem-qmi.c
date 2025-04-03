@@ -10852,6 +10852,110 @@ common_setup_cleanup_cell_broadcast_unsolicited_events (MMBroadbandModemQmi  *se
 }
 
 /*****************************************************************************/
+/* Load currently active channels (CellBroadcast interface) */
+
+static GArray *
+cell_broadcast_load_channels_finish (MMIfaceModemCellBroadcast *_self,
+                                     GAsyncResult              *res,
+                                     GError                   **error)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
+    /* Handle AT URC only fallback */
+    if (self->priv->cell_broadcast_fallback_at_only) {
+        return iface_modem_cell_broadcast_parent->load_channels_finish (_self, res, error);
+    }
+
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+cell_broadcast_get_broadcast_config_ready (QmiClientWms *client,
+                                           GAsyncResult *res,
+                                           gpointer     *user_data)
+{
+    g_autoptr(QmiMessageWmsGetBroadcastConfigOutput) output = NULL;
+    g_autoptr(GTask) task = G_TASK (user_data);
+    g_autoptr(GArray) channels = NULL;
+    GArray *elements = NULL;
+    gboolean active;
+    GError *error = NULL;
+    guint i;
+
+    output = qmi_client_wms_get_broadcast_config_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+        return;
+    }
+
+    if (!qmi_message_wms_get_broadcast_config_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get cbs channels: ");
+        g_task_return_error (task, error);
+        return;
+    }
+
+    if (!qmi_message_wms_get_broadcast_config_output_get_config (output, &active, &elements, &error)) {
+        g_prefix_error (&error, "Couldn't get retrieve cbs channels: ");
+        return;
+    }
+
+    channels = g_array_new (FALSE, FALSE, sizeof (MMCellBroadcastChannels));
+    for (i = 0; i < elements->len; i++) {
+        QmiMessageWmsGetBroadcastConfigOutputConfigChannelsElement elem;
+        MMCellBroadcastChannels ch;
+
+        elem = g_array_index (elements, QmiMessageWmsGetBroadcastConfigOutputConfigChannelsElement, i);
+        if (!elem.selected)
+            continue;
+
+        if (elem.start >  elem.end || elem.end >= G_MAXUINT16) {
+            g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                         "Couldn't parse channel interval '%d-%d'", elem.start, elem.end);
+            g_task_return_error (task, error);
+        }
+
+        ch.start = elem.start;
+        ch.end = elem.end;
+        g_array_append_val (channels, ch);
+    }
+
+    g_task_return_pointer (task,
+                           g_steal_pointer (&channels),
+                           (GDestroyNotify)g_array_unref);
+}
+
+static void
+cell_broadcast_load_channels (MMIfaceModemCellBroadcast *_self,
+                              GAsyncReadyCallback        callback,
+                              gpointer                   user_data)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    QmiClient *client = NULL;
+    g_autoptr(QmiMessageWmsGetBroadcastConfigInput) input = NULL;
+
+    /* Handle AT URC only fallback */
+    if (self->priv->cell_broadcast_fallback_at_only) {
+        iface_modem_cell_broadcast_parent->load_channels (_self, callback, user_data);
+        return;
+    }
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_WMS, &client,
+                                      callback, user_data))
+        return;
+
+    input = qmi_message_wms_get_broadcast_config_input_new ();
+    qmi_message_wms_get_broadcast_config_input_set_message_mode (input, QMI_WMS_MESSAGE_MODE_GSM_WCDMA, NULL);
+    qmi_client_wms_get_broadcast_config (QMI_CLIENT_WMS (client),
+                                         input,
+                                         5,
+                                         NULL,
+                                         (GAsyncReadyCallback)cell_broadcast_get_broadcast_config_ready,
+                                         g_task_new (self, NULL, callback, user_data));
+}
+
+/*****************************************************************************/
 /* Cleanup unsolicited event handlers (CellBroadcast interface) */
 
 static gboolean
@@ -14818,6 +14922,8 @@ iface_modem_cell_broadcast_init (MMIfaceModemCellBroadcastInterface *iface)
     iface->check_support_finish = cell_broadcast_check_support_finish;
     iface->setup_unsolicited_events = cell_broadcast_setup_unsolicited_events;
     iface->setup_unsolicited_events_finish = cell_broadcast_setup_unsolicited_events_finish;
+    iface->load_channels = cell_broadcast_load_channels;
+    iface->load_channels_finish = cell_broadcast_load_channels_finish;
     iface->cleanup_unsolicited_events = cell_broadcast_cleanup_unsolicited_events;
     iface->cleanup_unsolicited_events_finish = cell_broadcast_cleanup_unsolicited_events_finish;
     iface->set_channels = cell_broadcast_set_channels;
