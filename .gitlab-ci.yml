@@ -80,9 +80,9 @@ verify-dco:
   script: |
     if [[ -n "${CI_MERGE_REQUEST_DIFF_BASE_SHA}" ]]; then
       export COMMITS=$(git log --no-merges --format="%H" ${CI_MERGE_REQUEST_DIFF_BASE_SHA}.. | xargs)
-      for c in "${COMMITS}"; do
+      for c in ${COMMITS}; do
         $(git log --format="%b" -1 ${c} | grep -q "^Signed-off-by: .* <.*@.*>") && rc="$?" || rc="$?"
-        if [[ rc -eq 1 ]]; then
+        if [[ $rc -ne 0 ]]; then
           echo "Commit ${c} failed DCO Signed-off-by check"
           exit ${rc}
         fi
