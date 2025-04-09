@@ -72,14 +72,22 @@ test_supported_modes_expected (MMQmiSupportedModesContext   *ctx,
     g_autoptr(GArray)  built = NULL;
     g_autofree gchar  *expected_str = NULL;
     g_autofree gchar  *built_str = NULL;
+    g_autoptr(GError)  error = NULL;
 
-    built = mm_supported_modes_from_qmi_supported_modes_context (ctx, NULL);
+    built = mm_supported_modes_from_qmi_supported_modes_context (ctx, NULL, &error);
+    if (built == NULL) {
+        g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
+        g_assert_cmpint (n_expected_modes, ==, 0);
+    } else {
+        g_assert_no_error (error);
+        g_assert_cmpint (n_expected_modes, >, 0);
 
-    expected_str = mm_common_build_mode_combinations_string (expected_modes, n_expected_modes);
-    built_str = mm_common_build_mode_combinations_string ((MMModemModeCombination *)built->data, built->len);
+        expected_str = mm_common_build_mode_combinations_string (expected_modes, n_expected_modes);
+        built_str = mm_common_build_mode_combinations_string ((MMModemModeCombination *)built->data, built->len);
 
-    /* compare strings, so that the error shows the string values as well */
-    g_assert_cmpstr (built_str, ==, expected_str);
+        /* compare strings, so that the error shows the string values as well */
+        g_assert_cmpstr (built_str, ==, expected_str);
+    }
 }
 
 /*****************************************************************************/
@@ -1332,6 +1340,20 @@ test_supported_modes_generic_nr5g_lte_evdo (void)
                                    G_N_ELEMENTS (expected_modes));
 }
 
+static void
+test_supported_modes_generic_none (void)
+{
+    MMQmiSupportedModesContext ctx;
+
+    /* Dell Snapdragon X62 before FCC unlock reports no supported radio interfaces */
+    ctx.multimode = FALSE;
+    ctx.all = MM_MODEM_MODE_NONE;
+
+    test_supported_modes_expected (&ctx,
+                                   NULL,
+                                   0);
+}
+
 /*****************************************************************************/
 /* System Info processor helper */
 
@@ -1969,6 +1991,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/qmi/current-capabilities/generic/nr5g-lte-evdo",    test_current_capabilities_generic_nr5g_lte_evdo);
     g_test_add_func ("/MM/qmi/supported-capabilities/generic/nr5g-lte-evdo",  test_supported_capabilities_generic_nr5g_lte_evdo);
     g_test_add_func ("/MM/qmi/supported-modes/generic/nr5g-lte-evdo",         test_supported_modes_generic_nr5g_lte_evdo);
+
+    g_test_add_func ("/MM/qmi/supported-modes/generic/none",                  test_supported_modes_generic_none);
 
     g_test_add_func ("/MM/qmi/registration-state-from-system-info/2g/searching",     test_registration_state_from_qmi_system_info_2g_searching);
     g_test_add_func ("/MM/qmi/registration-state-from-system-info/2g/idle",          test_registration_state_from_qmi_system_info_2g_idle);

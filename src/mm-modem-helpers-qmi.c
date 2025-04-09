@@ -2541,12 +2541,21 @@ mm_supported_capabilities_from_qmi_supported_capabilities_context (MMQmiSupporte
 /* Utility to build list of supported modes */
 
 GArray *
-mm_supported_modes_from_qmi_supported_modes_context (MMQmiSupportedModesContext *ctx,
-                                                     gpointer                    log_object)
+mm_supported_modes_from_qmi_supported_modes_context (MMQmiSupportedModesContext  *ctx,
+                                                     gpointer                     log_object,
+                                                     GError                     **error)
 {
     g_autoptr(GArray)       combinations = NULL;
     g_autoptr(GArray)       all = NULL;
     MMModemModeCombination  mode;
+
+    if (ctx->all == MM_MODEM_MODE_NONE) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "No supported modes reported");
+        return NULL;
+    }
 
     /* Start with a mode including ALL */
     mode.allowed = ctx->all;

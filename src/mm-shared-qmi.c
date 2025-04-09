@@ -1728,6 +1728,7 @@ mm_shared_qmi_load_supported_modes (MMIfaceModem        *self,
     MMQmiSupportedModesContext  ctx = { 0 };
     guint                       i;
     GArray                     *combinations;
+    GError                     *error = NULL;
 
     task = g_task_new (self, NULL, callback, user_data);
 
@@ -1753,8 +1754,11 @@ mm_shared_qmi_load_supported_modes (MMIfaceModem        *self,
     ctx.current_capabilities = priv->current_capabilities;
     ctx.multimode = priv->multimode;
 
-    combinations = mm_supported_modes_from_qmi_supported_modes_context (&ctx, self);
-    g_task_return_pointer (task, combinations, (GDestroyNotify) g_array_unref);
+    combinations = mm_supported_modes_from_qmi_supported_modes_context (&ctx, self, &error);
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_pointer (task, combinations, (GDestroyNotify) g_array_unref);
     g_object_unref (task);
 }
 
