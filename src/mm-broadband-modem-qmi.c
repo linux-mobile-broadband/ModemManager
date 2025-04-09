@@ -5417,7 +5417,7 @@ network_reject_indication_cb (QmiClientNas                        *client,
                               QmiIndicationNasNetworkRejectOutput *output,
                               MMBroadbandModemQmi                 *self)
 {
-    QmiNasNetworkServiceDomain service_domain = QMI_NAS_NETWORK_SERVICE_DOMAIN_UNKNOWN;
+    QmiNasNetworkServiceDomain service_domain = QMI_NAS_NETWORK_SERVICE_DOMAIN_NONE;
     QmiNasRadioInterface       radio_interface = QMI_NAS_RADIO_INTERFACE_UNKNOWN;
     QmiNasRejectCause          reject_cause = QMI_NAS_REJECT_CAUSE_NONE;
     guint16                    mcc = 0;
