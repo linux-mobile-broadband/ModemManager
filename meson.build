@@ -259,14 +259,14 @@ config_h.set('WITH_BUILTIN_PLUGINS', enable_builtin_plugins)
 # MBIM support (enabled by default)
 enable_mbim = get_option('mbim')
 if enable_mbim
-  mbim_glib_dep = dependency('mbim-glib', version: '>= 1.31.95')
+  mbim_glib_dep = dependency('mbim-glib', version: '>= 1.32.0')
 endif
 config_h.set('WITH_MBIM', enable_mbim)
 
 # QMI support (enabled by default)
 enable_qmi = get_option('qmi')
 if enable_qmi
-  qmi_glib_dep = dependency('qmi-glib', version: '>= 1.35.95')
+  qmi_glib_dep = dependency('qmi-glib', version: '>= 1.36.0')
 endif
 config_h.set('WITH_QMI', enable_qmi)
 
