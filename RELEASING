@@ -1,21 +1,15 @@
 
 The ModemManager releases are generated using meson.
 
-0.1) For major releases:
-     * Increment mm_minor_version and reset mm_micro_version.
+1) For major releases:
+     * Increment minor component and reset micro component of 'version' in meson.build
      * Assuming API/ABI compatibility in libmm-glib, increment both
        mm_glib_lt_current and mm_glib_lt_age.
 
-0.2) For stable branch releases:
-     * Increment mm_micro_version.
+2) For stable branch releases:
+     * Increment micro component of 'version' in meson.build.
 
-1) Add signed tag:
-    $ git tag -s 1.20.0
-
-   The description included in the signed tag could be:
-    Release 1.20.0
-
-2) Configure and build the whole project, making sure gtk-doc and introspection
+3) Configure and build the whole project, making sure gtk-doc and introspection
    are enabled:
     $ meson setup build \
         --prefix=/usr \
@@ -24,11 +18,19 @@ The ModemManager releases are generated using meson.
         -Dgtk_doc=true
     $ ninja -C build
 
-3) Run the test suite and install locally:
+4) Run the test suite and install locally:
     $ ninja -C build dist
     $ sudo ninja -C build install
 
-4) Create directories for the manpages and gtk-doc documentation in
+5) Push changes to a release MR on gitlab; once CI passes merge the PR.
+
+6) Add signed tag pointing to the merge commit for the release MR:
+    $ git tag -s 1.20.0
+
+   The description included in the signed tag could be:
+    Release 1.20.0
+
+7) Create directories for the manpages and gtk-doc documentation in
    freedesktop.org, and also update the 'latest' links:
     $ ssh fd.o
     [fd.o] $ cd ${ModemManager}/man/
@@ -41,14 +43,14 @@ The ModemManager releases are generated using meson.
     [fd.o] $ mkdir -p ${VERSION}/libmm-glib
     [fd.o] $ ln -s ${VERSION} latest
 
-5) Generate HTML for the manpages:
+8) Generate HTML for the manpages:
     $ roffit < docs/man/mmcli.1 > mmcli.1.html
     $ roffit < docs/man/ModemManager.8 > ModemManager.8.html
 
-6) Upload manpages in HTML to freedesktop.org:
+9) Upload manpages in HTML to freedesktop.org:
     $ scp *.html fd.o:${ModemManager}/man/${VERSION}/
 
-7) Copy documentation from /usr/share/gtk-doc and fix online references manually
+10) Copy documentation from /usr/share/gtk-doc and fix online references manually
     $ mkdir ModemManager-html
     $ cp -r /usr/share/gtk-doc/html/ModemManager/* ModemManager-html/
     $ for FILE in $(ls ModemManager-html/*.html); do \
@@ -64,17 +66,17 @@ The ModemManager releases are generated using meson.
         sed -i 's|<a[^>]* href="\.\./gio/[^"]*|<a href="https://docs.gtk.org/gio/|g' $FILE; \
       done
 
-8) Upload the modified HTML files to freedesktop.org:
+11) Upload the modified HTML files to freedesktop.org:
     $ scp ModemManager-html/* fd.o:${ModemManager}/doc/${VERSION}/ModemManager/
     $ scp libmm-glib-html/* fd.o:${ModemManager}/doc/${VERSION}/libmm-glib/
 
-9.1) For major releases:
+12) For major releases:
      * Fork new stable branch (e.g. mm-${MAJOR}-${MINOR})
-     * Post-release version bump in the main branch, increment mm_minor_version.
-     * Post-release version bump in the stable branch, increment mm_micro_version.
+     * Post-release version bump in the main branch, increment minor 'version' component in meson.build.
+     * Post-release version bump in the stable branch, increment micro 'version' component in meson.build.
 
-9.2) For stable branch releases:
-     * Post-release version bump, increment mm_micro_version.
+13) For stable branch releases:
+     * Post-release version bump, increment micro 'version' component in meson.build.
 
 -------------------------------------------------------------------------------
 
