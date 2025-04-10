@@ -17,6 +17,9 @@ The most important features and changes in this release are the following:
    ** Fix MM_BEARER_IP_FAMILY_ANY ABI break introduced in 1.20
    ** Add new Cell Broadcast API
    ** Report sub-system vendor and product IDs in Firmware device IDs
+   ** Add new ID_MM_TTY_AT_PROBE_TRIES udev tag to control number of AT probes
+      on a per-port basis for plugins that do not override generic probing logic.
+   ** Add new Cell Broadcast API
 
  * Core:
    ** Improved handling of odd +CGDCONT responses
@@ -39,6 +42,8 @@ The most important features and changes in this release are the following:
       interrupting each other's operations
    ** Work around elogind sometimes not sending the PrepareForSleep signal
    ** Add generic Qualcomm Firehose and Sahara firmware update support
+   ** Fix SIM unlock behavior being treated at SIM hot-swaps
+   ** Detect 4G & 5G modem capabilities with newer AT commands
 
  * Translations:
    ** Updated Brazilian Portuguese and Polish translations
@@ -74,6 +79,7 @@ The most important features and changes in this release are the following:
  * mmcli:
    ** Higher long-running operation timeouts to avoid exiting before MM is done
    ** Print bearer D-Bus path after connection
+   ** Add commands for getting/setting Cell Broadcast properties
 
  * libmm-glib:
    ** 3gpp-profile: fix loading roaming allowance and profile source
@@ -104,6 +110,8 @@ The most important features and changes in this release are the following:
    ** Update all attach settings (home/partner/non-partner) to the same values
       so that roaming attach uses same settings as home
    ** Read operator name from SIM EF files rather than from the network
+   ** Correctly handle custom data classes, fixing registration with some
+      5G-capable modems that do not support later MS Basic Connect extensions
 
  * QMI:
    ** Report specific IP version disallowed rather than just "IP version
@@ -119,6 +127,8 @@ The most important features and changes in this release are the following:
    ** Fix enabling Serving System indications if the modem doesn't support
       System Info
    ** Implement getting/setting UE mode
+   ** Don't assert and die if modem reports no supported modes, like before FCC
+      unlock occurs
 
  * Plugins:
    ** Allow plugins to match on PCI subsystem device ID property
