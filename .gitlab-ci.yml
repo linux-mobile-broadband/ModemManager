@@ -24,6 +24,9 @@ stages:
     LIBQMI_BRANCH: 'main'
     LIBQRTR_BRANCH: 'main'
     LIBMBIM_BRANCH: 'main'
+    BUILD_MBIM: true
+    BUILD_QMI: true
+    BUILD_QRTR: true
 
 build container:
   extends:
@@ -35,11 +38,6 @@ build container:
     - merge_requests
     - tags
     - schedules
-
-before_script:
-    - export BUILD_MBIM=true
-    - export BUILD_QMI=true
-    - export BUILD_QRTR=true
 
 .prepare_deps: &prepare_deps
     - >
