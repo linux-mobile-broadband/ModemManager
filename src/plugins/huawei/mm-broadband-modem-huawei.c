@@ -3879,12 +3879,14 @@ modem_voice_disable_unsolicited_events (MMIfaceModemVoice   *self,
 static MMBaseCall *
 create_call (MMIfaceModemVoice *self,
              MMCallDirection    direction,
-             const gchar       *number)
+             const gchar       *number,
+             const guint        dtmf_tone_duration)
 {
     return mm_call_at_new (MM_BASE_MODEM (self),
                            G_OBJECT (self),
                            direction,
                            number,
+                           dtmf_tone_duration,
                            TRUE,  /* skip_incoming_timeout */
                            TRUE,  /* supports_dialing_to_ringing */
                            TRUE); /* supports_ringing_to_active) */

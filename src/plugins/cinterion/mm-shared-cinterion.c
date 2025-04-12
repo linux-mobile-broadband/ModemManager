@@ -998,7 +998,8 @@ mm_shared_cinterion_enable_location_gathering (MMIfaceModemLocation  *self,
 MMBaseCall *
 mm_shared_cinterion_create_call (MMIfaceModemVoice *self,
                                  MMCallDirection    direction,
-                                 const gchar       *number)
+                                 const gchar       *number,
+                                 const guint        dtmf_tone_duration)
 {
     Private *priv;
 
@@ -1010,6 +1011,7 @@ mm_shared_cinterion_create_call (MMIfaceModemVoice *self,
                                G_OBJECT (self),
                                direction,
                                number,
+                               dtmf_tone_duration,
                                /* When SLCC is supported we have support for detailed
                                 * call list events via call list report URCs */
                                TRUE,   /* incoming timeout not required */
@@ -1020,7 +1022,7 @@ mm_shared_cinterion_create_call (MMIfaceModemVoice *self,
     /* otherwise, run parent's generic base call logic */
     g_assert (priv->iface_modem_voice_parent);
     g_assert (priv->iface_modem_voice_parent->create_call);
-    return priv->iface_modem_voice_parent->create_call (self, direction, number);
+    return priv->iface_modem_voice_parent->create_call (self, direction, number, dtmf_tone_duration);
 }
 
 /*****************************************************************************/

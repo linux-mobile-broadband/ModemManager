@@ -105,7 +105,7 @@
         SendDtmf:
         @dtmf: DTMF tone identifier [0-9A-D*#].
 
-        Send a DTMF tone (Dual Tone Multi-Frequency) (only on supported modem).
+        Send a DTMF tone (Dual Tone Multi-Frequency) (only on supported modems).
 
         Applicable only if state is <link linkend="MM-CALL-STATE-ACTIVE:CAPS"><constant>MM_CALL_STATE_ACTIVE</constant></link>.
 
@@ -119,7 +119,7 @@
         DtmfReceived:
         @dtmf: DTMF tone identifier [0-9A-D*#].
 
-        Emitted when a DTMF tone is received (only on supported modem)
+        Emitted when a DTMF tone is received (only on supported modems)
 
         Since: 1.6
     -->
@@ -232,5 +232,18 @@
         Since: 1.10
     -->
     <property name="AudioFormat" type="a{sv}" access="read" />
+
+    <!--
+        DtmfToneDuration:
+
+        The length of DTMF tones, in milliseconds. Valid range is 100ms to
+        1000ms and is rounded up to the next 100ms if not evenly divisble
+        by 100. Set the duration by passing this property to
+        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Voice.CreateCall">CreateCall()</link>
+        at call creation time.
+
+        Since: 1.26
+    -->
+    <property name="DtmfToneDuration" type="u" access="read" />
   </interface>
 </node>

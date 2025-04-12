@@ -5871,3 +5871,19 @@ mm_parse_cpin_response (const gchar *response,
 
     return MM_MODEM_LOCK_UNKNOWN;
 }
+
+/*****************************************************************************/
+
+guint
+mm_dtmf_duration_normalize (guint duration_ms)
+{
+    /* Default to 500ms */
+    if (duration_ms == 0)
+        return 500;
+
+    /* round to next highest 100ms */
+    if (duration_ms % 100)
+        duration_ms = ((duration_ms + 100) / 100) * 100;
+
+    return CLAMP (duration_ms, 100, 1000);
+}

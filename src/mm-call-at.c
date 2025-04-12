@@ -36,9 +36,18 @@
 
 G_DEFINE_TYPE (MMCallAt, mm_call_at, MM_TYPE_BASE_CALL)
 
+typedef enum {
+    FEATURE_SUPPORT_UNKNOWN,
+    FEATURE_NOT_SUPPORTED,
+    FEATURE_SUPPORTED,
+} FeatureSupport;
+
 struct _MMCallAtPrivate {
     /* The modem which owns this call */
     MMBaseModem *modem;
+
+    /* DTMF support */
+    FeatureSupport vtd_supported;
 };
 
 /*****************************************************************************/
@@ -334,26 +343,66 @@ call_send_dtmf_ready (MMBaseModem  *modem,
 }
 
 static void
-call_send_dtmf (MMBaseCall *_self,
-                const gchar *dtmf,
-                GAsyncReadyCallback callback,
-                gpointer user_data)
+send_dtmf_digit (MMCallAt    *self,
+                 GTask       *task,
+                 const gchar  dtmf_digit)
 {
-    MMCallAt *self = MM_CALL_AT (_self);
-    GTask    *task;
-    gchar    *cmd;
+    g_autofree gchar *cmd = NULL;
 
-    task = g_task_new (self, NULL, callback, user_data);
-
-    cmd = g_strdup_printf ("AT+VTS=%c", dtmf[0]);
+    cmd = g_strdup_printf ("AT+VTS=%c", dtmf_digit);
     mm_base_modem_at_command (self->priv->modem,
                               cmd,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)call_send_dtmf_ready,
                               task);
+}
 
-    g_free (cmd);
+static void
+call_dtmf_vtd_ready (MMBaseModem  *modem,
+                     GAsyncResult *res,
+                     GTask        *task)
+{
+    MMCallAt          *self;
+    g_autoptr(GError)  error = NULL;
+    gchar              dtmf_digit;
+
+    self = g_task_get_source_object (task);
+
+    mm_base_modem_at_command_finish (modem, res, &error);
+    self->priv->vtd_supported = error ? FEATURE_NOT_SUPPORTED : FEATURE_SUPPORTED;
+
+    dtmf_digit = (gchar) GPOINTER_TO_UINT (g_task_get_task_data (task));
+    send_dtmf_digit (self, task, dtmf_digit);
+}
+
+static void
+call_send_dtmf (MMBaseCall *_self,
+                const gchar *dtmf,
+                GAsyncReadyCallback callback,
+                gpointer user_data)
+{
+    MMCallAt         *self = MM_CALL_AT (_self);
+    GTask            *task;
+    g_autofree gchar *cmd = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (self->priv->vtd_supported == FEATURE_NOT_SUPPORTED) {
+        send_dtmf_digit (self, task, dtmf[0]);
+        return;
+    }
+
+    g_task_set_task_data (task, GUINT_TO_POINTER (dtmf[0]), NULL);
+
+    /* Otherwise try to set duration */
+    cmd = g_strdup_printf ("AT+VTD=%u", mm_base_call_get_dtmf_tone_duration (_self));
+    mm_base_modem_at_command (self->priv->modem,
+                              cmd,
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)call_dtmf_vtd_ready,
+                              task);
 }
 
 /*****************************************************************************/
@@ -363,6 +412,7 @@ mm_call_at_new (MMBaseModem     *modem,
                 GObject         *bind_to,
                 MMCallDirection  direction,
                 const gchar     *number,
+                const guint      dtmf_tone_duration,
                 gboolean         skip_incoming_timeout,
                 gboolean         supports_dialing_to_ringing,
                 gboolean         supports_ringing_to_active)
@@ -370,10 +420,11 @@ mm_call_at_new (MMBaseModem     *modem,
     MMBaseCall *call;
 
     call = MM_BASE_CALL (g_object_new (MM_TYPE_CALL_AT,
-                                       MM_BASE_CALL_IFACE_MODEM_VOICE, modem,
-                                       MM_BIND_TO,                     bind_to,
-                                       "direction",                    direction,
-                                       "number",                       number,
+                                       MM_BASE_CALL_IFACE_MODEM_VOICE,           modem,
+                                       MM_BIND_TO,                               bind_to,
+                                       MM_CALL_DIRECTION,                        direction,
+                                       MM_CALL_NUMBER,                           number,
+                                       MM_CALL_DTMF_TONE_DURATION,               dtmf_tone_duration,
                                        MM_BASE_CALL_SKIP_INCOMING_TIMEOUT,       skip_incoming_timeout,
                                        MM_BASE_CALL_SUPPORTS_DIALING_TO_RINGING, supports_dialing_to_ringing,
                                        MM_BASE_CALL_SUPPORTS_RINGING_TO_ACTIVE,  supports_ringing_to_active,

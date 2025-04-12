@@ -37,6 +37,10 @@ typedef struct _MMBaseCall MMBaseCall;
 typedef struct _MMBaseCallClass MMBaseCallClass;
 typedef struct _MMBaseCallPrivate MMBaseCallPrivate;
 
+#define MM_CALL_DIRECTION          "direction"
+#define MM_CALL_NUMBER             "number"
+#define MM_CALL_DTMF_TONE_DURATION "dtmf-tone-duration"
+
 #define MM_BASE_CALL_PATH                        "call-path"
 #define MM_BASE_CALL_CONNECTION                  "call-connection"
 #define MM_BASE_CALL_IFACE_MODEM_VOICE           "call-iface-modem-voice"
@@ -128,5 +132,10 @@ void         mm_base_call_received_dtmf (MMBaseCall *self,
                                          const gchar *dtmf);
 
 void         mm_base_call_incoming_refresh (MMBaseCall *self);
+
+guint        mm_base_call_get_dtmf_tone_duration (MMBaseCall *self);
+
+void         mm_base_call_set_dtmf_tone_duration (MMBaseCall *self,
+                                                  guint       duration_ms);
 
 #endif /* MM_BASE_CALL_H */

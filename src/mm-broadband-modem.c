@@ -8899,7 +8899,8 @@ modem_voice_disable_unsolicited_events (MMIfaceModemVoice   *self,
 static MMBaseCall *
 modem_voice_create_call (MMIfaceModemVoice *_self,
                          MMCallDirection    direction,
-                         const gchar       *number)
+                         const gchar       *number,
+                         const guint        dtmf_tone_duration)
 {
     MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
 
@@ -8907,6 +8908,7 @@ modem_voice_create_call (MMIfaceModemVoice *_self,
                            G_OBJECT (self),
                            direction,
                            number,
+                           dtmf_tone_duration,
                            /* If +CLCC is supported, we want no incoming timeout.
                             * Also, we're able to support detailed call state updates without
                             * additional vendor-specific commands. */

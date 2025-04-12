@@ -53,6 +53,7 @@ MMBaseCall *mm_call_at_new (MMBaseModem     *modem,
                             GObject         *bind_to,
                             MMCallDirection  direction,
                             const gchar     *number,
+                            const guint      dtmf_tone_duration,
                             gboolean         skip_incoming_timeout,
                             gboolean         supports_dialing_to_ringing,
                             gboolean         supports_ringing_to_active);

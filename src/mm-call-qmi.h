@@ -49,6 +49,7 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMCallQmi, g_object_unref)
 
 MMBaseCall *mm_call_qmi_new (MMBaseModem     *modem,
                              MMCallDirection  direction,
-                             const gchar     *number);
+                             const gchar     *number,
+                             const guint      dtmf_tone_duration);
 
 #endif /* MM_CALL_QMI_H */

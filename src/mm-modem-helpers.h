@@ -643,4 +643,9 @@ guint mm_string_uint_map_lookup (const MMStringUintMap *map,
 MMModemLock mm_parse_cpin_response (const gchar *response,
                                     gboolean     expect_cpin_prefix);
 
+/*****************************************************************************/
+
+/* Helper to clamp duration and round to next 100ms */
+guint mm_dtmf_duration_normalize (guint duration_ms);
+
 #endif  /* MM_MODEM_HELPERS_H */

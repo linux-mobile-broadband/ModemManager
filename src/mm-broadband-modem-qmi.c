@@ -12190,11 +12190,13 @@ modem_voice_load_call_list (MMIfaceModemVoice   *self,
 static MMBaseCall *
 modem_voice_create_call (MMIfaceModemVoice *self,
                          MMCallDirection    direction,
-                         const gchar       *number)
+                         const gchar       *number,
+                         const guint        dtmf_tone_duration)
 {
     return mm_call_qmi_new (MM_BASE_MODEM (self),
                             direction,
-                            number);
+                            number,
+                            dtmf_tone_duration);
 }
 
 /*****************************************************************************/

@@ -922,6 +922,20 @@ mm_base_call_set_multiparty (MMBaseCall *self,
     return mm_gdbus_call_set_multiparty (MM_GDBUS_CALL (self), multiparty);
 }
 
+guint
+mm_base_call_get_dtmf_tone_duration (MMBaseCall *self)
+{
+    return mm_dtmf_duration_normalize (mm_gdbus_call_get_dtmf_tone_duration (MM_GDBUS_CALL (self)));
+}
+
+void
+mm_base_call_set_dtmf_tone_duration (MMBaseCall *self,
+                                     guint       duration_ms)
+{
+    return mm_gdbus_call_set_dtmf_tone_duration (MM_GDBUS_CALL (self),
+                                                 mm_dtmf_duration_normalize (duration_ms));
+}
+
 /*****************************************************************************/
 /* Current call index, only applicable while the call is ongoing
  * See 3GPP TS 22.030 [27], subclause 6.5.5.1.

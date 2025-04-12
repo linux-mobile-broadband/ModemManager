@@ -402,8 +402,11 @@ voice_start_continuous_dtmf_ready (QmiClientVoice *client,
                                    GAsyncResult   *res,
                                    GTask          *task)
 {
+    MMCallQmi                                           *self;
     g_autoptr(QmiMessageVoiceStartContinuousDtmfOutput)  output = NULL;
     GError                                              *error = NULL;
+
+    self = g_task_get_source_object (task);
 
     output = qmi_client_voice_start_continuous_dtmf_finish (client, res, &error);
     if (!output) {
@@ -420,8 +423,10 @@ voice_start_continuous_dtmf_ready (QmiClientVoice *client,
         return;
     }
 
-    /* Disable DTMF press after 500 ms */
-    g_timeout_add (500, (GSourceFunc) voice_stop_continuous_dtmf, task);
+    /* Disable DTMF press after DTMF tone duration elapses */
+    g_timeout_add (mm_base_call_get_dtmf_tone_duration (MM_BASE_CALL (self)),
+                   (GSourceFunc) voice_stop_continuous_dtmf,
+                   task);
 }
 
 static void
@@ -489,15 +494,17 @@ call_send_dtmf (MMBaseCall          *self,
 MMBaseCall *
 mm_call_qmi_new (MMBaseModem     *modem,
                  MMCallDirection  direction,
-                 const gchar     *number)
+                 const gchar     *number,
+                 const guint      dtmf_tone_duration)
 {
     MMBaseCall  *call;
 
     call = MM_BASE_CALL (g_object_new (MM_TYPE_CALL_QMI,
-                                       MM_BASE_CALL_IFACE_MODEM_VOICE, modem,
-                                       MM_BIND_TO,                     modem,
-                                       "direction",                    direction,
-                                       "number",                       number,
+                                       MM_BASE_CALL_IFACE_MODEM_VOICE,           modem,
+                                       MM_BIND_TO,                               modem,
+                                       MM_CALL_DIRECTION,                        direction,
+                                       MM_CALL_NUMBER,                           number,
+                                       MM_CALL_DTMF_TONE_DURATION,               dtmf_tone_duration,
                                        MM_BASE_CALL_SKIP_INCOMING_TIMEOUT,       TRUE,
                                        MM_BASE_CALL_SUPPORTS_DIALING_TO_RINGING, TRUE,
                                        MM_BASE_CALL_SUPPORTS_RINGING_TO_ACTIVE,  TRUE,

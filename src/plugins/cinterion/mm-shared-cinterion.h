@@ -105,7 +105,8 @@ gboolean              mm_shared_cinterion_disable_location_gathering_finish (MMI
 
 MMBaseCall *mm_shared_cinterion_create_call (MMIfaceModemVoice *self,
                                              MMCallDirection    direction,
-                                             const gchar       *number);
+                                             const gchar       *number,
+                                             const guint        dtmf_tone_duration);
 
 void     mm_shared_cinterion_voice_check_support                     (MMIfaceModemVoice   *self,
                                                                       GAsyncReadyCallback  callback,
