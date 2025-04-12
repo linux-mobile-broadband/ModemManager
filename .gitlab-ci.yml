@@ -62,7 +62,7 @@ build container:
       if [ "$BUILD_QMI" == "true" ]; then
         git clone --depth 1 --branch ${LIBQMI_BRANCH} https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
         pushd libqmi
-        meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=false -Dbash_completion=false -Dmbim_qmux=$BUILD_MBIM -Dqrtr=$BUILD_QRTR -Dcollection=basic
+        meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=false -Dbash_completion=false -Dmbim_qmux=$BUILD_MBIM -Dqrtr=$BUILD_QRTR
         ninja -C build
         ninja -C build install
         popd
