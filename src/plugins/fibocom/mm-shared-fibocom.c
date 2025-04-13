@@ -75,8 +75,8 @@ get_private (MMSharedFibocom *self)
         priv->class_parent = MM_SHARED_FIBOCOM_GET_IFACE (self)->peek_parent_class (self);
 
         /* Setup firmware interface of parent class */
-        g_assert (MM_SHARED_FIBOCOM_GET_IFACE (self)->peek_parent_firmware_interface);
-        priv->iface_modem_firmware_parent = MM_SHARED_FIBOCOM_GET_IFACE (self)->peek_parent_firmware_interface (self);
+        if (MM_SHARED_FIBOCOM_GET_IFACE (self)->peek_parent_firmware_interface)
+            priv->iface_modem_firmware_parent = MM_SHARED_FIBOCOM_GET_IFACE (self)->peek_parent_firmware_interface (self);
 
         g_object_set_qdata_full (G_OBJECT (self), private_quark, priv, (GDestroyNotify)private_free);
     }
