@@ -4866,6 +4866,29 @@ test_mnc_length (void)
 
 /*****************************************************************************/
 
+typedef struct {
+    const gchar                   *str;
+    const MMModemAccessTechnology  act;
+} TestActData;
+
+static const TestActData test_act_data[] = {
+    { "EDGE",      MM_MODEM_ACCESS_TECHNOLOGY_EDGE },
+    /* Ensure WCDMA does not get counted as 3GPP2 CDMA */
+    { "WCDMA",     MM_MODEM_ACCESS_TECHNOLOGY_UMTS },
+    { "CDMA-EVDO", MM_MODEM_ACCESS_TECHNOLOGY_1XRTT | MM_MODEM_ACCESS_TECHNOLOGY_EVDO0 },
+};
+
+static void
+test_string_to_access_tech (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (test_act_data); i++)
+        g_assert_cmpint (mm_string_to_access_tech (test_act_data[i].str), ==, test_act_data[i].act);
+}
+
+/*****************************************************************************/
+
 #define TESTCASE(t, d) g_test_create_case (#t, 0, d, NULL, (GTestFixtureFunc) t, NULL)
 
 int main (int argc, char **argv)
@@ -5110,6 +5133,8 @@ int main (int argc, char **argv)
 
     g_test_suite_add (suite, TESTCASE (test_spn_to_utf8, NULL));
     g_test_suite_add (suite, TESTCASE (test_mnc_length, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_string_to_access_tech, NULL));
 
     result = g_test_run ();
 
