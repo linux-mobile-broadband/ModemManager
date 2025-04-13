@@ -32,6 +32,10 @@ static GQuark in_call_event_context_quark;
 
 G_DEFINE_INTERFACE (MMIfaceModemVoice, mm_iface_modem_voice, MM_TYPE_IFACE_MODEM)
 
+static void setup_call_list_polling (MMCallList        *call_list,
+                                     const gchar       *call_path_added,
+                                     MMIfaceModemVoice *self);
+
 /*****************************************************************************/
 
 void
@@ -1781,6 +1785,7 @@ typedef enum {
     IN_CALL_SETUP_STEP_FIRST,
     IN_CALL_SETUP_STEP_UNSOLICITED_EVENTS,
     IN_CALL_SETUP_STEP_AUDIO_CHANNEL,
+    IN_CALL_SETUP_STEP_CHECK_POLLING,
     IN_CALL_SETUP_STEP_LAST,
 } InCallSetupStep;
 
@@ -1906,6 +1911,10 @@ in_call_setup_context_step (GTask *task)
                 task);
             return;
         }
+        ctx->step++;
+        /* fall-through */
+    case IN_CALL_SETUP_STEP_CHECK_POLLING:
+        setup_call_list_polling (NULL, NULL, self);
         ctx->step++;
         /* fall-through */
     case IN_CALL_SETUP_STEP_LAST:
