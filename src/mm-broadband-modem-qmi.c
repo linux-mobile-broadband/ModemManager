@@ -44,6 +44,7 @@
 #include "mm-iface-modem-firmware.h"
 #include "mm-iface-modem-sar.h"
 #include "mm-iface-modem-signal.h"
+#include "mm-iface-modem-time.h"
 #include "mm-iface-modem-oma.h"
 #include "mm-shared-qmi.h"
 #include "mm-sim-qmi.h"
@@ -67,12 +68,14 @@ static void iface_modem_oma_init                  (MMIfaceModemOmaInterface     
 static void iface_modem_firmware_init             (MMIfaceModemFirmwareInterface           *iface);
 static void iface_modem_sar_init                  (MMIfaceModemSarInterface                *iface);
 static void iface_modem_signal_init               (MMIfaceModemSignalInterface             *iface);
+static void iface_modem_time_init                 (MMIfaceModemTimeInterface               *iface);
 static void shared_qmi_init                       (MMSharedQmi                             *iface);
 
 static MMIfaceModemCellBroadcastInterface *iface_modem_cell_broadcast_parent;
 static MMIfaceModemLocationInterface      *iface_modem_location_parent;
 static MMIfaceModemMessagingInterface     *iface_modem_messaging_parent;
 static MMIfaceModemVoiceInterface         *iface_modem_voice_parent;
+static MMIfaceModemTimeInterface          *iface_modem_time_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmi, mm_broadband_modem_qmi, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -86,6 +89,7 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmi, mm_broadband_modem_qmi, MM_TYPE_BRO
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SAR, iface_modem_sar_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SIGNAL, iface_modem_signal_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_OMA, iface_modem_oma_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_QMI, shared_qmi_init))
@@ -190,6 +194,9 @@ struct _MMBroadbandModemQmiPrivate {
     /* Packet service state helpers when using NAS System Info and DSD
      * (not applicable when using NAS Serving System) */
     gboolean dsd_supported;
+
+    /* NAS doesn't support Get Network Time; chain up to parent */
+    gboolean nas_time_use_parent;
 };
 
 /*****************************************************************************/
@@ -9367,6 +9374,326 @@ enable_location_gathering (MMIfaceModemLocation  *self,
 }
 
 /*****************************************************************************/
+/* Load network time (Time interface) */
+
+static gchar *
+modem_time_load_network_time_finish (MMIfaceModemTime *self,
+                                     GAsyncResult *res,
+                                     GError **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+get_time_ready (QmiClientNas *client,
+                GAsyncResult *res,
+                GTask        *task)
+{
+    g_autoptr(QmiMessageNasGetNetworkTimeOutput)  output = NULL;
+    GError                                       *error = NULL;
+    guint16                                       year = 0;
+    guint8                                        month = 0;
+    guint8                                        day = 0;
+    guint8                                        hour = 0;
+    guint8                                        minute = 0;
+    guint8                                        second = 0;
+    gint8                                         tz_offset = 0;
+
+    output = qmi_client_nas_get_network_time_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_nas_get_network_time_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get network time: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_nas_get_network_time_output_get_3gpp_time (output,
+                                                                       &year,
+                                                                       &month,
+                                                                       &day,
+                                                                       &hour,
+                                                                       &minute,
+                                                                       &second,
+                                                                       NULL,
+                                                                       &tz_offset,
+                                                                       NULL,
+                                                                       NULL,
+                                                                       &error)) {
+        g_prefix_error (&error, "Couldn't get 3GPP network time info: ");
+        g_task_return_error (task, error);
+    } else {
+        gchar *iso8601p;
+
+        /* Return ISO-8601 format date/time string */
+        iso8601p = mm_new_iso8601_time (year, month, day, hour,
+                                        minute, second,
+                                        TRUE, (tz_offset * 15),
+                                        &error);
+        if (iso8601p)
+            g_task_return_pointer (task, iso8601p, g_free);
+        else
+            g_task_return_error (task, error);
+    }
+
+    g_object_unref (task);
+}
+
+static void
+parent_load_network_time_ready (MMIfaceModemTime *self,
+                                GAsyncResult     *res,
+                                GTask            *task)
+{
+    GError *error = NULL;
+    gchar  *iso8601p;
+
+    iso8601p = iface_modem_time_parent->load_network_time_finish (self, res, &error);
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_pointer (task, iso8601p, g_free);
+
+    g_object_unref (task);
+}
+
+static void
+modem_time_load_network_time (MMIfaceModemTime *_self,
+                              GAsyncReadyCallback callback,
+                              gpointer user_data)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    QmiClient           *client;
+    GTask               *task;
+    GError              *error = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (self->priv->nas_time_use_parent) {
+        iface_modem_time_parent->load_network_time (
+            MM_IFACE_MODEM_TIME (self),
+            (GAsyncReadyCallback) parent_load_network_time_ready,
+            task);
+        return;
+    }
+
+    client = mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
+                                        QMI_SERVICE_NAS,
+                                        MM_PORT_QMI_FLAG_DEFAULT,
+                                        &error);
+    if (!client) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    qmi_client_nas_get_network_time (QMI_CLIENT_NAS (client),
+                                     NULL,
+                                     10,
+                                     NULL,
+                                     (GAsyncReadyCallback)get_time_ready,
+                                     task);
+}
+
+/*****************************************************************************/
+/* Load network timezone (Time interface) */
+
+static MMNetworkTimezone *
+modem_time_load_network_timezone_finish (MMIfaceModemTime *self,
+                                         GAsyncResult *res,
+                                         GError **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+get_timezone_ready (QmiClientNas *client,
+                    GAsyncResult *res,
+                    GTask        *task)
+{
+    g_autoptr(QmiMessageNasGetNetworkTimeOutput)  output = NULL;
+    GError                                       *error = NULL;
+    gint8                                         tz_offset = 0;
+
+    output = qmi_client_nas_get_network_time_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_nas_get_network_time_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get network time: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_nas_get_network_time_output_get_3gpp_time (output,
+                                                                       NULL,
+                                                                       NULL,
+                                                                       NULL,
+                                                                       NULL,
+                                                                       NULL,
+                                                                       NULL,
+                                                                       NULL,
+                                                                       &tz_offset,
+                                                                       NULL,
+                                                                       NULL,
+                                                                       &error)) {
+        g_prefix_error (&error, "Couldn't get 3GPP network time info: ");
+        g_task_return_error (task, error);
+    } else {
+        MMNetworkTimezone *tz;
+
+        tz = mm_network_timezone_new ();
+        mm_network_timezone_set_offset (tz, tz_offset * 15);
+        g_task_return_pointer (task, tz, g_object_unref);
+    }
+
+    g_object_unref (task);
+}
+
+static void
+parent_load_network_timezone_ready (MMIfaceModemTime *self,
+                                    GAsyncResult     *res,
+                                    GTask            *task)
+{
+    GError            *error = NULL;
+    MMNetworkTimezone *tz;
+
+    tz = iface_modem_time_parent->load_network_timezone_finish (self, res, &error);
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_pointer (task, tz, g_object_unref);
+
+    g_object_unref (task);
+}
+
+static void
+modem_time_load_network_timezone (MMIfaceModemTime *_self,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    QmiClient           *client;
+    GTask               *task;
+    GError              *error = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (self->priv->nas_time_use_parent) {
+        iface_modem_time_parent->load_network_timezone (
+            MM_IFACE_MODEM_TIME (self),
+            (GAsyncReadyCallback) parent_load_network_timezone_ready,
+            task);
+        return;
+    }
+
+    client = mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
+                                        QMI_SERVICE_NAS,
+                                        MM_PORT_QMI_FLAG_DEFAULT,
+                                        &error);
+    if (!client) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    qmi_client_nas_get_network_time (QMI_CLIENT_NAS (client),
+                                     NULL,
+                                     10,
+                                     NULL,
+                                     (GAsyncReadyCallback)get_timezone_ready,
+                                     task);
+}
+
+/*****************************************************************************/
+/* Check support (Time interface) */
+
+static gboolean
+modem_time_check_support_finish (MMIfaceModemTime *self,
+                                 GAsyncResult *res,
+                                 GError **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+parent_time_check_support_ready (MMIfaceModemTime *_self,
+                                 GAsyncResult     *res,
+                                 GTask            *task)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    GError              *error = NULL;
+    gboolean             supported;
+
+    self->priv->nas_time_use_parent = TRUE;
+
+    supported = iface_modem_time_parent->check_support_finish (_self, res, &error);
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, supported);
+
+    g_object_unref (task);
+}
+
+static void
+check_time_support_ready (QmiClientNas *client,
+                          GAsyncResult *res,
+                          GTask        *task)
+{
+    MMBroadbandModemQmi                          *self;
+    g_autoptr(QmiMessageNasGetNetworkTimeOutput)  output = NULL;
+
+    self = g_task_get_source_object (task);
+
+    output = qmi_client_nas_get_network_time_finish (client, res, NULL);
+    if (!output || !qmi_message_nas_get_network_time_output_get_result (output, NULL)) {
+        /* Try parent implementation */
+        if (iface_modem_time_parent->check_support &&
+            iface_modem_time_parent->load_network_time &&
+            iface_modem_time_parent->load_network_time_finish &&
+            iface_modem_time_parent->load_network_timezone &&
+            iface_modem_time_parent->load_network_timezone_finish) {
+            iface_modem_time_parent->check_support (
+                MM_IFACE_MODEM_TIME (self),
+                (GAsyncReadyCallback) parent_time_check_support_ready,
+                task);
+            return;
+        }
+
+        /* Otherwise unsupported */
+        g_task_return_boolean (task, FALSE);
+    } else {
+        g_task_return_boolean (task, TRUE);
+    }
+
+    g_object_unref (task);
+}
+
+static void
+modem_time_check_support (MMIfaceModemTime *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    QmiClient *client;
+    GTask     *task;
+    GError    *error = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    client = mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
+                                        QMI_SERVICE_NAS,
+                                        MM_PORT_QMI_FLAG_DEFAULT,
+                                        &error);
+    if (!client) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    qmi_client_nas_get_network_time (QMI_CLIENT_NAS (client),
+                                     NULL,
+                                     10,
+                                     NULL,
+                                     (GAsyncReadyCallback)check_time_support_ready,
+                                     task);
+}
+
+/*****************************************************************************/
 /* Check support (OMA interface) */
 
 static gboolean
@@ -15055,6 +15382,19 @@ iface_modem_sar_init (MMIfaceModemSarInterface *iface)
     iface->enable_finish = sar_enable_finish;
     iface->set_power_level = sar_set_power_level;
     iface->set_power_level_finish = sar_set_power_level_finish;
+}
+
+static void
+iface_modem_time_init (MMIfaceModemTimeInterface *iface)
+{
+    iface_modem_time_parent = g_type_interface_peek_parent (iface);
+
+    iface->check_support = modem_time_check_support;
+    iface->check_support_finish = modem_time_check_support_finish;
+    iface->load_network_time = modem_time_load_network_time;
+    iface->load_network_time_finish = modem_time_load_network_time_finish;
+    iface->load_network_timezone = modem_time_load_network_timezone;
+    iface->load_network_timezone_finish = modem_time_load_network_timezone_finish;
 }
 
 static void
