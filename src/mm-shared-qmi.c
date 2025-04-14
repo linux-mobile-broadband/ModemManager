@@ -5355,14 +5355,6 @@ loc_get_nmea_types_indication_cb (QmiClientLoc                       *client,
 
     qmi_indication_loc_get_nmea_types_output_get_nmea_types (output, &nmea_types_mask, NULL);
 
-    /* If the configured NMEA types already include GGA, GSV and GSA, we're fine. For raw
-     * GPS sources GGA is the only required one, the other two are given for completeness */
-    if ((nmea_types_mask & desired_nmea_types_mask) == desired_nmea_types_mask) {
-        g_task_return_boolean (task, TRUE);
-        g_object_unref (task);
-        return;
-    }
-
     input = qmi_message_loc_set_nmea_types_input_new ();
     qmi_message_loc_set_nmea_types_input_set_nmea_types (input, (nmea_types_mask | desired_nmea_types_mask), NULL);
     qmi_client_loc_set_nmea_types (ctx->client,
