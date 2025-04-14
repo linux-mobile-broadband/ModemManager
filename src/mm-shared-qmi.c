@@ -5093,14 +5093,58 @@ pds_gps_service_state_stop_ready (QmiClientPds *client,
 }
 
 static void
+loc_lock_engine_ready (QmiClientLoc *client,
+                       GAsyncResult *res,
+                       GTask        *task)
+{
+    MMSharedQmi                      *self;
+    Private                          *priv;
+    QmiMessageLocSetEngineLockOutput *output;
+    GError                           *error = NULL;
+
+    output = qmi_client_loc_set_engine_lock_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!qmi_message_loc_set_engine_lock_output_get_result (output, &error)
+     && !g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NO_PERMISSION)) {
+        g_prefix_error (&error, "Couldn't lock GPS engine: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        qmi_message_loc_set_engine_lock_output_unref (output);
+        return;
+    }
+
+    g_clear_error (&error);
+    qmi_message_loc_set_engine_lock_output_unref (output);
+
+    self = g_task_get_source_object (task);
+    priv = get_private (self);
+
+    if (priv->loc_client) {
+        if (priv->loc_location_nmea_indication_id != 0) {
+            g_signal_handler_disconnect (priv->loc_client, priv->loc_location_nmea_indication_id);
+            priv->loc_location_nmea_indication_id = 0;
+        }
+        g_clear_object (&priv->loc_client);
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
 loc_stop_ready (QmiClientLoc *client,
                 GAsyncResult *res,
                 GTask        *task)
 {
-    MMSharedQmi             *self;
-    Private                 *priv;
-    QmiMessageLocStopOutput *output;
-    GError                  *error = NULL;
+    QmiMessageLocStopOutput         *output;
+    QmiMessageLocSetEngineLockInput *input;
+    GError                          *error = NULL;
 
     output = qmi_client_loc_stop_finish (client, res, &error);
     if (!output) {
@@ -5120,19 +5164,16 @@ loc_stop_ready (QmiClientLoc *client,
 
     qmi_message_loc_stop_output_unref (output);
 
-    self = g_task_get_source_object (task);
-    priv = get_private (self);
+    input = qmi_message_loc_set_engine_lock_input_new ();
+    qmi_message_loc_set_engine_lock_input_set_lock_type (input, QMI_LOC_LOCK_TYPE_ALL, NULL);
+    qmi_client_loc_set_engine_lock (QMI_CLIENT_LOC (client),
+                                    input,
+                                    10,
+                                    NULL,
+                                    (GAsyncReadyCallback) loc_lock_engine_ready,
+                                    task);
+    qmi_message_loc_set_engine_lock_input_unref (input);
 
-    if (priv->loc_client) {
-        if (priv->loc_location_nmea_indication_id != 0) {
-            g_signal_handler_disconnect (priv->loc_client, priv->loc_location_nmea_indication_id);
-            priv->loc_location_nmea_indication_id = 0;
-        }
-        g_clear_object (&priv->loc_client);
-    }
-
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
 }
 
 static void
@@ -5667,6 +5708,49 @@ loc_start_ready (QmiClientLoc *client,
 }
 
 static void
+loc_unlock_engine_ready (QmiClientLoc *client,
+                         GAsyncResult *res,
+                         GTask        *task)
+{
+    QmiMessageLocStartInput          *input;
+    QmiMessageLocSetEngineLockOutput *output;
+    GError                           *error = NULL;
+
+    output = qmi_client_loc_set_engine_lock_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!qmi_message_loc_set_engine_lock_output_get_result (output, &error)
+     && !g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NO_PERMISSION)) {
+        g_prefix_error (&error, "Couldn't unlock GPS engine: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        qmi_message_loc_set_engine_lock_output_unref (output);
+        return;
+    }
+
+    g_clear_error (&error);
+    qmi_message_loc_set_engine_lock_output_unref (output);
+
+    input = qmi_message_loc_start_input_new ();
+    qmi_message_loc_start_input_set_session_id (input, DEFAULT_LOC_SESSION_ID, NULL);
+    qmi_message_loc_start_input_set_intermediate_report_state (input, QMI_LOC_INTERMEDIATE_REPORT_STATE_DISABLE, NULL);
+    qmi_message_loc_start_input_set_minimum_interval_between_position_reports (input, 1000, NULL);
+    qmi_message_loc_start_input_set_fix_recurrence_type (input, QMI_LOC_FIX_RECURRENCE_TYPE_REQUEST_PERIODIC_FIXES, NULL);
+    qmi_client_loc_start (QMI_CLIENT_LOC (client),
+                          input,
+                          10,
+                          NULL,
+                          (GAsyncReadyCallback) loc_start_ready,
+                          task);
+    qmi_message_loc_start_input_unref (input);
+}
+
+static void
 start_gps_engine (MMSharedQmi         *self,
                   GAsyncReadyCallback  callback,
                   gpointer             user_data)
@@ -5703,20 +5787,17 @@ start_gps_engine (MMSharedQmi         *self,
                                         MM_PORT_QMI_FLAG_DEFAULT,
                                         NULL);
     if (client) {
-        QmiMessageLocStartInput *input;
+        QmiMessageLocSetEngineLockInput *input;
 
-        input = qmi_message_loc_start_input_new ();
-        qmi_message_loc_start_input_set_session_id (input, DEFAULT_LOC_SESSION_ID, NULL);
-        qmi_message_loc_start_input_set_intermediate_report_state (input, QMI_LOC_INTERMEDIATE_REPORT_STATE_DISABLE, NULL);
-        qmi_message_loc_start_input_set_minimum_interval_between_position_reports (input, 1000, NULL);
-        qmi_message_loc_start_input_set_fix_recurrence_type (input, QMI_LOC_FIX_RECURRENCE_TYPE_REQUEST_PERIODIC_FIXES, NULL);
-        qmi_client_loc_start (QMI_CLIENT_LOC (client),
-                              input,
-                              10,
-                              NULL,
-                              (GAsyncReadyCallback) loc_start_ready,
-                              task);
-        qmi_message_loc_start_input_unref (input);
+        input = qmi_message_loc_set_engine_lock_input_new ();
+        qmi_message_loc_set_engine_lock_input_set_lock_type (input, QMI_LOC_LOCK_TYPE_MT, NULL);
+        qmi_client_loc_set_engine_lock (QMI_CLIENT_LOC (client),
+                                        input,
+                                        10,
+                                        NULL,
+                                        (GAsyncReadyCallback) loc_unlock_engine_ready,
+                                        task);
+        qmi_message_loc_set_engine_lock_input_unref (input);
         return;
     }
 
