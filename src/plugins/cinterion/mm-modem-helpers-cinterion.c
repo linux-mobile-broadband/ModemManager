@@ -794,7 +794,7 @@ mm_cinterion_parse_sxrat_test (const gchar *response,
         return FALSE;
     }
 
-    r = g_regex_new ("\\^SXRAT:\\s*\\(([^\\)]*)\\),\\(([^\\)]*)\\)(,\\(([^\\)]*)\\))?(?:\\r\\n)?",
+    r = g_regex_new ("\\^SXRAT:\\s*\\(([^\\)]*)\\),\\s*\\(([^\\)]*)\\)(,\\s*\\(([^\\)]*)\\))?(?:\\r\\n)?",
                      G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
                      0, NULL);
 

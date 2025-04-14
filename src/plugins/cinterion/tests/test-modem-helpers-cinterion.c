@@ -1827,6 +1827,38 @@ test_sxrat_response_els61 (void)
 }
 
 static void
+test_sxrat_response_pls63_w (void)
+{
+    GArray *expected_rat;
+    GArray *expected_pref1;
+    GArray *expected_pref2;
+    const guint vals[] = { 0, 2, 3 };
+    guint val;
+    const gchar *response =
+        "^SXRAT: (0-6), (0,2,3), (0,2,3)\r\n"
+        "\r\n";
+
+    expected_rat = g_array_sized_new (FALSE, FALSE, sizeof (guint), 7);
+    for (val = 0; val < 7; val++)
+        g_array_append_val (expected_rat, val);
+
+    expected_pref1 = g_array_sized_new (FALSE, FALSE, sizeof (guint), 3);
+    g_array_append_vals (expected_pref1, &vals, 3);
+
+    expected_pref2 = g_array_sized_new (FALSE, FALSE, sizeof (guint), 3);
+    g_array_append_vals (expected_pref2, &vals, 3);
+
+    common_test_sxrat (response,
+                       expected_rat,
+                       expected_pref1,
+                       expected_pref2);
+
+    g_array_unref (expected_rat);
+    g_array_unref (expected_pref1);
+    g_array_unref (expected_pref2);
+}
+
+static void
 test_sxrat_response_other (void)
 {
     GArray *expected_rat;
@@ -2177,6 +2209,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/cinterion/sgauth",                  test_sgauth_response);
     g_test_add_func ("/MM/cinterion/sxrat",                   test_sxrat);
     g_test_add_func ("/MM/cinterion/sxrat/response/els61",    test_sxrat_response_els61);
+    g_test_add_func ("/MM/cinterion/sxrat/response/pls63w",   test_sxrat_response_pls63_w);
     g_test_add_func ("/MM/cinterion/sxrat/response/other",    test_sxrat_response_other);
     g_test_add_func ("/MM/cinterion/cops/only-mode-2g",       test_cops_only_mode_2g);
     g_test_add_func ("/MM/cinterion/cops/only-mode-3g",       test_cops_only_mode_3g);
