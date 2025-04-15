@@ -5272,6 +5272,7 @@ loc_location_nmea_indication_cb (QmiClientLoc               *client,
 
 typedef struct {
     QmiClientLoc *client;
+    GCancellable *req_cancel;
     guint         timeout_id;
     gulong        indication_id;
 } SetupRequiredNmeaTracesContext;
@@ -5286,6 +5287,10 @@ setup_required_nmea_traces_cleanup_action (SetupRequiredNmeaTracesContext *ctx)
     if (ctx->timeout_id) {
         g_source_remove (ctx->timeout_id);
         ctx->timeout_id = 0;
+    }
+    if (ctx->req_cancel) {
+        g_cancellable_cancel (ctx->req_cancel);
+        g_object_unref (g_steal_pointer (&ctx->req_cancel));
     }
 }
 
@@ -5352,23 +5357,15 @@ loc_set_nmea_types_ready (QmiClientLoc *client,
 
     output = qmi_client_loc_set_nmea_types_finish (client, res, &error);
     if (!output || !qmi_message_loc_set_nmea_types_output_get_result (output, &error)) {
+        if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+            return;
+
+        ctx = g_task_get_task_data (task);
+        setup_required_nmea_traces_cleanup_action (ctx);
+
         g_task_return_error (task, error);
         g_object_unref (task);
-        return;
     }
-
-    /* The task ownership is shared between signal and timeout; the one which is
-     * scheduled first will cancel the other. */
-    ctx = g_task_get_task_data (task);
-    g_assert (!ctx->indication_id);
-    ctx->indication_id = g_signal_connect (ctx->client,
-                                           "set-nmea-types",
-                                           G_CALLBACK (loc_set_nmea_types_indication_cb),
-                                           task);
-    g_assert (!ctx->timeout_id);
-    ctx->timeout_id = g_timeout_add_seconds (10,
-                                             (GSourceFunc)setup_required_nmea_traces_timeout,
-                                             task);
 }
 
 static void
@@ -5396,14 +5393,29 @@ loc_get_nmea_types_indication_cb (QmiClientLoc                       *client,
 
     qmi_indication_loc_get_nmea_types_output_get_nmea_types (output, &nmea_types_mask, NULL);
 
+    /* The task ownership is shared by the request, the signal, and the
+     * timeout; the one which is scheduled first will cancel the others.
+     */
+    g_assert (!ctx->req_cancel);
+    ctx->req_cancel = g_cancellable_new ();
     input = qmi_message_loc_set_nmea_types_input_new ();
     qmi_message_loc_set_nmea_types_input_set_nmea_types (input, (nmea_types_mask | desired_nmea_types_mask), NULL);
     qmi_client_loc_set_nmea_types (ctx->client,
                                    input,
                                    10,
-                                   NULL,
+                                   ctx->req_cancel,
                                    (GAsyncReadyCallback)loc_set_nmea_types_ready,
                                    task);
+
+    g_assert (!ctx->indication_id);
+    ctx->indication_id = g_signal_connect (ctx->client,
+                                           "set-nmea-types",
+                                           G_CALLBACK (loc_set_nmea_types_indication_cb),
+                                           task);
+    g_assert (!ctx->timeout_id);
+    ctx->timeout_id = g_timeout_add_seconds (10,
+                                             (GSourceFunc)setup_required_nmea_traces_timeout,
+                                             task);
 }
 
 static void
@@ -5417,23 +5429,15 @@ loc_get_nmea_types_ready (QmiClientLoc *client,
 
     output = qmi_client_loc_get_nmea_types_finish (client, res, &error);
     if (!output || !qmi_message_loc_get_nmea_types_output_get_result (output, &error)) {
+        if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+            return;
+
+        ctx = g_task_get_task_data (task);
+        setup_required_nmea_traces_cleanup_action (ctx);
+
         g_task_return_error (task, error);
         g_object_unref (task);
-        return;
     }
-
-    /* The task ownership is shared between signal and timeout; the one which is
-     * scheduled first will cancel the other. */
-    ctx = g_task_get_task_data (task);
-    g_assert (!ctx->indication_id);
-    ctx->indication_id = g_signal_connect (ctx->client,
-                                           "get-nmea-types",
-                                           G_CALLBACK (loc_get_nmea_types_indication_cb),
-                                           task);
-    g_assert (!ctx->timeout_id);
-    ctx->timeout_id = g_timeout_add_seconds (10,
-                                             (GSourceFunc)setup_required_nmea_traces_timeout,
-                                             task);
 }
 
 static void
@@ -5469,12 +5473,28 @@ setup_required_nmea_traces (MMSharedQmi         *self,
         ctx->client = QMI_CLIENT_LOC (g_object_ref (client));
         g_task_set_task_data (task, ctx, (GDestroyNotify)setup_required_nmea_traces_context_free);
 
+        /* The task ownership is shared by the request, the signal, and the
+         * timeout; the one which is scheduled first will cancel the others.
+         */
+        g_assert (!ctx->req_cancel);
+        ctx->req_cancel = g_cancellable_new ();
         qmi_client_loc_get_nmea_types (ctx->client,
                                        NULL,
                                        10,
-                                       NULL,
+                                       ctx->req_cancel,
                                        (GAsyncReadyCallback)loc_get_nmea_types_ready,
                                        task);
+
+        g_assert (!ctx->indication_id);
+        ctx->indication_id = g_signal_connect (ctx->client,
+                                               "get-nmea-types",
+                                               G_CALLBACK (loc_get_nmea_types_indication_cb),
+                                               task);
+        g_assert (!ctx->timeout_id);
+        ctx->timeout_id = g_timeout_add_seconds (10,
+                                                 (GSourceFunc)setup_required_nmea_traces_timeout,
+                                                 task);
+
         return;
     }
 
