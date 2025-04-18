@@ -1809,13 +1809,6 @@ mm_base_modem_authorize (MMBaseModem *self,
 
     task = g_task_new (self, self->priv->authp_cancellable, callback, user_data);
 
-    /* When running in the session bus for tests, default to always allow */
-    if (mm_context_get_test_session ()) {
-        g_task_return_boolean (task, TRUE);
-        g_object_unref (task);
-        return;
-    }
-
     mm_auth_provider_authorize (self->priv->authp,
                                 invocation,
                                 authorization,

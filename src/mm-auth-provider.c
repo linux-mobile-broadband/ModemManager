@@ -22,6 +22,7 @@
 #include "mm-log-object.h"
 #include "mm-utils.h"
 #include "mm-auth-provider.h"
+#include "mm-context.h"
 
 #if defined WITH_POLKIT
 # include <polkit/polkit.h>
@@ -127,6 +128,13 @@ mm_auth_provider_authorize (MMAuthProvider        *self,
     GTask *task;
 
     task = g_task_new (self, cancellable, callback, user_data);
+
+    /* When running in the session bus for tests, default to always allow */
+    if (mm_context_get_test_session ()) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
 
 #if defined WITH_POLKIT
     {
