@@ -8882,7 +8882,8 @@ messaging_create_sms (MMIfaceModemMessaging *_self)
         return iface_modem_messaging_parent->create_sms (_self);
     }
 
-    return mm_sms_qmi_new (MM_BASE_MODEM (self));
+    return mm_sms_qmi_new (MM_BASE_MODEM (self),
+                           mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)));
 }
 
 

@@ -9233,7 +9233,8 @@ enable_unsolicited_events_messaging (MMIfaceModemMessaging *_self,
 static MMBaseSms *
 messaging_create_sms (MMIfaceModemMessaging *self)
 {
-    return mm_sms_mbim_new (MM_BASE_MODEM (self));
+    return mm_sms_mbim_new (MM_BASE_MODEM (self),
+                            mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)));
 }
 
 /*****************************************************************************/

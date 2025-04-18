@@ -45,6 +45,7 @@ struct _MMSmsMbimClass {
 GType mm_sms_mbim_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMSmsMbim, g_object_unref)
 
-MMBaseSms *mm_sms_mbim_new (MMBaseModem *modem);
+MMBaseSms *mm_sms_mbim_new (MMBaseModem *modem,
+                            gboolean     is_3gpp);
 
 #endif /* MM_SMS_MBIM_H */

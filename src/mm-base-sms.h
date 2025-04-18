@@ -52,6 +52,7 @@ typedef struct _MMBaseSmsPrivate MMBaseSmsPrivate;
 #define MM_BASE_SMS_IS_MULTIPART        "sms-is-multipart"
 #define MM_BASE_SMS_MAX_PARTS           "sms-max-parts"
 #define MM_BASE_SMS_MULTIPART_REFERENCE "sms-multipart-reference"
+#define MM_BASE_SMS_IS_3GPP             "sms-is-3gpp"
 
 struct _MMBaseSms {
     MmGdbusSmsSkeleton parent;
@@ -91,7 +92,8 @@ GType mm_base_sms_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBaseSms, g_object_unref)
 
 /* This one can be overridden by plugins */
-MMBaseSms *mm_base_sms_new                 (MMBaseModem *modem);
+MMBaseSms *mm_base_sms_new                 (MMBaseModem *modem,
+                                            gboolean     is_3gpp);
 MMBaseSms *mm_base_sms_new_from_properties (MMBaseModem *modem,
                                             MMSmsProperties *properties,
                                             GError **error);

@@ -332,11 +332,12 @@ sms_delete (MMBaseSms *self,
 /*****************************************************************************/
 
 MMBaseSms *
-mm_sms_mbim_new (MMBaseModem *modem)
+mm_sms_mbim_new (MMBaseModem *modem, gboolean is_3gpp)
 {
     return MM_BASE_SMS (g_object_new (MM_TYPE_SMS_MBIM,
                                       MM_BASE_SMS_MODEM, modem,
                                       MM_BIND_TO, G_OBJECT (modem),
+                                      MM_BASE_SMS_IS_3GPP, is_3gpp,
                                       NULL));
 }
 

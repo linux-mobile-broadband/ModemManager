@@ -8225,7 +8225,8 @@ modem_messaging_load_initial_sms_parts (MMIfaceModemMessaging *self,
 static MMBaseSms *
 modem_messaging_create_sms (MMIfaceModemMessaging *self)
 {
-    return mm_base_sms_new (MM_BASE_MODEM (self));
+    return mm_base_sms_new (MM_BASE_MODEM (self),
+                            mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)));
 }
 
 /*****************************************************************************/

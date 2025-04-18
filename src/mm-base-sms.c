@@ -55,6 +55,7 @@ enum {
     PROP_IS_MULTIPART,
     PROP_MAX_PARTS,
     PROP_MULTIPART_REFERENCE,
+    PROP_IS_3GPP,
     PROP_LAST
 };
 
@@ -88,6 +89,9 @@ struct _MMBaseSmsPrivate {
     /* Set to true when all needed parts were received,
      * parsed and assembled */
     gboolean is_assembled;
+
+    /* TRUE for 3GPP SMS; FALSE for CDMA */
+    gboolean is_3gpp;
 };
 
 /*****************************************************************************/
@@ -310,25 +314,7 @@ static gboolean
 generate_submit_pdus (MMBaseSms *self,
                       GError **error)
 {
-    MMBaseModem *modem;
-    gboolean is_3gpp;
-
-    /* First; decide which kind of PDU we'll generate, based on the current modem caps */
-
-    g_object_get (self,
-                  MM_BASE_SMS_MODEM, &modem,
-                  NULL);
-    g_assert (modem != NULL);
-
-    is_3gpp = mm_iface_modem_is_3gpp (MM_IFACE_MODEM (modem));
-    g_object_unref (modem);
-
-    /* On a 3GPP-capable modem, create always a 3GPP SMS (even if the modem is 3GPP+3GPP2) */
-    if (is_3gpp)
-        return generate_3gpp_submit_pdus (self, error);
-
-    /* Otherwise, create a 3GPP2 SMS */
-    return generate_cdma_submit_pdus (self, error);
+    return self->priv->is_3gpp ? generate_3gpp_submit_pdus (self, error) : generate_cdma_submit_pdus (self, error);
 }
 
 /*****************************************************************************/
@@ -1801,11 +1787,12 @@ mm_base_sms_multipart_take_part (MMBaseSms *self,
 }
 
 MMBaseSms *
-mm_base_sms_new (MMBaseModem *modem)
+mm_base_sms_new (MMBaseModem *modem, gboolean is_3gpp)
 {
     return MM_BASE_SMS (g_object_new (MM_TYPE_BASE_SMS,
                                       MM_BASE_SMS_MODEM, modem,
                                       MM_BIND_TO, modem,
+                                      MM_BASE_SMS_IS_3GPP, is_3gpp,
                                       NULL));
 }
 
@@ -2021,6 +2008,9 @@ set_property (GObject *object,
     case PROP_MULTIPART_REFERENCE:
         self->priv->multipart_reference = g_value_get_uint (value);
         break;
+    case PROP_IS_3GPP:
+        self->priv->is_3gpp = g_value_get_boolean (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -2056,6 +2046,9 @@ get_property (GObject *object,
         break;
     case PROP_MULTIPART_REFERENCE:
         g_value_set_uint (value, self->priv->multipart_reference);
+        break;
+    case PROP_IS_3GPP:
+        g_value_set_boolean (value, self->priv->is_3gpp);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -2192,4 +2185,12 @@ mm_base_sms_class_init (MMBaseSmsClass *klass)
                            0, G_MAXUINT, 0,
                            G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_MULTIPART_REFERENCE, properties[PROP_MULTIPART_REFERENCE]);
+
+    properties[PROP_IS_3GPP] =
+        g_param_spec_boolean (MM_BASE_SMS_IS_3GPP,
+                              "Is 3GPP",
+                              "Whether the SMS is a 3GPP one or a CDMA one",
+                              FALSE,
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_IS_3GPP, properties[PROP_IS_3GPP]);
 }
