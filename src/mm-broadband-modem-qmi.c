@@ -8414,7 +8414,6 @@ messaging_event_report_indication_cb (QmiClientNas *client,
     QmiWmsAckIndicator ack_ind;
     guint32 transaction_id;
     QmiWmsMessageFormat msg_format;
-    QmiWmsMessageTagType tag;
     GArray *raw_data = NULL;
 
     /* Handle transfer-route MT messages */
@@ -8459,13 +8458,10 @@ messaging_event_report_indication_cb (QmiClientNas *client,
         }
 
         /* Defaults for transfer-route messages, which are not stored anywhere */
-        storage = QMI_WMS_STORAGE_TYPE_NONE;
-        memory_index = 0;
-        tag = QMI_WMS_MESSAGE_TAG_TYPE_MT_NOT_READ;
         add_new_read_sms_part (MM_IFACE_MODEM_MESSAGING (self),
-                               storage,
-                               memory_index,
-                               tag,
+                               QMI_WMS_STORAGE_TYPE_NONE,
+                               SMS_PART_INVALID_INDEX,
+                               QMI_WMS_MESSAGE_TAG_TYPE_MT_NOT_READ,
                                msg_format,
                                TRUE,
                                raw_data);

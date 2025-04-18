@@ -10,6 +10,7 @@ test_units = {
   'modem-helpers': libhelpers_dep,
   'sms-part-3gpp': libhelpers_dep,
   'sms-part-cdma': libhelpers_dep,
+  'sms-list': libsms_dep,
   'udev-rules': libkerneldevice_dep,
 }
 
