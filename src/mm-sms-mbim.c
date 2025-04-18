@@ -77,7 +77,6 @@ peek_device (gpointer self,
 /* Send the SMS */
 
 typedef struct {
-    MMBaseModem *modem;
     MbimDevice *device;
     GList *current;
 } SmsSendContext;
@@ -86,7 +85,6 @@ static void
 sms_send_context_free (SmsSendContext *ctx)
 {
     g_object_unref (ctx->device);
-    g_object_unref (ctx->modem);
     g_slice_free (SmsSendContext, ctx);
 }
 
@@ -199,9 +197,6 @@ sms_send (MMBaseSms *self,
     /* Setup the context */
     ctx = g_slice_new0 (SmsSendContext);
     ctx->device = g_object_ref (device);
-    g_object_get (self,
-                  MM_BASE_SMS_MODEM, &ctx->modem,
-                  NULL);
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)sms_send_context_free);
@@ -213,7 +208,6 @@ sms_send (MMBaseSms *self,
 /*****************************************************************************/
 
 typedef struct {
-    MMBaseModem *modem;
     MbimDevice *device;
     GList *current;
     guint n_failed;
@@ -223,7 +217,6 @@ static void
 sms_delete_parts_context_free (SmsDeletePartsContext *ctx)
 {
     g_object_unref (ctx->device);
-    g_object_unref (ctx->modem);
     g_slice_free (SmsDeletePartsContext, ctx);
 }
 
@@ -327,9 +320,6 @@ sms_delete (MMBaseSms *self,
 
     ctx = g_slice_new0 (SmsDeletePartsContext);
     ctx->device = g_object_ref (device);
-    g_object_get (self,
-                  MM_BASE_SMS_MODEM, &ctx->modem,
-                  NULL);
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)sms_delete_parts_context_free);
