@@ -34,7 +34,6 @@
 #include "mm-iface-modem-3gpp-profile-manager.h"
 #include "mm-iface-modem-cdma.h"
 #include "mm-base-bearer.h"
-#include "mm-base-modem-at.h"
 #include "mm-base-modem.h"
 #include "mm-log-object.h"
 #include "mm-modem-helpers.h"
