@@ -101,6 +101,49 @@ mm_iface_modem_messaging_create_sms (MMIfaceModemMessaging *self)
 
 /*****************************************************************************/
 
+void
+mm_iface_modem_messaging_lock_storages (MMIfaceModemMessaging *self,
+                                        MMSmsStorage           mem1,
+                                        MMSmsStorage           mem2,
+                                        GAsyncReadyCallback    callback,
+                                        gpointer               user_data)
+{
+    g_assert (MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->lock_storages != NULL);
+
+    MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->lock_storages (self,
+                                                              mem1,
+                                                              mem2,
+                                                              callback,
+                                                              user_data);
+}
+
+gboolean
+mm_iface_modem_messaging_lock_storages_finish (MMIfaceModemMessaging  *self,
+                                               GAsyncResult           *res,
+                                               GError                **error)
+
+{
+    g_assert (MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->lock_storages_finish != NULL);
+
+    return MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->lock_storages_finish (self,
+                                                                            res,
+                                                                            error);
+}
+
+void
+mm_iface_modem_messaging_unlock_storages (MMIfaceModemMessaging *self,
+                                          gboolean               mem1,
+                                          gboolean               mem2)
+{
+    g_assert (MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->unlock_storages != NULL);
+
+    MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->unlock_storages (self,
+                                                                mem1,
+                                                                mem2);
+}
+
+/*****************************************************************************/
+
 typedef struct {
     GArray *supported_mem1;
     GArray *supported_mem2;

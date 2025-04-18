@@ -78,6 +78,21 @@ struct _MMIfaceModemMessagingInterface {
                                             GAsyncResult *res,
                                             GError **error);
 
+    /* Lock storages (async) */
+    void (*lock_storages)            (MMIfaceModemMessaging *self,
+                                      MMSmsStorage mem1, /* reading/listing/deleting */
+                                      MMSmsStorage mem2, /* storing/sending */
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data);
+    gboolean (*lock_storages_finish) (MMIfaceModemMessaging *self,
+                                      GAsyncResult *res,
+                                      GError **error);
+
+    /* Unlock storages */
+    void (*unlock_storages)          (MMIfaceModemMessaging *self,
+                                      gboolean mem1,
+                                      gboolean mem2);
+
     /* Setup SMS format (async) */
     void (* setup_sms_format) (MMIfaceModemMessaging *self,
                                GAsyncReadyCallback callback,
@@ -181,6 +196,19 @@ gboolean mm_iface_modem_messaging_is_storage_supported_for_receiving (MMIfaceMod
 
 /* SMS creation */
 MMBaseSms *mm_iface_modem_messaging_create_sms (MMIfaceModemMessaging *self);
+
+/* Locking/unlocking SMS storages */
+void     mm_iface_modem_messaging_lock_storages        (MMIfaceModemMessaging *self,
+                                                        MMSmsStorage           mem1,
+                                                        MMSmsStorage           mem2,
+                                                        GAsyncReadyCallback    callback,
+                                                        gpointer               user_data);
+gboolean mm_iface_modem_messaging_lock_storages_finish (MMIfaceModemMessaging *self,
+                                                        GAsyncResult          *res,
+                                                        GError                **error);
+void     mm_iface_modem_messaging_unlock_storages      (MMIfaceModemMessaging *self,
+                                                        gboolean               mem1,
+                                                        gboolean               mem2);
 
 /* Look for a new valid multipart reference */
 guint8 mm_iface_modem_messaging_get_local_multipart_reference (MMIfaceModemMessaging *self,

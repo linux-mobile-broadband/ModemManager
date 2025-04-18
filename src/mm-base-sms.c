@@ -28,6 +28,7 @@
 
 #include "mm-base-sms.h"
 #include "mm-broadband-modem.h"
+#include "mm-auth-provider.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-messaging.h"
 #include "mm-sms-part-3gpp.h"
@@ -848,8 +849,11 @@ static void
 sms_store_context_free (SmsStoreContext *ctx)
 {
     /* Unlock mem2 storage if we had the lock */
-    if (ctx->need_unlock)
-        mm_broadband_modem_unlock_sms_storages (MM_BROADBAND_MODEM (ctx->modem), FALSE, TRUE);
+    if (ctx->need_unlock) {
+        mm_iface_modem_messaging_unlock_storages (MM_IFACE_MODEM_MESSAGING (ctx->modem),
+                                                  FALSE,
+                                                  TRUE);
+    }
     g_object_unref (ctx->port);
     g_object_unref (ctx->modem);
     g_free (ctx->msg_data);
@@ -986,7 +990,7 @@ sms_store_next_part (GTask *task)
 }
 
 static void
-store_lock_sms_storages_ready (MMBroadbandModem *modem,
+store_lock_sms_storages_ready (MMIfaceModemMessaging *messaging,
                                GAsyncResult     *res,
                                GTask            *task)
 {
@@ -994,7 +998,7 @@ store_lock_sms_storages_ready (MMBroadbandModem *modem,
     SmsStoreContext *ctx;
     GError          *error = NULL;
 
-    if (!mm_broadband_modem_lock_sms_storages_finish (modem, res, &error)) {
+    if (!mm_iface_modem_messaging_lock_storages_finish (messaging, res, &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -1040,15 +1044,15 @@ sms_store (MMBaseSms           *self,
     ctx->storage = storage;
 
     /* Different ways to do it if on PDU or text mode */
+    g_assert (MM_IS_IFACE_MODEM_MESSAGING (self->priv->modem));
     g_object_get (self->priv->modem,
                   MM_IFACE_MODEM_MESSAGING_SMS_PDU_MODE, &ctx->use_pdu_mode,
                   NULL);
     g_task_set_task_data (task, ctx, (GDestroyNotify)sms_store_context_free);
 
     /* First, lock storage to use */
-    g_assert (MM_IS_BROADBAND_MODEM (self->priv->modem));
-    mm_broadband_modem_lock_sms_storages (
-        MM_BROADBAND_MODEM (self->priv->modem),
+    mm_iface_modem_messaging_lock_storages (
+        MM_IFACE_MODEM_MESSAGING (self->priv->modem),
         MM_SMS_STORAGE_UNKNOWN, /* none required for mem1 */
         ctx->storage,
         (GAsyncReadyCallback)store_lock_sms_storages_ready,
@@ -1072,8 +1076,11 @@ static void
 sms_send_context_free (SmsSendContext *ctx)
 {
     /* Unlock mem2 storage if we had the lock */
-    if (ctx->need_unlock)
-        mm_broadband_modem_unlock_sms_storages (MM_BROADBAND_MODEM (ctx->modem), FALSE, TRUE);
+    if (ctx->need_unlock) {
+        mm_iface_modem_messaging_unlock_storages (MM_IFACE_MODEM_MESSAGING (ctx->modem),
+                                                  FALSE,
+                                                  TRUE);
+    }
     g_object_unref (ctx->port);
     g_object_unref (ctx->modem);
     g_free (ctx->msg_data);
@@ -1290,15 +1297,15 @@ sms_send_next_part (GTask *task)
 }
 
 static void
-send_lock_sms_storages_ready (MMBroadbandModem *modem,
-                              GAsyncResult     *res,
-                              GTask            *task)
+send_lock_sms_storages_ready (MMIfaceModemMessaging *messaging,
+                              GAsyncResult          *res,
+                              GTask                 *task)
 {
     MMBaseSms      *self;
     SmsSendContext *ctx;
     GError         *error = NULL;
 
-    if (!mm_broadband_modem_lock_sms_storages_finish (modem, res, &error)) {
+    if (!mm_iface_modem_messaging_lock_storages_finish (messaging, res, &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -1346,9 +1353,9 @@ sms_send (MMBaseSms           *self,
     ctx->from_storage = (mm_base_sms_get_storage (self) != MM_SMS_STORAGE_UNKNOWN);
     if (ctx->from_storage) {
         /* When sending from storage, first lock storage to use */
-        g_assert (MM_IS_BROADBAND_MODEM (self->priv->modem));
-        mm_broadband_modem_lock_sms_storages (
-            MM_BROADBAND_MODEM (self->priv->modem),
+        g_assert (MM_IS_IFACE_MODEM_MESSAGING (self->priv->modem));
+        mm_iface_modem_messaging_lock_storages (
+            MM_IFACE_MODEM_MESSAGING (self->priv->modem),
             MM_SMS_STORAGE_UNKNOWN, /* none required for mem1 */
             mm_base_sms_get_storage (self),
             (GAsyncReadyCallback)send_lock_sms_storages_ready,
@@ -1377,8 +1384,11 @@ static void
 sms_delete_parts_context_free (SmsDeletePartsContext *ctx)
 {
     /* Unlock mem1 storage if we had the lock */
-    if (ctx->need_unlock)
-        mm_broadband_modem_unlock_sms_storages (MM_BROADBAND_MODEM (ctx->modem), TRUE, FALSE);
+    if (ctx->need_unlock) {
+        mm_iface_modem_messaging_unlock_storages (MM_IFACE_MODEM_MESSAGING (ctx->modem),
+                                                  TRUE,
+                                                  FALSE);
+    }
     g_object_unref (ctx->modem);
     g_slice_free (SmsDeletePartsContext, ctx);
 }
@@ -1456,15 +1466,15 @@ delete_next_part (GTask *task)
 }
 
 static void
-delete_lock_sms_storages_ready (MMBroadbandModem *modem,
-                                GAsyncResult     *res,
-                                GTask            *task)
+delete_lock_sms_storages_ready (MMIfaceModemMessaging *messaging,
+                                GAsyncResult          *res,
+                                GTask                 *task)
 {
     MMBaseSms             *self;
     SmsDeletePartsContext *ctx;
     GError                *error = NULL;
 
-    if (!mm_broadband_modem_lock_sms_storages_finish (modem, res, &error)) {
+    if (!mm_iface_modem_messaging_lock_storages_finish (messaging, res, &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -1504,8 +1514,8 @@ sms_delete (MMBaseSms           *self,
     }
 
     /* Select specific storage to delete from */
-    mm_broadband_modem_lock_sms_storages (
-        MM_BROADBAND_MODEM (self->priv->modem),
+    mm_iface_modem_messaging_lock_storages (
+        MM_IFACE_MODEM_MESSAGING (self->priv->modem),
         mm_base_sms_get_storage (self),
         MM_SMS_STORAGE_UNKNOWN, /* none required for mem2 */
         (GAsyncReadyCallback)delete_lock_sms_storages_ready,

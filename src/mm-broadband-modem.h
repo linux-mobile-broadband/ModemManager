@@ -126,18 +126,6 @@ gchar *mm_broadband_modem_create_device_identifier (MMBroadbandModem  *self,
                                                     const gchar       *ati1,
                                                     GError           **error);
 
-/* Locking/unlocking SMS storages */
-void     mm_broadband_modem_lock_sms_storages        (MMBroadbandModem *self,
-                                                      MMSmsStorage mem1, /* reading/listing/deleting */
-                                                      MMSmsStorage mem2, /* storing/sending */
-                                                      GAsyncReadyCallback callback,
-                                                      gpointer user_data);
-gboolean mm_broadband_modem_lock_sms_storages_finish (MMBroadbandModem *self,
-                                                      GAsyncResult *res,
-                                                      GError **error);
-void     mm_broadband_modem_unlock_sms_storages      (MMBroadbandModem *self,
-                                                      gboolean mem1,
-                                                      gboolean mem2);
 /* Helper to update SIM hot swap */
 gboolean mm_broadband_modem_sim_hot_swap_ports_context_init  (MMBroadbandModem  *self,
                                                               GError           **error);
