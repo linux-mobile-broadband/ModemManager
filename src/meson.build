@@ -298,6 +298,7 @@ sources = files(
   'mm-base-modem.c',
   'mm-base-sim.c',
   'mm-base-sms.c',
+  'mm-sms-at.c',
   'mm-bind.c',
   'mm-bearer-list.c',
   'mm-broadband-bearer.c',

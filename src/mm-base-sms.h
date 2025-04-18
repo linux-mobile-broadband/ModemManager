@@ -91,9 +91,6 @@ struct _MMBaseSmsClass {
 GType mm_base_sms_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBaseSms, g_object_unref)
 
-/* This one can be overridden by plugins */
-MMBaseSms *mm_base_sms_new                 (MMBaseModem *modem,
-                                            gboolean     is_3gpp);
 MMBaseSms *mm_base_sms_new_from_properties (MMBaseModem *modem,
                                             MMSmsProperties *properties,
                                             GError **error);
