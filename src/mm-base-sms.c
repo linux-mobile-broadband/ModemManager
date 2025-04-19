@@ -469,20 +469,20 @@ handle_store_auth_ready (MMAuthProvider     *authp,
         return;
     }
 
-    /* Prepare the SMS to be stored, creating the PDU list if required */
-    if (!prepare_sms_to_be_stored (ctx->self, &error)) {
-        mm_obj_warn (ctx->self, "failed preparing SMS message to be stored: %s", error->message);
-        mm_dbus_method_invocation_take_error (ctx->invocation, error);
-        handle_store_context_free (ctx);
-        return;
-    }
-
     /* If not stored, check if we do support doing it */
     if (!MM_BASE_SMS_GET_CLASS (ctx->self)->store ||
         !MM_BASE_SMS_GET_CLASS (ctx->self)->store_finish) {
         mm_obj_warn (ctx->self, "failed storing SMS message: unsupported");
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Storing SMS is not supported by this modem");
+        handle_store_context_free (ctx);
+        return;
+    }
+
+    /* Prepare the SMS to be stored, creating the PDU list if required */
+    if (!prepare_sms_to_be_stored (ctx->self, &error)) {
+        mm_obj_warn (ctx->self, "failed preparing SMS message to be stored: %s", error->message);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_store_context_free (ctx);
         return;
     }
