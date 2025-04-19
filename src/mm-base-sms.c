@@ -61,6 +61,8 @@ enum {
 static GParamSpec *properties[PROP_LAST];
 
 struct _MMBaseSmsPrivate {
+    gboolean initialized;
+
     /* The connection to the system bus */
     GDBusConnection *connection;
     guint            dbus_id;
@@ -1051,19 +1053,17 @@ mm_base_sms_multipart_take_part (MMBaseSms *self,
     return TRUE;
 }
 
-MMBaseSms *
-mm_base_sms_singlepart_new (MMBaseModem *modem,
-                            MMSmsState state,
-                            MMSmsStorage storage,
-                            MMSmsPart *part,
-                            GError **error)
+gboolean
+mm_base_sms_singlepart_init (MMBaseSms     *self,
+                             MMBaseModem   *modem,
+                             MMSmsState     state,
+                             MMSmsStorage   storage,
+                             MMSmsPart     *part,
+                             GError       **error)
 {
-    MMBaseSms *self;
-
     g_assert (MM_IS_IFACE_MODEM_MESSAGING (modem));
+    g_assert (self->priv->initialized == FALSE);
 
-    /* Create an SMS object as defined by the interface */
-    self = mm_iface_modem_messaging_create_sms (MM_IFACE_MODEM_MESSAGING (modem));
     g_object_set (self,
                   "state",   state,
                   "storage", storage,
@@ -1079,34 +1079,33 @@ mm_base_sms_singlepart_new (MMBaseModem *modem,
         /* Note: we need to remove the part from the list, as we really didn't
          * take it, and therefore the caller is responsible for freeing it. */
         self->priv->parts = g_list_remove (self->priv->parts, part);
-        g_clear_object (&self);
-    } else
-        /* Only export once properly created */
-        mm_base_sms_export (self);
+        return FALSE;
+    }
 
-    return self;
+    /* Only export once properly created */
+    self->priv->initialized = TRUE;
+    mm_base_sms_export (self);
+    return TRUE;
 }
 
-MMBaseSms *
-mm_base_sms_multipart_new (MMBaseModem *modem,
-                           MMSmsState state,
-                           MMSmsStorage storage,
-                           guint reference,
-                           guint max_parts,
-                           MMSmsPart *first_part,
-                           GError **error)
+gboolean
+mm_base_sms_multipart_init (MMBaseSms     *self,
+                            MMBaseModem   *modem,
+                            MMSmsState     state,
+                            MMSmsStorage   storage,
+                            guint          reference,
+                            guint          max_parts,
+                            MMSmsPart     *first_part,
+                            GError       **error)
 {
-    MMBaseSms *self;
-
     g_assert (MM_IS_IFACE_MODEM_MESSAGING (modem));
+    g_assert (self->priv->initialized == FALSE);
 
     /* If this is the first part of a RECEIVED SMS, we overwrite the state
      * as RECEIVING, to indicate that it is not completed yet. */
     if (state == MM_SMS_STATE_RECEIVED)
         state = MM_SMS_STATE_RECEIVING;
 
-    /* Create an SMS object as defined by the interface */
-    self = mm_iface_modem_messaging_create_sms (MM_IFACE_MODEM_MESSAGING (modem));
     g_object_set (self,
                   MM_BASE_SMS_IS_MULTIPART,        TRUE,
                   MM_BASE_SMS_MAX_PARTS,           max_parts,
@@ -1120,29 +1119,30 @@ mm_base_sms_multipart_new (MMBaseModem *modem,
                   NULL);
 
     if (!mm_base_sms_multipart_take_part (self, first_part, error))
-        g_clear_object (&self);
+        return FALSE;
 
     /* We do export incomplete multipart messages, in order to be able to
      *  request removal of all parts of those multipart SMS that will never
      *  get completed.
      * Only the STATE of the SMS object will be valid in the exported DBus
      *  interface.*/
-    if (self)
-        mm_base_sms_export (self);
+    self->priv->initialized = TRUE;
+    mm_base_sms_export (self);
 
-    return self;
+    return TRUE;
 }
 
-MMBaseSms *
-mm_base_sms_new_from_properties (MMBaseModem      *modem,
-                                 MMSmsProperties  *props,
-                                 GError          **error)
+gboolean
+mm_base_sms_init_from_properties (MMBaseSms        *self,
+                                  MMBaseModem      *modem,
+                                  MMSmsProperties  *props,
+                                  GError          **error)
 {
-    MMBaseSms *self;
     const gchar *text;
     GByteArray *data;
 
     g_assert (MM_IS_IFACE_MODEM_MESSAGING (modem));
+    g_assert (self->priv->initialized == FALSE);
 
     text = mm_sms_properties_get_text (props);
     data = mm_sms_properties_peek_data_bytearray (props);
@@ -1156,7 +1156,7 @@ mm_base_sms_new_from_properties (MMBaseModem      *modem,
                      "Cannot create SMS: mandatory parameter '%s' is missing",
                      (!mm_sms_properties_get_number (props)?
                       "number" : "text' or 'data"));
-        return NULL;
+        return FALSE;
     }
 
     /* Don't create SMS from properties if both text and data are given */
@@ -1165,11 +1165,9 @@ mm_base_sms_new_from_properties (MMBaseModem      *modem,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_INVALID_ARGS,
                      "Cannot create SMS: both 'text' and 'data' given");
-        return NULL;
+        return FALSE;
     }
 
-    /* Create an SMS object as defined by the interface */
-    self = mm_iface_modem_messaging_create_sms (MM_IFACE_MODEM_MESSAGING (modem));
     g_object_set (self,
                   "state",    MM_SMS_STATE_UNKNOWN,
                   "storage",  MM_SMS_STORAGE_UNKNOWN,
@@ -1197,10 +1195,11 @@ mm_base_sms_new_from_properties (MMBaseModem      *modem,
                                g_variant_new ("(uv)", MM_SMS_VALIDITY_TYPE_UNKNOWN, g_variant_new_boolean (FALSE))),
                   NULL);
 
-    /* Only export once properly created */
+    /* Only export once properly initialized */
+    self->priv->initialized = TRUE;
     mm_base_sms_export (self);
 
-    return self;
+    return TRUE;
 }
 
 /*****************************************************************************/

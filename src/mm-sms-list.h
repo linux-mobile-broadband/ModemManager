@@ -68,6 +68,7 @@ gboolean mm_sms_list_has_part (MMSmsList *self,
                                guint index);
 
 gboolean mm_sms_list_take_part (MMSmsList *self,
+                                MMBaseSms *uninitialized_sms,
                                 MMSmsPart *part,
                                 MMSmsState state,
                                 MMSmsStorage storage,

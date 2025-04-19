@@ -22,6 +22,7 @@
 #include "mm-sms-list.h"
 #include "mm-error-helpers.h"
 #include "mm-log-object.h"
+#include "mm-broadband-modem.h"
 
 #define SUPPORT_CHECKED_TAG "messaging-support-checked-tag"
 #define SUPPORTED_TAG       "messaging-supported-tag"
@@ -87,16 +88,6 @@ void
 mm_iface_modem_messaging_bind_simple_status (MMIfaceModemMessaging *self,
                                              MMSimpleStatus *status)
 {
-}
-
-/*****************************************************************************/
-
-MMBaseSms *
-mm_iface_modem_messaging_create_sms (MMIfaceModemMessaging *self)
-{
-    g_assert (MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->create_sms != NULL);
-
-    return MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->create_sms (self);
 }
 
 /*****************************************************************************/
@@ -339,8 +330,8 @@ handle_create_auth_ready (MMIfaceAuth         *auth,
         return;
     }
 
-    sms = mm_base_sms_new_from_properties (MM_BASE_MODEM (self), properties, &error);
-    if (!sms) {
+    sms = mm_broadband_modem_create_sms (MM_BROADBAND_MODEM (self));
+    if (!mm_base_sms_init_from_properties (sms, MM_BASE_MODEM (self), properties, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_create_context_free (ctx);
         return;
@@ -525,13 +516,14 @@ handle_set_default_storage (MmGdbusModemMessaging *skeleton,
 /*****************************************************************************/
 
 gboolean
-mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,
-                                    MMSmsPart             *sms_part,
-                                    MMSmsState             state,
-                                    MMSmsStorage           storage)
+mm_iface_modem_messaging_take_part (MMIfaceModemMessaging  *self,
+                                    MMBaseSms              *uninitialized_sms,
+                                    MMSmsPart              *sms_part,
+                                    MMSmsState              state,
+                                    MMSmsStorage            storage,
+                                    GError                **error)
 {
     g_autoptr(MMSmsList) list = NULL;
-    g_autoptr(GError)    error = NULL;
     gboolean             added = FALSE;
 
     g_object_get (self,
@@ -539,14 +531,19 @@ mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,
                   NULL);
 
     if (list) {
-        added = mm_sms_list_take_part (list, sms_part, state, storage, &error);
+        added = mm_sms_list_take_part (list, uninitialized_sms, sms_part, state, storage, error);
         if (!added)
-            mm_obj_dbg (self, "couldn't take part in SMS list: %s", error->message);
+            g_prefix_error (error, "couldn't take part in SMS list: ");
     }
 
-    /* If part wasn't taken, we need to free the part ourselves */
+    /* If part wasn't taken, we need to free the part and SMS ourselves */
     if (!added)
         mm_sms_part_free (sms_part);
+
+    /* Always drop original ref to the uninialized SMS, as MMSmsList will have
+     * taken a reference to the SMS if it wants to keep it around.
+     */
+    g_object_unref (uninitialized_sms);
 
     return added;
 }

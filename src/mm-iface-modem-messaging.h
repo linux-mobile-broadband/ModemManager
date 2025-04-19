@@ -142,9 +142,6 @@ struct _MMIfaceModemMessagingInterface {
     gboolean (*load_initial_sms_parts_finish) (MMIfaceModemMessaging *self,
                                                GAsyncResult *res,
                                                GError **error);
-
-    /* Create SMS objects */
-    MMBaseSms * (* create_sms) (MMIfaceModemMessaging *self);
 };
 
 /* Initialize Messaging interface (async) */
@@ -181,10 +178,12 @@ void mm_iface_modem_messaging_bind_simple_status (MMIfaceModemMessaging *self,
                                                   MMSimpleStatus *status);
 
 /* Report new SMS part */
-gboolean mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,
-                                             MMSmsPart *sms_part,
-                                             MMSmsState state,
-                                             MMSmsStorage storage);
+gboolean mm_iface_modem_messaging_take_part (MMIfaceModemMessaging  *self,
+                                             MMBaseSms              *uninitialized_sms,
+                                             MMSmsPart              *sms_part,
+                                             MMSmsState              state,
+                                             MMSmsStorage            storage,
+                                             GError                **error);
 
 /* Check storage support */
 gboolean mm_iface_modem_messaging_is_storage_supported_for_storing   (MMIfaceModemMessaging *self,

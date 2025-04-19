@@ -9035,24 +9035,33 @@ add_sms_part (MMBroadbandModemMbim       *self,
                                                  self,
                                                  FALSE,
                                                  &error);
-    if (part) {
-        mm_obj_dbg (self, "correctly parsed PDU (%d)", pdu->message_index);
-        if (expected_index != SMS_PART_INVALID_INDEX && (expected_index != mm_sms_part_get_index (part))) {
-            /* Some Fibocom L850 modems report an invalid part index (always 1) in the response
-             * message. Because we know which message part was requested, we can use that value
-             * instead to workaround this bug. */
-            mm_obj_dbg (self, "Expected SMS part index '%u' but device reports index '%u': using the expected one",
-                        expected_index, mm_sms_part_get_index (part));
-            mm_sms_part_set_index (part, expected_index);
-        }
-        mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
-                                            part,
-                                            mm_sms_state_from_mbim_message_status (pdu->message_status),
-                                            MM_SMS_STORAGE_MT);
-    } else {
+    if (!part) {
         /* Don't treat the error as critical */
         mm_obj_dbg (self, "error parsing PDU (%d): %s",
                     pdu->message_index, error->message);
+        return;
+    }
+
+    mm_obj_dbg (self, "correctly parsed PDU (%d)", pdu->message_index);
+    if (expected_index != SMS_PART_INVALID_INDEX && (expected_index != mm_sms_part_get_index (part))) {
+        /* Some Fibocom L850 modems report an invalid part index (always 1) in the response
+         * message. Because we know which message part was requested, we can use that value
+         * instead to workaround this bug. */
+        mm_obj_dbg (self, "Expected SMS part index '%u' but device reports index '%u': using the expected one",
+                    expected_index, mm_sms_part_get_index (part));
+        mm_sms_part_set_index (part, expected_index);
+    }
+
+    if (!mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
+                                             mm_broadband_modem_create_sms (MM_BROADBAND_MODEM (self)),
+                                             part,
+                                             mm_sms_state_from_mbim_message_status (pdu->message_status),
+                                             MM_SMS_STORAGE_MT,
+                                             &error)) {
+        /* Don't treat the error as critical */
+        mm_obj_dbg (self, "error adding SMS (%d): %s",
+                    pdu->message_index, error->message);
+        return;
     }
 }
 
@@ -9231,7 +9240,7 @@ enable_unsolicited_events_messaging (MMIfaceModemMessaging *_self,
 /* Create SMS (Messaging interface) */
 
 static MMBaseSms *
-messaging_create_sms (MMIfaceModemMessaging *self)
+messaging_create_sms (MMBroadbandModem *self)
 {
     return mm_sms_mbim_new (MM_BASE_MODEM (self),
                             mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)));
@@ -10717,7 +10726,6 @@ iface_modem_messaging_init (MMIfaceModemMessagingInterface *iface)
     iface->enable_unsolicited_events_finish = common_enable_disable_unsolicited_events_messaging_finish;
     iface->disable_unsolicited_events = disable_unsolicited_events_messaging;
     iface->disable_unsolicited_events_finish = common_enable_disable_unsolicited_events_messaging_finish;
-    iface->create_sms = messaging_create_sms;
 }
 
 static void
@@ -10787,6 +10795,7 @@ mm_broadband_modem_mbim_class_init (MMBroadbandModemMbimClass *klass)
     /* Do not initialize the MBIM modem through AT commands */
     broadband_modem_class->enabling_modem_init = NULL;
     broadband_modem_class->enabling_modem_init_finish = NULL;
+    broadband_modem_class->create_sms = messaging_create_sms;
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     g_object_class_install_property (object_class, PROP_QMI_UNSUPPORTED,

@@ -259,24 +259,23 @@ cmp_sms_by_part_index_and_storage (MMBaseSms *sms,
 
 static gboolean
 take_singlepart (MMSmsList *self,
+                 MMBaseSms *sms,
                  MMSmsPart *part,
                  MMSmsState state,
                  MMSmsStorage storage,
                  GError **error)
 {
-    MMBaseSms *sms;
-
-    sms = mm_base_sms_singlepart_new (self->priv->modem,
+    if (!mm_base_sms_singlepart_init (sms,
+                                      self->priv->modem,
                                       state,
                                       storage,
                                       part,
-                                      error);
-    if (!sms)
+                                      error))
         return FALSE;
 
     mm_obj_dbg (sms, "creating new singlepart SMS object");
 
-    self->priv->list = g_list_prepend (self->priv->list, sms);
+    self->priv->list = g_list_prepend (self->priv->list, g_object_ref (sms));
     g_signal_emit (self, signals[SIGNAL_ADDED], 0,
                    mm_base_sms_get_path (sms),
                    state == MM_SMS_STATE_RECEIVED);
@@ -285,13 +284,13 @@ take_singlepart (MMSmsList *self,
 
 static gboolean
 take_multipart (MMSmsList *self,
+                MMBaseSms *sms,
                 MMSmsPart *part,
                 MMSmsState state,
                 MMSmsStorage storage,
                 GError **error)
 {
     GList *l;
-    MMBaseSms *sms;
     guint concat_reference;
 
     concat_reference = mm_sms_part_get_concat_reference (part);
@@ -304,20 +303,20 @@ take_multipart (MMSmsList *self,
     }
 
     /* Create new Multipart */
-    sms = mm_base_sms_multipart_new (self->priv->modem,
+    if (!mm_base_sms_multipart_init (sms,
+                                     self->priv->modem,
                                      state,
                                      storage,
                                      concat_reference,
                                      mm_sms_part_get_concat_max (part),
                                      part,
-                                     error);
-    if (!sms)
+                                     error))
         return FALSE;
 
     mm_obj_dbg (sms, "creating new multipart SMS object: need to receive %u parts with reference '%u'",
                 mm_sms_part_get_concat_max (part),
                 concat_reference);
-    self->priv->list = g_list_prepend (self->priv->list, sms);
+    self->priv->list = g_list_prepend (self->priv->list, g_object_ref (sms));
     g_signal_emit (self, signals[SIGNAL_ADDED], 0,
                    mm_base_sms_get_path (sms),
                    (state == MM_SMS_STATE_RECEIVED ||
@@ -347,6 +346,7 @@ mm_sms_list_has_part (MMSmsList *self,
 
 gboolean
 mm_sms_list_take_part (MMSmsList *self,
+                       MMBaseSms *uninitialized_sms,
                        MMSmsPart *part,
                        MMSmsState state,
                        MMSmsStorage storage,
@@ -379,7 +379,7 @@ mm_sms_list_take_part (MMSmsList *self,
                         mm_sms_part_get_concat_sequence (part),
                         mm_sms_part_get_concat_max (part));
 
-        return take_multipart (self, part, state, storage, error);
+        return take_multipart (self, uninitialized_sms, part, state, storage, error);
     }
 
     /* Otherwise, we build a whole new single-part MMSms just from this part */
@@ -389,7 +389,7 @@ mm_sms_list_take_part (MMSmsList *self,
                     mm_sms_part_get_index (part));
     else
         mm_obj_dbg (self, "SMS part (not stored) is from a singlepart SMS");
-    return take_singlepart (self, part, state, storage, error);
+    return take_singlepart (self, uninitialized_sms, part, state, storage, error);
 }
 
 /*****************************************************************************/

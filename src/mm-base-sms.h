@@ -91,21 +91,25 @@ struct _MMBaseSmsClass {
 GType mm_base_sms_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBaseSms, g_object_unref)
 
-MMBaseSms *mm_base_sms_new_from_properties (MMBaseModem *modem,
-                                            MMSmsProperties *properties,
-                                            GError **error);
-MMBaseSms *mm_base_sms_singlepart_new      (MMBaseModem *modem,
-                                            MMSmsState state,
-                                            MMSmsStorage storage,
-                                            MMSmsPart *part,
-                                            GError **error);
-MMBaseSms *mm_base_sms_multipart_new       (MMBaseModem *modem,
-                                            MMSmsState state,
-                                            MMSmsStorage storage,
-                                            guint reference,
-                                            guint max_parts,
-                                            MMSmsPart *first_part,
-                                            GError **error);
+gboolean   mm_base_sms_init_from_properties (MMBaseSms        *self,
+                                             MMBaseModem      *modem,
+                                             MMSmsProperties  *properties,
+                                             GError          **error);
+gboolean   mm_base_sms_singlepart_init      (MMBaseSms     *self,
+                                             MMBaseModem   *modem,
+                                             MMSmsState     state,
+                                             MMSmsStorage   storage,
+                                             MMSmsPart     *part,
+                                             GError       **error);
+gboolean   mm_base_sms_multipart_init       (MMBaseSms     *self,
+                                             MMBaseModem   *modem,
+                                             MMSmsState     state,
+                                             MMSmsStorage   storage,
+                                             guint          reference,
+                                             guint          max_parts,
+                                             MMSmsPart     *first_part,
+                                             GError       **error);
+
 gboolean   mm_base_sms_multipart_take_part (MMBaseSms *self,
                                             MMSmsPart *part,
                                             GError **error);
