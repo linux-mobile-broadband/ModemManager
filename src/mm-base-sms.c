@@ -56,6 +56,7 @@ enum {
     PROP_MULTIPART_REFERENCE,
     PROP_IS_3GPP,
     PROP_DEFAULT_STORAGE,
+    PROP_SUPPORTED_STORAGES,
     PROP_LAST
 };
 
@@ -95,7 +96,9 @@ struct _MMBaseSmsPrivate {
     /* TRUE for 3GPP SMS; FALSE for CDMA */
     gboolean is_3gpp;
 
-    MMSmsStorage default_storage;
+    /* SMS storage */
+    MMSmsStorage  default_storage;
+    GArray       *supported_storages;
 };
 
 /*****************************************************************************/
@@ -411,6 +414,7 @@ handle_store_auth_ready (MMAuthProvider     *authp,
                          HandleStoreContext *ctx)
 {
     GError *error = NULL;
+    gboolean storage_supported = FALSE;
 
     if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -442,9 +446,23 @@ handle_store_auth_ready (MMAuthProvider     *authp,
     }
 
     /* Check if the requested storage is allowed for storing */
-    if (!mm_iface_modem_messaging_is_storage_supported_for_storing (MM_IFACE_MODEM_MESSAGING (ctx->self->priv->modem),
-                                                                    ctx->storage,
-                                                                    &error)) {
+    if (ctx->self->priv->supported_storages) {
+        guint i;
+
+        for (i = 0; i < ctx->self->priv->supported_storages->len; i++) {
+            if (ctx->storage == g_array_index (ctx->self->priv->supported_storages, MMSmsStorage, i)) {
+                storage_supported = TRUE;
+                break;
+            }
+        }
+    }
+
+    if (!storage_supported) {
+        g_set_error (&error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_UNSUPPORTED,
+                     "Storage '%s' is not supported for storing",
+                     mm_sms_storage_get_string (ctx->storage));
         mm_obj_warn (ctx->self, "failed storing SMS message: %s", error->message);
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_store_context_free (ctx);
@@ -1216,6 +1234,19 @@ log_object_build_id (MMLogObject *_self)
 
 /*****************************************************************************/
 
+/* FIXME: use g_array_copy() when glib min version is >= 2.62 */
+static GArray *
+copy_storage_array (GArray *orig)
+{
+    GArray *copy = NULL;
+
+    if (orig) {
+        copy = g_array_sized_new (FALSE, FALSE, sizeof (MMSmsStorage), orig->len);
+        g_array_append_vals (copy, orig->data, orig->len);
+    }
+    return copy;
+}
+
 static void
 set_property (GObject *object,
               guint prop_id,
@@ -1269,6 +1300,11 @@ set_property (GObject *object,
     case PROP_DEFAULT_STORAGE:
         self->priv->default_storage = g_value_get_enum (value);
         break;
+    case PROP_SUPPORTED_STORAGES:
+        /* Copy the array rather than just ref-ing it */
+        g_clear_pointer (&self->priv->supported_storages, (GDestroyNotify)g_array_unref);
+        self->priv->supported_storages = copy_storage_array (g_value_get_boxed (value));
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -1310,6 +1346,9 @@ get_property (GObject *object,
         break;
     case PROP_DEFAULT_STORAGE:
         g_value_set_enum (value, self->priv->default_storage);
+        break;
+    case PROP_SUPPORTED_STORAGES:
+        g_value_set_boxed (value, copy_storage_array (self->priv->supported_storages));
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1362,6 +1401,7 @@ dispose (GObject *object)
     g_clear_object (&self->priv->bind_to);
     g_cancellable_cancel (self->priv->authp_cancellable);
     g_clear_object (&self->priv->authp_cancellable);
+    g_clear_pointer (&self->priv->supported_storages, (GDestroyNotify)g_array_unref);
 
     G_OBJECT_CLASS (mm_base_sms_parent_class)->dispose (object);
 }
@@ -1456,4 +1496,12 @@ mm_base_sms_class_init (MMBaseSmsClass *klass)
                            MM_SMS_STORAGE_UNKNOWN,
                            G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_DEFAULT_STORAGE, properties[PROP_DEFAULT_STORAGE]);
+
+    properties[PROP_SUPPORTED_STORAGES] =
+        g_param_spec_boxed (MM_BASE_SMS_SUPPORTED_STORAGES,
+                            "Supported storages",
+                            "Array of MMSmsStorage indicating supported storages for storing the SMS",
+                            G_TYPE_ARRAY,
+                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_SUPPORTED_STORAGES, properties[PROP_SUPPORTED_STORAGES]);
 }
