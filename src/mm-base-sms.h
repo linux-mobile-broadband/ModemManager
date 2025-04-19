@@ -53,6 +53,7 @@ typedef struct _MMBaseSmsPrivate MMBaseSmsPrivate;
 #define MM_BASE_SMS_MAX_PARTS           "sms-max-parts"
 #define MM_BASE_SMS_MULTIPART_REFERENCE "sms-multipart-reference"
 #define MM_BASE_SMS_IS_3GPP             "sms-is-3gpp"
+#define MM_BASE_SMS_DEFAULT_STORAGE     "sms-default-storage"
 
 struct _MMBaseSms {
     MmGdbusSmsSkeleton parent;

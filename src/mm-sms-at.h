@@ -53,7 +53,8 @@ struct _MMSmsAtClass {
 GType mm_sms_at_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMSmsAt, g_object_unref)
 
-MMBaseSms *mm_sms_at_new (MMBaseModem *modem,
-                          gboolean     is_3gpp);
+MMBaseSms *mm_sms_at_new (MMBaseModem  *modem,
+                          gboolean      is_3gpp,
+                          MMSmsStorage  default_storage);
 
 #endif /* MM_SMS_AT_H */

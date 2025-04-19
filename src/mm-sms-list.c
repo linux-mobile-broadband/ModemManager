@@ -394,6 +394,21 @@ mm_sms_list_take_part (MMSmsList *self,
 
 /*****************************************************************************/
 
+void
+mm_sms_list_set_default_storage (MMSmsList    *self,
+                                 MMSmsStorage  default_storage)
+{
+    GList *l;
+
+    for (l = self->priv->list; l; l = g_list_next (l)) {
+        g_object_set (MM_BASE_SMS (l->data),
+                      MM_BASE_SMS_DEFAULT_STORAGE, default_storage,
+                      NULL);
+    }
+}
+
+/*****************************************************************************/
+
 static gchar *
 log_object_build_id (MMLogObject *_self)
 {

@@ -193,6 +193,8 @@ gboolean mm_iface_modem_messaging_is_storage_supported_for_receiving (MMIfaceMod
                                                                       MMSmsStorage storage,
                                                                       GError **error);
 
+MMSmsStorage mm_iface_modem_messaging_get_default_storage (MMIfaceModemMessaging *self);
+
 /* SMS creation */
 MMBaseSms *mm_iface_modem_messaging_create_sms (MMIfaceModemMessaging *self);
 

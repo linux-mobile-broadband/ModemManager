@@ -788,13 +788,16 @@ sms_delete (MMBaseSms           *sms,
 /*****************************************************************************/
 
 MMBaseSms *
-mm_sms_at_new (MMBaseModem *modem, gboolean is_3gpp)
+mm_sms_at_new (MMBaseModem  *modem,
+               gboolean      is_3gpp,
+               MMSmsStorage  default_storage)
 {
     MMBaseSms *sms;
 
     sms = MM_BASE_SMS (g_object_new (MM_TYPE_SMS_AT,
                                      MM_BASE_SMS_MODEM, modem,
                                      MM_BASE_SMS_IS_3GPP, is_3gpp,
+                                     MM_BASE_SMS_DEFAULT_STORAGE, default_storage,
                                      NULL));
     MM_SMS_AT (sms)->priv->modem = g_object_ref (modem);
     return sms;

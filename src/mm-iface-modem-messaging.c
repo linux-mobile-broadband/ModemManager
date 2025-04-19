@@ -433,7 +433,8 @@ handle_set_default_storage_ready (MMIfaceModemMessaging          *self,
                                   GAsyncResult                   *res,
                                   HandleSetDefaultStorageContext *ctx)
 {
-    GError *error = NULL;
+    GError               *error = NULL;
+    g_autoptr(MMSmsList)  list = NULL;
 
     if (!MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->set_default_storage_finish (self, res, &error)) {
         mm_obj_warn (self, "could not set default storage: %s", error->message);
@@ -445,6 +446,13 @@ handle_set_default_storage_ready (MMIfaceModemMessaging          *self,
     g_object_set (self,
                   MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE, ctx->storage,
                   NULL);
+
+    /* Update default storage in all SMSs too */
+    g_object_get (self,
+                  MM_IFACE_MODEM_MESSAGING_SMS_LIST, &list,
+                  NULL);
+    if (list)
+        mm_sms_list_set_default_storage (list, ctx->storage);
 
     mm_obj_info (self, "set the default storage successfully");
     mm_gdbus_modem_messaging_complete_set_default_storage (ctx->skeleton, ctx->invocation);
@@ -596,6 +604,18 @@ mm_iface_modem_messaging_is_storage_supported_for_receiving (MMIfaceModemMessagi
                                  storage,
                                  "receiving",
                                  error);
+}
+
+MMSmsStorage
+mm_iface_modem_messaging_get_default_storage (MMIfaceModemMessaging *self)
+{
+    MMSmsStorage storage = MM_SMS_STORAGE_UNKNOWN;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE, &storage,
+                  NULL);
+    g_assert (storage != MM_SMS_STORAGE_UNKNOWN);
+    return storage;
 }
 
 /*****************************************************************************/

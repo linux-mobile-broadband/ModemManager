@@ -89,4 +89,7 @@ gboolean mm_sms_list_has_local_multipart_reference (MMSmsList *self,
                                                     const gchar *number,
                                                     guint8 reference);
 
+void mm_sms_list_set_default_storage (MMSmsList *self,
+                                      MMSmsStorage default_storage);
+
 #endif /* MM_SMS_LIST_H */

@@ -8259,8 +8259,12 @@ mm_broadband_modem_create_sms (MMBroadbandModem *self)
 static MMBaseSms *
 modem_messaging_create_sms (MMBroadbandModem *self)
 {
+    MMSmsStorage default_storage;
+
+    default_storage = mm_iface_modem_messaging_get_default_storage (MM_IFACE_MODEM_MESSAGING (self));
     return mm_sms_at_new (MM_BASE_MODEM (self),
-                          mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)));
+                          mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)),
+                          default_storage);
 }
 
 /*****************************************************************************/

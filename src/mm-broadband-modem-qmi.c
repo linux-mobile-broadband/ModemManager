@@ -8881,14 +8881,17 @@ static MMBaseSms *
 messaging_create_sms (MMBroadbandModem *_self)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    MMSmsStorage         default_storage;
 
     /* Handle AT URC only fallback */
     if (self->priv->messaging_fallback_at_only) {
         return MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_qmi_parent_class)->create_sms (_self);
     }
 
+    default_storage = mm_iface_modem_messaging_get_default_storage (MM_IFACE_MODEM_MESSAGING (self));
     return mm_sms_qmi_new (MM_BASE_MODEM (self),
-                           mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)));
+                           mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)),
+                           default_storage);
 }
 
 

@@ -55,6 +55,7 @@ enum {
     PROP_MAX_PARTS,
     PROP_MULTIPART_REFERENCE,
     PROP_IS_3GPP,
+    PROP_DEFAULT_STORAGE,
     PROP_LAST
 };
 
@@ -93,6 +94,8 @@ struct _MMBaseSmsPrivate {
 
     /* TRUE for 3GPP SMS; FALSE for CDMA */
     gboolean is_3gpp;
+
+    MMSmsStorage default_storage;
 };
 
 /*****************************************************************************/
@@ -486,9 +489,7 @@ handle_store (MMBaseSms             *self,
 
     if (ctx->storage == MM_SMS_STORAGE_UNKNOWN) {
         /* We'll set now the proper storage, taken from the default mem2 one */
-        g_object_get (self->priv->modem,
-                      MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE, &ctx->storage,
-                      NULL);
+        ctx->storage = self->priv->default_storage;
         g_assert (ctx->storage != MM_SMS_STORAGE_UNKNOWN);
     }
 
@@ -1265,6 +1266,9 @@ set_property (GObject *object,
     case PROP_IS_3GPP:
         self->priv->is_3gpp = g_value_get_boolean (value);
         break;
+    case PROP_DEFAULT_STORAGE:
+        self->priv->default_storage = g_value_get_enum (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -1303,6 +1307,9 @@ get_property (GObject *object,
         break;
     case PROP_IS_3GPP:
         g_value_set_boolean (value, self->priv->is_3gpp);
+        break;
+    case PROP_DEFAULT_STORAGE:
+        g_value_set_enum (value, self->priv->default_storage);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1440,4 +1447,13 @@ mm_base_sms_class_init (MMBaseSmsClass *klass)
                               FALSE,
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
     g_object_class_install_property (object_class, PROP_IS_3GPP, properties[PROP_IS_3GPP]);
+
+    properties[PROP_DEFAULT_STORAGE] =
+        g_param_spec_enum (MM_BASE_SMS_DEFAULT_STORAGE,
+                           "Default storage",
+                           "Default SMS storage",
+                           MM_TYPE_SMS_STORAGE,
+                           MM_SMS_STORAGE_UNKNOWN,
+                           G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_DEFAULT_STORAGE, properties[PROP_DEFAULT_STORAGE]);
 }
