@@ -61,6 +61,8 @@ struct _MMSmsListPrivate {
     GList *list;
 };
 
+static void _release_sms_internal (MMBaseSms *sms, MMSmsList *self);
+
 /*****************************************************************************/
 
 gboolean
@@ -161,7 +163,7 @@ delete_ready (MMBaseSms *sms,
                             path,
                             (GCompareFunc)cmp_sms_by_path);
     if (l) {
-        g_object_unref (MM_BASE_SMS (l->data));
+        _release_sms_internal (MM_BASE_SMS (l->data), self);
         self->priv->list = g_list_delete_link (self->priv->list, l);
     }
 
@@ -213,14 +215,61 @@ mm_sms_list_delete_sms (MMSmsList *self,
 
 /*****************************************************************************/
 
+static void
+set_local_multipart_reference (MMBaseSms   *sms,
+                               const gchar *number,
+                               MMSmsList   *self)
+{
+    guint8 reference;
+    guint8 first;
+
+    /* Start by looking for a random number */
+    reference = g_random_int_range (1, 255);
+
+    /* Then, look for the given reference in user-created messages */
+    first = reference;
+    do {
+        if (!mm_sms_list_has_local_multipart_reference (self, number, reference)) {
+            mm_base_sms_set_multipart_reference (sms, reference);
+            return;
+        }
+
+        if (reference == 255)
+            reference = 1;
+        else
+            reference++;
+    } while (reference != first);
+}
+
+static void
+_release_sms_internal (MMBaseSms *sms, MMSmsList *self)
+{
+    g_signal_handlers_disconnect_by_func (sms, set_local_multipart_reference, self);
+    g_object_unref (sms);
+}
+
+static void
+_add_sms_internal (MMSmsList *self,
+                   MMBaseSms *sms,
+                   gboolean   received)
+{
+    self->priv->list = g_list_prepend (self->priv->list, g_object_ref (sms));
+    g_signal_connect (sms,
+                      MM_BASE_SMS_SET_LOCAL_MULTIPART_REFERENCE,
+                      (GCallback)set_local_multipart_reference,
+                      self);
+
+    g_signal_emit (self, signals[SIGNAL_ADDED], 0,
+                   mm_base_sms_get_path (sms),
+                   received);
+}
+
+
 void
 mm_sms_list_add_sms (MMSmsList *self,
                      MMBaseSms *sms)
 {
-    self->priv->list = g_list_prepend (self->priv->list, g_object_ref (sms));
-    g_signal_emit (self, signals[SIGNAL_ADDED], 0,
-                   mm_base_sms_get_path (sms),
-                   FALSE);
+    _add_sms_internal (self, sms, FALSE);
 }
 
 /*****************************************************************************/
@@ -274,11 +323,7 @@ take_singlepart (MMSmsList *self,
         return FALSE;
 
     mm_obj_dbg (sms, "creating new singlepart SMS object");
-
-    self->priv->list = g_list_prepend (self->priv->list, g_object_ref (sms));
-    g_signal_emit (self, signals[SIGNAL_ADDED], 0,
-                   mm_base_sms_get_path (sms),
-                   state == MM_SMS_STATE_RECEIVED);
+    _add_sms_internal (self, sms, state == MM_SMS_STATE_RECEIVED);
     return TRUE;
 }
 
@@ -316,12 +361,7 @@ take_multipart (MMSmsList *self,
     mm_obj_dbg (sms, "creating new multipart SMS object: need to receive %u parts with reference '%u'",
                 mm_sms_part_get_concat_max (part),
                 concat_reference);
-    self->priv->list = g_list_prepend (self->priv->list, g_object_ref (sms));
-    g_signal_emit (self, signals[SIGNAL_ADDED], 0,
-                   mm_base_sms_get_path (sms),
-                   (state == MM_SMS_STATE_RECEIVED ||
-                    state == MM_SMS_STATE_RECEIVING));
-
+    _add_sms_internal (self, sms, (state == MM_SMS_STATE_RECEIVED || state == MM_SMS_STATE_RECEIVING));
     return TRUE;
 }
 
@@ -488,8 +528,8 @@ dispose (GObject *object)
 
     g_clear_object (&self->priv->modem);
     g_clear_object (&self->priv->bind_to);
-    g_list_free_full (self->priv->list, g_object_unref);
-    self->priv->list = NULL;
+    g_list_foreach (self->priv->list, (GFunc)_release_sms_internal, self);
+    g_clear_pointer (&self->priv->list, (GDestroyNotify)g_list_free);
 
     G_OBJECT_CLASS (mm_sms_list_parent_class)->dispose (object);
 }

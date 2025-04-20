@@ -211,9 +211,4 @@ void     mm_iface_modem_messaging_unlock_storages      (MMIfaceModemMessaging *s
                                                         gboolean               mem1,
                                                         gboolean               mem2);
 
-/* Look for a new valid multipart reference */
-guint8 mm_iface_modem_messaging_get_local_multipart_reference (MMIfaceModemMessaging *self,
-                                                               const gchar *number,
-                                                               GError **error);
-
 #endif /* MM_IFACE_MODEM_MESSAGING_H */

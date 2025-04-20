@@ -36,54 +36,6 @@ G_DEFINE_INTERFACE (MMIfaceModemMessaging, mm_iface_modem_messaging, MM_TYPE_IFA
 
 /*****************************************************************************/
 
-guint8
-mm_iface_modem_messaging_get_local_multipart_reference (MMIfaceModemMessaging *self,
-                                                        const gchar *number,
-                                                        GError **error)
-{
-    MMSmsList *list = NULL;
-    guint8 reference;
-    guint8 first;
-
-    /* Start by looking for a random number */
-    reference = g_random_int_range (1,255);
-
-    /* Then, look for the given reference in user-created messages */
-    g_object_get (self,
-                  MM_IFACE_MODEM_MESSAGING_SMS_LIST, &list,
-                  NULL);
-    if (!list)
-        return reference;
-
-    first = reference;
-    do {
-        if (!mm_sms_list_has_local_multipart_reference (list, number, reference)) {
-            g_object_unref (list);
-            return reference;
-        }
-
-        if (reference == 255)
-            reference = 1;
-        else
-            reference++;
-    }
-    while (reference != first);
-
-    g_object_unref (list);
-
-    /* We were not able to find a new valid multipart reference :/
-     * return an error */
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_TOO_MANY,
-                 "Cannot create multipart SMS: No valid multipart reference "
-                 "available for destination number '%s'",
-                 number);
-    return 0;
-}
-
-/*****************************************************************************/
-
 void
 mm_iface_modem_messaging_bind_simple_status (MMIfaceModemMessaging *self,
                                              MMSimpleStatus *status)

@@ -46,6 +46,7 @@ typedef struct _MMBaseSms MMBaseSms;
 typedef struct _MMBaseSmsClass MMBaseSmsClass;
 typedef struct _MMBaseSmsPrivate MMBaseSmsPrivate;
 
+/* Properties */
 #define MM_BASE_SMS_PATH                "sms-path"
 #define MM_BASE_SMS_CONNECTION          "sms-connection"
 #define MM_BASE_SMS_MODEM               "sms-modem"
@@ -55,6 +56,9 @@ typedef struct _MMBaseSmsPrivate MMBaseSmsPrivate;
 #define MM_BASE_SMS_IS_3GPP             "sms-is-3gpp"
 #define MM_BASE_SMS_DEFAULT_STORAGE     "sms-default-storage"
 #define MM_BASE_SMS_SUPPORTED_STORAGES  "sms-supported-storages"
+
+/* Signals */
+#define MM_BASE_SMS_SET_LOCAL_MULTIPART_REFERENCE "sms-set-local-multipart-reference"
 
 struct _MMBaseSms {
     MmGdbusSmsSkeleton parent;
@@ -88,6 +92,10 @@ struct _MMBaseSmsClass {
     gboolean (* delete_finish) (MMBaseSms *self,
                                 GAsyncResult *res,
                                 GError **error);
+
+    /* Signal */
+    void (*set_local_multipart_reference) (MMBaseSms   *self,
+                                           const gchar *number);
 };
 
 GType mm_base_sms_get_type (void);
@@ -128,6 +136,8 @@ GList       *mm_base_sms_get_parts      (MMBaseSms *self);
 gboolean     mm_base_sms_is_multipart            (MMBaseSms *self);
 guint        mm_base_sms_get_max_parts           (MMBaseSms *self);
 guint        mm_base_sms_get_multipart_reference (MMBaseSms *self);
+void         mm_base_sms_set_multipart_reference (MMBaseSms *self,
+                                                  guint      reference);
 gboolean     mm_base_sms_multipart_is_complete   (MMBaseSms *self);
 gboolean     mm_base_sms_multipart_is_assembled  (MMBaseSms *self);
 

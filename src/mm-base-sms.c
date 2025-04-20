@@ -62,6 +62,13 @@ enum {
 
 static GParamSpec *properties[PROP_LAST];
 
+enum {
+    SIGNAL_SET_LOCAL_MULTIPART_REFERENCE,
+    SIGNAL_LAST
+};
+
+static guint signals[SIGNAL_LAST] = { 0 };
+
 struct _MMBaseSmsPrivate {
     gboolean initialized;
 
@@ -383,25 +390,21 @@ prepare_sms_to_be_stored (MMBaseSms  *self,
      * when storing locally, as we could collide with the references used
      * in other existing messages. */
     if (self->priv->is_multipart) {
-        GList  *l;
-        guint8  reference;
+        const gchar *number;
 
-        /* Look for a valid multipart reference to use. When storing, we need to
-         * check whether we have already stored multipart SMS with the same
-         * reference and destination number */
-        reference = mm_iface_modem_messaging_get_local_multipart_reference (
-                        MM_IFACE_MODEM_MESSAGING (self->priv->modem),
-                        mm_gdbus_sms_get_number (MM_GDBUS_SMS (self)),
-                        error);
-        if (!reference) {
-            g_prefix_error (error, "Cannot get local multipart reference: ");
+        number = mm_gdbus_sms_get_number (MM_GDBUS_SMS (self));
+        g_signal_emit (self,
+                       signals[SIGNAL_SET_LOCAL_MULTIPART_REFERENCE],
+                       0,
+                       number);
+        if (self->priv->multipart_reference == 0) {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_TOO_MANY,
+                         "Cannot create multipart SMS: No valid multipart reference "
+                         "available for destination number '%s'",
+                         number);
             return FALSE;
-        }
-
-        self->priv->multipart_reference = reference;
-        for (l = self->priv->parts; l; l = g_list_next (l)) {
-            mm_sms_part_set_concat_reference ((MMSmsPart *)l->data,
-                                              self->priv->multipart_reference);
         }
     }
 
@@ -587,7 +590,7 @@ prepare_sms_to_be_sent (MMBaseSms  *self,
      * multipart reference. When sending a message which wasn't stored
      * yet, we can just get a random multipart reference. */
     if (self->priv->is_multipart) {
-        self->priv->multipart_reference = g_random_int_range (1,255);
+        self->priv->multipart_reference = g_random_int_range (1, 255);
         for (l = self->priv->parts; l; l = g_list_next (l)) {
             mm_sms_part_set_concat_reference ((MMSmsPart *)l->data,
                                               self->priv->multipart_reference);
@@ -760,6 +763,23 @@ mm_base_sms_get_multipart_reference (MMBaseSms *self)
     g_return_val_if_fail (self->priv->is_multipart, 0);
 
     return self->priv->multipart_reference;
+}
+
+void
+mm_base_sms_set_multipart_reference (MMBaseSms *self, guint reference)
+{
+    GList *l;
+
+    g_return_if_fail (self->priv->is_multipart);
+    g_return_if_fail (reference > 0);
+    g_return_if_fail (reference <= 255);
+    g_return_if_fail (self->priv->multipart_reference == 0);
+
+    self->priv->multipart_reference = reference;
+    for (l = self->priv->parts; l; l = g_list_next (l)) {
+        mm_sms_part_set_concat_reference ((MMSmsPart *)l->data,
+                                          self->priv->multipart_reference);
+    }
 }
 
 gboolean
@@ -1504,4 +1524,14 @@ mm_base_sms_class_init (MMBaseSmsClass *klass)
                             G_TYPE_ARRAY,
                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
     g_object_class_install_property (object_class, PROP_SUPPORTED_STORAGES, properties[PROP_SUPPORTED_STORAGES]);
+
+    /* Signals */
+    signals[SIGNAL_SET_LOCAL_MULTIPART_REFERENCE] =
+        g_signal_new (MM_BASE_SMS_SET_LOCAL_MULTIPART_REFERENCE,
+                      G_OBJECT_CLASS_TYPE (object_class),
+                      G_SIGNAL_RUN_FIRST,
+                      G_STRUCT_OFFSET (MMBaseSmsClass, set_local_multipart_reference),
+                      NULL, NULL,
+                      g_cclosure_marshal_generic,
+                      G_TYPE_NONE, 0);
 }
