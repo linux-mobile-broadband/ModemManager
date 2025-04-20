@@ -24,7 +24,6 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-iface-modem-messaging.h"
 #include "mm-sms-list.h"
 #include "mm-base-sms.h"
 #include "mm-log-object.h"
@@ -40,10 +39,8 @@ G_DEFINE_TYPE_EXTENDED (MMSmsList, mm_sms_list, G_TYPE_OBJECT, 0,
 enum {
     PROP_0,
     PROP_BIND_TO,
-    PROP_MODEM,
     PROP_LAST
 };
-static GParamSpec *properties[PROP_LAST];
 
 enum {
     SIGNAL_ADDED,
@@ -55,8 +52,6 @@ static guint signals[SIGNAL_LAST];
 struct _MMSmsListPrivate {
     /* The object this SMS list is bound to */
     GObject *bind_to;
-    /* The owner modem */
-    MMBaseModem *modem;
     /* List of sms objects */
     GList *list;
 };
@@ -456,11 +451,10 @@ log_object_build_id (MMLogObject *_self)
 /*****************************************************************************/
 
 MMSmsList *
-mm_sms_list_new (MMBaseModem *modem, GObject *bind_to)
+mm_sms_list_new (GObject *bind_to)
 {
     /* Create the object */
     return g_object_new  (MM_TYPE_SMS_LIST,
-                          MM_SMS_LIST_MODEM, modem,
                           MM_BIND_TO, bind_to,
                           NULL);
 }
@@ -479,10 +473,6 @@ set_property (GObject *object,
         self->priv->bind_to = g_value_dup_object (value);
         mm_bind_to (MM_BIND (self), NULL, self->priv->bind_to);
         break;
-    case PROP_MODEM:
-        g_clear_object (&self->priv->modem);
-        self->priv->modem = g_value_dup_object (value);
-        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -500,9 +490,6 @@ get_property (GObject *object,
     switch (prop_id) {
     case PROP_BIND_TO:
         g_value_set_object (value, self->priv->bind_to);
-        break;
-    case PROP_MODEM:
-        g_value_set_object (value, self->priv->modem);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -524,7 +511,6 @@ dispose (GObject *object)
 {
     MMSmsList *self = MM_SMS_LIST (object);
 
-    g_clear_object (&self->priv->modem);
     g_clear_object (&self->priv->bind_to);
     g_list_foreach (self->priv->list, (GFunc)_release_sms_internal, self);
     g_clear_pointer (&self->priv->list, (GDestroyNotify)g_list_free);
@@ -556,14 +542,6 @@ mm_sms_list_class_init (MMSmsListClass *klass)
     object_class->dispose = dispose;
 
     /* Properties */
-    properties[PROP_MODEM] =
-        g_param_spec_object (MM_SMS_LIST_MODEM,
-                             "Modem",
-                             "The Modem which owns this SMS list",
-                             MM_TYPE_BASE_MODEM,
-                             G_PARAM_READWRITE);
-    g_object_class_install_property (object_class, PROP_MODEM, properties[PROP_MODEM]);
-
     g_object_class_override_property (object_class, PROP_BIND_TO, MM_BIND_TO);
 
     /* Signals */

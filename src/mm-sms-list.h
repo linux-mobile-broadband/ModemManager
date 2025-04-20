@@ -19,7 +19,7 @@
 #include <glib.h>
 #include <glib-object.h>
 
-#include "mm-base-modem.h"
+#include "mm-base-sms.h"
 #include "mm-sms-part.h"
 
 #define MM_TYPE_SMS_LIST            (mm_sms_list_get_type ())
@@ -32,8 +32,6 @@
 typedef struct _MMSmsList MMSmsList;
 typedef struct _MMSmsListClass MMSmsListClass;
 typedef struct _MMSmsListPrivate MMSmsListPrivate;
-
-#define MM_SMS_LIST_MODEM "sms-list-modem"
 
 #define MM_SMS_ADDED     "sms-added"
 #define MM_SMS_DELETED   "sms-deleted"
@@ -57,8 +55,7 @@ struct _MMSmsListClass {
 GType mm_sms_list_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMSmsList, g_object_unref)
 
-MMSmsList *mm_sms_list_new (MMBaseModem *modem,
-                            GObject     *bind_to);
+MMSmsList *mm_sms_list_new (GObject     *bind_to);
 
 GStrv mm_sms_list_get_paths (MMSmsList *self);
 guint mm_sms_list_get_count (MMSmsList *self);
