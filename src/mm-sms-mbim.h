@@ -33,9 +33,11 @@
 
 typedef struct _MMSmsMbim MMSmsMbim;
 typedef struct _MMSmsMbimClass MMSmsMbimClass;
+typedef struct _MMSmsMbimPrivate MMSmsMbimPrivate;
 
 struct _MMSmsMbim {
     MMBaseSms parent;
+    MMSmsMbimPrivate *priv;
 };
 
 struct _MMSmsMbimClass {

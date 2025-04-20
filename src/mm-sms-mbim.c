@@ -35,25 +35,22 @@
 
 G_DEFINE_TYPE (MMSmsMbim, mm_sms_mbim, MM_TYPE_BASE_SMS)
 
+struct _MMSmsMbimPrivate {
+    MMBaseModem *modem;
+};
+
 /*****************************************************************************/
 
 static gboolean
-peek_device (gpointer self,
-             MbimDevice **o_device,
-             GAsyncReadyCallback callback,
-             gpointer user_data)
+peek_device (MMSmsMbim            *self,
+             MbimDevice          **o_device,
+             GAsyncReadyCallback   callback,
+             gpointer              user_data)
 {
-    MMBaseModem *modem = NULL;
-
-    g_object_get (G_OBJECT (self),
-                  MM_BASE_SMS_MODEM, &modem,
-                  NULL);
-    g_assert (MM_IS_BASE_MODEM (modem));
-
     if (o_device) {
         MMPortMbim *port;
 
-        port = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (modem));
+        port = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self->priv->modem));
         if (!port) {
             g_task_report_new_error (self,
                                      callback,
@@ -62,14 +59,12 @@ peek_device (gpointer self,
                                      MM_CORE_ERROR,
                                      MM_CORE_ERROR_FAILED,
                                      "Couldn't peek MBIM port");
-            g_object_unref (modem);
             return FALSE;
         }
 
         *o_device = mm_port_mbim_peek_device (port);
     }
 
-    g_object_unref (modem);
     return TRUE;
 }
 
@@ -191,7 +186,7 @@ sms_send (MMBaseSms *self,
     MbimDevice *device;
     GTask *task;
 
-    if (!peek_device (self, &device, callback, user_data))
+    if (!peek_device (MM_SMS_MBIM (self), &device, callback, user_data))
         return;
 
     /* Setup the context */
@@ -315,7 +310,7 @@ sms_delete (MMBaseSms *self,
     MbimDevice *device;
     GTask *task;
 
-    if (!peek_device (self, &device, callback, user_data))
+    if (!peek_device (MM_SMS_MBIM (self), &device, callback, user_data))
         return;
 
     ctx = g_slice_new0 (SmsDeletePartsContext);
@@ -336,23 +331,44 @@ mm_sms_mbim_new (MMBaseModem  *modem,
                  gboolean      is_3gpp,
                  MMSmsStorage  default_storage)
 {
-    return MM_BASE_SMS (g_object_new (MM_TYPE_SMS_MBIM,
-                                      MM_BASE_SMS_MODEM, modem,
-                                      MM_BIND_TO, G_OBJECT (modem),
-                                      MM_BASE_SMS_IS_3GPP, is_3gpp,
-                                      MM_BASE_SMS_DEFAULT_STORAGE, default_storage,
-                                      NULL));
+    MMBaseSms   *sms;
+
+    g_return_val_if_fail (MM_IS_BROADBAND_MODEM_MBIM (modem), NULL);
+
+    sms = MM_BASE_SMS (g_object_new (MM_TYPE_SMS_MBIM,
+                                     MM_BIND_TO, G_OBJECT (modem),
+                                     MM_BASE_SMS_IS_3GPP, is_3gpp,
+                                     MM_BASE_SMS_DEFAULT_STORAGE, default_storage,
+                                     NULL));
+    MM_SMS_MBIM (sms)->priv->modem = g_object_ref (modem);
+    return sms;
 }
 
 static void
 mm_sms_mbim_init (MMSmsMbim *self)
 {
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_SMS_MBIM, MMSmsMbimPrivate);
+}
+
+static void
+dispose (GObject *object)
+{
+    MMSmsMbim *self = MM_SMS_MBIM (object);
+
+    g_clear_object (&self->priv->modem);
+
+    G_OBJECT_CLASS (mm_sms_mbim_parent_class)->dispose (object);
 }
 
 static void
 mm_sms_mbim_class_init (MMSmsMbimClass *klass)
 {
+    GObjectClass   *object_class = G_OBJECT_CLASS (klass);
     MMBaseSmsClass *base_sms_class = MM_BASE_SMS_CLASS (klass);
+
+    g_type_class_add_private (object_class, sizeof (MMSmsMbimPrivate));
+
+    object_class->dispose = dispose;
 
     base_sms_class->store = NULL;
     base_sms_class->store_finish = NULL;

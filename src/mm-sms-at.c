@@ -32,6 +32,7 @@
 #include "mm-sms-part-3gpp.h"
 #include "mm-base-modem-at.h"
 #include "mm-log-object.h"
+#include "mm-bind.h"
 
 G_DEFINE_TYPE (MMSmsAt, mm_sms_at, MM_TYPE_BASE_SMS)
 
@@ -795,7 +796,7 @@ mm_sms_at_new (MMBaseModem  *modem,
     MMBaseSms *sms;
 
     sms = MM_BASE_SMS (g_object_new (MM_TYPE_SMS_AT,
-                                     MM_BASE_SMS_MODEM, modem,
+                                     MM_BIND_TO, G_OBJECT (modem),
                                      MM_BASE_SMS_IS_3GPP, is_3gpp,
                                      MM_BASE_SMS_DEFAULT_STORAGE, default_storage,
                                      NULL));

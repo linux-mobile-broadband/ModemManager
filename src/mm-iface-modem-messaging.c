@@ -283,7 +283,7 @@ handle_create_auth_ready (MMIfaceAuth         *auth,
     }
 
     sms = mm_broadband_modem_create_sms (MM_BROADBAND_MODEM (self));
-    if (!mm_base_sms_init_from_properties (sms, MM_BASE_MODEM (self), properties, &error)) {
+    if (!mm_base_sms_init_from_properties (sms, properties, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_create_context_free (ctx);
         return;

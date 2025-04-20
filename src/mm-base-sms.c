@@ -27,10 +27,7 @@
 #include <libmm-glib.h>
 
 #include "mm-base-sms.h"
-#include "mm-broadband-modem.h"
 #include "mm-auth-provider.h"
-#include "mm-iface-modem.h"
-#include "mm-iface-modem-messaging.h"
 #include "mm-sms-part-3gpp.h"
 #include "mm-log-object.h"
 #include "mm-modem-helpers.h"
@@ -50,7 +47,6 @@ enum {
     PROP_PATH,
     PROP_CONNECTION,
     PROP_BIND_TO,
-    PROP_MODEM,
     PROP_IS_MULTIPART,
     PROP_MAX_PARTS,
     PROP_MULTIPART_REFERENCE,
@@ -75,6 +71,12 @@ struct _MMBaseSmsPrivate {
     /* The connection to the system bus */
     GDBusConnection *connection;
     guint            dbus_id;
+    /* Object to which our connection property should be bound */
+    GObject *connection_parent;
+    /* GObject property name of the parent's connection property to
+     * which this SMS"s connection should be bound.
+     */
+    gchar   *connection_parent_property_name;
 
     /* The authorization provider */
     MMAuthProvider *authp;
@@ -83,8 +85,6 @@ struct _MMBaseSmsPrivate {
     /* The object this SMS is bound to */
     GObject *bind_to;
 
-    /* The modem which owns this SMS */
-    MMBaseModem *modem;
     /* The path where the SMS object is exported */
     gchar *path;
 
@@ -1094,13 +1094,11 @@ mm_base_sms_multipart_take_part (MMBaseSms *self,
 
 gboolean
 mm_base_sms_singlepart_init (MMBaseSms     *self,
-                             MMBaseModem   *modem,
                              MMSmsState     state,
                              MMSmsStorage   storage,
                              MMSmsPart     *part,
                              GError       **error)
 {
-    g_assert (MM_IS_IFACE_MODEM_MESSAGING (modem));
     g_assert (self->priv->initialized == FALSE);
 
     g_object_set (self,
@@ -1129,7 +1127,6 @@ mm_base_sms_singlepart_init (MMBaseSms     *self,
 
 gboolean
 mm_base_sms_multipart_init (MMBaseSms     *self,
-                            MMBaseModem   *modem,
                             MMSmsState     state,
                             MMSmsStorage   storage,
                             guint          reference,
@@ -1137,7 +1134,6 @@ mm_base_sms_multipart_init (MMBaseSms     *self,
                             MMSmsPart     *first_part,
                             GError       **error)
 {
-    g_assert (MM_IS_IFACE_MODEM_MESSAGING (modem));
     g_assert (self->priv->initialized == FALSE);
 
     /* If this is the first part of a RECEIVED SMS, we overwrite the state
@@ -1173,14 +1169,12 @@ mm_base_sms_multipart_init (MMBaseSms     *self,
 
 gboolean
 mm_base_sms_init_from_properties (MMBaseSms        *self,
-                                  MMBaseModem      *modem,
                                   MMSmsProperties  *props,
                                   GError          **error)
 {
     const gchar *text;
     GByteArray *data;
 
-    g_assert (MM_IS_IFACE_MODEM_MESSAGING (modem));
     g_assert (self->priv->initialized == FALSE);
 
     text = mm_sms_properties_get_text (props);
@@ -1301,10 +1295,6 @@ set_property (GObject *object,
         self->priv->bind_to = g_value_dup_object (value);
         mm_bind_to (MM_BIND (self), MM_BASE_SMS_CONNECTION, self->priv->bind_to);
         break;
-    case PROP_MODEM:
-        g_clear_object (&self->priv->modem);
-        self->priv->modem = g_value_dup_object (value);
-        break;
     case PROP_IS_MULTIPART:
         self->priv->is_multipart = g_value_get_boolean (value);
         break;
@@ -1348,9 +1338,6 @@ get_property (GObject *object,
         break;
     case PROP_BIND_TO:
         g_value_set_object (value, self->priv->bind_to);
-        break;
-    case PROP_MODEM:
-        g_value_set_object (value, self->priv->modem);
         break;
     case PROP_IS_MULTIPART:
         g_value_set_boolean (value, self->priv->is_multipart);
@@ -1417,7 +1404,6 @@ dispose (GObject *object)
         g_clear_object (&self->priv->connection);
     }
 
-    g_clear_object (&self->priv->modem);
     g_clear_object (&self->priv->bind_to);
     g_cancellable_cancel (self->priv->authp_cancellable);
     g_clear_object (&self->priv->authp_cancellable);
@@ -1467,14 +1453,6 @@ mm_base_sms_class_init (MMBaseSmsClass *klass)
     g_object_class_install_property (object_class, PROP_PATH, properties[PROP_PATH]);
 
     g_object_class_override_property (object_class, PROP_BIND_TO, MM_BIND_TO);
-
-    properties[PROP_MODEM] =
-        g_param_spec_object (MM_BASE_SMS_MODEM,
-                             "Modem",
-                             "The Modem which owns this SMS",
-                             MM_TYPE_BASE_MODEM,
-                             G_PARAM_READWRITE);
-    g_object_class_install_property (object_class, PROP_MODEM, properties[PROP_MODEM]);
 
     properties[PROP_IS_MULTIPART] =
         g_param_spec_boolean (MM_BASE_SMS_IS_MULTIPART,

@@ -315,7 +315,6 @@ take_singlepart (MMSmsList *self,
                  GError **error)
 {
     if (!mm_base_sms_singlepart_init (sms,
-                                      self->priv->modem,
                                       state,
                                       storage,
                                       part,
@@ -349,7 +348,6 @@ take_multipart (MMSmsList *self,
 
     /* Create new Multipart */
     if (!mm_base_sms_multipart_init (sms,
-                                     self->priv->modem,
                                      state,
                                      storage,
                                      concat_reference,

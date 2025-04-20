@@ -35,9 +35,11 @@
 
 typedef struct _MMSmsQmi MMSmsQmi;
 typedef struct _MMSmsQmiClass MMSmsQmiClass;
+typedef struct _MMSmsQmiPrivate MMSmsQmiPrivate;
 
 struct _MMSmsQmi {
     MMBaseSms parent;
+    MMSmsQmiPrivate *priv;
 };
 
 struct _MMSmsQmiClass {

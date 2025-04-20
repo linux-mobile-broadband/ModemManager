@@ -37,6 +37,10 @@
 
 G_DEFINE_TYPE (MMSmsQmi, mm_sms_qmi, MM_TYPE_BASE_SMS)
 
+struct _MMSmsQmiPrivate {
+    MMBaseModem *modem;
+};
+
 /*****************************************************************************/
 
 static gboolean
@@ -46,18 +50,10 @@ ensure_qmi_client (MMSmsQmi *self,
                    GAsyncReadyCallback callback,
                    gpointer user_data)
 {
-    MMBaseModem *modem = NULL;
     QmiClient *client;
     MMPortQmi *port;
 
-    g_object_get (self,
-                  MM_BASE_SMS_MODEM, &modem,
-                  NULL);
-    g_assert (MM_IS_BASE_MODEM (modem));
-
-    port = mm_broadband_modem_qmi_peek_port_qmi (MM_BROADBAND_MODEM_QMI (modem));
-    g_object_unref (modem);
-
+    port = mm_broadband_modem_qmi_peek_port_qmi (MM_BROADBAND_MODEM_QMI (self->priv->modem));
     if (!port) {
         g_task_report_new_error (self,
                                  callback,
@@ -119,7 +115,6 @@ check_sms_type_support (MMSmsQmi *self,
 /* Store the SMS */
 
 typedef struct {
-    MMBaseModem *modem;
     QmiClientWms *client;
     MMSmsStorage storage;
     GList *current;
@@ -129,7 +124,6 @@ static void
 sms_store_context_free (SmsStoreContext *ctx)
 {
     g_object_unref (ctx->client);
-    g_object_unref (ctx->modem);
     g_slice_free (SmsStoreContext, ctx);
 }
 
@@ -260,11 +254,12 @@ sms_store_next_part (GTask *task)
 }
 
 static void
-sms_store (MMBaseSms *self,
+sms_store (MMBaseSms *_self,
            MMSmsStorage storage,
            GAsyncReadyCallback callback,
            gpointer user_data)
 {
+    MMSmsQmi *self = MM_SMS_QMI (_self);
     SmsStoreContext *ctx;
     QmiClient *client = NULL;
     GError *error = NULL;
@@ -280,17 +275,13 @@ sms_store (MMBaseSms *self,
     ctx = g_slice_new0 (SmsStoreContext);
     ctx->client = QMI_CLIENT_WMS (g_object_ref (client));
     ctx->storage = storage;
-    g_object_get (self,
-                  MM_BASE_SMS_MODEM, &ctx->modem,
-                  NULL);
-
-    ctx->current = mm_base_sms_get_parts (self);
+    ctx->current = mm_base_sms_get_parts (_self);
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)sms_store_context_free);
 
     /* Check whether we support the given SMS type */
-    if (!check_sms_type_support (MM_SMS_QMI (self), ctx->modem, (MMSmsPart *)ctx->current->data, &error)) {
+    if (!check_sms_type_support (MM_SMS_QMI (self), self->priv->modem, (MMSmsPart *)ctx->current->data, &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -304,7 +295,6 @@ sms_store (MMBaseSms *self,
 /* Send the SMS */
 
 typedef struct {
-    MMBaseModem *modem;
     QmiClientWms *client;
     gboolean from_storage;
     GList *current;
@@ -314,7 +304,6 @@ static void
 sms_send_context_free (SmsSendContext *ctx)
 {
     g_object_unref (ctx->client);
-    g_object_unref (ctx->modem);
     g_slice_free (SmsSendContext, ctx);
 }
 
@@ -595,10 +584,11 @@ sms_send_next_part (GTask *task)
 }
 
 static void
-sms_send (MMBaseSms *self,
-          GAsyncReadyCallback callback,
-          gpointer user_data)
+sms_send (MMBaseSms           *_self,
+          GAsyncReadyCallback  callback,
+          gpointer             user_data)
 {
+    MMSmsQmi *self = MM_SMS_QMI (_self);
     SmsSendContext *ctx;
     QmiClient *client = NULL;
     GError *error = NULL;
@@ -613,20 +603,16 @@ sms_send (MMBaseSms *self,
     /* Setup the context */
     ctx = g_slice_new0 (SmsSendContext);
     ctx->client = QMI_CLIENT_WMS (g_object_ref (client));
-    g_object_get (self,
-                  MM_BASE_SMS_MODEM, &ctx->modem,
-                  NULL);
-
     /* If the SMS is STORED, try to send from storage */
-    ctx->from_storage = (mm_base_sms_get_storage (self) != MM_SMS_STORAGE_UNKNOWN);
+    ctx->from_storage = (mm_base_sms_get_storage (_self) != MM_SMS_STORAGE_UNKNOWN);
 
-    ctx->current = mm_base_sms_get_parts (self);
+    ctx->current = mm_base_sms_get_parts (_self);
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)sms_send_context_free);
 
     /* Check whether we support the given SMS type */
-    if (!check_sms_type_support (MM_SMS_QMI (self), ctx->modem, (MMSmsPart *)ctx->current->data, &error)) {
+    if (!check_sms_type_support (MM_SMS_QMI (self), self->priv->modem, (MMSmsPart *)ctx->current->data, &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -638,7 +624,6 @@ sms_send (MMBaseSms *self,
 /*****************************************************************************/
 
 typedef struct {
-    MMBaseModem *modem;
     QmiClientWms *client;
     GList *current;
     guint n_failed;
@@ -648,7 +633,6 @@ static void
 sms_delete_parts_context_free (SmsDeletePartsContext *ctx)
 {
     g_object_unref (ctx->client);
-    g_object_unref (ctx->modem);
     g_slice_free (SmsDeletePartsContext, ctx);
 }
 
@@ -771,9 +755,6 @@ sms_delete (MMBaseSms *self,
 
     ctx = g_slice_new0 (SmsDeletePartsContext);
     ctx->client = QMI_CLIENT_WMS (g_object_ref (client));
-    g_object_get (self,
-                  MM_BASE_SMS_MODEM, &ctx->modem,
-                  NULL);
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)sms_delete_parts_context_free);
@@ -790,23 +771,44 @@ mm_sms_qmi_new (MMBaseModem  *modem,
                 gboolean      is_3gpp,
                 MMSmsStorage  default_storage)
 {
-    return MM_BASE_SMS (g_object_new (MM_TYPE_SMS_QMI,
-                                      MM_BASE_SMS_MODEM, modem,
-                                      MM_BIND_TO, G_OBJECT (modem),
-                                      MM_BASE_SMS_IS_3GPP, is_3gpp,
-                                      MM_BASE_SMS_DEFAULT_STORAGE, default_storage,
-                                      NULL));
+    MMBaseSms   *sms;
+
+    g_return_val_if_fail (MM_IS_BROADBAND_MODEM_QMI (modem), NULL);
+
+    sms = MM_BASE_SMS (g_object_new (MM_TYPE_SMS_QMI,
+                                     MM_BIND_TO, G_OBJECT (modem),
+                                     MM_BASE_SMS_IS_3GPP, is_3gpp,
+                                     MM_BASE_SMS_DEFAULT_STORAGE, default_storage,
+                                     NULL));
+    MM_SMS_QMI (sms)->priv->modem = g_object_ref (modem);
+    return sms;
 }
 
 static void
 mm_sms_qmi_init (MMSmsQmi *self)
 {
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_SMS_QMI, MMSmsQmiPrivate);
+}
+
+static void
+dispose (GObject *object)
+{
+    MMSmsQmi *self = MM_SMS_QMI (object);
+
+    g_clear_object (&self->priv->modem);
+
+    G_OBJECT_CLASS (mm_sms_qmi_parent_class)->dispose (object);
 }
 
 static void
 mm_sms_qmi_class_init (MMSmsQmiClass *klass)
 {
+    GObjectClass   *object_class = G_OBJECT_CLASS (klass);
     MMBaseSmsClass *base_sms_class = MM_BASE_SMS_CLASS (klass);
+
+    g_type_class_add_private (object_class, sizeof (MMSmsQmiPrivate));
+
+    object_class->dispose = dispose;
 
     base_sms_class->store = sms_store;
     base_sms_class->store_finish = sms_store_finish;

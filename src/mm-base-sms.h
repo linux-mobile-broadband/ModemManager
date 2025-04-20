@@ -25,7 +25,6 @@
 #include <libmm-glib.h>
 
 #include "mm-sms-part.h"
-#include "mm-base-modem.h"
 
 /*****************************************************************************/
 
@@ -49,13 +48,13 @@ typedef struct _MMBaseSmsPrivate MMBaseSmsPrivate;
 /* Properties */
 #define MM_BASE_SMS_PATH                "sms-path"
 #define MM_BASE_SMS_CONNECTION          "sms-connection"
-#define MM_BASE_SMS_MODEM               "sms-modem"
 #define MM_BASE_SMS_IS_MULTIPART        "sms-is-multipart"
 #define MM_BASE_SMS_MAX_PARTS           "sms-max-parts"
 #define MM_BASE_SMS_MULTIPART_REFERENCE "sms-multipart-reference"
 #define MM_BASE_SMS_IS_3GPP             "sms-is-3gpp"
 #define MM_BASE_SMS_DEFAULT_STORAGE     "sms-default-storage"
 #define MM_BASE_SMS_SUPPORTED_STORAGES  "sms-supported-storages"
+#define MM_BASE_SMS_CONNECTION_PARENT_PROPERTY_NAME "sms-connection-parent-property-name"
 
 /* Signals */
 #define MM_BASE_SMS_SET_LOCAL_MULTIPART_REFERENCE "sms-set-local-multipart-reference"
@@ -102,17 +101,14 @@ GType mm_base_sms_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBaseSms, g_object_unref)
 
 gboolean   mm_base_sms_init_from_properties (MMBaseSms        *self,
-                                             MMBaseModem      *modem,
                                              MMSmsProperties  *properties,
                                              GError          **error);
 gboolean   mm_base_sms_singlepart_init      (MMBaseSms     *self,
-                                             MMBaseModem   *modem,
                                              MMSmsState     state,
                                              MMSmsStorage   storage,
                                              MMSmsPart     *part,
                                              GError       **error);
 gboolean   mm_base_sms_multipart_init       (MMBaseSms     *self,
-                                             MMBaseModem   *modem,
                                              MMSmsState     state,
                                              MMSmsStorage   storage,
                                              guint          reference,
