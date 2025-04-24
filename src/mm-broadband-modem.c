@@ -761,11 +761,14 @@ parse_caps_cgmm (MMBaseModem   *self,
     if (!response)
         return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
 
-    /* This check detects some really old Motorola GPRS dongles and phones */
+    /* This check detects some really old Motorola and Mediatek GPRS dongles
+     * and phones.
+     */
     if (strstr (response, "GSM900") ||
         strstr (response, "GSM1800") ||
         strstr (response, "GSM1900") ||
-        strstr (response, "GSM850")) {
+        strstr (response, "GSM850") ||
+        strstr (response, "MTK2")) {
         /* At least, it's a GSM modem */
         *result = g_variant_new_uint32 (MM_MODEM_CAPABILITY_GSM_UMTS);
         return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
