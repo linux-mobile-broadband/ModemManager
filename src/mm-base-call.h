@@ -90,14 +90,22 @@ struct _MMBaseCallClass {
                                 GAsyncResult *res,
                                 GError **error);
 
-    /* Send a DTMF tone */
-    void     (* send_dtmf)        (MMBaseCall *self,
-                                   const gchar *dtmf,
-                                   GAsyncReadyCallback callback,
-                                   gpointer user_data);
-    gboolean (* send_dtmf_finish) (MMBaseCall *self,
-                                   GAsyncResult *res,
-                                   GError **error);
+    /* DTMF tone handling */
+    void     (* send_dtmf)        (MMBaseCall           *self,
+                                   const gchar          *dtmf,
+                                   GAsyncReadyCallback   callback,
+                                   gpointer              user_data);
+    gboolean (* send_dtmf_finish) (MMBaseCall           *self,
+                                   GAsyncResult         *res,
+                                   GError              **error);
+
+    void     (* stop_dtmf)        (MMBaseCall           *self,
+                                   GAsyncReadyCallback   callback,
+                                   gpointer              user_data);
+    gboolean (* stop_dtmf_finish) (MMBaseCall           *self,
+                                   GAsyncResult         *res,
+                                   GError              **error);
+
 };
 
 GType mm_base_call_get_type (void);

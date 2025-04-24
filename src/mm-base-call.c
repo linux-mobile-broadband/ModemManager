@@ -89,6 +89,9 @@ struct _MMBaseCallPrivate {
      * 'terminated' is coming asynchronously (e.g. via in-call state
      * update notifications) */
     GCancellable *start_cancellable;
+
+    /* DTMF support */
+    GQueue *dtmf_queue;
 };
 
 /*****************************************************************************/
@@ -728,6 +731,239 @@ handle_hangup (MMBaseCall *self,
 /*****************************************************************************/
 /* Send dtmf (DBus call handling) */
 
+typedef enum {
+    DTMF_STEP_FIRST,
+    DTMF_STEP_START,
+    DTMF_STEP_TIMEOUT,
+    DTMF_STEP_STOP,
+    DTMF_STEP_LAST,
+} DtmfStep;
+
+typedef struct {
+    DtmfStep   step;
+    GError    *saved_error;
+    guint8     call_id;
+    gchar     *dtmf;
+    guint      timeout_id;
+} SendDtmfContext;
+
+static void
+send_dtmf_context_clear_timeout (SendDtmfContext *ctx)
+{
+    if (ctx->timeout_id) {
+        g_source_remove (ctx->timeout_id);
+        ctx->timeout_id = 0;
+    }
+}
+
+static void
+send_dtmf_context_free (SendDtmfContext *ctx)
+{
+    send_dtmf_context_clear_timeout (ctx);
+    g_free (ctx->dtmf);
+    g_assert (!ctx->saved_error);
+    g_slice_free (SendDtmfContext, ctx);
+}
+
+static void send_dtmf_task_step_next (GTask *task);
+
+static void
+stop_dtmf_ignore_ready (MMBaseCall     *self,
+                        GAsyncResult   *res,
+                        gpointer        unused)
+{
+    /* Ignore the result and error */
+    MM_BASE_CALL_GET_CLASS (self)->stop_dtmf_finish (self, res, NULL);
+}
+
+static void
+send_dtmf_task_cancel (GTask *task)
+{
+    MMBaseCall      *self;
+    SendDtmfContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+
+    send_dtmf_context_clear_timeout (ctx);
+    if (ctx->step > DTMF_STEP_FIRST && ctx->step < DTMF_STEP_STOP) {
+        if (MM_BASE_CALL_GET_CLASS (self)->stop_dtmf) {
+            MM_BASE_CALL_GET_CLASS (self)->stop_dtmf (self,
+                                                      (GAsyncReadyCallback)stop_dtmf_ignore_ready,
+                                                      NULL);
+        }
+    }
+    g_assert (ctx->step != DTMF_STEP_LAST);
+    ctx->step = DTMF_STEP_LAST;
+    send_dtmf_task_step_next (task);
+}
+
+static void
+stop_dtmf_ready (MMBaseCall     *self,
+                 GAsyncResult   *res,
+                 GTask          *task)
+{
+    SendDtmfContext *ctx;
+    GError          *error = NULL;
+    gboolean         success;
+
+    ctx = g_task_get_task_data (task);
+
+    success = MM_BASE_CALL_GET_CLASS (self)->stop_dtmf_finish (self, res, &error);
+    if (ctx->step == DTMF_STEP_STOP) {
+        if (!success) {
+            g_propagate_error (&ctx->saved_error, error);
+            ctx->step = DTMF_STEP_LAST;
+        } else
+            ctx->step++;
+
+        send_dtmf_task_step_next (task);
+    }
+
+    /* Balance stop_dtmf() */
+    g_object_unref (task);
+}
+
+static gboolean
+dtmf_timeout (GTask *task)
+{
+    SendDtmfContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    send_dtmf_context_clear_timeout (ctx);
+    ctx->step++;
+    send_dtmf_task_step_next (task);
+
+    return G_SOURCE_REMOVE;
+}
+
+static void
+send_dtmf_ready (MMBaseCall   *self,
+                 GAsyncResult *res,
+                 GTask        *task)
+{
+    SendDtmfContext *ctx;
+    GError          *error = NULL;
+    gboolean         success;
+
+    ctx = g_task_get_task_data (task);
+
+    success = MM_BASE_CALL_GET_CLASS (self)->send_dtmf_finish (self, res, &error);
+    if (ctx->step == DTMF_STEP_START) {
+        if (!success) {
+            g_propagate_error (&ctx->saved_error, error);
+            ctx->step = DTMF_STEP_LAST;
+        } else
+            ctx->step++;
+
+        send_dtmf_task_step_next (task);
+    }
+
+    /* Balance send_dtmf() */
+    g_object_unref (task);
+}
+
+static void
+send_dtmf_task_step_next (GTask *task)
+{
+    SendDtmfContext *ctx;
+    gboolean         need_stop;
+    MMBaseCall      *self;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    need_stop = MM_BASE_CALL_GET_CLASS (self)->stop_dtmf &&
+                MM_BASE_CALL_GET_CLASS (self)->stop_dtmf_finish;
+
+    switch (ctx->step) {
+    case DTMF_STEP_FIRST:
+        ctx->step++;
+        /* Fall through */
+    case DTMF_STEP_START:
+        MM_BASE_CALL_GET_CLASS (self)->send_dtmf (self,
+                                                  ctx->dtmf,
+                                                  (GAsyncReadyCallback)send_dtmf_ready,
+                                                  g_object_ref (task));
+        break;
+    case DTMF_STEP_TIMEOUT:
+        if (need_stop) {
+            /* Disable DTMF press after DTMF tone duration elapses */
+            ctx->timeout_id = g_timeout_add (mm_base_call_get_dtmf_tone_duration (self),
+                                             (GSourceFunc) dtmf_timeout,
+                                             task);
+            return;
+        }
+        /* Fall through */
+    case DTMF_STEP_STOP:
+        if (need_stop) {
+            send_dtmf_context_clear_timeout (ctx);
+            MM_BASE_CALL_GET_CLASS (self)->stop_dtmf (self,
+                                                      (GAsyncReadyCallback)stop_dtmf_ready,
+                                                      g_object_ref (task));
+            return;
+        }
+        /* Fall through */
+    case DTMF_STEP_LAST:
+        send_dtmf_context_clear_timeout (ctx);
+        if (ctx->saved_error)
+            g_task_return_error (task, g_steal_pointer (&ctx->saved_error));
+        else
+            g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+
+        /* Start the next tone if any are queued */
+        g_queue_remove (self->priv->dtmf_queue, task);
+        task = g_queue_peek_head (self->priv->dtmf_queue);
+        if (task)
+            send_dtmf_task_step_next (task);
+        break;
+    default:
+        g_assert_not_reached ();
+    }
+}
+
+static gboolean
+send_dtmf_task_finish (MMBaseCall    *self,
+                       GAsyncResult  *res,
+                       GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static GTask *
+send_dtmf_task_new (MMBaseCall           *self,
+                    const gchar          *dtmf,
+                    GAsyncReadyCallback   callback,
+                    gpointer              user_data,
+                    GError              **error)
+{
+    GTask           *task;
+    SendDtmfContext *ctx;
+    guint8           call_id;
+
+    call_id = mm_base_call_get_index (self);
+    if (call_id == 0) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_INVALID_ARGS,
+                     "Invalid call index");
+        return NULL;
+    }
+
+    task = g_task_new (self, NULL, callback, user_data);
+    ctx = g_slice_new0 (SendDtmfContext);
+    ctx->call_id = call_id;
+    ctx->dtmf = g_strdup (dtmf);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) send_dtmf_context_free);
+
+    return task;
+}
+
+/*****************************************************************************/
+/* Send DTMF D-Bus request handling */
+
 typedef struct {
     MMBaseCall *self;
     GDBusMethodInvocation *invocation;
@@ -750,7 +986,7 @@ handle_send_dtmf_ready (MMBaseCall *self,
 {
     GError *error = NULL;
 
-    if (!MM_BASE_CALL_GET_CLASS (self)->send_dtmf_finish (self, res, &error)) {
+    if (!send_dtmf_task_finish (self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
         mm_gdbus_call_complete_send_dtmf (MM_GDBUS_CALL (ctx->self), ctx->invocation);
@@ -764,8 +1000,9 @@ handle_send_dtmf_auth_ready (MMAuthProvider *authp,
                              GAsyncResult *res,
                              HandleSendDtmfContext *ctx)
 {
-    MMCallState state;
-    GError *error = NULL;
+    MMCallState  state;
+    GError      *error = NULL;
+    GTask       *task;
 
     if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -775,7 +1012,7 @@ handle_send_dtmf_auth_ready (MMAuthProvider *authp,
 
     state = mm_gdbus_call_get_state (MM_GDBUS_CALL (ctx->self));
 
-    /* Check if we do support doing it */
+    /* Check if we do support doing DTMF at all */
     if (!MM_BASE_CALL_GET_CLASS (ctx->self)->send_dtmf ||
         !MM_BASE_CALL_GET_CLASS (ctx->self)->send_dtmf_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
@@ -793,9 +1030,20 @@ handle_send_dtmf_auth_ready (MMAuthProvider *authp,
     }
 
     mm_obj_info (ctx->self, "processing user request to send DTMF...");
-    MM_BASE_CALL_GET_CLASS (ctx->self)->send_dtmf (ctx->self, ctx->dtmf,
-                                                   (GAsyncReadyCallback)handle_send_dtmf_ready,
-                                                   ctx);
+    task = send_dtmf_task_new (ctx->self,
+                               ctx->dtmf,
+                               (GAsyncReadyCallback)handle_send_dtmf_ready,
+                               ctx,
+                               &error);
+    if (!task) {
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_send_dtmf_context_free (ctx);
+        return;
+    }
+
+    g_queue_push_tail (ctx->self->priv->dtmf_queue, task);
+    if (g_queue_get_length (ctx->self->priv->dtmf_queue) == 1)
+        send_dtmf_task_step_next (task);
 }
 
 static gboolean
@@ -1116,12 +1364,17 @@ mm_base_call_init (MMBaseCall *self)
     /* Setup authorization provider */
     self->priv->authp = mm_auth_provider_get ();
     self->priv->authp_cancellable = g_cancellable_new ();
+
+    self->priv->dtmf_queue = g_queue_new ();
 }
 
 static void
 finalize (GObject *object)
 {
     MMBaseCall *self = MM_BASE_CALL (object);
+
+    g_assert (g_queue_get_length (self->priv->dtmf_queue) == 0);
+    g_queue_free (g_steal_pointer (&self->priv->dtmf_queue));
 
     g_assert (!self->priv->start_cancellable);
     g_free (self->priv->path);
@@ -1152,6 +1405,9 @@ dispose (GObject *object)
     g_clear_object (&self->priv->bind_to);
     g_cancellable_cancel (self->priv->authp_cancellable);
     g_clear_object (&self->priv->authp_cancellable);
+
+    g_queue_foreach (self->priv->dtmf_queue, (GFunc) send_dtmf_task_cancel, NULL);
+    g_queue_clear (self->priv->dtmf_queue);
 
     G_OBJECT_CLASS (mm_base_call_parent_class)->dispose (object);
 }
