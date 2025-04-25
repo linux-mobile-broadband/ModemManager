@@ -736,6 +736,7 @@ typedef enum {
     DTMF_STEP_START,
     DTMF_STEP_TIMEOUT,
     DTMF_STEP_STOP,
+    DTMF_STEP_NEXT,
     DTMF_STEP_LAST,
 } DtmfStep;
 
@@ -743,7 +744,12 @@ typedef struct {
     DtmfStep   step;
     GError    *saved_error;
     guint8     call_id;
-    gchar     *dtmf;
+    /* Array of DTMF runs; split by pauses */
+    GPtrArray *dtmfs;
+    /* index into dtmfs */
+    guint      cur_dtmf;
+    /* index into cur dtmf run string */
+    gchar     *cur_tone;
     guint      timeout_id;
 } SendDtmfContext;
 
@@ -760,7 +766,8 @@ static void
 send_dtmf_context_free (SendDtmfContext *ctx)
 {
     send_dtmf_context_clear_timeout (ctx);
-    g_free (ctx->dtmf);
+    g_ptr_array_foreach (ctx->dtmfs, (GFunc) g_free, NULL);
+    g_ptr_array_free (ctx->dtmfs, TRUE);
     g_assert (!ctx->saved_error);
     g_slice_free (SendDtmfContext, ctx);
 }
@@ -831,6 +838,10 @@ dtmf_timeout (GTask *task)
 
     ctx = g_task_get_task_data (task);
 
+    /* If this was a pause character; move past it */
+    if (ctx->cur_tone[0] == MM_CALL_DTMF_PAUSE_CHAR)
+        ctx->cur_tone++;
+
     send_dtmf_context_clear_timeout (ctx);
     ctx->step++;
     send_dtmf_task_step_next (task);
@@ -845,17 +856,21 @@ send_dtmf_ready (MMBaseCall   *self,
 {
     SendDtmfContext *ctx;
     GError          *error = NULL;
-    gboolean         success;
+    gssize           num_sent;
 
     ctx = g_task_get_task_data (task);
 
-    success = MM_BASE_CALL_GET_CLASS (self)->send_dtmf_finish (self, res, &error);
+    num_sent = MM_BASE_CALL_GET_CLASS (self)->send_dtmf_finish (self, res, &error);
     if (ctx->step == DTMF_STEP_START) {
-        if (!success) {
+        if (num_sent < 0) {
             g_propagate_error (&ctx->saved_error, error);
             ctx->step = DTMF_STEP_LAST;
-        } else
+        } else {
+            g_assert (num_sent > 0);
+            g_assert ((guint) num_sent <= strlen (ctx->cur_tone));
+            ctx->cur_tone += num_sent;
             ctx->step++;
+        }
 
         send_dtmf_task_step_next (task);
     }
@@ -875,7 +890,7 @@ send_dtmf_task_step_next (GTask *task)
     self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
-    is_pause = (ctx->dtmf[0] == MM_CALL_DTMF_PAUSE_CHAR);
+    is_pause = (ctx->cur_tone[0] == MM_CALL_DTMF_PAUSE_CHAR);
     need_stop = MM_BASE_CALL_GET_CLASS (self)->stop_dtmf &&
                 MM_BASE_CALL_GET_CLASS (self)->stop_dtmf_finish;
 
@@ -886,7 +901,7 @@ send_dtmf_task_step_next (GTask *task)
     case DTMF_STEP_START:
         if (!is_pause) {
             MM_BASE_CALL_GET_CLASS (self)->send_dtmf (self,
-                                                      ctx->dtmf,
+                                                      ctx->cur_tone,
                                                       (GAsyncReadyCallback)send_dtmf_ready,
                                                       g_object_ref (task));
             return;
@@ -913,6 +928,22 @@ send_dtmf_task_step_next (GTask *task)
                                                       g_object_ref (task));
             return;
         }
+        /* Fall through */
+    case DTMF_STEP_NEXT:
+        /* Advance to next DTMF run? */
+        if (ctx->cur_tone[0] == '\0') {
+            ctx->cur_dtmf++;
+            if (ctx->cur_dtmf < ctx->dtmfs->len)
+                ctx->cur_tone = g_ptr_array_index (ctx->dtmfs, ctx->cur_dtmf);
+        }
+
+        /* More to send? */
+        if (ctx->cur_tone[0]) {
+            ctx->step = DTMF_STEP_START;
+            send_dtmf_task_step_next (task);
+            return;
+        }
+        /* no more DTMF characters to send */
         /* Fall through */
     case DTMF_STEP_LAST:
         send_dtmf_context_clear_timeout (ctx);
@@ -948,9 +979,9 @@ send_dtmf_task_new (MMBaseCall           *self,
                     gpointer              user_data,
                     GError              **error)
 {
-    GTask           *task;
-    SendDtmfContext *ctx;
-    guint8           call_id;
+    GTask            *task;
+    SendDtmfContext  *ctx;
+    guint8            call_id;
 
     call_id = mm_base_call_get_index (self);
     if (call_id == 0) {
@@ -962,9 +993,13 @@ send_dtmf_task_new (MMBaseCall           *self,
     }
 
     task = g_task_new (self, NULL, callback, user_data);
+
     ctx = g_slice_new0 (SendDtmfContext);
     ctx->call_id = call_id;
-    ctx->dtmf = g_strdup (dtmf);
+    /* Split DTMF into runs of DTMF characters interrupted by pauses */
+    ctx->dtmfs = mm_dtmf_split (dtmf);
+    g_assert (ctx->dtmfs->len > 0);
+    ctx->cur_tone = g_ptr_array_index (ctx->dtmfs, ctx->cur_dtmf);
     g_task_set_task_data (task, ctx, (GDestroyNotify) send_dtmf_context_free);
 
     return task;
@@ -1021,6 +1056,22 @@ handle_send_dtmf_auth_ready (MMAuthProvider *authp,
 
     state = mm_gdbus_call_get_state (MM_GDBUS_CALL (ctx->self));
 
+    /* Ensure there are DTMF characters to send */
+    if (!ctx->dtmf || !ctx->dtmf[0]) {
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                        "No DTMF characters given");
+        handle_send_dtmf_context_free (ctx);
+        return;
+    }
+
+    /* And that there aren't too many */
+    if (strlen (ctx->dtmf) > 50) {
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                        "Too many DTMF characters");
+        handle_send_dtmf_context_free (ctx);
+        return;
+    }
+
     /* Check if we do support doing DTMF at all */
     if (!MM_BASE_CALL_GET_CLASS (ctx->self)->send_dtmf ||
         !MM_BASE_CALL_GET_CLASS (ctx->self)->send_dtmf_finish) {
@@ -1031,7 +1082,7 @@ handle_send_dtmf_auth_ready (MMAuthProvider *authp,
     }
 
     /* We can only send_dtmf when call is in ACTIVE state */
-    if (state != MM_CALL_STATE_ACTIVE ){
+    if (state != MM_CALL_STATE_ACTIVE) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                                         "This call was not active, cannot send dtmf");
         handle_send_dtmf_context_free (ctx);

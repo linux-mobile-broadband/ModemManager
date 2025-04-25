@@ -95,7 +95,8 @@ struct _MMBaseCallClass {
                                    const gchar          *dtmf,
                                    GAsyncReadyCallback   callback,
                                    gpointer              user_data);
-    gboolean (* send_dtmf_finish) (MMBaseCall           *self,
+    /* Returns the number of DTMF characters sent, or < 1 on error */
+    gssize   (* send_dtmf_finish) (MMBaseCall           *self,
                                    GAsyncResult         *res,
                                    GError              **error);
 

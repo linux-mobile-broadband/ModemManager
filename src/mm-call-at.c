@@ -312,12 +312,12 @@ call_hangup (MMBaseCall          *_self,
 /*****************************************************************************/
 /* Send DTMF tone to call */
 
-static gboolean
+static gssize
 call_send_dtmf_finish (MMBaseCall *self,
                        GAsyncResult *res,
                        GError **error)
 {
-    return g_task_propagate_boolean (G_TASK (res), error);
+    return g_task_propagate_int (G_TASK (res), error);
 }
 
 static void
@@ -338,7 +338,8 @@ call_send_dtmf_ready (MMBaseModem  *modem,
         return;
     }
 
-    g_task_return_boolean (task, TRUE);
+    /* We sent one character */
+    g_task_return_int (task, 1);
     g_object_unref (task);
 }
 

@@ -432,12 +432,12 @@ call_stop_dtmf (MMBaseCall          *_self,
                                            task);
 }
 
-static gboolean
+static gssize
 call_send_dtmf_finish (MMBaseCall    *call,
                        GAsyncResult  *res,
                        GError       **error)
 {
-    return g_task_propagate_boolean (G_TASK (res), error);
+    return g_task_propagate_int (G_TASK (res), error);
 }
 
 static void
@@ -456,7 +456,7 @@ voice_start_continuous_dtmf_ready (QmiClientVoice *client,
         g_prefix_error (&error, "Couldn't send DTMF character: ");
         g_task_return_error (task, error);
     } else {
-        g_task_return_boolean (task, TRUE);
+        g_task_return_int (task, 1);
     }
     g_object_unref (task);
 }
