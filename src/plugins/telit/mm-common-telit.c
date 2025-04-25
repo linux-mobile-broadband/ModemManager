@@ -42,11 +42,13 @@ telit_grab_port (MMPlugin *self,
 {
     MMKernelDevice *port;
     MMDevice *device;
+    MMPortGroup pgroup;
     MMPortType ptype;
     MMPortSerialAtFlag pflags = MM_PORT_SERIAL_AT_FLAG_NONE;
     const gchar *subsys;
 
     port = mm_port_probe_peek_port (probe);
+    pgroup = mm_port_probe_get_port_group (probe);
     ptype = mm_port_probe_get_port_type (probe);
     device = mm_port_probe_peek_device (probe);
     subsys = mm_port_probe_get_port_subsys (probe);
@@ -76,12 +78,13 @@ telit_grab_port (MMPlugin *self,
                         mm_port_probe_get_port_name (probe));
             ptype = MM_PORT_TYPE_GPS;
         } else
-            ptype = MM_PORT_TYPE_IGNORED;
+            pgroup = MM_PORT_GROUP_IGNORED;
     }
 
 out:
     return mm_base_modem_grab_port (modem,
                                     port,
+                                    pgroup,
                                     ptype,
                                     pflags,
                                     error);

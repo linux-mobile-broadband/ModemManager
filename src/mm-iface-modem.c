@@ -5718,6 +5718,14 @@ interface_initialization_step (GTask *task)
             mm_gdbus_modem_set_ports (ctx->skeleton, mm_common_ports_array_to_variant (port_infos, n_port_infos));
             mm_modem_port_info_array_free (port_infos, n_port_infos);
         }
+        if (!mm_gdbus_modem_get_ignored_ports (ctx->skeleton)) {
+            MMModemPortInfo *port_infos;
+            guint n_port_infos;
+
+            port_infos = mm_base_modem_get_ignored_port_infos (MM_BASE_MODEM (self), &n_port_infos);
+            mm_gdbus_modem_set_ignored_ports (ctx->skeleton, mm_common_ports_array_to_variant (port_infos, n_port_infos));
+            mm_modem_port_info_array_free (port_infos, n_port_infos);
+        }
         ctx->step++;
         /* fall-through */
 

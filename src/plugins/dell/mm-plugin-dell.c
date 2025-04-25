@@ -493,6 +493,7 @@ grab_port (MMPlugin     *self,
 
     return mm_base_modem_grab_port (modem,
                                     mm_port_probe_peek_port (probe),
+                                    mm_port_probe_get_port_group (probe),
                                     mm_port_probe_get_port_type (probe),
                                     MM_PORT_SERIAL_AT_FLAG_NONE,
                                     error);

@@ -2002,6 +2002,17 @@ mm_port_probe_list_has_xmmrpc_port (GList *list)
     return FALSE;
 }
 
+MMPortGroup
+mm_port_probe_get_port_group (MMPortProbe *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), MM_PORT_GROUP_UNKNOWN);
+
+    if (self->priv->is_ignored)
+        return MM_PORT_GROUP_IGNORED;
+
+    return MM_PORT_GROUP_USED;
+}
+
 MMPortType
 mm_port_probe_get_port_type (MMPortProbe *self)
 {
@@ -2142,14 +2153,6 @@ mm_port_probe_list_is_xmm (GList *probes)
     }
 
     return FALSE;
-}
-
-gboolean
-mm_port_probe_is_ignored (MMPortProbe *self)
-{
-    g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
-
-    return self->priv->is_ignored;
 }
 
 const gchar *

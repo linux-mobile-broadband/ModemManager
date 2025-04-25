@@ -974,19 +974,20 @@ mm_plugin_create_modem (MMPlugin  *self,
             GError      *inner_error = NULL;
             MMPortProbe *probe;
             gboolean     grabbed = FALSE;
-            gboolean     force_ignored = FALSE;
             const gchar *subsys;
             const gchar *name;
             const gchar *driver;
+            MMPortGroup  port_group;
             MMPortType   port_type;
 
             probe = MM_PORT_PROBE (l->data);
 
-            subsys    = mm_port_probe_get_port_subsys (probe);
-            name      = mm_port_probe_get_port_name   (probe);
-            port_type = mm_port_probe_get_port_type   (probe);
+            subsys     = mm_port_probe_get_port_subsys (probe);
+            name       = mm_port_probe_get_port_name   (probe);
+            port_group = mm_port_probe_get_port_group  (probe);
+            port_type  = mm_port_probe_get_port_type   (probe);
 
-            driver    = mm_kernel_device_get_driver (mm_port_probe_peek_port (probe));
+            driver     = mm_kernel_device_get_driver (mm_port_probe_peek_port (probe));
 
             /* If grabbing a port fails, just warn. We'll decide if the modem is
              * valid or not when all ports get organized */
@@ -1003,9 +1004,8 @@ mm_plugin_create_modem (MMPlugin  *self,
             }
 
             /* Ports that are explicitly ignored will be grabbed as ignored */
-            if (mm_port_probe_is_ignored (probe)) {
+            if (port_group == MM_PORT_GROUP_IGNORED) {
                 mm_obj_dbg (self, "port %s is explicitly ignored", name);
-                force_ignored = TRUE;
                 goto grab_port;
             }
 
@@ -1017,7 +1017,7 @@ mm_plugin_create_modem (MMPlugin  *self,
                     g_strcmp0 (driver, "qmi_wwan") != 0) {
                     /* Non-QMI net ports are ignored in QMI modems */
                     mm_obj_dbg (self, "ignoring non-QMI net port %s in QMI modem", name);
-                    force_ignored = TRUE;
+                    port_group = MM_PORT_GROUP_IGNORED;
                     goto grab_port;
                 }
 
@@ -1026,7 +1026,7 @@ mm_plugin_create_modem (MMPlugin  *self,
                     g_strcmp0 (driver, "qmi_wwan") == 0) {
                     /* QMI net ports are ignored in non-QMI modems */
                     mm_obj_dbg (self, "ignoring QMI net port %s in non-QMI modem", name);
-                    force_ignored = TRUE;
+                    port_group = MM_PORT_GROUP_IGNORED;
                     goto grab_port;
                 }
 #else
@@ -1034,7 +1034,7 @@ mm_plugin_create_modem (MMPlugin  *self,
                     g_strcmp0 (driver, "qmi_wwan") == 0) {
                     /* QMI net ports are ignored if QMI support not built */
                     mm_obj_dbg (self, "ignoring QMI net port %s as QMI support isn't available", name);
-                    force_ignored = TRUE;
+                    port_group = MM_PORT_GROUP_IGNORED;
                     goto grab_port;
                 }
 #endif
@@ -1048,7 +1048,7 @@ mm_plugin_create_modem (MMPlugin  *self,
                     g_strcmp0 (driver, "cdc_mbim") != 0) {
                     /* Non-MBIM net ports are ignored in MBIM modems */
                     mm_obj_dbg (self, "ignoring non-MBIM net port %s in MBIM modem", name);
-                    force_ignored = TRUE;
+                    port_group = MM_PORT_GROUP_IGNORED;
                     goto grab_port;
                 }
 
@@ -1057,27 +1057,21 @@ mm_plugin_create_modem (MMPlugin  *self,
                     g_strcmp0 (driver, "cdc_mbim") == 0) {
                     /* MBIM net ports are ignored in non-MBIM modems */
                     mm_obj_dbg (self, "ignoring MBIM net port %s in non-MBIM modem", name);
-                    force_ignored = TRUE;
+                    port_group = MM_PORT_GROUP_IGNORED;
                     goto grab_port;
                 }
 #else
                 if (port_type == MM_PORT_TYPE_NET &&
                     g_strcmp0 (driver, "cdc_mbim") == 0) {
                     mm_obj_dbg (self, "ignoring MBIM net port %s as MBIM support isn't available", name);
-                    force_ignored = TRUE;
+                    port_group = MM_PORT_GROUP_IGNORED;
                     goto grab_port;
                 }
 #endif
             }
 
         grab_port:
-            if (force_ignored)
-                grabbed = mm_base_modem_grab_port (modem,
-                                                   mm_port_probe_peek_port (probe),
-                                                   MM_PORT_TYPE_IGNORED,
-                                                   MM_PORT_SERIAL_AT_FLAG_NONE,
-                                                   &inner_error);
-            else if (MM_PLUGIN_GET_CLASS (self)->grab_port)
+            if (port_group != MM_PORT_GROUP_IGNORED && MM_PLUGIN_GET_CLASS (self)->grab_port)
                 grabbed = MM_PLUGIN_GET_CLASS (self)->grab_port (MM_PLUGIN (self),
                                                                  modem,
                                                                  probe,
@@ -1085,7 +1079,8 @@ mm_plugin_create_modem (MMPlugin  *self,
             else
                 grabbed = mm_base_modem_grab_port (modem,
                                                    mm_port_probe_peek_port (probe),
-                                                   mm_port_probe_get_port_type (probe),
+                                                   port_group,
+                                                   port_type,
                                                    MM_PORT_SERIAL_AT_FLAG_NONE,
                                                    &inner_error);
 
@@ -1128,6 +1123,7 @@ mm_plugin_create_modem (MMPlugin  *self,
                 g_clear_error (&inner_error);
             } else if (!mm_base_modem_grab_port (modem,
                                                  kernel_device,
+                                                 MM_PORT_GROUP_USED,
                                                  MM_PORT_TYPE_AT,
                                                  MM_PORT_SERIAL_AT_FLAG_NONE,
                                                  &inner_error)) {

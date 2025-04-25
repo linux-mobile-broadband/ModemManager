@@ -174,6 +174,7 @@ mm_port_serial_gps_new (const char *name)
     return MM_PORT_SERIAL_GPS (g_object_new (MM_TYPE_PORT_SERIAL_GPS,
                                              MM_PORT_DEVICE, name,
                                              MM_PORT_SUBSYS, MM_PORT_SUBSYS_TTY,
+                                             MM_PORT_GROUP, MM_PORT_GROUP_USED,
                                              MM_PORT_TYPE, MM_PORT_TYPE_GPS,
                                              NULL));
 }

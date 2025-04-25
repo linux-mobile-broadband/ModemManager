@@ -241,6 +241,7 @@ mm_port_mbim_fibocom_new (const gchar  *name,
     return MM_PORT_MBIM_FIBOCOM (g_object_new (MM_TYPE_PORT_MBIM_FIBOCOM,
                                                MM_PORT_DEVICE, name,
                                                MM_PORT_SUBSYS, subsys,
+                                               MM_PORT_GROUP, MM_PORT_GROUP_USED,
                                                MM_PORT_TYPE, MM_PORT_TYPE_MBIM,
                                                NULL));
 }

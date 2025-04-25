@@ -138,6 +138,14 @@ gboolean           mm_modem_get_ports                (MMModem *self,
                                                       MMModemPortInfo **ports,
                                                       guint *n_ports);
 
+gboolean           mm_modem_peek_ignored_ports       (MMModem *self,
+                                                      const MMModemPortInfo **ports,
+                                                      guint *n_ports);
+
+gboolean           mm_modem_get_ignored_ports        (MMModem *self,
+                                                      MMModemPortInfo **ports,
+                                                      guint *n_ports);
+
 const gchar       *mm_modem_get_equipment_identifier (MMModem *self);
 gchar             *mm_modem_dup_equipment_identifier (MMModem *self);
 

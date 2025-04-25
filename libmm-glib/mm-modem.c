@@ -47,6 +47,7 @@ struct _MMModemPrivate {
     GMutex mutex;
 
     PROPERTY_ARRAY_DECLARE (ports)
+    PROPERTY_ARRAY_DECLARE (ignored_ports)
     PROPERTY_ARRAY_DECLARE (supported_modes)
     PROPERTY_ARRAY_DECLARE (supported_capabilities)
     PROPERTY_ARRAY_DECLARE (supported_bands)
@@ -984,7 +985,7 @@ mm_modem_dup_primary_port (MMModem *self)
  *  mm_modem_port_info_array_free() when no longer needed.
  * @n_ports: (out): Return location for the number of values in @ports.
  *
- * Gets the list of ports in the modem.
+ * Gets the list of used ports in the modem.
  *
  * Returns: %TRUE if @ports and @n_ports are set, %FALSE otherwise.
  *
@@ -992,6 +993,44 @@ mm_modem_dup_primary_port (MMModem *self)
  */
 
 PROPERTY_ARRAY_DEFINE_DEEP (ports,
+                            Modem, modem, MODEM,
+                            MMModemPortInfo,
+                            mm_common_ports_variant_to_garray,
+                            mm_common_ports_garray_to_array)
+
+/*****************************************************************************/
+
+/**
+ * mm_modem_peek_ignored_ports:
+ * @self: A #MMModem.
+ * @ports: (out) (array length=n_ports) (transfer none): Return location for the
+ *  array of #MMModemPortInfo values. Do not free the returned value, it is
+ *  owned by @self.
+ * @n_ports: (out): Return location for the number of values in @ports.
+ *
+ * Gets the list of ignored ports in the modem.
+ *
+ * Returns: %TRUE if @ports and @n_ports are set, %FALSE otherwise.
+ *
+ * Since: 1.26
+ */
+
+/**
+ * mm_modem_get_ignored_ports:
+ * @self: A #MMModem.
+ * @ports: (out) (array length=n_ports): Return location for the array of
+ *  #MMModemPortInfo values. The returned array should be freed with
+ *  mm_modem_port_info_array_free() when no longer needed.
+ * @n_ports: (out): Return location for the number of values in @ports.
+ *
+ * Gets the list of ignored ports in the modem.
+ *
+ * Returns: %TRUE if @ports and @n_ports are set, %FALSE otherwise.
+ *
+ * Since: 1.26
+ */
+
+PROPERTY_ARRAY_DEFINE_DEEP (ignored_ports,
                             Modem, modem, MODEM,
                             MMModemPortInfo,
                             mm_common_ports_variant_to_garray,
@@ -3430,6 +3469,7 @@ mm_modem_init (MMModem *self)
     g_mutex_init (&self->priv->mutex);
 
     PROPERTY_INITIALIZE (ports,                  "ports")
+    PROPERTY_INITIALIZE (ignored_ports,          "ignored-ports")
     PROPERTY_INITIALIZE (supported_modes,        "supported-modes")
     PROPERTY_INITIALIZE (supported_capabilities, "supported-capabilities")
     PROPERTY_INITIALIZE (supported_bands,        "supported-bands")
@@ -3445,6 +3485,7 @@ finalize (GObject *object)
     g_mutex_clear (&self->priv->mutex);
 
     PROPERTY_ARRAY_FINALIZE (ports)
+    PROPERTY_ARRAY_FINALIZE (ignored_ports)
     PROPERTY_ARRAY_FINALIZE (supported_modes)
     PROPERTY_ARRAY_FINALIZE (supported_capabilities)
     PROPERTY_ARRAY_FINALIZE (supported_bands)

@@ -526,6 +526,7 @@ mm_port_serial_at_new (const char   *name,
     return MM_PORT_SERIAL_AT (g_object_new (MM_TYPE_PORT_SERIAL_AT,
                                             MM_PORT_DEVICE, name,
                                             MM_PORT_SUBSYS, subsys,
+                                            MM_PORT_GROUP,  MM_PORT_GROUP_USED,
                                             MM_PORT_TYPE,   MM_PORT_TYPE_AT,
                                             NULL));
 }

@@ -81,6 +81,7 @@ grab_port (MMPlugin *self,
 
     return mm_base_modem_grab_port (modem,
                                     port,
+                                    mm_port_probe_get_port_group (probe),
                                     MM_PORT_TYPE_AT, /* we only allow AT ports here */
                                     pflags,
                                     error);

@@ -2842,6 +2842,7 @@ mm_port_qmi_new (const gchar  *name,
     return MM_PORT_QMI (g_object_new (MM_TYPE_PORT_QMI,
                                       MM_PORT_DEVICE, name,
                                       MM_PORT_SUBSYS, subsys,
+                                      MM_PORT_GROUP, MM_PORT_GROUP_USED,
                                       MM_PORT_TYPE, MM_PORT_TYPE_QMI,
                                       NULL));
 }
@@ -2855,6 +2856,7 @@ mm_port_qmi_new_from_node (const gchar *name,
                                       "node", node,
                                       MM_PORT_DEVICE, name,
                                       MM_PORT_SUBSYS, MM_PORT_SUBSYS_QRTR,
+                                      MM_PORT_GROUP, MM_PORT_GROUP_USED,
                                       MM_PORT_TYPE, MM_PORT_TYPE_QMI,
                                       NULL));
 }

@@ -202,6 +202,7 @@ PM_DRIVERS = "Drivers"
 PM_PLUGIN = "Plugin"
 PM_PRIMARY_PORT = "PrimaryPort"
 PM_PORTS = "Ports"
+PM_IGNORED_PORTS = "IgnoredPorts"
 PM_EQUIPMENT_IDENTIFIER = "EquipmentIdentifier"
 PM_UNLOCK_REQUIRED = "UnlockRequired"
 PM_UNLOCK_RETRIES = "UnlockRetries"
@@ -259,6 +260,7 @@ class Modem(ExportedObj):
         #props[PM_PLUGIN] = None
         #props[PM_PRIMARY_PORT] = None
         #props[PM_PORTS] = None
+        #props[PM_IGNORED_PORTS] = None
         #props[PM_EQUIPMENT_IDENTIFIER] = None
         #props[PM_UNLOCK_RETRIES] = dbus.UInt32(0)
         #props[PM_ACCESS_TECHNOLOGIES] = None
