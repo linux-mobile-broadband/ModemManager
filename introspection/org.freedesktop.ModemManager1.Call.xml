@@ -103,9 +103,10 @@
 
     <!--
         SendDtmf:
-        @dtmf: DTMF tone identifier [0-9A-D*#].
+        @dtmf: DTMF tone identifier [0-9A-D*#] or pause character [,].
 
         Send a DTMF tone (Dual Tone Multi-Frequency) (only on supported modems).
+        Since 1.26 the comma [,] is interpreted as a two-second pause.
 
         Applicable only if state is <link linkend="MM-CALL-STATE-ACTIVE:CAPS"><constant>MM_CALL_STATE_ACTIVE</constant></link>.
 

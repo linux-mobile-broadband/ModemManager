@@ -870,10 +870,12 @@ send_dtmf_task_step_next (GTask *task)
     SendDtmfContext *ctx;
     gboolean         need_stop;
     MMBaseCall      *self;
+    gboolean         is_pause;
 
     self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
+    is_pause = (ctx->dtmf[0] == MM_CALL_DTMF_PAUSE_CHAR);
     need_stop = MM_BASE_CALL_GET_CLASS (self)->stop_dtmf &&
                 MM_BASE_CALL_GET_CLASS (self)->stop_dtmf_finish;
 
@@ -882,23 +884,30 @@ send_dtmf_task_step_next (GTask *task)
         ctx->step++;
         /* Fall through */
     case DTMF_STEP_START:
-        MM_BASE_CALL_GET_CLASS (self)->send_dtmf (self,
-                                                  ctx->dtmf,
-                                                  (GAsyncReadyCallback)send_dtmf_ready,
-                                                  g_object_ref (task));
-        break;
+        if (!is_pause) {
+            MM_BASE_CALL_GET_CLASS (self)->send_dtmf (self,
+                                                      ctx->dtmf,
+                                                      (GAsyncReadyCallback)send_dtmf_ready,
+                                                      g_object_ref (task));
+            return;
+        }
+        /* Fall through */
     case DTMF_STEP_TIMEOUT:
-        if (need_stop) {
+        if (need_stop || is_pause) {
+            guint duration;
+
+            duration = is_pause ? 2000 : mm_base_call_get_dtmf_tone_duration (self);
+
             /* Disable DTMF press after DTMF tone duration elapses */
-            ctx->timeout_id = g_timeout_add (mm_base_call_get_dtmf_tone_duration (self),
+            ctx->timeout_id = g_timeout_add (duration,
                                              (GSourceFunc) dtmf_timeout,
                                              task);
             return;
         }
         /* Fall through */
     case DTMF_STEP_STOP:
-        if (need_stop) {
-            send_dtmf_context_clear_timeout (ctx);
+        send_dtmf_context_clear_timeout (ctx);
+        if (need_stop && !is_pause) {
             MM_BASE_CALL_GET_CLASS (self)->stop_dtmf (self,
                                                       (GAsyncReadyCallback)stop_dtmf_ready,
                                                       g_object_ref (task));

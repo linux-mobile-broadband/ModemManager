@@ -41,6 +41,8 @@ typedef struct _MMBaseCallPrivate MMBaseCallPrivate;
 #define MM_CALL_NUMBER             "number"
 #define MM_CALL_DTMF_TONE_DURATION "dtmf-tone-duration"
 
+#define MM_CALL_DTMF_PAUSE_CHAR ','
+
 #define MM_BASE_CALL_PATH                        "call-path"
 #define MM_BASE_CALL_CONNECTION                  "call-connection"
 #define MM_BASE_CALL_IFACE_MODEM_VOICE           "call-iface-modem-voice"
