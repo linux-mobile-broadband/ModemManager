@@ -35,6 +35,11 @@
 
 G_DEFINE_TYPE (MMCallQmi, mm_call_qmi, MM_TYPE_BASE_CALL)
 
+struct _MMCallQmiPrivate {
+    /* The modem which owns this call */
+    MMBaseModem *modem;
+};
+
 /*****************************************************************************/
 
 static gboolean
@@ -48,12 +53,7 @@ ensure_qmi_client (MMCallQmi            *self,
     QmiClient   *client;
     MMPortQmi   *port;
 
-    g_object_get (self,
-                  MM_BASE_CALL_MODEM, &modem,
-                  NULL);
-    g_assert (MM_IS_BASE_MODEM (modem));
-
-    port = mm_broadband_modem_qmi_peek_port_qmi (MM_BROADBAND_MODEM_QMI (modem));
+    port = mm_broadband_modem_qmi_peek_port_qmi (MM_BROADBAND_MODEM_QMI (self->priv->modem));
     g_object_unref (modem);
 
     if (!port) {
@@ -491,26 +491,47 @@ mm_call_qmi_new (MMBaseModem     *modem,
                  MMCallDirection  direction,
                  const gchar     *number)
 {
-    return MM_BASE_CALL (g_object_new (MM_TYPE_CALL_QMI,
-                                       MM_BASE_CALL_MODEM, modem,
-                                       MM_BIND_TO,         G_OBJECT (modem),
-                                       "direction",        direction,
-                                       "number",           number,
+    MMBaseCall  *call;
+
+    call = MM_BASE_CALL (g_object_new (MM_TYPE_CALL_QMI,
+                                       MM_BASE_CALL_IFACE_MODEM_VOICE, modem,
+                                       MM_BIND_TO,                     modem,
+                                       "direction",                    direction,
+                                       "number",                       number,
                                        MM_BASE_CALL_SKIP_INCOMING_TIMEOUT,       TRUE,
                                        MM_BASE_CALL_SUPPORTS_DIALING_TO_RINGING, TRUE,
                                        MM_BASE_CALL_SUPPORTS_RINGING_TO_ACTIVE,  TRUE,
                                        NULL));
+    MM_CALL_QMI (call)->priv->modem = g_object_ref (modem);
+    return call;
 }
 
 static void
 mm_call_qmi_init (MMCallQmi *self)
 {
+    /* Initialize private data */
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_CALL_QMI, MMCallQmiPrivate);
+}
+
+static void
+dispose (GObject *object)
+{
+    MMCallQmi *self = MM_CALL_QMI (object);
+
+    g_clear_object (&self->priv->modem);
+
+    G_OBJECT_CLASS (mm_call_qmi_parent_class)->dispose (object);
 }
 
 static void
 mm_call_qmi_class_init (MMCallQmiClass *klass)
 {
+    GObjectClass    *object_class = G_OBJECT_CLASS (klass);
     MMBaseCallClass *base_call_class = MM_BASE_CALL_CLASS (klass);
+
+    g_type_class_add_private (object_class, sizeof (MMCallQmiPrivate));
+
+    object_class->dispose = dispose;
 
     base_call_class->start = call_start;
     base_call_class->start_finish = call_start_finish;

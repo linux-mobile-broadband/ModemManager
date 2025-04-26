@@ -33,9 +33,11 @@
 
 typedef struct _MMCallQmi MMCallQmi;
 typedef struct _MMCallQmiClass MMCallQmiClass;
+typedef struct _MMCallQmiPrivate MMCallQmiPrivate;
 
 struct _MMCallQmi {
     MMBaseCall parent;
+    MMCallQmiPrivate *priv;
 };
 
 struct _MMCallQmiClass {

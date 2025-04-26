@@ -29,10 +29,7 @@
 #include "mm-base-call.h"
 #include "mm-broadband-modem.h"
 #include "mm-auth-provider.h"
-#include "mm-iface-modem.h"
 #include "mm-iface-modem-voice.h"
-#include "mm-base-modem-at.h"
-#include "mm-base-modem.h"
 #include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-error-helpers.h"
@@ -50,7 +47,7 @@ enum {
     PROP_PATH,
     PROP_CONNECTION,
     PROP_BIND_TO,
-    PROP_MODEM,
+    PROP_IFACE_MODEM_VOICE,
     PROP_SKIP_INCOMING_TIMEOUT,
     PROP_SUPPORTS_DIALING_TO_RINGING,
     PROP_SUPPORTS_RINGING_TO_ACTIVE,
@@ -71,8 +68,8 @@ struct _MMBaseCallPrivate {
     /* The object this Call is bound to */
     GObject *bind_to;
 
-    /* The modem which owns this call */
-    MMBaseModem *modem;
+    /* The voice interface which owns this call */
+    MMIfaceModemVoice *iface;
     /* The path where the call object is exported */
     gchar *path;
     /* Features */
@@ -240,7 +237,7 @@ handle_start_auth_ready (MMAuthProvider *authp,
     mm_obj_info (ctx->self, "processing user request to start voice call...");
 
     /* Disallow non-emergency calls when in emergency-only state */
-    if (!mm_iface_modem_voice_authorize_outgoing_call (MM_IFACE_MODEM_VOICE (ctx->self->priv->modem), ctx->self, &error)) {
+    if (!mm_iface_modem_voice_authorize_outgoing_call (ctx->self->priv->iface, ctx->self, &error)) {
         mm_base_call_change_state (ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_UNKNOWN);
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_start_context_free (ctx);
@@ -535,7 +532,7 @@ handle_join_multiparty_auth_ready (MMAuthProvider              *authp,
     /* This action is provided in the Call API, but implemented in the Modem.Voice interface
      * logic, because the action affects not only one call object, but all call objects that
      * are part of the multiparty call. */
-    mm_iface_modem_voice_join_multiparty (MM_IFACE_MODEM_VOICE (ctx->self->priv->modem),
+    mm_iface_modem_voice_join_multiparty (ctx->self->priv->iface,
                                           ctx->self,
                                           (GAsyncReadyCallback)modem_voice_join_multiparty_ready,
                                           ctx);
@@ -609,7 +606,7 @@ handle_leave_multiparty_auth_ready (MMAuthProvider               *authp,
     /* This action is provided in the Call API, but implemented in the Modem.Voice interface
      * logic, because the action affects not only one call object, but all call objects that
      * are part of the multiparty call. */
-    mm_iface_modem_voice_leave_multiparty (MM_IFACE_MODEM_VOICE (ctx->self->priv->modem),
+    mm_iface_modem_voice_leave_multiparty (ctx->self->priv->iface,
                                            ctx->self,
                                            (GAsyncReadyCallback)modem_voice_leave_multiparty_ready,
                                            ctx);
@@ -1002,28 +999,6 @@ log_object_build_id (MMLogObject *_self)
 
 /*****************************************************************************/
 
-MMBaseCall *
-mm_base_call_new (MMBaseModem     *modem,
-                  GObject         *bind_to,
-                  MMCallDirection  direction,
-                  const gchar     *number,
-                  gboolean         skip_incoming_timeout,
-                  gboolean         supports_dialing_to_ringing,
-                  gboolean         supports_ringing_to_active)
-{
-    return MM_BASE_CALL (g_object_new (MM_TYPE_BASE_CALL,
-                                       MM_BASE_CALL_MODEM, modem,
-                                       MM_BIND_TO,         bind_to,
-                                       "direction",        direction,
-                                       "number",           number,
-                                       MM_BASE_CALL_SKIP_INCOMING_TIMEOUT,       skip_incoming_timeout,
-                                       MM_BASE_CALL_SUPPORTS_DIALING_TO_RINGING, supports_dialing_to_ringing,
-                                       MM_BASE_CALL_SUPPORTS_RINGING_TO_ACTIVE,  supports_ringing_to_active,
-                                       NULL));
-}
-
-/*****************************************************************************/
-
 static void
 set_property (GObject *object,
               guint prop_id,
@@ -1058,9 +1033,9 @@ set_property (GObject *object,
         self->priv->bind_to = g_value_dup_object (value);
         mm_bind_to (MM_BIND (self), MM_BASE_CALL_CONNECTION, self->priv->bind_to);
         break;
-    case PROP_MODEM:
-        g_clear_object (&self->priv->modem);
-        self->priv->modem = g_value_dup_object (value);
+    case PROP_IFACE_MODEM_VOICE:
+        g_clear_object (&self->priv->iface);
+        self->priv->iface = g_value_dup_object (value);
         break;
     case PROP_SKIP_INCOMING_TIMEOUT:
         self->priv->skip_incoming_timeout = g_value_get_boolean (value);
@@ -1095,8 +1070,8 @@ get_property (GObject *object,
     case PROP_BIND_TO:
         g_value_set_object (value, self->priv->bind_to);
         break;
-    case PROP_MODEM:
-        g_value_set_object (value, self->priv->modem);
+    case PROP_IFACE_MODEM_VOICE:
+        g_value_set_object (value, self->priv->iface);
         break;
     case PROP_SKIP_INCOMING_TIMEOUT:
         g_value_set_boolean (value, self->priv->skip_incoming_timeout);
@@ -1159,7 +1134,7 @@ dispose (GObject *object)
         g_clear_object (&self->priv->connection);
     }
 
-    g_clear_object (&self->priv->modem);
+    g_clear_object (&self->priv->iface);
     g_clear_object (&self->priv->bind_to);
     g_cancellable_cancel (self->priv->authp_cancellable);
     g_clear_object (&self->priv->authp_cancellable);
@@ -1209,13 +1184,13 @@ mm_base_call_class_init (MMBaseCallClass *klass)
 
     g_object_class_override_property (object_class, PROP_BIND_TO, MM_BIND_TO);
 
-    properties[PROP_MODEM] =
-        g_param_spec_object (MM_BASE_CALL_MODEM,
-                             "Modem",
-                             "The Modem which owns this call",
-                             MM_TYPE_BASE_MODEM,
+    properties[PROP_IFACE_MODEM_VOICE] =
+        g_param_spec_object (MM_BASE_CALL_IFACE_MODEM_VOICE,
+                             "Modem Voice Interface",
+                             "The Modem voice interface which owns this call",
+                             MM_TYPE_IFACE_MODEM_VOICE,
                              G_PARAM_READWRITE);
-    g_object_class_install_property (object_class, PROP_MODEM, properties[PROP_MODEM]);
+    g_object_class_install_property (object_class, PROP_IFACE_MODEM_VOICE, properties[PROP_IFACE_MODEM_VOICE]);
 
     properties[PROP_SKIP_INCOMING_TIMEOUT] =
         g_param_spec_boolean (MM_BASE_CALL_SKIP_INCOMING_TIMEOUT,
