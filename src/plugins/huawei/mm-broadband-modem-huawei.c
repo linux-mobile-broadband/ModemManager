@@ -49,6 +49,7 @@
 #include "mm-broadband-bearer.h"
 #include "mm-bearer-list.h"
 #include "mm-sim-huawei.h"
+#include "mm-call-at.h"
 
 static void iface_modem_init           (MMIfaceModemInterface         *iface);
 static void iface_modem_3gpp_init      (MMIfaceModem3gppInterface     *iface);
@@ -3880,13 +3881,13 @@ create_call (MMIfaceModemVoice *self,
              MMCallDirection    direction,
              const gchar       *number)
 {
-    return mm_base_call_new (MM_BASE_MODEM (self),
-                             G_OBJECT (self),
-                             direction,
-                             number,
-                             TRUE,  /* skip_incoming_timeout */
-                             TRUE,  /* supports_dialing_to_ringing */
-                             TRUE); /* supports_ringing_to_active) */
+    return mm_call_at_new (MM_BASE_MODEM (self),
+                           G_OBJECT (self),
+                           direction,
+                           number,
+                           TRUE,  /* skip_incoming_timeout */
+                           TRUE,  /* supports_dialing_to_ringing */
+                           TRUE); /* supports_ringing_to_active) */
 }
 
 /*****************************************************************************/

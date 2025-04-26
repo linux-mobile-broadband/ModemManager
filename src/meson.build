@@ -324,6 +324,7 @@ sources = files(
   'mm-auth-provider.c',
   'mm-base-bearer.c',
   'mm-base-call.c',
+  'mm-call-at.c',
   'mm-base-cbm.c',
   'mm-base-manager.c',
   'mm-base-modem-at.c',

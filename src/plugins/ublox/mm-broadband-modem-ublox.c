@@ -33,6 +33,7 @@
 #include "mm-sim-ublox.h"
 #include "mm-modem-helpers-ublox.h"
 #include "mm-ublox-enums-types.h"
+#include "mm-call-at.h"
 
 static void iface_modem_init       (MMIfaceModemInterface      *iface);
 static void iface_modem_voice_init (MMIfaceModemVoiceInterface *iface);
@@ -1505,13 +1506,13 @@ create_call (MMIfaceModemVoice *self,
              MMCallDirection    direction,
              const gchar       *number)
 {
-    return mm_base_call_new (MM_BASE_MODEM (self),
-                             G_OBJECT (self),
-                             direction,
-                             number,
-                             TRUE,  /* skip_incoming_timeout */
-                             TRUE,  /* supports_dialing_to_ringing */
-                             TRUE); /* supports_ringing_to_active */
+    return mm_call_at_new (MM_BASE_MODEM (self),
+                           G_OBJECT (self),
+                           direction,
+                           number,
+                           TRUE,  /* skip_incoming_timeout */
+                           TRUE,  /* supports_dialing_to_ringing */
+                           TRUE); /* supports_ringing_to_active */
 }
 
 /*****************************************************************************/

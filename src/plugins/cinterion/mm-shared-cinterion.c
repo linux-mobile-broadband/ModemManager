@@ -31,6 +31,7 @@
 #include "mm-base-modem-at.h"
 #include "mm-shared-cinterion.h"
 #include "mm-modem-helpers-cinterion.h"
+#include "mm-call-at.h"
 
 G_DEFINE_INTERFACE (MMSharedCinterion, mm_shared_cinterion, MM_TYPE_IFACE_MODEM)
 
@@ -1005,15 +1006,15 @@ mm_shared_cinterion_create_call (MMIfaceModemVoice *self,
     priv = get_private (MM_SHARED_CINTERION (self));
     if (priv->slcc_support == FEATURE_SUPPORTED) {
         mm_obj_dbg (self, "created new call with ^SLCC support");
-        return mm_base_call_new (MM_BASE_MODEM (self),
-                                 G_OBJECT (self),
-                                 direction,
-                                 number,
-                                 /* When SLCC is supported we have support for detailed
-                                  * call list events via call list report URCs */
-                                 TRUE,   /* incoming timeout not required */
-                                 TRUE,   /* dialing->ringing supported */
-                                 TRUE);  /* ringing->active supported */
+        return mm_call_at_new (MM_BASE_MODEM (self),
+                               G_OBJECT (self),
+                               direction,
+                               number,
+                               /* When SLCC is supported we have support for detailed
+                                * call list events via call list report URCs */
+                               TRUE,   /* incoming timeout not required */
+                               TRUE,   /* dialing->ringing supported */
+                               TRUE);  /* ringing->active supported */
     }
 
     /* otherwise, run parent's generic base call logic */
