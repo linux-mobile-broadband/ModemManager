@@ -315,18 +315,11 @@ daemon_enums_types_dep = declare_dependency(
   include_directories: '.',
 )
 
-# Additional vendor plugins
-subdir('plugins')
-
-# ModemManager daemon
-sources = files(
-  'main.c',
-  'mm-auth-provider.c',
+base_sources = files(
   'mm-base-bearer.c',
   'mm-base-call.c',
   'mm-call-at.c',
   'mm-base-cbm.c',
-  'mm-base-manager.c',
   'mm-base-modem-at.c',
   'mm-base-modem.c',
   'mm-base-sim.c',
@@ -341,7 +334,6 @@ sources = files(
   'mm-dispatcher-connection.c',
   'mm-dispatcher-fcc-unlock.c',
   'mm-dispatcher-modem-setup.c',
-  'mm-filter.c',
   'mm-iface-modem-3gpp.c',
   'mm-iface-modem-3gpp-profile-manager.c',
   'mm-iface-modem-3gpp-ussd.c',
@@ -359,15 +351,68 @@ sources = files(
   'mm-iface-modem-voice.c',
   'mm-iface-op-lock.c',
   'mm-log-helpers.c',
-  'mm-plugin.c',
-  'mm-plugin-manager.c',
-  'mm-port-probe.c',
-  'mm-port-probe-at.c',
   'mm-private-boxed-types.c',
   'mm-sleep-context.c',
 )
 
+# MM base library (used by MM and tests)
+incs = [
+  top_inc,
+  kerneldevice_inc,
+]
+
+deps = [
+  libmm_glib_dep,
+  libhelpers_dep,
+  libauth_dep,
+  libport_dep,
+  libqcdm_dep,
+  daemon_enums_types_dep,
+]
+
+private_deps = []
+
+c_args = [
+  '-DMM_COMPILATION',
+  '-DPLUGINDIR="@0@"'.format(mm_prefix / mm_pkglibdir),
+  '-DMODEMSETUPDIRPACKAGE="@0@"'.format(mm_prefix / mm_pkglibdir / 'modem-setup.d'),
+  '-DMODEMSETUPDIRUSER="@0@"'.format(mm_prefix / mm_pkgsysconfdir / 'modem-setup.d'),
+  '-DFCCUNLOCKDIRPACKAGE="@0@"'.format(mm_prefix / mm_pkglibdir / 'fcc-unlock.d'),
+  '-DFCCUNLOCKDIRUSER="@0@"'.format(mm_prefix / mm_pkgsysconfdir / 'fcc-unlock.d'),
+  '-DCONNECTIONDIRPACKAGE="@0@"'.format(mm_prefix / mm_pkglibdir / 'connection.d'),
+  '-DCONNECTIONDIRUSER="@0@"'.format(mm_prefix / mm_pkgsysconfdir / 'connection.d'),
+]
+
+libmmbase = static_library(
+  'mmbase',
+  sources: base_sources + daemon_enums_sources,
+  include_directories: incs,
+  dependencies: deps,
+  c_args: c_args,
+)
+
+libmmbase_dep = declare_dependency(
+  include_directories: ['.', kerneldevice_inc],
+  dependencies: deps,
+  link_with: libmmbase,
+)
+
+# Additional vendor plugins
+subdir('plugins')
+
+# ModemManager daemon
+sources = files(
+  'main.c',
+  'mm-base-manager.c',
+  'mm-filter.c',
+  'mm-plugin.c',
+  'mm-plugin-manager.c',
+  'mm-port-probe.c',
+  'mm-port-probe-at.c',
+)
+
 sources += daemon_enums_sources
+sources += base_sources
 
 deps = [
   gmodule_dep,
@@ -383,7 +428,6 @@ endif
 
 c_args = [
   '-DMM_COMPILATION',
-  '-DPLUGINDIR="@0@"'.format(mm_prefix / mm_pkglibdir),
   '-DMODEMSETUPDIRPACKAGE="@0@"'.format(mm_prefix / mm_pkglibdir / 'modem-setup.d'),
   '-DMODEMSETUPDIRUSER="@0@"'.format(mm_prefix / mm_pkgsysconfdir / 'modem-setup.d'),
   '-DFCCUNLOCKDIRPACKAGE="@0@"'.format(mm_prefix / mm_pkglibdir / 'fcc-unlock.d'),
