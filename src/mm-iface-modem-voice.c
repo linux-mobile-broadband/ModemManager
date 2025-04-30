@@ -3012,7 +3012,7 @@ interface_initialization_step (GTask *task)
         /* Create a new call list if not already available (this initialization
          * may be called multiple times) */
         if (!list) {
-            list = mm_call_list_new (MM_BASE_MODEM (self));
+            list = mm_call_list_new ();
             g_object_set (self,
                           MM_IFACE_MODEM_VOICE_CALL_LIST, list,
                           NULL);
