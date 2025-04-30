@@ -20,6 +20,7 @@
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-log.h"
+#include "mm-bind.h"
 
 G_DEFINE_TYPE (MMBroadbandBearerFibocomEcm, mm_broadband_bearer_fibocom_ecm, MM_TYPE_BROADBAND_BEARER)
 
@@ -513,6 +514,7 @@ mm_broadband_bearer_fibocom_ecm_new (MMBroadbandModemFibocom *modem,
         callback,
         user_data,
         MM_BASE_BEARER_MODEM, modem,
+        MM_BIND_TO, modem,
         MM_BASE_BEARER_CONFIG, config,
         NULL);
 }

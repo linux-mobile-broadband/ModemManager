@@ -1506,6 +1506,7 @@ create_call (MMIfaceModemVoice *self,
              const gchar       *number)
 {
     return mm_base_call_new (MM_BASE_MODEM (self),
+                             G_OBJECT (self),
                              direction,
                              number,
                              TRUE,  /* skip_incoming_timeout */

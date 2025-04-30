@@ -39,6 +39,7 @@
 #include "mm-daemon-enums-types.h"
 #include "mm-serial-parsers.h"
 #include "mm-modem-helpers.h"
+#include "mm-bind.h"
 
 static void log_object_iface_init (MMLogObjectInterface *iface);
 static void auth_iface_init (MMIfaceAuthInterface *iface);
@@ -2752,7 +2753,7 @@ mm_base_modem_class_init (MMBaseModemClass *klass)
     g_object_class_install_property (object_class, PROP_SUBSYSTEM_DEVICE_ID, properties[PROP_SUBSYSTEM_DEVICE_ID]);
 
     properties[PROP_CONNECTION] =
-        g_param_spec_object (MM_BASE_MODEM_CONNECTION,
+        g_param_spec_object (MM_BINDABLE_CONNECTION,
                              "Connection",
                              "GDBus connection to the system bus.",
                              G_TYPE_DBUS_CONNECTION,

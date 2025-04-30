@@ -33,6 +33,7 @@
 #include "mm-bearer-mbim.h"
 #include "mm-log-object.h"
 #include "mm-context.h"
+#include "mm-bind.h"
 
 G_DEFINE_TYPE (MMBearerMbim, mm_bearer_mbim, MM_TYPE_BASE_BEARER)
 
@@ -2019,6 +2020,7 @@ mm_bearer_mbim_new (MMBroadbandModemMbim *modem,
      * g_object_new() here */
     bearer = g_object_new (MM_TYPE_BEARER_MBIM,
                            MM_BASE_BEARER_MODEM,  modem,
+                           MM_BIND_TO, G_OBJECT (modem),
                            MM_BASE_BEARER_CONFIG, config,
                            NULL);
 

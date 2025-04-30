@@ -25,6 +25,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include "mm-bind.h"
 #include "mm-sim-iridium.h"
 
 G_DEFINE_TYPE (MMSimIridium, mm_sim_iridium, MM_TYPE_BASE_SIM)
@@ -63,6 +64,7 @@ mm_sim_iridium_new (MMBaseModem *modem,
                                 callback,
                                 user_data,
                                 MM_BASE_SIM_MODEM, modem,
+                                MM_BIND_TO, G_OBJECT (modem),
                                 "active", TRUE, /* by default always active */
                                 NULL);
 }

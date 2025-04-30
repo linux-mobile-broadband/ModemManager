@@ -37,6 +37,7 @@
 #include "mm-modem-helpers.h"
 #include "mm-port-enums-types.h"
 #include "mm-helper-enums-types.h"
+#include "mm-bind.h"
 
 static void async_initable_iface_init (GAsyncInitableIface *iface);
 
@@ -1966,6 +1967,7 @@ mm_broadband_bearer_new (MMBroadbandModem *modem,
         callback,
         user_data,
         MM_BASE_BEARER_MODEM,             modem,
+        MM_BIND_TO,                       G_OBJECT (modem),
         MM_BASE_BEARER_CONFIG,            bearer_properties,
         MM_BROADBAND_BEARER_FLOW_CONTROL, flow_control,
         NULL);

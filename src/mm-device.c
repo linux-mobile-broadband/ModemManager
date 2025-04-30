@@ -27,6 +27,7 @@
 #include "mm-plugin.h"
 #include "mm-log-object.h"
 #include "mm-daemon-enums-types.h"
+#include "mm-bind.h"
 
 static void log_object_iface_init (MMLogObjectInterface *iface);
 
@@ -341,7 +342,7 @@ unexport_modem (MMDevice *self)
     if (path != NULL) {
         g_dbus_object_manager_server_unexport (self->priv->object_manager, path);
         g_object_set (self->priv->modem,
-                      MM_BASE_MODEM_CONNECTION, NULL,
+                      MM_BINDABLE_CONNECTION, NULL,
                       NULL);
         mm_obj_dbg (self, "unexported modem from path '%s'", path);
         g_free (path);
@@ -389,7 +390,7 @@ export_modem (MMDevice *self)
     path = g_strdup_printf (MM_DBUS_MODEM_PREFIX "/%d", mm_base_modem_get_dbus_id (self->priv->modem));
     g_object_set (self->priv->modem,
                   "g-object-path", path,
-                  MM_BASE_MODEM_CONNECTION, connection,
+                  MM_BINDABLE_CONNECTION, connection,
                   NULL);
 
     g_dbus_object_manager_server_export (self->priv->object_manager,

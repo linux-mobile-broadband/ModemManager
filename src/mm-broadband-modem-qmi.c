@@ -11550,7 +11550,7 @@ cell_broadcast_create_cbm (MMIfaceModemCellBroadcast *_self)
         return iface_modem_cell_broadcast_parent->create_cbm (_self);
     }
 
-    return mm_base_cbm_new (MM_BASE_MODEM (self));
+    return mm_base_cbm_new (MM_BASE_MODEM (self), G_OBJECT (self));
 }
 
 /*****************************************************************************/

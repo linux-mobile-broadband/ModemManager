@@ -28,6 +28,7 @@
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-cinterion.h"
 #include "mm-daemon-enums-types.h"
+#include "mm-bind.h"
 
 G_DEFINE_TYPE (MMBroadbandBearerCinterion, mm_broadband_bearer_cinterion, MM_TYPE_BROADBAND_BEARER)
 
@@ -767,6 +768,7 @@ mm_broadband_bearer_cinterion_new (MMBroadbandModemCinterion *modem,
         callback,
         user_data,
         MM_BASE_BEARER_MODEM, modem,
+        MM_BIND_TO, modem,
         MM_BASE_BEARER_CONFIG, config,
         NULL);
 }

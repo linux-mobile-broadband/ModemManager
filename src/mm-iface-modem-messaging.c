@@ -1008,7 +1008,7 @@ interface_enabling_step (GTask *task)
     case ENABLING_STEP_FIRST: {
         MMSmsList *list;
 
-        list = mm_sms_list_new (MM_BASE_MODEM (self));
+        list = mm_sms_list_new (MM_BASE_MODEM (self), G_OBJECT (self));
         g_object_set (self,
                       MM_IFACE_MODEM_MESSAGING_SMS_LIST, list,
                       NULL);

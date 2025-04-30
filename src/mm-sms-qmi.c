@@ -33,6 +33,7 @@
 #include "mm-sms-part-3gpp.h"
 #include "mm-sms-part-cdma.h"
 #include "mm-log-object.h"
+#include "mm-bind.h"
 
 G_DEFINE_TYPE (MMSmsQmi, mm_sms_qmi, MM_TYPE_BASE_SMS)
 
@@ -789,6 +790,7 @@ mm_sms_qmi_new (MMBaseModem *modem)
 {
     return MM_BASE_SMS (g_object_new (MM_TYPE_SMS_QMI,
                                       MM_BASE_SMS_MODEM, modem,
+                                      MM_BIND_TO, G_OBJECT (modem),
                                       NULL));
 }
 

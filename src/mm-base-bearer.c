@@ -42,6 +42,7 @@
 #include "mm-bearer-stats.h"
 #include "mm-dispatcher-connection.h"
 #include "mm-auth-provider.h"
+#include "mm-bind.h"
 
 /* We require up to 20s to get a proper IP when using PPP */
 #define BEARER_IP_TIMEOUT_DEFAULT 20
@@ -55,9 +56,11 @@
 #define BEARER_CONNECTION_MONITOR_TIMEOUT          5
 
 static void log_object_iface_init (MMLogObjectInterface *iface);
+static void bind_iface_init (MMBindInterface *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBaseBearer, mm_base_bearer, MM_GDBUS_TYPE_BEARER_SKELETON, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_BIND, bind_iface_init))
 
 typedef enum {
     CONNECTION_FORBIDDEN_REASON_NONE,
@@ -71,6 +74,7 @@ enum {
     PROP_0,
     PROP_PATH,
     PROP_CONNECTION,
+    PROP_BIND_TO,
     PROP_MODEM,
     PROP_STATUS,
     PROP_CONFIG,
@@ -87,6 +91,9 @@ struct _MMBaseBearerPrivate {
     /* The authorization provider */
     MMAuthProvider *authp;
     GCancellable   *authp_cancellable;
+
+    /* The object this bearer is bound to */
+    GObject *bind_to;
 
     /* The modem which owns this BEARER */
     MMBaseModem *modem;
@@ -1744,17 +1751,15 @@ set_property (GObject *object,
         else if (self->priv->path)
             base_bearer_dbus_export (self);
         break;
+    case PROP_BIND_TO:
+        g_clear_object (&self->priv->bind_to);
+        self->priv->bind_to = g_value_dup_object (value);
+        mm_bind_to (MM_BIND (self), MM_BASE_BEARER_CONNECTION, self->priv->bind_to);
+        break;
     case PROP_MODEM:
         g_clear_object (&self->priv->modem);
         self->priv->modem = g_value_dup_object (value);
         if (self->priv->modem) {
-            /* Set owner ID */
-            mm_log_object_set_owner_id (MM_LOG_OBJECT (self), mm_log_object_get_id (MM_LOG_OBJECT (self->priv->modem)));
-            /* Bind the modem's connection (which is set when it is exported,
-             * and unset when unexported) to the BEARER's connection */
-            g_object_bind_property (self->priv->modem, MM_BASE_MODEM_CONNECTION,
-                                    self, MM_BASE_BEARER_CONNECTION,
-                                    G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
             if (self->priv->config) {
                 /* Listen to 3GPP/CDMA registration state changes. We need both
                  * 'config' and 'modem' set. */
@@ -1803,6 +1808,9 @@ get_property (GObject *object,
         break;
     case PROP_CONNECTION:
         g_value_set_object (value, self->priv->connection);
+        break;
+    case PROP_BIND_TO:
+        g_value_set_object (value, self->priv->bind_to);
         break;
     case PROP_MODEM:
         g_value_set_object (value, self->priv->modem);
@@ -1886,6 +1894,7 @@ dispose (GObject *object)
     reset_deferred_unregistration (self);
 
     g_clear_object (&self->priv->modem);
+    g_clear_object (&self->priv->bind_to);
     g_clear_object (&self->priv->config);
     g_cancellable_cancel (self->priv->authp_cancellable);
     g_clear_object (&self->priv->authp_cancellable);
@@ -1897,6 +1906,11 @@ static void
 log_object_iface_init (MMLogObjectInterface *iface)
 {
     iface->build_id = log_object_build_id;
+}
+
+static void
+bind_iface_init (MMBindInterface *iface)
+{
 }
 
 static void
@@ -1929,6 +1943,8 @@ mm_base_bearer_class_init (MMBaseBearerClass *klass)
                              NULL,
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_PATH, properties[PROP_PATH]);
+
+    g_object_class_override_property (object_class, PROP_BIND_TO, MM_BIND_TO);
 
     properties[PROP_MODEM] =
         g_param_spec_object (MM_BASE_BEARER_MODEM,

@@ -640,7 +640,7 @@ interface_enabling_step (GTask *task)
     case ENABLING_STEP_FIRST: {
         g_autoptr (MMCbmList) list = NULL;
 
-        list = mm_cbm_list_new (MM_BASE_MODEM (self));
+        list = mm_cbm_list_new (MM_BASE_MODEM (self), G_OBJECT (self));
         g_object_set (self,
                       MM_IFACE_MODEM_CELL_BROADCAST_CBM_LIST, list,
                       NULL);

@@ -35,16 +35,20 @@
 #include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-error-helpers.h"
+#include "mm-bind.h"
 
 static void log_object_iface_init (MMLogObjectInterface *iface);
+static void bind_iface_init (MMBindInterface *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBaseCall, mm_base_call, MM_GDBUS_TYPE_CALL_SKELETON, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_BIND, bind_iface_init))
 
 enum {
     PROP_0,
     PROP_PATH,
     PROP_CONNECTION,
+    PROP_BIND_TO,
     PROP_MODEM,
     PROP_SKIP_INCOMING_TIMEOUT,
     PROP_SUPPORTS_DIALING_TO_RINGING,
@@ -62,6 +66,9 @@ struct _MMBaseCallPrivate {
     /* The authorization provider */
     MMAuthProvider *authp;
     GCancellable   *authp_cancellable;
+
+    /* The object this Call is bound to */
+    GObject *bind_to;
 
     /* The modem which owns this call */
     MMBaseModem *modem;
@@ -1304,6 +1311,7 @@ log_object_build_id (MMLogObject *_self)
 
 MMBaseCall *
 mm_base_call_new (MMBaseModem     *modem,
+                  GObject         *bind_to,
                   MMCallDirection  direction,
                   const gchar     *number,
                   gboolean         skip_incoming_timeout,
@@ -1312,6 +1320,7 @@ mm_base_call_new (MMBaseModem     *modem,
 {
     return MM_BASE_CALL (g_object_new (MM_TYPE_BASE_CALL,
                                        MM_BASE_CALL_MODEM, modem,
+                                       MM_BIND_TO,         bind_to,
                                        "direction",        direction,
                                        "number",           number,
                                        MM_BASE_CALL_SKIP_INCOMING_TIMEOUT,       skip_incoming_timeout,
@@ -1351,18 +1360,14 @@ set_property (GObject *object,
         else if (self->priv->path)
             call_dbus_export (self);
         break;
+    case PROP_BIND_TO:
+        g_clear_object (&self->priv->bind_to);
+        self->priv->bind_to = g_value_dup_object (value);
+        mm_bind_to (MM_BIND (self), MM_BASE_CALL_CONNECTION, self->priv->bind_to);
+        break;
     case PROP_MODEM:
         g_clear_object (&self->priv->modem);
         self->priv->modem = g_value_dup_object (value);
-        if (self->priv->modem) {
-            /* Set owner ID */
-            mm_log_object_set_owner_id (MM_LOG_OBJECT (self), mm_log_object_get_id (MM_LOG_OBJECT (self->priv->modem)));
-            /* Bind the modem's connection (which is set when it is exported,
-             * and unset when unexported) to the call's connection */
-            g_object_bind_property (self->priv->modem, MM_BASE_MODEM_CONNECTION,
-                                    self, MM_BASE_CALL_CONNECTION,
-                                    G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
-        }
         break;
     case PROP_SKIP_INCOMING_TIMEOUT:
         self->priv->skip_incoming_timeout = g_value_get_boolean (value);
@@ -1393,6 +1398,9 @@ get_property (GObject *object,
         break;
     case PROP_CONNECTION:
         g_value_set_object (value, self->priv->connection);
+        break;
+    case PROP_BIND_TO:
+        g_value_set_object (value, self->priv->bind_to);
         break;
     case PROP_MODEM:
         g_value_set_object (value, self->priv->modem);
@@ -1459,6 +1467,7 @@ dispose (GObject *object)
     }
 
     g_clear_object (&self->priv->modem);
+    g_clear_object (&self->priv->bind_to);
     g_cancellable_cancel (self->priv->authp_cancellable);
     g_clear_object (&self->priv->authp_cancellable);
 
@@ -1469,6 +1478,11 @@ static void
 log_object_iface_init (MMLogObjectInterface *iface)
 {
     iface->build_id = log_object_build_id;
+}
+
+static void
+bind_iface_init (MMBindInterface *iface)
+{
 }
 
 static void
@@ -1510,6 +1524,8 @@ mm_base_call_class_init (MMBaseCallClass *klass)
                              NULL,
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_PATH, properties[PROP_PATH]);
+
+    g_object_class_override_property (object_class, PROP_BIND_TO, MM_BIND_TO);
 
     properties[PROP_MODEM] =
         g_param_spec_object (MM_BASE_CALL_MODEM,

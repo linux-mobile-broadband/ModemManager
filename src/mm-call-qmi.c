@@ -31,6 +31,7 @@
 #include "mm-call-qmi.h"
 #include "mm-base-modem.h"
 #include "mm-log-object.h"
+#include "mm-bind.h"
 
 G_DEFINE_TYPE (MMCallQmi, mm_call_qmi, MM_TYPE_BASE_CALL)
 
@@ -492,6 +493,7 @@ mm_call_qmi_new (MMBaseModem     *modem,
 {
     return MM_BASE_CALL (g_object_new (MM_TYPE_CALL_QMI,
                                        MM_BASE_CALL_MODEM, modem,
+                                       MM_BIND_TO,         G_OBJECT (modem),
                                        "direction",        direction,
                                        "number",           number,
                                        MM_BASE_CALL_SKIP_INCOMING_TIMEOUT,       TRUE,

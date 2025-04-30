@@ -26,6 +26,7 @@
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-base-modem-at.h"
+#include "mm-bind.h"
 
 #include "mm-sim-ublox.h"
 
@@ -144,6 +145,7 @@ mm_sim_ublox_new (MMBaseModem          *modem,
                                 callback,
                                 user_data,
                                 MM_BASE_SIM_MODEM, modem,
+                                MM_BIND_TO, G_OBJECT (modem),
                                 "active", TRUE, /* by default always active */
                                 NULL);
 }

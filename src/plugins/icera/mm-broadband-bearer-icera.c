@@ -34,6 +34,7 @@
 #include "mm-error-helpers.h"
 #include "mm-daemon-enums-types.h"
 #include "mm-modem-helpers-icera.h"
+#include "mm-bind.h"
 
 G_DEFINE_TYPE (MMBroadbandBearerIcera, mm_broadband_bearer_icera, MM_TYPE_BROADBAND_BEARER);
 
@@ -791,6 +792,7 @@ mm_broadband_bearer_icera_new (MMBroadbandModem *modem,
         callback,
         user_data,
         MM_BASE_BEARER_MODEM, modem,
+        MM_BIND_TO, modem,
         MM_BASE_BEARER_CONFIG, config,
         MM_BROADBAND_BEARER_ICERA_DEFAULT_IP_METHOD, ip_method,
         NULL);

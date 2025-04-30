@@ -57,7 +57,6 @@ typedef struct _MMBaseModem MMBaseModem;
 typedef struct _MMBaseModemClass MMBaseModemClass;
 typedef struct _MMBaseModemPrivate MMBaseModemPrivate;
 
-#define MM_BASE_MODEM_CONNECTION          "base-modem-connection"
 #define MM_BASE_MODEM_MAX_TIMEOUTS        "base-modem-max-timeouts"
 #define MM_BASE_MODEM_VALID               "base-modem-valid"
 #define MM_BASE_MODEM_DEVICE              "base-modem-device"

@@ -34,18 +34,22 @@
 #include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-error-helpers.h"
+#include "mm-bind.h"
 
 static void async_initable_iface_init (GAsyncInitableIface *iface);
 static void log_object_iface_init     (MMLogObjectInterface *iface);
+static void bind_iface_init           (MMBindInterface *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBaseSim, mm_base_sim, MM_GDBUS_TYPE_SIM_SKELETON, 0,
                         G_IMPLEMENT_INTERFACE (G_TYPE_ASYNC_INITABLE, async_initable_iface_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_BIND, bind_iface_init))
 
 enum {
     PROP_0,
     PROP_PATH,
     PROP_CONNECTION,
+    PROP_BIND_TO,
     PROP_MODEM,
     PROP_SLOT_NUMBER,
     PROP_LAST
@@ -66,6 +70,9 @@ struct _MMBaseSimPrivate {
     /* The authorization provider */
     MMAuthProvider *authp;
     GCancellable   *authp_cancellable;
+
+    /* The object this SIM is bound to */
+    GObject *bind_to;
 
     /* The modem which owns this SIM */
     MMBaseModem *modem;
@@ -2295,6 +2302,7 @@ load_gid2 (MMBaseSim           *self,
 
 MMBaseSim *
 mm_base_sim_new_initialized (MMBaseModem *modem,
+                             GObject     *bind_to,
                              guint        slot_number,
                              gboolean     active,
                              const gchar *sim_identifier,
@@ -2308,6 +2316,7 @@ mm_base_sim_new_initialized (MMBaseModem *modem,
 
     sim = MM_BASE_SIM (g_object_new (MM_TYPE_BASE_SIM,
                                      MM_BASE_SIM_MODEM,       modem,
+                                     MM_BIND_TO,              bind_to,
                                      MM_BASE_SIM_SLOT_NUMBER, slot_number,
                                      "active",                active,
                                      "sim-identifier",        sim_identifier,
@@ -2897,6 +2906,7 @@ initable_init_async (GAsyncInitable *initable,
 
 void
 mm_base_sim_new (MMBaseModem *modem,
+                 GObject *bind_to,
                  GCancellable *cancellable,
                  GAsyncReadyCallback callback,
                  gpointer user_data)
@@ -2907,6 +2917,7 @@ mm_base_sim_new (MMBaseModem *modem,
                                 callback,
                                 user_data,
                                 MM_BASE_SIM_MODEM, modem,
+                                MM_BIND_TO, bind_to,
                                 "active", TRUE, /* by default always active */
                                 NULL);
 }
@@ -2972,18 +2983,14 @@ set_property (GObject *object,
         else if (self->priv->path)
             sim_dbus_export (self);
         break;
+    case PROP_BIND_TO:
+        g_clear_object (&self->priv->bind_to);
+        self->priv->bind_to = g_value_dup_object (value);
+        mm_bind_to (MM_BIND (self), MM_BASE_SIM_CONNECTION, self->priv->bind_to);
+        break;
     case PROP_MODEM:
         g_clear_object (&self->priv->modem);
         self->priv->modem = g_value_dup_object (value);
-        if (self->priv->modem) {
-            /* Set owner ID */
-            mm_log_object_set_owner_id (MM_LOG_OBJECT (self), mm_log_object_get_id (MM_LOG_OBJECT (self->priv->modem)));
-            /* Bind the modem's connection (which is set when it is exported,
-             * and unset when unexported) to the SIM's connection */
-            g_object_bind_property (self->priv->modem, MM_BASE_MODEM_CONNECTION,
-                                    self, MM_BASE_SIM_CONNECTION,
-                                    G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
-        }
         break;
     case PROP_SLOT_NUMBER:
         self->priv->slot_number = g_value_get_uint (value);
@@ -3008,6 +3015,9 @@ get_property (GObject *object,
         break;
     case PROP_CONNECTION:
         g_value_set_object (value, self->priv->connection);
+        break;
+    case PROP_BIND_TO:
+        g_value_set_object (value, self->priv->bind_to);
         break;
     case PROP_MODEM:
         g_value_set_object (value, self->priv->modem);
@@ -3056,6 +3066,7 @@ dispose (GObject *object)
     }
 
     g_clear_object (&self->priv->modem);
+    g_clear_object (&self->priv->bind_to);
     g_cancellable_cancel (self->priv->authp_cancellable);
     g_clear_object (&self->priv->authp_cancellable);
 
@@ -3073,6 +3084,11 @@ static void
 log_object_iface_init (MMLogObjectInterface *iface)
 {
     iface->build_id = log_object_build_id;
+}
+
+static void
+bind_iface_init (MMBindInterface *iface)
+{
 }
 
 static void
@@ -3138,6 +3154,8 @@ mm_base_sim_class_init (MMBaseSimClass *klass)
                              MM_TYPE_BASE_MODEM,
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_MODEM, properties[PROP_MODEM]);
+
+    g_object_class_override_property (object_class, PROP_BIND_TO, MM_BIND_TO);
 
     properties[PROP_SLOT_NUMBER] =
         g_param_spec_uint (MM_BASE_SIM_SLOT_NUMBER,

@@ -63,6 +63,7 @@
 #include "libqcdm/src/logs.h"
 #include "libqcdm/src/log-items.h"
 #include "mm-helper-enums-types.h"
+#include "mm-bind.h"
 
 static void iface_modem_init                      (MMIfaceModemInterface                   *iface);
 static void iface_modem_3gpp_init                 (MMIfaceModem3gppInterface               *iface);
@@ -504,6 +505,7 @@ modem_create_sim (MMIfaceModem *self,
 {
     /* New generic SIM */
     mm_base_sim_new (MM_BASE_MODEM (self),
+                     G_OBJECT (self),
                      NULL, /* cancellable */
                      callback,
                      user_data);
@@ -5905,6 +5907,7 @@ modem_3gpp_create_initial_eps_bearer (MMIfaceModem3gpp   *self,
      * attempt connection through this bearer object. */
     bearer = g_object_new (MM_TYPE_BASE_BEARER,
                            MM_BASE_BEARER_MODEM,  MM_BASE_MODEM (self),
+                           MM_BIND_TO,            G_OBJECT (self),
                            MM_BASE_BEARER_CONFIG, config,
                            "bearer-type",         MM_BEARER_TYPE_DEFAULT_ATTACH,
                            "connected",           TRUE,
@@ -8896,6 +8899,7 @@ modem_voice_create_call (MMIfaceModemVoice *_self,
     MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
 
     return mm_base_call_new (MM_BASE_MODEM (self),
+                             G_OBJECT (self),
                              direction,
                              number,
                              /* If +CLCC is supported, we want no incoming timeout.
@@ -10688,7 +10692,7 @@ modem_cell_broadcast_cleanup_unsolicited_events (MMIfaceModemCellBroadcast *self
 static MMBaseCbm *
 modem_cell_broadcast_create_cbm (MMIfaceModemCellBroadcast *self)
 {
-    return mm_base_cbm_new (MM_BASE_MODEM (self));
+    return mm_base_cbm_new (MM_BASE_MODEM (self), G_OBJECT (self));
 }
 
 /***********************************************************************************/

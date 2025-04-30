@@ -56,7 +56,8 @@ struct _MMBaseCbmClass {
 GType mm_base_cbm_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBaseCbm, g_object_unref)
 
-MMBaseCbm *mm_base_cbm_new       (MMBaseModem *modem);
+MMBaseCbm *mm_base_cbm_new       (MMBaseModem *modem,
+                                  GObject     *bind_to);
 gboolean   mm_base_cbm_take_part (MMBaseCbm *self,
                                   MMCbmPart *part,
                                   GError **error);

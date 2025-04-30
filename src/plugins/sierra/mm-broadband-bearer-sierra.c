@@ -32,6 +32,7 @@
 #include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-sierra.h"
+#include "mm-bind.h"
 
 G_DEFINE_TYPE (MMBroadbandBearerSierra, mm_broadband_bearer_sierra, MM_TYPE_BROADBAND_BEARER);
 
@@ -599,6 +600,7 @@ mm_broadband_bearer_sierra_new (MMBroadbandModem *modem,
         callback,
         user_data,
         MM_BASE_BEARER_MODEM, modem,
+        MM_BIND_TO, modem,
         MM_BASE_BEARER_CONFIG, config,
         MM_BROADBAND_BEARER_SIERRA_IS_ICERA, is_icera,
         NULL);

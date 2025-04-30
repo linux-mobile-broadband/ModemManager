@@ -1006,6 +1006,7 @@ mm_shared_cinterion_create_call (MMIfaceModemVoice *self,
     if (priv->slcc_support == FEATURE_SUPPORTED) {
         mm_obj_dbg (self, "created new call with ^SLCC support");
         return mm_base_call_new (MM_BASE_MODEM (self),
+                                 G_OBJECT (self),
                                  direction,
                                  number,
                                  /* When SLCC is supported we have support for detailed
