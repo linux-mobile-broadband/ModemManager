@@ -206,10 +206,43 @@ libport_dep = declare_dependency(
   link_with: libport,
 )
 
+# auth provider library
+sources = files(
+  'mm-auth-provider.c',
+  'mm-context.c',
+)
+
+incs = [
+  top_inc,
+  kerneldevice_inc,
+]
+
+deps = [libmm_glib_dep, libhelpers_dep]
+
+if enable_polkit
+  deps += polkit_gobject_dep
+endif
+
+private_deps = []
+
+libauth = static_library(
+  'auth',
+  sources: sources,
+  include_directories: incs,
+  dependencies: deps,
+  c_args: '-DPLUGINDIR="@0@"'.format(mm_prefix / mm_pkglibdir),
+)
+
+libauth_dep = declare_dependency(
+  include_directories: ['.', kerneldevice_inc],
+  dependencies: deps,
+  link_with: libauth,
+)
+
 # Daemon enums, required by plugins
 headers = files(
   'mm-base-bearer.h',
-  'mm-base-modem.h',
+  'mm-iface-op-lock.h',
   'mm-filter.h',
   'mm-port-probe.h',
 )
@@ -292,6 +325,7 @@ sources = files(
   'mm-iface-modem-simple.c',
   'mm-iface-modem-time.c',
   'mm-iface-modem-voice.c',
+  'mm-iface-op-lock.c',
   'mm-log-helpers.c',
   'mm-plugin.c',
   'mm-plugin-manager.c',
@@ -308,6 +342,7 @@ deps = [
   gmodule_dep,
   libport_dep,
   libqcdm_dep,
+  libauth_dep,
 ]
 
 if enable_tests

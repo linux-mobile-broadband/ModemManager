@@ -436,7 +436,7 @@ mm_device_initialize_modem (MMDevice *self)
 
     mm_obj_dbg (self, "modem initializing...");
     mm_base_modem_initialize (modem,
-                              MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
+                              MM_OPERATION_LOCK_REQUIRED,
                               (GAsyncReadyCallback)initialize_ready,
                               g_object_ref (self));
 }
@@ -868,8 +868,8 @@ mm_device_inhibit (MMDevice            *self,
      * an exclusive lock marked as override, so the modem object will not
      * allow any additional lock request any more. */
     mm_base_modem_disable (self->priv->modem,
-                           MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
-                           MM_BASE_MODEM_OPERATION_PRIORITY_OVERRIDE,
+                           MM_OPERATION_LOCK_REQUIRED,
+                           MM_OPERATION_PRIORITY_OVERRIDE,
                            (GAsyncReadyCallback)inhibit_disable_ready,
                            task);
 }

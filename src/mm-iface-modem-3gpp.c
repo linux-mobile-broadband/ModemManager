@@ -30,6 +30,7 @@
 #include "mm-error-helpers.h"
 #include "mm-log.h"
 #include "mm-log-helpers.h"
+#include "mm-iface-op-lock.h"
 
 #define SUBSYSTEM_3GPP "3gpp"
 
@@ -840,14 +841,15 @@ handle_register_ready (MMIfaceModem3gpp      *self,
 }
 
 static void
-handle_register_auth_ready (MMBaseModem           *self,
+handle_register_auth_ready (MMIfaceAuth           *auth,
                             GAsyncResult          *res,
                             HandleRegisterContext *ctx)
 {
+    MMIfaceModem3gpp *self = MM_IFACE_MODEM_3GPP (auth);
     MMModemState  modem_state = MM_MODEM_STATE_UNKNOWN;
     GError       *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (auth, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_register_context_free (ctx);
         return;
@@ -915,7 +917,7 @@ handle_register (MmGdbusModem3gpp      *skeleton,
     ctx->self = g_object_ref (self);
     ctx->operator_id = g_strdup (operator_id);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_register_auth_ready,
@@ -1007,13 +1009,14 @@ handle_scan_ready (MMIfaceModem3gpp  *self,
 }
 
 static void
-handle_scan_auth_ready (MMBaseModem       *self,
+handle_scan_auth_ready (MMIfaceAuth       *auth,
                         GAsyncResult      *res,
                         HandleScanContext *ctx)
 {
+    MMIfaceModem3gpp *self = MM_IFACE_MODEM_3GPP (auth);
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (auth, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_scan_context_free (ctx);
         return;
@@ -1053,7 +1056,7 @@ handle_scan (MmGdbusModem3gpp      *skeleton,
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_scan_auth_ready,
@@ -1145,13 +1148,14 @@ handle_set_eps_ue_mode_operation_ready (MMIfaceModem3gpp                   *self
 }
 
 static void
-handle_set_eps_ue_mode_operation_auth_ready (MMBaseModem                        *self,
+handle_set_eps_ue_mode_operation_auth_ready (MMIfaceAuth                        *auth,
                                              GAsyncResult                       *res,
                                              HandleSetEpsUeModeOperationContext *ctx)
 {
+    MMIfaceModem3gpp *self = MM_IFACE_MODEM_3GPP (auth);
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (auth, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_eps_ue_mode_operation_context_free (ctx);
         return;
@@ -1198,7 +1202,7 @@ handle_set_eps_ue_mode_operation (MmGdbusModem3gpp      *skeleton,
     ctx->self       = g_object_ref (self);
     ctx->mode       = mode;
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_set_eps_ue_mode_operation_auth_ready,
@@ -1233,7 +1237,7 @@ static void
 handle_set_initial_eps_bearer_settings_context_free (HandleSetInitialEpsBearerSettingsContext *ctx)
 {
     if (ctx->operation_id >= 0)
-        mm_base_modem_operation_unlock (MM_BASE_MODEM (ctx->self), ctx->operation_id);
+        mm_iface_op_lock_unlock (MM_IFACE_OP_LOCK (ctx->self), ctx->operation_id);
 
     g_assert (!ctx->saved_error);
     g_clear_object (&ctx->config);
@@ -1419,16 +1423,17 @@ handle_set_initial_eps_bearer_settings_step (HandleSetInitialEpsBearerSettingsCo
 }
 
 static void
-set_initial_eps_bearer_settings_auth_ready (MMBaseModem                              *self,
+set_initial_eps_bearer_settings_auth_ready (MMIfaceOpLock                            *_self,
                                             GAsyncResult                             *res,
                                             HandleSetInitialEpsBearerSettingsContext *ctx)
 {
+    MMBaseModem                   *self = MM_BASE_MODEM (_self);
     gboolean                       force = FALSE;
     GError                        *error = NULL;
     GVariant                      *old_dictionary;
     g_autoptr(MMBearerProperties)  old_config = NULL;
 
-    ctx->operation_id = mm_base_modem_authorize_and_operation_lock_finish (self, res, &error);
+    ctx->operation_id = mm_iface_op_lock_authorize_and_lock_finish (_self, res, &error);
     if (ctx->operation_id < 0) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_initial_eps_bearer_settings_context_free (ctx);
@@ -1488,13 +1493,13 @@ handle_set_initial_eps_bearer_settings (MmGdbusModem3gpp      *skeleton,
     ctx->previous_power_state = MM_MODEM_POWER_STATE_UNKNOWN;
     ctx->operation_id = -1;
 
-    mm_base_modem_authorize_and_operation_lock (MM_BASE_MODEM (self),
-                                                invocation,
-                                                MM_AUTHORIZATION_DEVICE_CONTROL,
-                                                MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
-                                                "set-initial-eps-bearer-settings",
-                                                (GAsyncReadyCallback)set_initial_eps_bearer_settings_auth_ready,
-                                                ctx);
+    mm_iface_op_lock_authorize_and_lock (MM_IFACE_OP_LOCK (self),
+                                         invocation,
+                                         MM_AUTHORIZATION_DEVICE_CONTROL,
+                                         MM_OPERATION_PRIORITY_DEFAULT,
+                                         "set-initial-eps-bearer-settings",
+                                         (GAsyncReadyCallback)set_initial_eps_bearer_settings_auth_ready,
+                                         ctx);
     return TRUE;
 }
 
@@ -1572,13 +1577,14 @@ handle_disable_facility_lock_ready (MMIfaceModem3gpp                 *self,
 }
 
 static void
-disable_facility_lock_auth_ready (MMBaseModem                      *self,
+disable_facility_lock_auth_ready (MMIfaceAuth                      *auth,
                                   GAsyncResult                     *res,
                                   HandleDisableFacilityLockContext *ctx)
 {
+    MMIfaceModem3gpp *self = MM_IFACE_MODEM_3GPP (auth);
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (auth, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_disable_facility_lock_context_free (ctx);
         return;
@@ -1648,7 +1654,7 @@ handle_disable_facility_lock (MmGdbusModem3gpp      *skeleton,
     ctx->self       = g_object_ref (self);
     ctx->dictionary = g_variant_ref (dictionary);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)disable_facility_lock_auth_ready,
@@ -1749,13 +1755,14 @@ internal_set_packet_service_state_ready (MMIfaceModem3gpp                *self,
 }
 
 static void
-set_packet_service_state_auth_ready (MMBaseModem                     *self,
+set_packet_service_state_auth_ready (MMIfaceAuth                     *auth,
                                      GAsyncResult                    *res,
                                      HandlePacketServiceStateContext *ctx)
 {
+    MMIfaceModem3gpp *self = MM_IFACE_MODEM_3GPP (auth);
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (auth, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_packet_service_state_context_free (ctx);
         return;
@@ -1798,7 +1805,7 @@ handle_set_packet_service_state (MmGdbusModem3gpp              *skeleton,
     ctx->self = g_object_ref (self);
     ctx->packet_service_state = packet_service_state;
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)set_packet_service_state_auth_ready,
@@ -1821,7 +1828,7 @@ static void
 handle_set_nr5g_registration_settings_context_free (HandleSetNr5gRegistrationSettingsContext *ctx)
 {
     if (ctx->operation_id >= 0)
-        mm_base_modem_operation_unlock (MM_BASE_MODEM (ctx->self), ctx->operation_id);
+        mm_iface_op_lock_unlock (MM_IFACE_OP_LOCK (ctx->self), ctx->operation_id);
 
     g_clear_object (&ctx->settings);
     g_variant_unref (ctx->dictionary);
@@ -1893,17 +1900,18 @@ set_nr5g_registration_settings_ready (MMIfaceModem3gpp                         *
 }
 
 static void
-set_nr5g_registration_settings_auth_ready (MMBaseModem                              *self,
+set_nr5g_registration_settings_auth_ready (MMIfaceOpLock                            *_self,
                                            GAsyncResult                             *res,
                                            HandleSetNr5gRegistrationSettingsContext *ctx)
 {
+    MMBaseModem                           *self = MM_BASE_MODEM (_self);
     GError                                *error = NULL;
     GVariant                              *old_dictionary;
     g_autoptr(MMNr5gRegistrationSettings)  old_settings = NULL;
     MMModem3gppDrxCycle                    new_drx_cycle;
     MMModem3gppMicoMode                    new_mico_mode;
 
-    ctx->operation_id = mm_base_modem_authorize_and_operation_lock_finish (self, res, &error);
+    ctx->operation_id = mm_iface_op_lock_authorize_and_lock_finish (_self, res, &error);
     if (ctx->operation_id < 0) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_nr5g_registration_settings_context_free (ctx);
@@ -1979,13 +1987,13 @@ handle_set_nr5g_registration_settings (MmGdbusModem3gpp      *skeleton,
     ctx->dictionary = g_variant_ref (dictionary);
     ctx->operation_id = -1;
 
-    mm_base_modem_authorize_and_operation_lock (MM_BASE_MODEM (self),
-                                                invocation,
-                                                MM_AUTHORIZATION_DEVICE_CONTROL,
-                                                MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
-                                                "set-nr5g-registration-settings",
-                                                (GAsyncReadyCallback)set_nr5g_registration_settings_auth_ready,
-                                                ctx);
+    mm_iface_op_lock_authorize_and_lock (MM_IFACE_OP_LOCK (self),
+                                         invocation,
+                                         MM_AUTHORIZATION_DEVICE_CONTROL,
+                                         MM_OPERATION_PRIORITY_DEFAULT,
+                                         "set-nr5g-registration-settings",
+                                         (GAsyncReadyCallback)set_nr5g_registration_settings_auth_ready,
+                                         ctx);
     return TRUE;
 }
 
@@ -3595,15 +3603,16 @@ handle_set_carrier_lock_ready (MMIfaceModem3gpp            *self,
 }
 
 static void
-handle_set_carrier_lock_auth_ready (MMBaseModem                 *self,
+handle_set_carrier_lock_auth_ready (MMIfaceAuth                 *auth,
                                     GAsyncResult                *res,
                                     HandleSetCarrierLockContext *ctx)
 {
-    GError       *error = NULL;
-    const guint8 *data;
-    gsize         data_size;
+    MMIfaceModem3gpp *self = MM_IFACE_MODEM_3GPP (auth);
+    GError           *error = NULL;
+    const guint8     *data;
+    gsize             data_size;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (auth, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_carrier_lock_context_free (ctx);
         return;
@@ -3642,7 +3651,7 @@ handle_set_carrier_lock (MmGdbusModem3gpp      *skeleton,
     ctx->self = g_object_ref (self);
     ctx->data = g_variant_ref (data);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_set_carrier_lock_auth_ready,

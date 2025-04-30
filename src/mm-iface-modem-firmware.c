@@ -180,13 +180,14 @@ load_list_ready (MMIfaceModemFirmware *self,
 }
 
 static void
-list_auth_ready (MMBaseModem *self,
+list_auth_ready (MMIfaceAuth *_self,
                  GAsyncResult *res,
                  HandleListContext *ctx)
 {
+    MMIfaceModemFirmware *self = MM_IFACE_MODEM_FIRMWARE (_self);
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_list_context_free (ctx);
         return;
@@ -221,7 +222,7 @@ handle_list (MmGdbusModemFirmware *skeleton,
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_FIRMWARE,
                              (GAsyncReadyCallback)list_auth_ready,
@@ -265,13 +266,14 @@ change_current_ready (MMIfaceModemFirmware *self,
 }
 
 static void
-select_auth_ready (MMBaseModem *self,
+select_auth_ready (MMIfaceAuth *_self,
                    GAsyncResult *res,
                    HandleSelectContext *ctx)
 {
+    MMIfaceModemFirmware *self = MM_IFACE_MODEM_FIRMWARE (_self);
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_select_context_free (ctx);
         return;
@@ -308,7 +310,7 @@ handle_select (MmGdbusModemFirmware *skeleton,
     ctx->self = g_object_ref (self);
     ctx->name = g_strdup (name);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_FIRMWARE,
                              (GAsyncReadyCallback)select_auth_ready,

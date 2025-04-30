@@ -41,6 +41,7 @@
 #include "mm-error-helpers.h"
 #include "mm-bearer-stats.h"
 #include "mm-dispatcher-connection.h"
+#include "mm-auth-provider.h"
 
 /* We require up to 20s to get a proper IP when using PPP */
 #define BEARER_IP_TIMEOUT_DEFAULT 20
@@ -82,6 +83,10 @@ struct _MMBaseBearerPrivate {
     /* The connection to the system bus */
     GDBusConnection *connection;
     guint            dbus_id;
+
+    /* The authorization provider */
+    MMAuthProvider *authp;
+    GCancellable   *authp_cancellable;
 
     /* The modem which owns this BEARER */
     MMBaseModem *modem;
@@ -1118,7 +1123,6 @@ mm_base_bearer_connect (MMBaseBearer *self,
 
 typedef struct {
     MMBaseBearer *self;
-    MMBaseModem *modem;
     GDBusMethodInvocation *invocation;
 } HandleConnectContext;
 
@@ -1126,7 +1130,6 @@ static void
 handle_connect_context_free (HandleConnectContext *ctx)
 {
     g_object_unref (ctx->invocation);
-    g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_free (ctx);
 }
@@ -1147,13 +1150,13 @@ handle_connect_ready (MMBaseBearer *self,
 }
 
 static void
-handle_connect_auth_ready (MMBaseModem *modem,
+handle_connect_auth_ready (MMAuthProvider *authp,
                            GAsyncResult *res,
                            HandleConnectContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+    if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_connect_context_free (ctx);
         return;
@@ -1174,15 +1177,13 @@ handle_connect (MMBaseBearer *self,
     ctx = g_new0 (HandleConnectContext, 1);
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
-    g_object_get (self,
-                  MM_BASE_BEARER_MODEM, &ctx->modem,
-                  NULL);
 
-    mm_base_modem_authorize (ctx->modem,
-                             invocation,
-                             MM_AUTHORIZATION_DEVICE_CONTROL,
-                             (GAsyncReadyCallback)handle_connect_auth_ready,
-                             ctx);
+    mm_auth_provider_authorize (self->priv->authp,
+                                invocation,
+                                MM_AUTHORIZATION_DEVICE_CONTROL,
+                                self->priv->authp_cancellable,
+                                (GAsyncReadyCallback)handle_connect_auth_ready,
+                                ctx);
     return TRUE;
 }
 
@@ -1307,7 +1308,6 @@ mm_base_bearer_disconnect (MMBaseBearer *self,
 
 typedef struct {
     MMBaseBearer *self;
-    MMBaseModem *modem;
     GDBusMethodInvocation *invocation;
 } HandleDisconnectContext;
 
@@ -1315,7 +1315,6 @@ static void
 handle_disconnect_context_free (HandleDisconnectContext *ctx)
 {
     g_object_unref (ctx->invocation);
-    g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_free (ctx);
 }
@@ -1336,13 +1335,13 @@ handle_disconnect_ready (MMBaseBearer *self,
 }
 
 static void
-handle_disconnect_auth_ready (MMBaseModem *modem,
+handle_disconnect_auth_ready (MMAuthProvider *authp,
                               GAsyncResult *res,
                               HandleDisconnectContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+    if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_disconnect_context_free (ctx);
         return;
@@ -1363,15 +1362,13 @@ handle_disconnect (MMBaseBearer *self,
     ctx = g_new0 (HandleDisconnectContext, 1);
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
-    g_object_get (self,
-                  MM_BASE_BEARER_MODEM, &ctx->modem,
-                  NULL);
 
-    mm_base_modem_authorize (ctx->modem,
-                             invocation,
-                             MM_AUTHORIZATION_DEVICE_CONTROL,
-                             (GAsyncReadyCallback)handle_disconnect_auth_ready,
-                             ctx);
+    mm_auth_provider_authorize (self->priv->authp,
+                                invocation,
+                                MM_AUTHORIZATION_DEVICE_CONTROL,
+                                self->priv->authp_cancellable,
+                                (GAsyncReadyCallback)handle_disconnect_auth_ready,
+                                ctx);
     return TRUE;
 }
 
@@ -1835,6 +1832,10 @@ mm_base_bearer_init (MMBaseBearer *self)
     /* Each bearer is given a unique id to build its own DBus path */
     self->priv->dbus_id = id++;
 
+    /* Setup authorization provider */
+    self->priv->authp = mm_auth_provider_get ();
+    self->priv->authp_cancellable = g_cancellable_new ();
+
     self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
     self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
     self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_NONE;
@@ -1886,6 +1887,8 @@ dispose (GObject *object)
 
     g_clear_object (&self->priv->modem);
     g_clear_object (&self->priv->config);
+    g_cancellable_cancel (self->priv->authp_cancellable);
+    g_clear_object (&self->priv->authp_cancellable);
 
     G_OBJECT_CLASS (mm_base_bearer_parent_class)->dispose (object);
 }

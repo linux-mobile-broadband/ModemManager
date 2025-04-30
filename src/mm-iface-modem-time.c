@@ -75,14 +75,15 @@ load_network_time_ready (MMIfaceModemTime            *self,
 }
 
 static void
-handle_get_network_time_auth_ready (MMBaseModem                 *self,
+handle_get_network_time_auth_ready (MMIfaceAuth                 *_self,
                                     GAsyncResult                *res,
                                     HandleGetNetworkTimeContext *ctx)
 {
-    MMModemState  state;
-    GError       *error = NULL;
+    MMIfaceModemTime *self = MM_IFACE_MODEM_TIME (_self);
+    MMModemState      state;
+    GError           *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_get_network_time_context_free (ctx);
         return;
@@ -127,7 +128,7 @@ handle_get_network_time (MmGdbusModemTime      *skeleton,
     ctx->skeleton = g_object_ref (skeleton);
     ctx->self = g_object_ref (self);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_TIME,
                              (GAsyncReadyCallback)handle_get_network_time_auth_ready,

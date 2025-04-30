@@ -136,17 +136,18 @@ handle_activate_ready (MMIfaceModemCdma *self,
 }
 
 static void
-handle_activate_auth_ready (MMBaseModem *self,
+handle_activate_auth_ready (MMIfaceAuth *_self,
                             GAsyncResult *res,
                             HandleActivateContext *ctx)
 {
+    MMIfaceModemCdma *self = MM_IFACE_MODEM_CDMA (_self);
     Private      *priv;
     MMModemState  modem_state;
     GError       *error = NULL;
 
     priv = get_private (MM_IFACE_MODEM_CDMA (self));
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_activate_context_free (ctx);
         return;
@@ -254,7 +255,7 @@ handle_activate (MmGdbusModemCdma *skeleton,
     ctx->self = g_object_ref (self);
     ctx->carrier = g_strdup (carrier);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_activate_auth_ready,
@@ -302,10 +303,11 @@ handle_activate_manual_ready (MMIfaceModemCdma *self,
 }
 
 static void
-handle_activate_manual_auth_ready (MMBaseModem *self,
+handle_activate_manual_auth_ready (MMIfaceAuth *_self,
                                    GAsyncResult *res,
                                    HandleActivateManualContext *ctx)
 {
+    MMIfaceModemCdma                 *self = MM_IFACE_MODEM_CDMA (_self);
     MMCdmaManualActivationProperties *properties;
     Private                          *priv;
     MMModemState                      modem_state;
@@ -313,7 +315,7 @@ handle_activate_manual_auth_ready (MMBaseModem *self,
 
     priv = get_private (MM_IFACE_MODEM_CDMA (self));
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_activate_manual_context_free (ctx);
         return;
@@ -422,7 +424,7 @@ handle_activate_manual (MmGdbusModemCdma *skeleton,
     ctx->self = g_object_ref (self);
     ctx->dictionary = g_variant_ref (dictionary);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_activate_manual_auth_ready,

@@ -374,7 +374,7 @@ handle_setup_context_free (HandleSetupContext *ctx)
 }
 
 static void
-handle_setup_auth_ready (MMBaseModem        *_self,
+handle_setup_auth_ready (MMIfaceAuth        *_self,
                          GAsyncResult       *res,
                          HandleSetupContext *ctx)
 {
@@ -382,7 +382,7 @@ handle_setup_auth_ready (MMBaseModem        *_self,
     GError             *error = NULL;
     Private            *priv;
 
-    if (!mm_base_modem_authorize_finish (_self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_setup_context_free (ctx);
         return;
@@ -418,7 +418,7 @@ handle_setup (MmGdbusModemSignal    *skeleton,
     ctx->skeleton = g_object_ref (skeleton);
     ctx->rate = rate;
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_setup_auth_ready,
@@ -471,7 +471,7 @@ setup_thresholds_restart_ready (MMIfaceModemSignal           *self,
 }
 
 static void
-handle_setup_thresholds_auth_ready (MMBaseModem                  *_self,
+handle_setup_thresholds_auth_ready (MMIfaceAuth                  *_self,
                                     GAsyncResult                 *res,
                                     HandleSetupThresholdsContext *ctx)
 {
@@ -484,7 +484,7 @@ handle_setup_thresholds_auth_ready (MMBaseModem                  *_self,
 
     priv = get_private (self);
 
-    if (!mm_base_modem_authorize_finish (_self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_setup_thresholds_context_free (ctx);
         return;
@@ -545,7 +545,7 @@ handle_setup_thresholds (MmGdbusModemSignal    *skeleton,
     ctx->skeleton = g_object_ref (skeleton);
     ctx->settings = g_variant_ref (settings);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_setup_thresholds_auth_ready,

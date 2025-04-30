@@ -180,14 +180,15 @@ handle_delete_ready (MMSmsList           *list,
 }
 
 static void
-handle_delete_auth_ready (MMBaseModem         *self,
+handle_delete_auth_ready (MMIfaceAuth         *auth,
                           GAsyncResult        *res,
                           HandleDeleteContext *ctx)
 {
-    g_autoptr(MMSmsList)  list = NULL;
-    GError               *error = NULL;
+    MMIfaceModemMessaging *self = MM_IFACE_MODEM_MESSAGING (auth);
+    g_autoptr(MMSmsList)   list = NULL;
+    GError                *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (auth, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_delete_context_free (ctx);
         return;
@@ -236,7 +237,7 @@ handle_delete (MmGdbusModemMessaging *skeleton,
     ctx->self = g_object_ref (self);
     ctx->path = g_strdup (path);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_MESSAGING,
                              (GAsyncReadyCallback)handle_delete_auth_ready,
@@ -264,16 +265,17 @@ handle_create_context_free (HandleCreateContext *ctx)
 }
 
 static void
-handle_create_auth_ready (MMBaseModem         *self,
+handle_create_auth_ready (MMIfaceAuth         *auth,
                           GAsyncResult        *res,
                           HandleCreateContext *ctx)
 {
+    MMIfaceModemMessaging      *self = MM_IFACE_MODEM_MESSAGING (auth);
     GError                     *error = NULL;
     g_autoptr(MMSmsList)        list = NULL;
     g_autoptr(MMSmsProperties)  properties = NULL;
     g_autoptr(MMBaseSms)        sms = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (auth, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_create_context_free (ctx);
         return;
@@ -334,7 +336,7 @@ handle_create (MmGdbusModemMessaging *skeleton,
     ctx->self = g_object_ref (self);
     ctx->dictionary = g_variant_ref (dictionary);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_MESSAGING,
                              (GAsyncReadyCallback)handle_create_auth_ready,
@@ -416,13 +418,14 @@ handle_set_default_storage_ready (MMIfaceModemMessaging          *self,
 }
 
 static void
-handle_set_default_storage_auth_ready (MMBaseModem                    *self,
+handle_set_default_storage_auth_ready (MMIfaceAuth                    *auth,
                                        GAsyncResult                   *res,
                                        HandleSetDefaultStorageContext *ctx)
 {
+    MMIfaceModemMessaging *self = MM_IFACE_MODEM_MESSAGING (auth);
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (auth, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_default_storage_context_free (ctx);
         return;
@@ -469,7 +472,7 @@ handle_set_default_storage (MmGdbusModemMessaging *skeleton,
     ctx->self       = g_object_ref (self);
     ctx->storage    = (MMSmsStorage)storage;
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_MESSAGING,
                              (GAsyncReadyCallback)handle_set_default_storage_auth_ready,

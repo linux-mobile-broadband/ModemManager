@@ -36,6 +36,7 @@
 #include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-error-helpers.h"
+#include "mm-auth-provider.h"
 
 static void log_object_iface_init (MMLogObjectInterface *iface);
 
@@ -59,6 +60,10 @@ struct _MMBaseSmsPrivate {
     /* The connection to the system bus */
     GDBusConnection *connection;
     guint            dbus_id;
+
+    /* The authorization provider */
+    MMAuthProvider *authp;
+    GCancellable   *authp_cancellable;
 
     /* The modem which owns this SMS */
     MMBaseModem *modem;
@@ -324,7 +329,6 @@ generate_submit_pdus (MMBaseSms *self,
 
 typedef struct {
     MMBaseSms             *self;
-    MMBaseModem           *modem;
     GDBusMethodInvocation *invocation;
     MMSmsStorage           storage;
 } HandleStoreContext;
@@ -333,7 +337,6 @@ static void
 handle_store_context_free (HandleStoreContext *ctx)
 {
     g_object_unref (ctx->invocation);
-    g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_slice_free (HandleStoreContext, ctx);
 }
@@ -406,13 +409,13 @@ prepare_sms_to_be_stored (MMBaseSms  *self,
 }
 
 static void
-handle_store_auth_ready (MMBaseModem        *modem,
+handle_store_auth_ready (MMAuthProvider     *authp,
                          GAsyncResult       *res,
                          HandleStoreContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+    if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_store_context_free (ctx);
         return;
@@ -442,7 +445,7 @@ handle_store_auth_ready (MMBaseModem        *modem,
     }
 
     /* Check if the requested storage is allowed for storing */
-    if (!mm_iface_modem_messaging_is_storage_supported_for_storing (MM_IFACE_MODEM_MESSAGING (ctx->modem),
+    if (!mm_iface_modem_messaging_is_storage_supported_for_storing (MM_IFACE_MODEM_MESSAGING (ctx->self->priv->modem),
                                                                     ctx->storage,
                                                                     &error)) {
         mm_obj_warn (ctx->self, "failed storing SMS message: %s", error->message);
@@ -485,9 +488,6 @@ handle_store (MMBaseSms             *self,
     ctx = g_slice_new0 (HandleStoreContext);
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
-    g_object_get (self,
-                  MM_BASE_SMS_MODEM, &ctx->modem,
-                  NULL);
     ctx->storage = (MMSmsStorage)storage;
 
     if (ctx->storage == MM_SMS_STORAGE_UNKNOWN) {
@@ -498,11 +498,12 @@ handle_store (MMBaseSms             *self,
         g_assert (ctx->storage != MM_SMS_STORAGE_UNKNOWN);
     }
 
-    mm_base_modem_authorize (ctx->modem,
-                             invocation,
-                             MM_AUTHORIZATION_MESSAGING,
-                             (GAsyncReadyCallback)handle_store_auth_ready,
-                             ctx);
+    mm_auth_provider_authorize (self->priv->authp,
+                                invocation,
+                                MM_AUTHORIZATION_MESSAGING,
+                                self->priv->authp_cancellable,
+                                (GAsyncReadyCallback)handle_store_auth_ready,
+                                ctx);
     return TRUE;
 }
 
@@ -511,7 +512,6 @@ handle_store (MMBaseSms             *self,
 
 typedef struct {
     MMBaseSms             *self;
-    MMBaseModem           *modem;
     GDBusMethodInvocation *invocation;
 } HandleSendContext;
 
@@ -519,7 +519,6 @@ static void
 handle_send_context_free (HandleSendContext *ctx)
 {
     g_object_unref (ctx->invocation);
-    g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_slice_free (HandleSendContext, ctx);
 }
@@ -586,14 +585,14 @@ prepare_sms_to_be_sent (MMBaseSms  *self,
 }
 
 static void
-handle_send_auth_ready (MMBaseModem       *modem,
+handle_send_auth_ready (MMAuthProvider    *authp,
                         GAsyncResult      *res,
                         HandleSendContext *ctx)
 {
     MMSmsState  state;
     GError     *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+    if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_send_context_free (ctx);
         return;
@@ -650,15 +649,13 @@ handle_send (MMBaseSms             *self,
     ctx = g_slice_new0 (HandleSendContext);
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
-    g_object_get (self,
-                  MM_BASE_SMS_MODEM, &ctx->modem,
-                  NULL);
 
-    mm_base_modem_authorize (ctx->modem,
-                             invocation,
-                             MM_AUTHORIZATION_MESSAGING,
-                             (GAsyncReadyCallback)handle_send_auth_ready,
-                             ctx);
+    mm_auth_provider_authorize (self->priv->authp,
+                                invocation,
+                                MM_AUTHORIZATION_MESSAGING,
+                                self->priv->authp_cancellable,
+                                (GAsyncReadyCallback)handle_send_auth_ready,
+                                ctx);
     return TRUE;
 }
 
@@ -2071,6 +2068,10 @@ mm_base_sms_init (MMBaseSms *self)
 
     /* Each SMS is given a unique id to build its own DBus path */
     self->priv->dbus_id = id++;
+
+    /* Setup authorization provider */
+    self->priv->authp = mm_auth_provider_get ();
+    self->priv->authp_cancellable = g_cancellable_new ();
 }
 
 static void
@@ -2097,6 +2098,8 @@ dispose (GObject *object)
     }
 
     g_clear_object (&self->priv->modem);
+    g_cancellable_cancel (self->priv->authp_cancellable);
+    g_clear_object (&self->priv->authp_cancellable);
 
     G_OBJECT_CLASS (mm_base_sms_parent_class)->dispose (object);
 }

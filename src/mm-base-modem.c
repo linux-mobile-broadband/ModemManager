@@ -41,9 +41,13 @@
 #include "mm-modem-helpers.h"
 
 static void log_object_iface_init (MMLogObjectInterface *iface);
+static void auth_iface_init (MMIfaceAuthInterface *iface);
+static void op_lock_iface_init (MMIfaceOpLockInterface *iface);
 
 G_DEFINE_ABSTRACT_TYPE_WITH_CODE (MMBaseModem, mm_base_modem, MM_GDBUS_TYPE_OBJECT_SKELETON,
-                                  G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init))
+                                  G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init)
+                                  G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_AUTH, auth_iface_init)
+                                  G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_OP_LOCK, op_lock_iface_init))
 
 /* If we get 10 consecutive timeouts in a serial port, we consider the modem
  * invalid and we request re-probing. */
@@ -149,6 +153,16 @@ struct _MMBaseModemPrivate {
     GList    *scheduled_operations;
     gboolean  scheduled_operations_forbidden_forever;
 };
+
+static void   mm_base_modem_operation_lock        (MMBaseModem          *self,
+                                                   MMOperationPriority   priority,
+                                                   const gchar          *description,
+                                                   GAsyncReadyCallback   callback,
+                                                   gpointer              user_data);
+static gssize mm_base_modem_operation_lock_finish (MMBaseModem          *self,
+                                                   GAsyncResult         *res,
+                                                   GError              **error);
+
 
 guint
 mm_base_modem_get_dbus_id (MMBaseModem *self)
@@ -774,7 +788,7 @@ state_operation_ready (MMBaseModem  *self,
     ctx = g_task_get_task_data (task);
 
     if (ctx->operation_id >= 0) {
-        mm_base_modem_operation_unlock (self, ctx->operation_id);
+        mm_iface_op_lock_unlock (MM_IFACE_OP_LOCK (self), ctx->operation_id);
         ctx->operation_id = (gssize) -1;
     }
 
@@ -821,12 +835,12 @@ lock_before_state_operation_ready (MMBaseModem  *self,
 }
 
 static void
-state_operation (MMBaseModem                  *self,
-                 StateOperationType            operation_type,
-                 MMBaseModemOperationLock      operation_lock,
-                 MMBaseModemOperationPriority  operation_priority,
-                 GAsyncReadyCallback           callback,
-                 gpointer                      user_data)
+state_operation (MMBaseModem         *self,
+                 StateOperationType   operation_type,
+                 MMOperationLock      operation_lock,
+                 MMOperationPriority  operation_priority,
+                 GAsyncReadyCallback  callback,
+                 gpointer             user_data)
 {
     GTask                 *task;
     StateOperationContext *ctx;
@@ -878,12 +892,12 @@ state_operation (MMBaseModem                  *self,
     }
     g_assert (ctx->operation && ctx->operation_finish);
 
-    if (operation_lock == MM_BASE_MODEM_OPERATION_LOCK_ALREADY_ACQUIRED) {
+    if (operation_lock == MM_OPERATION_LOCK_ALREADY_ACQUIRED) {
         state_operation_run (task);
         return;
     }
 
-    g_assert (operation_lock == MM_BASE_MODEM_OPERATION_LOCK_REQUIRED);
+    g_assert (operation_lock == MM_OPERATION_LOCK_REQUIRED);
     mm_base_modem_operation_lock (self,
                                   operation_priority,
                                   operation_description,
@@ -905,14 +919,14 @@ mm_base_modem_sync_finish (MMBaseModem   *self,
 
 void
 mm_base_modem_sync (MMBaseModem              *self,
-                    MMBaseModemOperationLock  operation_lock,
-                    GAsyncReadyCallback       callback,
-                    gpointer                  user_data)
+                    MMOperationLock      operation_lock,
+                    GAsyncReadyCallback  callback,
+                    gpointer             user_data)
 {
     state_operation (self,
                      STATE_OPERATION_TYPE_SYNC,
                      operation_lock,
-                     MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
+                     MM_OPERATION_PRIORITY_DEFAULT,
                      callback,
                      user_data);
 }
@@ -930,11 +944,11 @@ mm_base_modem_disable_finish (MMBaseModem   *self,
 }
 
 void
-mm_base_modem_disable (MMBaseModem                  *self,
-                       MMBaseModemOperationLock      operation_lock,
-                       MMBaseModemOperationPriority  operation_priority,
-                       GAsyncReadyCallback           callback,
-                       gpointer                      user_data)
+mm_base_modem_disable (MMBaseModem         *self,
+                       MMOperationLock      operation_lock,
+                       MMOperationPriority  operation_priority,
+                       GAsyncReadyCallback  callback,
+                       gpointer             user_data)
 {
     state_operation (self,
                      STATE_OPERATION_TYPE_DISABLE,
@@ -955,15 +969,15 @@ mm_base_modem_enable_finish (MMBaseModem   *self,
 }
 
 void
-mm_base_modem_enable (MMBaseModem              *self,
-                      MMBaseModemOperationLock  operation_lock,
-                      GAsyncReadyCallback       callback,
-                      gpointer                  user_data)
+mm_base_modem_enable (MMBaseModem         *self,
+                      MMOperationLock      operation_lock,
+                      GAsyncReadyCallback  callback,
+                      gpointer             user_data)
 {
     state_operation (self,
                      STATE_OPERATION_TYPE_ENABLE,
                      operation_lock,
-                     MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
+                     MM_OPERATION_PRIORITY_DEFAULT,
                      callback,
                      user_data);
 }
@@ -979,15 +993,15 @@ mm_base_modem_initialize_finish (MMBaseModem   *self,
 }
 
 void
-mm_base_modem_initialize (MMBaseModem              *self,
-                          MMBaseModemOperationLock  operation_lock,
-                          GAsyncReadyCallback       callback,
-                          gpointer                  user_data)
+mm_base_modem_initialize (MMBaseModem         *self,
+                          MMOperationLock      operation_lock,
+                          GAsyncReadyCallback  callback,
+                          gpointer             user_data)
 {
     state_operation (self,
                      STATE_OPERATION_TYPE_INITIALIZE,
                      operation_lock,
-                     MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
+                     MM_OPERATION_PRIORITY_DEFAULT,
                      callback,
                      user_data);
 }
@@ -1775,8 +1789,8 @@ mm_base_modem_organize_ports (MMBaseModem *self,
 /*****************************************************************************/
 /* Authorization */
 
-gboolean
-mm_base_modem_authorize_finish (MMBaseModem *self,
+static gboolean
+mm_base_modem_authorize_finish (MMIfaceAuth *auth,
                                 GAsyncResult *res,
                                 GError **error)
 {
@@ -1798,14 +1812,15 @@ authorize_ready (MMAuthProvider *authp,
     g_object_unref (task);
 }
 
-void
-mm_base_modem_authorize (MMBaseModem *self,
+static void
+mm_base_modem_authorize (MMIfaceAuth *auth,
                          GDBusMethodInvocation *invocation,
                          const gchar *authorization,
                          GAsyncReadyCallback callback,
                          gpointer user_data)
 {
-    GTask *task;
+    MMBaseModem *self = MM_BASE_MODEM (auth);
+    GTask       *task;
 
     task = g_task_new (self, self->priv->authp_cancellable, callback, user_data);
 
@@ -1821,10 +1836,10 @@ mm_base_modem_authorize (MMBaseModem *self,
 /* Exclusive operation */
 
 typedef struct {
-    gssize                        id;
-    MMBaseModemOperationPriority  priority;
-    gchar                        *description;
-    GTask                        *wait_task;
+    gssize               id;
+    MMOperationPriority  priority;
+    gchar               *description;
+    GTask               *wait_task;
 } OperationInfo;
 
 static void
@@ -1837,7 +1852,7 @@ operation_info_free (OperationInfo *info)
 
 /* Exclusive operation lock */
 
-gssize
+static gssize
 mm_base_modem_operation_lock_finish (MMBaseModem   *self,
                                      GAsyncResult  *res,
                                      GError       **error)
@@ -1862,7 +1877,7 @@ base_modem_operation_run (MMBaseModem *self)
     /* Run the operation in head of the list */
     mm_obj_dbg (self, "[operation %" G_GSSIZE_FORMAT "] %s - %s: lock acquired",
                 info->id,
-                mm_base_modem_operation_priority_get_string (info->priority),
+                mm_operation_priority_get_string (info->priority),
                 info->description);
     task = g_steal_pointer (&info->wait_task);
     g_task_return_int (task, info->id);
@@ -1905,7 +1920,7 @@ abort_pending_operations (MMBaseModem *self)
         g_assert (info->wait_task);
         mm_obj_dbg (self, "[operation %" G_GSSIZE_FORMAT "] %s - %s: aborted early",
                     info->id,
-                    mm_base_modem_operation_priority_get_string (info->priority),
+                    mm_operation_priority_get_string (info->priority),
                     info->description);
 
         task = g_steal_pointer (&info->wait_task);
@@ -1918,12 +1933,12 @@ abort_pending_operations (MMBaseModem *self)
     self->priv->scheduled_operations = head;
 }
 
-void
-mm_base_modem_operation_lock (MMBaseModem                   *self,
-                              MMBaseModemOperationPriority   priority,
-                              const gchar                   *description,
-                              GAsyncReadyCallback            callback,
-                              gpointer                       user_data)
+static void
+mm_base_modem_operation_lock (MMBaseModem          *self,
+                              MMOperationPriority   priority,
+                              const gchar          *description,
+                              GAsyncReadyCallback   callback,
+                              gpointer              user_data)
 {
     GTask          *task;
     OperationInfo  *info;
@@ -1950,19 +1965,19 @@ mm_base_modem_operation_lock (MMBaseModem                   *self,
     } else
         operation_id++;
 
-    if (info->priority == MM_BASE_MODEM_OPERATION_PRIORITY_OVERRIDE) {
+    if (info->priority == MM_OPERATION_PRIORITY_OVERRIDE) {
         mm_obj_dbg (self, "[operation %" G_GSSIZE_FORMAT "] %s - %s: override requested - no new operations will be allowed",
                     info->id,
-                    mm_base_modem_operation_priority_get_string (info->priority),
+                    mm_operation_priority_get_string (info->priority),
                     info->description);
         g_assert (!self->priv->scheduled_operations_forbidden_forever);
         self->priv->scheduled_operations_forbidden_forever = TRUE;
         abort_pending_operations (self);
         self->priv->scheduled_operations = g_list_append (self->priv->scheduled_operations, info);
-    } else if (info->priority == MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT) {
+    } else if (info->priority == MM_OPERATION_PRIORITY_DEFAULT) {
         mm_obj_dbg (self, "[operation %" G_GSSIZE_FORMAT "] %s - %s: scheduled",
                     info->id,
-                    mm_base_modem_operation_priority_get_string (info->priority),
+                    mm_operation_priority_get_string (info->priority),
                     info->description);
         self->priv->scheduled_operations = g_list_append (self->priv->scheduled_operations, info);
     } else
@@ -1973,10 +1988,11 @@ mm_base_modem_operation_lock (MMBaseModem                   *self,
 
 /* Exclusive operation unlock */
 
-void
-mm_base_modem_operation_unlock (MMBaseModem *self,
-                                gssize       operation_id)
+static void
+mm_base_modem_operation_unlock (MMIfaceOpLock *_self,
+                                gssize         operation_id)
 {
+    MMBaseModem   *self = MM_BASE_MODEM (_self);
     OperationInfo *info;
 
     g_assert (self->priv->scheduled_operations);
@@ -1987,7 +2003,7 @@ mm_base_modem_operation_unlock (MMBaseModem *self,
 
     mm_obj_dbg (self, "[operation %" G_GSSIZE_FORMAT "] %s - %s: lock released",
                 info->id,
-                mm_base_modem_operation_priority_get_string (info->priority),
+                mm_operation_priority_get_string (info->priority),
                 info->description);
 
     /* Remove head list item and free its contents */
@@ -2002,9 +2018,9 @@ mm_base_modem_operation_unlock (MMBaseModem *self,
 /*****************************************************************************/
 
 typedef struct {
-    GDBusMethodInvocation        *invocation;
-    MMBaseModemOperationPriority  operation_priority;
-    gchar                        *operation_description;
+    GDBusMethodInvocation *invocation;
+    MMOperationPriority    operation_priority;
+    gchar                 *operation_description;
 } AuthorizeAndOperationLockContext;
 
 static void
@@ -2015,8 +2031,8 @@ authorize_and_operation_lock_context_free (AuthorizeAndOperationLockContext *ctx
     g_slice_free (AuthorizeAndOperationLockContext, ctx);
 }
 
-gssize
-mm_base_modem_authorize_and_operation_lock_finish (MMBaseModem   *self,
+static gssize
+mm_base_modem_authorize_and_operation_lock_finish (MMIfaceOpLock *self,
                                                    GAsyncResult  *res,
                                                    GError       **error)
 {
@@ -2040,35 +2056,35 @@ lock_after_authorize_ready (MMBaseModem  *self,
 }
 
 static void
-authorize_before_lock_ready (MMBaseModem  *self,
+authorize_before_lock_ready (MMIfaceAuth  *auth,
                              GAsyncResult *res,
                              GTask        *task)
 {
     GError                           *error = NULL;
     AuthorizeAndOperationLockContext *ctx;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (auth, res, &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
     }
 
     ctx = g_task_get_task_data (task);
-    mm_base_modem_operation_lock (self,
+    mm_base_modem_operation_lock (MM_BASE_MODEM (auth),
                                   ctx->operation_priority,
                                   ctx->operation_description,
                                   (GAsyncReadyCallback) lock_after_authorize_ready,
                                   task);
 }
 
-void
-mm_base_modem_authorize_and_operation_lock (MMBaseModem                  *self,
-                                            GDBusMethodInvocation        *invocation,
-                                            const gchar                  *authorization,
-                                            MMBaseModemOperationPriority  operation_priority,
-                                            const gchar                  *operation_description,
-                                            GAsyncReadyCallback           callback,
-                                            gpointer                      user_data)
+static void
+mm_base_modem_authorize_and_operation_lock (MMIfaceOpLock         *self,
+                                            GDBusMethodInvocation *invocation,
+                                            const gchar           *authorization,
+                                            MMOperationPriority    operation_priority,
+                                            const gchar           *operation_description,
+                                            GAsyncReadyCallback    callback,
+                                            gpointer               user_data)
 {
     GTask                            *task;
     AuthorizeAndOperationLockContext *ctx;
@@ -2081,7 +2097,7 @@ mm_base_modem_authorize_and_operation_lock (MMBaseModem                  *self,
     ctx->operation_description = g_strdup (operation_description);
     g_task_set_task_data (task, ctx, (GDestroyNotify)authorize_and_operation_lock_context_free);
 
-    mm_base_modem_authorize (self,
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              authorization,
                              (GAsyncReadyCallback)authorize_before_lock_ready,
@@ -2621,6 +2637,21 @@ static void
 log_object_iface_init (MMLogObjectInterface *iface)
 {
     iface->build_id = log_object_build_id;
+}
+
+static void
+auth_iface_init (MMIfaceAuthInterface *iface)
+{
+    iface->authorize = mm_base_modem_authorize;
+    iface->authorize_finish = mm_base_modem_authorize_finish;
+}
+
+static void
+op_lock_iface_init (MMIfaceOpLockInterface *iface)
+{
+    iface->authorize_and_lock = mm_base_modem_authorize_and_operation_lock;
+    iface->authorize_and_lock_finish = mm_base_modem_authorize_and_operation_lock_finish;
+    iface->unlock = mm_base_modem_operation_unlock;
 }
 
 static void

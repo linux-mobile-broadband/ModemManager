@@ -63,6 +63,10 @@ struct _MMBaseSimPrivate {
     GDBusConnection *connection;
     guint            dbus_id;
 
+    /* The authorization provider */
+    MMAuthProvider *authp;
+    GCancellable   *authp_cancellable;
+
     /* The modem which owns this SIM */
     MMBaseModem *modem;
     /* The path where the SIM object is exported */
@@ -238,13 +242,13 @@ handle_change_pin_ready (MMBaseSim *self,
 }
 
 static void
-handle_change_pin_auth_ready (MMBaseModem *modem,
+handle_change_pin_auth_ready (MMAuthProvider *authp,
                               GAsyncResult *res,
                               HandleChangePinContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+    if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_change_pin_context_free (ctx);
         return;
@@ -296,11 +300,12 @@ handle_change_pin (MMBaseSim *self,
     ctx->old_pin = g_strdup (old_pin);
     ctx->new_pin = g_strdup (new_pin);
 
-    mm_base_modem_authorize (self->priv->modem,
-                             invocation,
-                             MM_AUTHORIZATION_DEVICE_CONTROL,
-                             (GAsyncReadyCallback)handle_change_pin_auth_ready,
-                             ctx);
+    mm_auth_provider_authorize (self->priv->authp,
+                                invocation,
+                                MM_AUTHORIZATION_DEVICE_CONTROL,
+                                self->priv->authp_cancellable,
+                                (GAsyncReadyCallback)handle_change_pin_auth_ready,
+                                ctx);
     return TRUE;
 }
 
@@ -421,13 +426,13 @@ handle_enable_pin_ready (MMBaseSim *self,
 }
 
 static void
-handle_enable_pin_auth_ready (MMBaseModem *modem,
+handle_enable_pin_auth_ready (MMAuthProvider *authp,
                               GAsyncResult *res,
                               HandleEnablePinContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+    if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_enable_pin_context_free (ctx);
         return;
@@ -478,11 +483,12 @@ handle_enable_pin (MMBaseSim *self,
     ctx->pin = g_strdup (pin);
     ctx->enabled = enabled;
 
-    mm_base_modem_authorize (self->priv->modem,
-                             invocation,
-                             MM_AUTHORIZATION_DEVICE_CONTROL,
-                             (GAsyncReadyCallback)handle_enable_pin_auth_ready,
-                             ctx);
+    mm_auth_provider_authorize (self->priv->authp,
+                                invocation,
+                                MM_AUTHORIZATION_DEVICE_CONTROL,
+                                self->priv->authp_cancellable,
+                                (GAsyncReadyCallback)handle_enable_pin_auth_ready,
+                                ctx);
     return TRUE;
 }
 
@@ -844,13 +850,13 @@ handle_send_pin_ready (MMBaseSim *self,
 }
 
 static void
-handle_send_pin_auth_ready (MMBaseModem *modem,
+handle_send_pin_auth_ready (MMAuthProvider *authp,
                             GAsyncResult *res,
                             HandleSendPinContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+    if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_send_pin_context_free (ctx);
         return;
@@ -889,11 +895,12 @@ handle_send_pin (MMBaseSim *self,
     ctx->invocation = g_object_ref (invocation);
     ctx->pin = g_strdup (pin);
 
-    mm_base_modem_authorize (self->priv->modem,
-                             invocation,
-                             MM_AUTHORIZATION_DEVICE_CONTROL,
-                             (GAsyncReadyCallback)handle_send_pin_auth_ready,
-                             ctx);
+    mm_auth_provider_authorize (self->priv->authp,
+                                invocation,
+                                MM_AUTHORIZATION_DEVICE_CONTROL,
+                                self->priv->authp_cancellable,
+                                (GAsyncReadyCallback)handle_send_pin_auth_ready,
+                                ctx);
     return TRUE;
 }
 
@@ -948,13 +955,13 @@ handle_send_puk_ready (MMBaseSim *self,
 }
 
 static void
-handle_send_puk_auth_ready (MMBaseModem *modem,
+handle_send_puk_auth_ready (MMAuthProvider *authp,
                             GAsyncResult *res,
                             HandleSendPukContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+    if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_send_puk_context_free (ctx);
         return;
@@ -996,11 +1003,12 @@ handle_send_puk (MMBaseSim *self,
     ctx->puk = g_strdup (puk);
     ctx->new_pin = g_strdup (new_pin);
 
-    mm_base_modem_authorize (self->priv->modem,
-                             invocation,
-                             MM_AUTHORIZATION_DEVICE_CONTROL,
-                             (GAsyncReadyCallback)handle_send_puk_auth_ready,
-                             ctx);
+    mm_auth_provider_authorize (self->priv->authp,
+                                invocation,
+                                MM_AUTHORIZATION_DEVICE_CONTROL,
+                                self->priv->authp_cancellable,
+                                (GAsyncReadyCallback)handle_send_puk_auth_ready,
+                                ctx);
     return TRUE;
 }
 
@@ -1504,13 +1512,13 @@ handle_set_preferred_networks_ready (MMBaseSim *self,
 }
 
 static void
-handle_set_preferred_networks_auth_ready (MMBaseModem *modem,
+handle_set_preferred_networks_auth_ready (MMAuthProvider *authp,
                                           GAsyncResult *res,
                                           HandleSetPreferredNetworksContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+    if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_preferred_networks_context_free (ctx);
         return;
@@ -1558,11 +1566,12 @@ handle_set_preferred_networks (MMBaseSim *self,
     ctx->invocation = g_object_ref (invocation);
     ctx->networks = g_variant_ref (networks_variant);
 
-    mm_base_modem_authorize (self->priv->modem,
-                             invocation,
-                             MM_AUTHORIZATION_DEVICE_CONTROL,
-                             (GAsyncReadyCallback)handle_set_preferred_networks_auth_ready,
-                             ctx);
+    mm_auth_provider_authorize (self->priv->authp,
+                                invocation,
+                                MM_AUTHORIZATION_DEVICE_CONTROL,
+                                self->priv->authp_cancellable,
+                                (GAsyncReadyCallback)handle_set_preferred_networks_auth_ready,
+                                ctx);
     return TRUE;
 }
 
@@ -3047,6 +3056,8 @@ dispose (GObject *object)
     }
 
     g_clear_object (&self->priv->modem);
+    g_cancellable_cancel (self->priv->authp_cancellable);
+    g_clear_object (&self->priv->authp_cancellable);
 
     G_OBJECT_CLASS (mm_base_sim_parent_class)->dispose (object);
 }

@@ -992,8 +992,8 @@ device_shutdown_step (GTask *task)
                         "disabling modem%d",
                         mm_base_modem_get_dbus_id (ctx->modem));
             mm_base_modem_disable (ctx->modem,
-                                   MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
-                                   MM_BASE_MODEM_OPERATION_PRIORITY_OVERRIDE,
+                                   MM_OPERATION_LOCK_REQUIRED,
+                                   MM_OPERATION_PRIORITY_OVERRIDE,
                                    (GAsyncReadyCallback)shutdown_disable_ready,
                                    task);
             return;
@@ -1228,7 +1228,7 @@ mm_base_manager_sync (MMBaseManager *self)
         /* We just want to start the synchronization, we don't need the result */
         if (modem) {
             mm_base_modem_sync (modem,
-                                MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
+                                MM_OPERATION_LOCK_REQUIRED,
                                 (GAsyncReadyCallback)base_modem_sync_ready,
                                 NULL);
         }

@@ -756,7 +756,7 @@ connection_step (ConnectionContext *ctx)
         mm_obj_msg (ctx->self, "simple connect state (%d/%d): enable",
                     ctx->step, CONNECTION_STEP_LAST);
         mm_base_modem_enable (MM_BASE_MODEM (ctx->self),
-                              MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
+                              MM_OPERATION_LOCK_REQUIRED,
                               (GAsyncReadyCallback)enable_ready,
                               ctx);
         return;
@@ -881,14 +881,15 @@ connection_step (ConnectionContext *ctx)
 }
 
 static void
-connect_auth_ready (MMBaseModem *self,
+connect_auth_ready (MMIfaceAuth *_self,
                     GAsyncResult *res,
                     ConnectionContext *ctx)
 {
+    MMIfaceModemSimple *self = MM_IFACE_MODEM_SIMPLE (_self);
     GError *error = NULL;
     MMModemState current = MM_MODEM_STATE_UNKNOWN;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         connection_context_free (ctx);
         return;
@@ -980,7 +981,7 @@ handle_connect (MmGdbusModemSimple    *skeleton,
     ctx->self = g_object_ref (self);
     ctx->dictionary = g_variant_ref (dictionary);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)connect_auth_ready,
@@ -1025,14 +1026,15 @@ bearer_list_disconnect_bearers_ready (MMBearerList         *bearer_list,
 }
 
 static void
-disconnect_auth_ready (MMBaseModem          *self,
+disconnect_auth_ready (MMIfaceAuth          *_self,
                        GAsyncResult         *res,
                        DisconnectionContext *ctx)
 {
+    MMIfaceModemSimple      *self = MM_IFACE_MODEM_SIMPLE (_self);
     g_autoptr(MMBearerList)  list = NULL;
     GError                  *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         disconnection_context_free (ctx);
         return;
@@ -1087,7 +1089,7 @@ handle_disconnect (MmGdbusModemSimple    *skeleton,
     if (g_strcmp0 (bearer_path, "/") != 0)
         ctx->bearer_path = g_strdup (bearer_path);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)disconnect_auth_ready,

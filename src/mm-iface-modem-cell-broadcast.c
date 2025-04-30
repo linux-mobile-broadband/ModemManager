@@ -79,13 +79,14 @@ set_channels_ready (MMIfaceModemCellBroadcast             *self,
 }
 
 static void
-handle_set_channels_auth_ready (MMBaseModem                           *self,
+handle_set_channels_auth_ready (MMIfaceAuth                           *_self,
                                 GAsyncResult                          *res,
                                 HandleSetChannelsCellBroadcastContext *ctx)
 {
+    MMIfaceModemCellBroadcast *self = MM_IFACE_MODEM_CELL_BROADCAST (_self);
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_channels_context_free (ctx);
         return;
@@ -128,7 +129,8 @@ handle_set_channels (MmGdbusModemCellBroadcast *skeleton,
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
     ctx->channels = mm_common_cell_broadcast_channels_variant_to_garray (channels);
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_set_channels_auth_ready,
@@ -173,14 +175,15 @@ handle_delete_ready (MMCbmList           *list,
 }
 
 static void
-handle_delete_auth_ready (MMBaseModem         *self,
+handle_delete_auth_ready (MMIfaceAuth         *_self,
                           GAsyncResult        *res,
                           HandleDeleteContext *ctx)
 {
+    MMIfaceModemCellBroadcast *self = MM_IFACE_MODEM_CELL_BROADCAST (_self);
     g_autoptr(MMCbmList)  list = NULL;
     GError               *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_delete_context_free (ctx);
         return;
@@ -229,7 +232,7 @@ handle_delete (MmGdbusModemCellBroadcast *skeleton,
     ctx->self = g_object_ref (self);
     ctx->path = g_strdup (path);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_CELL_BROADCAST,
                              (GAsyncReadyCallback)handle_delete_auth_ready,
