@@ -35,6 +35,7 @@ typedef struct _MMDispatcherConnectionPrivate MMDispatcherConnectionPrivate;
 typedef enum { /*< underscore_name=mm_dispatcher_connection_event >*/
     MM_DISPATCHER_CONNECTION_EVENT_CONNECTED,
     MM_DISPATCHER_CONNECTION_EVENT_DISCONNECTED,
+    MM_DISPATCHER_CONNECTION_EVENT_DISCONNECT_REQUEST,
 } MMDispatcherConnectionEvent;
 
 GType                   mm_dispatcher_connection_get_type   (void);

@@ -66,6 +66,8 @@ mm_dispatcher_connection_event_to_string (MMDispatcherConnectionEvent event)
         return g_strdup ("connected");
     case MM_DISPATCHER_CONNECTION_EVENT_DISCONNECTED:
         return g_strdup ("disconnected");
+    case MM_DISPATCHER_CONNECTION_EVENT_DISCONNECT_REQUEST:
+        return g_strdup ("disconnect-request");
     default:
         return NULL;
     }

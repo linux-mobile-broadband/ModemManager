@@ -1492,6 +1492,8 @@ mm_base_bearer_disconnect_force (MMBaseBearer *self)
 
     if (self->priv->ignore_disconnection_reports) {
         mm_obj_dbg (self, "disconnection should be forced but it's explicitly ignored");
+        bearer_run_dispatcher_scripts (self,
+                                       MM_DISPATCHER_CONNECTION_EVENT_DISCONNECT_REQUEST);
         return;
     }
 
