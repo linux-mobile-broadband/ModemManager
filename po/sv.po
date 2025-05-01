@@ -1,16 +1,16 @@
 # Swedish translation for ModemManager.
-# Copyright (C) 2017, 2020 ModemManager's COPYRIGHT HOLDER
+# Copyright © 2017, 2020, 2024, 2025 ModemManager's COPYRIGHT HOLDER
 # This file is distributed under the same license as the ModemManager package.
 # Josef Andersson <l10nl18nsweja@gmail.com>, 2017.
-# Anders Jonsson <anders.jonsson@norsjovallen.se>, 2020.
+# Anders Jonsson <anders.jonsson@norsjovallen.se>, 2020, 2024, 2025.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: ModemManager main\n"
 "Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
 "ModemManager/issues\n"
-"POT-Creation-Date: 2022-07-16 14:32+0200\n"
-"PO-Revision-Date: 2020-09-18 23:56+0200\n"
+"POT-Creation-Date: 2025-01-23 03:26+0000\n"
+"PO-Revision-Date: 2025-04-23 22:39+0200\n"
 "Last-Translator: Anders Jonsson <anders.jonsson@norsjovallen.se>\n"
 "Language-Team: Swedish <tp-sv@listor.tp-sv.se>\n"
 "Language: sv\n"
@@ -18,81 +18,92 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Generator: Poedit 2.4.1\n"
+"X-Generator: Poedit 3.5\n"
 
+# https://it-ord.computersweden.se/ord/cell-broadcast/
 #: data/org.freedesktop.ModemManager1.policy.in.in:13
+msgid "Enable and view Cell Broadcast messages"
+msgstr "Aktivera och visa Cell Broadcast-meddelanden"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:14
+msgid "System policy prevents enabling or viewing this device's text messages."
+msgstr ""
+"En systempolicy förhindrar att aktivera eller visa denna enhets "
+"textmeddelanden."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:22
 msgid "Control the Modem Manager daemon"
 msgstr "Kontrollera demonen för Modem Manager"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:14
+#: data/org.freedesktop.ModemManager1.policy.in.in:23
 msgid "System policy prevents controlling the Modem Manager."
 msgstr "En systempolicy förhindrar kontroll av Modem Manager."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:22
+#: data/org.freedesktop.ModemManager1.policy.in.in:31
 msgid "Unlock and control a mobile broadband device"
 msgstr "Lås upp och kontrollera en mobil bredbandsenhet"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:23
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
 msgid ""
 "System policy prevents unlocking or controlling the mobile broadband device."
 msgstr ""
 "En systempolicy hindrar upplåsning eller kontroll över den mobila "
 "bredbandsenheten."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:31
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
 msgid "Add, modify, and delete mobile broadband contacts"
 msgstr "Lägg till, ändra och ta bort mobila bredbandskontakter"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:32
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
 msgid ""
 "System policy prevents adding, modifying, or deleting this device's contacts."
 msgstr ""
 "En systempolicy förhindrar att lägga till, ändra och ta bort denna enhets "
 "kontakter."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:40
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
 msgid "Send, save, modify, and delete text messages"
 msgstr "Skicka, spara, ändra och ta bort meddelanden"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:41
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
 msgid ""
 "System policy prevents sending or manipulating this device's text messages."
 msgstr ""
 "En systempolicy förhindrar att skicka eller ändra denna enhets "
 "textmeddelanden."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:49
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
 msgid "Accept incoming voice calls or start outgoing voice calls."
 msgstr "Acceptera inkommande röstsamtal eller påbörja utgående röstsamtal."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:50
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
 msgid "System policy prevents voice calls."
 msgstr "En systempolicy förhindrar röstsamtal."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:58
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
 msgid "Query network time and timezone information"
 msgstr "Fråga efter nätverkstid och tidzonsinformation"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:59
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
 msgid "System policy prevents querying network time information."
 msgstr "En systempolicy förhindrar frågande av nätverkstidsinformation."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:67
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
 msgid "Enable and view geographic location and positioning information"
 msgstr "Aktivera och visa geografisk plats samt positioneringsinformation"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:68
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
 msgid ""
 "System policy prevents enabling or viewing geographic location information."
 msgstr ""
 "En systempolicy förhindrar aktivering eller visning av geografisk "
 "platsinformation."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:76
+#: data/org.freedesktop.ModemManager1.policy.in.in:85
 msgid "Query and utilize network information and services"
 msgstr "Fråga efter och nyttja nätverksinformation och tjänster"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:77
+#: data/org.freedesktop.ModemManager1.policy.in.in:86
 msgid ""
 "System policy prevents querying or utilizing network information and "
 "services."
@@ -100,16 +111,16 @@ msgstr ""
 "En systempolicy förhindrar frågande och nyttjande av nätverksinformation och "
 "tjänster."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:85
+#: data/org.freedesktop.ModemManager1.policy.in.in:94
 msgid "Query and manage firmware on a mobile broadband device"
 msgstr "Fråga efter och hantera fast programvara för en mobil bredbandsenhet"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:86
+#: data/org.freedesktop.ModemManager1.policy.in.in:95
 msgid "System policy prevents querying or managing this device's firmware."
 msgstr ""
 "En systempolicy förhindrar att fråga och hantera denna enhets fasta "
 "programvara."
 
-#: src/mm-sleep-monitor-systemd.c:125
+#: src/mm-sleep-monitor-systemd.c:130
 msgid "ModemManager needs to reset devices"
 msgstr "ModemManager behöver starta om enheter"
