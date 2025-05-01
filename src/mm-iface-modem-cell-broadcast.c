@@ -275,16 +275,6 @@ handle_list (MmGdbusModemCellBroadcast *skeleton,
 
 /*****************************************************************************/
 
-MMBaseCbm *
-mm_iface_modem_cell_broadcast_create_cbm (MMIfaceModemCellBroadcast *self)
-{
-    g_assert (MM_IFACE_MODEM_CELL_BROADCAST_GET_IFACE (self)->create_cbm != NULL);
-
-    return MM_IFACE_MODEM_CELL_BROADCAST_GET_IFACE (self)->create_cbm (self);
-}
-
-/*****************************************************************************/
-
 typedef struct _InitializationContext InitializationContext;
 static void interface_initialization_step (GTask *task);
 
@@ -742,22 +732,22 @@ mm_iface_modem_cell_broadcast_enable (MMIfaceModemCellBroadcast *self,
 /*****************************************************************************/
 
 gboolean
-mm_iface_modem_cell_broadcast_take_part (MMIfaceModemCellBroadcast *self,
-                                         MMCbmPart                 *cbm_part,
-                                         MMCbmState                 state)
+mm_iface_modem_cell_broadcast_take_part (MMIfaceModemCellBroadcast  *self,
+                                         GObject                    *bind_to,
+                                         MMCbmPart                  *cbm_part,
+                                         MMCbmState                  state,
+                                         GError                    **error)
 {
     g_autoptr(MMCbmList) list = NULL;
-    g_autoptr(GError)    error = NULL;
     gboolean             added = FALSE;
 
     g_object_get (self,
                   MM_IFACE_MODEM_CELL_BROADCAST_CBM_LIST, &list,
                   NULL);
-
     if (list) {
-        added = mm_cbm_list_take_part (list, cbm_part, state, &error);
+        added = mm_cbm_list_take_part (list, bind_to, cbm_part, state, error);
         if (!added)
-            mm_obj_dbg (self, "Can't take part in CBM list: %s", error->message);
+            g_prefix_error (error, "couldn't take part in CBM list: ");
     }
 
     /* If part wasn't taken, we need to free the part ourselves */

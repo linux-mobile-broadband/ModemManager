@@ -69,6 +69,7 @@ gboolean mm_cbm_list_has_part (MMCbmList *self,
                                guint8     part_num);
 
 gboolean mm_cbm_list_take_part (MMCbmList *self,
+                                GObject *bind_to,
                                 MMCbmPart *part,
                                 MMCbmState state,
                                 GError **error);

@@ -179,6 +179,7 @@ cmp_cbm_by_serial_and_id (MMBaseCbm *cbm,
 
 static gboolean
 take_part (MMCbmList *self,
+           GObject *bind_to,
            MMCbmPart *part,
            MMCbmState state,
            GError **error)
@@ -202,7 +203,7 @@ take_part (MMCbmList *self,
     }
 
     /* Create new cbm */
-    cbm = mm_base_cbm_new_with_part (self->priv->modem,
+    cbm = mm_base_cbm_new_with_part (bind_to,
                                      state,
                                      mm_cbm_part_get_num_parts (part),
                                      part,
@@ -256,6 +257,7 @@ mm_cbm_list_has_part (MMCbmList *self,
 
 gboolean
 mm_cbm_list_take_part (MMCbmList *self,
+                       GObject *bind_to,
                        MMCbmPart *part,
                        MMCbmState state,
                        GError   **error)
@@ -275,7 +277,7 @@ mm_cbm_list_take_part (MMCbmList *self,
         return FALSE;
     }
 
-    return take_part (self, part, state, error);
+    return take_part (self, bind_to, part, state, error);
 }
 
 /*****************************************************************************/

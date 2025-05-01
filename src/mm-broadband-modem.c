@@ -10606,7 +10606,7 @@ cbc_cbm_received (MMPortSerialAt *port,
                   GMatchInfo *info,
                   MMBroadbandModem *self)
 {
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
     MMCbmPart *part;
     guint length;
     gchar *pdu;
@@ -10621,15 +10621,19 @@ cbc_cbm_received (MMPortSerialAt *port,
         return;
 
     part = mm_cbm_part_new_from_pdu (pdu, self, &error);
-    if (part) {
-        mm_obj_dbg (self, "correctly parsed PDU");
-        mm_iface_modem_cell_broadcast_take_part (MM_IFACE_MODEM_CELL_BROADCAST (self),
-                                                 part,
-                                                 MM_CBM_STATE_RECEIVED);
-    } else {
+    if (!part) {
         /* Don't treat the error as critical */
         mm_obj_dbg (self, "error parsing PDU: %s", error->message);
-        g_error_free (error);
+    } else {
+        mm_obj_dbg (self, "correctly parsed PDU");
+        if (!mm_iface_modem_cell_broadcast_take_part (MM_IFACE_MODEM_CELL_BROADCAST (self),
+                                                      G_OBJECT (self),
+                                                      part,
+                                                      MM_CBM_STATE_RECEIVED,
+                                                      &error)) {
+            /* Don't treat the error as critical */
+            mm_obj_dbg (self, "error adding CBM: %s", error->message);
+        }
     }
 }
 
@@ -10684,15 +10688,6 @@ modem_cell_broadcast_cleanup_unsolicited_events (MMIfaceModemCellBroadcast *self
                                                  gpointer user_data)
 {
     set_cell_broadcast_unsolicited_events_handlers (self, FALSE, callback, user_data);
-}
-
-/*****************************************************************************/
-/* Create CBM (CellBroadcast interface) */
-
-static MMBaseCbm *
-modem_cell_broadcast_create_cbm (MMIfaceModemCellBroadcast *self)
-{
-    return mm_base_cbm_new (MM_BASE_MODEM (self), G_OBJECT (self));
 }
 
 /***********************************************************************************/
@@ -14507,7 +14502,6 @@ iface_modem_cell_broadcast_init (MMIfaceModemCellBroadcastInterface *iface)
     iface->cleanup_unsolicited_events_finish = modem_cell_broadcast_setup_cleanup_unsolicited_events_finish;
     iface->set_channels = modem_cell_broadcast_set_channels;
     iface->set_channels_finish = modem_cell_broadcast_set_channels_finish;
-    iface->create_cbm = modem_cell_broadcast_create_cbm;
 }
 
 static void

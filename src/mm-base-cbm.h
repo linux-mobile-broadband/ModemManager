@@ -23,7 +23,6 @@
 #include <libmm-glib.h>
 
 #include "mm-cbm-part.h"
-#include "mm-base-modem.h"
 
 /*****************************************************************************/
 
@@ -40,7 +39,6 @@ typedef struct _MMBaseCbmPrivate MMBaseCbmPrivate;
 
 #define MM_BASE_CBM_PATH       "cbm-path"
 #define MM_BASE_CBM_CONNECTION "cbm-connection"
-#define MM_BASE_CBM_MODEM      "cbm-modem"
 #define MM_BASE_CBM_MAX_PARTS  "cbm-max-parts"
 #define MM_BASE_CBM_SERIAL     "cbm-serial"
 
@@ -56,12 +54,11 @@ struct _MMBaseCbmClass {
 GType mm_base_cbm_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBaseCbm, g_object_unref)
 
-MMBaseCbm *mm_base_cbm_new       (MMBaseModem *modem,
-                                  GObject     *bind_to);
+MMBaseCbm *mm_base_cbm_new       (GObject   *bind_to);
 gboolean   mm_base_cbm_take_part (MMBaseCbm *self,
                                   MMCbmPart *part,
                                   GError **error);
-MMBaseCbm *mm_base_cbm_new_with_part (MMBaseModem *modem,
+MMBaseCbm *mm_base_cbm_new_with_part (GObject *bind_to,
                                       MMCbmState state,
                                       guint max_parts,
                                       MMCbmPart *first_part,
