@@ -138,6 +138,7 @@ print_bearer_info (MMBearer *bearer)
     g_autoptr(MMBearerProperties)  properties = NULL;
     g_autoptr(MMBearerStats)       stats = NULL;
     g_autoptr(GError)              connection_error = NULL;
+    gboolean                       disconnect_request = FALSE;
     gint                           profile_id;
     gchar                         *profile_id_str;
 
@@ -147,6 +148,7 @@ print_bearer_info (MMBearer *bearer)
     stats            = mm_bearer_get_stats (bearer);
     profile_id       = mm_bearer_get_profile_id (bearer);
     connection_error = mm_bearer_get_connection_error (bearer);
+    disconnect_request = mm_bearer_get_disconnect_request (bearer);
 
     profile_id_str = (profile_id != MM_3GPP_PROFILE_ID_UNKNOWN) ? g_strdup_printf ("%d", profile_id) : NULL;
 
@@ -156,6 +158,7 @@ print_bearer_info (MMBearer *bearer)
     mmcli_output_string      (MMC_F_BEARER_STATUS_CONNECTED,                mm_bearer_get_connected (bearer) ? "yes" : "no");
     mmcli_output_string_take (MMC_F_BEARER_STATUS_CONNECTION_ERROR_NAME,    connection_error ? g_dbus_error_encode_gerror (connection_error) : NULL);
     mmcli_output_string      (MMC_F_BEARER_STATUS_CONNECTION_ERROR_MESSAGE, connection_error ? connection_error->message : NULL);
+    mmcli_output_string      (MMC_F_BEARER_STATUS_DISCONNECT_REQUEST,       disconnect_request ? "yes" : "no");
     mmcli_output_string      (MMC_F_BEARER_STATUS_SUSPENDED,                mm_bearer_get_suspended (bearer) ? "yes" : "no");
     mmcli_output_string      (MMC_F_BEARER_STATUS_MULTIPLEXED,              mm_bearer_get_multiplexed (bearer) ? "yes" : "no");
     mmcli_output_string      (MMC_F_BEARER_STATUS_INTERFACE,                mm_bearer_get_interface (bearer));

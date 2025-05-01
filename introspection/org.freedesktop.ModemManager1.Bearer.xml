@@ -116,6 +116,16 @@
     <property name="ConnectionError" type="(ss)" access="read" />
 
     <!--
+        DisconnectRequest:
+
+        Indicates that the bearer is no longer useable and the connection
+        manager should terminate it as soon as possible.
+
+        Since: 1.26
+    -->
+    <property name="DisconnectRequest" type="b" access="read" />
+
+    <!--
         Suspended:
 
         In some devices, packet data service will be suspended while the device
