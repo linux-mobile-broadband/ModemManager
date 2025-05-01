@@ -5587,6 +5587,21 @@ modem_3gpp_run_registration_checks_finish (MMIfaceModem3gpp  *self,
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
+static void
+run_registration_checks_reload_current_registration_info_ready (MMIfaceModem3gpp *modem,
+                                                                GAsyncResult     *res,
+                                                                GTask            *task)
+{
+    GError *error = NULL;
+
+    mm_iface_modem_3gpp_reload_current_registration_info_finish (modem, res, &error);
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
 static void run_registration_checks_context_step (GTask *task);
 
 static void
@@ -5828,13 +5843,17 @@ run_registration_checks_context_step (GTask *task)
             error = g_steal_pointer (&ctx->error_cs);
         else
             g_assert_not_reached ();
+
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
     }
 
-    if (error)
-        g_task_return_error (task, error);
-    else
-        g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+    /* When everything is done, recheck operator info as it may have changed */
+    mm_iface_modem_3gpp_reload_current_registration_info (
+        MM_IFACE_MODEM_3GPP (self),
+        (GAsyncReadyCallback)run_registration_checks_reload_current_registration_info_ready,
+        task);
 }
 
 static void
