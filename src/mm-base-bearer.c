@@ -472,7 +472,7 @@ dispatcher_connection_run_ready (MMDispatcherConnection *dispatcher,
 
 static void
 bearer_run_dispatcher_scripts (MMBaseBearer *self,
-                               gboolean      connected)
+                               MMDispatcherConnectionEvent event)
 {
     MMDispatcherConnection *dispatcher;
     const gchar *interface;
@@ -486,7 +486,7 @@ bearer_run_dispatcher_scripts (MMBaseBearer *self,
                                   g_dbus_object_get_object_path (G_DBUS_OBJECT (self->priv->modem)),
                                   self->priv->path,
                                   interface,
-                                  connected,
+                                  event,
                                   NULL, /* cancellable */
                                   (GAsyncReadyCallback)dispatcher_connection_run_ready,
                                   g_object_ref (self));
@@ -531,7 +531,7 @@ bearer_update_status (MMBaseBearer *self,
         g_autoptr(GString) report = NULL;
 
         /* Report disconnection via dispatcher scripts, before resetting the interface */
-        bearer_run_dispatcher_scripts (self, FALSE);
+        bearer_run_dispatcher_scripts (self, MM_DISPATCHER_CONNECTION_EVENT_DISCONNECTED);
 
         bearer_reset_interface_status (self);
         /* Cleanup flag to ignore disconnection reports */
@@ -599,7 +599,7 @@ bearer_update_status_connected (MMBaseBearer     *self,
     connection_monitor_start (self);
 
     /* Run dispatcher scripts */
-    bearer_run_dispatcher_scripts (self, TRUE);
+    bearer_run_dispatcher_scripts (self, MM_DISPATCHER_CONNECTION_EVENT_CONNECTED);
 }
 
 /*****************************************************************************/
