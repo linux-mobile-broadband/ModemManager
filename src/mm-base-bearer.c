@@ -500,6 +500,7 @@ bearer_reset_interface_status (MMBaseBearer *self)
     mm_gdbus_bearer_set_profile_id (MM_GDBUS_BEARER (self), MM_3GPP_PROFILE_ID_UNKNOWN);
     mm_gdbus_bearer_set_multiplexed (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (self), FALSE);
+    mm_gdbus_bearer_set_disconnect_request (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_suspended (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (self), NULL);
     mm_gdbus_bearer_set_ip4_config (
@@ -1491,13 +1492,14 @@ mm_base_bearer_disconnect_force (MMBaseBearer *self)
         return;
 
     if (self->priv->ignore_disconnection_reports) {
-        mm_obj_dbg (self, "disconnection should be forced but it's explicitly ignored");
+        mm_obj_msg (self, "disconnection should be forced, but we can't. Request disconnection instead.");
+        mm_gdbus_bearer_set_disconnect_request (MM_GDBUS_BEARER(self), TRUE);
         bearer_run_dispatcher_scripts (self,
                                        MM_DISPATCHER_CONNECTION_EVENT_DISCONNECT_REQUEST);
         return;
     }
 
-    mm_obj_dbg (self, "forcing disconnection");
+    mm_obj_msg (self, "forcing disconnection");
 
     /* If currently connecting, try to cancel that operation. */
     if (self->priv->status == MM_BEARER_STATUS_CONNECTING) {
