@@ -5887,3 +5887,37 @@ mm_dtmf_duration_normalize (guint duration_ms)
 
     return CLAMP (duration_ms, 100, 1000);
 }
+
+GPtrArray *
+mm_dtmf_split (const gchar *dtmf)
+{
+    GPtrArray   *array;
+    const gchar *p = dtmf;
+    GString     *cur = NULL;
+
+    array = g_ptr_array_new ();
+
+    while (*p) {
+        if (*p == MM_CALL_DTMF_PAUSE_CHAR) {
+            if (cur) {
+                g_ptr_array_add (array, g_string_free (cur, FALSE));
+                cur = NULL;
+            }
+            g_ptr_array_add (array, g_strdup (","));
+        } else {
+            if (!cur)
+                cur = g_string_new (NULL);
+            g_string_append_c (cur, *p);
+        }
+        p++;
+    }
+    if (cur)
+        g_ptr_array_add (array, g_string_free (cur, FALSE));
+
+    if (array->len == 0) {
+        g_ptr_array_free (array, TRUE);
+        return NULL;
+    }
+
+    return array;
+}

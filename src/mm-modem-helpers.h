@@ -648,4 +648,8 @@ MMModemLock mm_parse_cpin_response (const gchar *response,
 /* Helper to clamp duration and round to next 100ms */
 guint mm_dtmf_duration_normalize (guint duration_ms);
 
+#define MM_CALL_DTMF_PAUSE_CHAR ','
+
+GPtrArray *mm_dtmf_split (const gchar *dtmf);
+
 #endif  /* MM_MODEM_HELPERS_H */
