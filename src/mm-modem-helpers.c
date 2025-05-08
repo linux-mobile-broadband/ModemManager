@@ -1218,8 +1218,9 @@ get_mm_access_tech_from_etsi_access_tech (guint    val,
         return MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
     case 6:
         return MM_MODEM_ACCESS_TECHNOLOGY_HSPA;
-    case 7:  /* E-UTRAN */
     case 9:  /* E-UTRAN (NB-S1) */
+        return MM_MODEM_ACCESS_TECHNOLOGY_LTE_NB_IOT;
+    case 7:  /* E-UTRAN */
     case 10: /* E-UTRA connected to a 5GCN */
         return MM_MODEM_ACCESS_TECHNOLOGY_LTE;
     case 11: /* NR connected to a 5G CN */
@@ -4160,11 +4161,11 @@ mm_string_to_access_tech (const gchar *string)
      * are included in other strings too.
      */
     len = strlen (string);
-    if (strncmp (string, "EVDO", 4) && (len >= 4 && !isalnum (string[4])))
+    if (!strncmp (string, "EVDO", 4) && (len >= 4 && !isalnum (string[4])))
         act |= MM_MODEM_ACCESS_TECHNOLOGY_EVDO0;
-    if (strncmp (string, "CDMA", 4) && (len >= 4 && !isalnum (string[4])))
+    if (!strncmp (string, "CDMA", 4) && (len >= 4 && !isalnum (string[4])))
         act |= MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
-    if (strncmp (string, "CDMA-EVDO", 9) && (len >= 9 && !isalnum (string[9])))
+    if (!strncmp (string, "CDMA-EVDO", 9) && (len >= 9 && !isalnum (string[9])))
         act |= MM_MODEM_ACCESS_TECHNOLOGY_1XRTT | MM_MODEM_ACCESS_TECHNOLOGY_EVDO0;
 
     return act;
