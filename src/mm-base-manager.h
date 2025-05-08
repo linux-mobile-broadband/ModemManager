@@ -25,6 +25,7 @@
 
 #include "mm-filter.h"
 #include "mm-gdbus-manager.h"
+#include "mm-sleep-context.h"
 
 #define MM_TYPE_BASE_MANAGER            (mm_base_manager_get_type ())
 #define MM_BASE_MANAGER(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_BASE_MANAGER, MMBaseManager))
@@ -71,10 +72,11 @@ MMBaseManager   *mm_base_manager_new         (GDBusConnection  *bus,
 void             mm_base_manager_start       (MMBaseManager *manager,
                                               gboolean manual_scan);
 
-void             mm_base_manager_shutdown    (MMBaseManager *manager,
-                                              gboolean       disable,
-                                              gboolean       power_low,
-                                              gboolean       remove);
+void             mm_base_manager_shutdown    (MMBaseManager  *manager,
+                                              gboolean        disable,
+                                              gboolean        power_low,
+                                              gboolean        remove,
+                                              MMSleepContext *ctx);
 
 #if defined WITH_SUSPEND_RESUME
 void             mm_base_manager_sync        (MMBaseManager *manager);

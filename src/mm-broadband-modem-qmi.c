@@ -13994,17 +13994,6 @@ static void
 dispose (GObject *object)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (object);
-    MMPortQmi *qmi;
-
-    /* If any port cleanup is needed, it must be done during dispose(), as
-     * the modem object will be affected by an explicit g_object_run_dispose()
-     * that will remove all port references right away */
-    qmi = mm_broadband_modem_qmi_peek_port_qmi (self);
-    if (qmi) {
-        /* If we did open the QMI port during initialization, close it now */
-        if (mm_port_qmi_is_open (qmi))
-            mm_port_qmi_close (qmi, NULL, NULL);
-    }
 
     g_list_free_full (self->priv->firmware_list, g_object_unref);
     self->priv->firmware_list = NULL;

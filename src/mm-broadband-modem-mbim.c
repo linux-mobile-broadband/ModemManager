@@ -10416,10 +10416,6 @@ dispose (GObject *object)
         /* Explicitly remove notification handler */
         self->priv->setup_flags = PROCESS_NOTIFICATION_FLAG_NONE;
         common_setup_cleanup_unsolicited_events_sync (self, mbim, FALSE);
-
-        /* If we did open the MBIM port during initialization, close it now */
-        if (mm_port_mbim_is_open (mbim))
-            mm_port_mbim_close (mbim, NULL, NULL);
     }
 
     g_clear_object (&self->priv->unlock_retries);

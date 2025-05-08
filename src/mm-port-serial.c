@@ -1482,8 +1482,6 @@ port_serial_close_force (MMPortSerial *self)
     if (self->priv->forced_close)
         return;
 
-    mm_obj_dbg (self, "forced to close port");
-
     /* Mark as having forced the close, so that we don't warn about incorrect
      * open counts */
     self->priv->forced_close = TRUE;
@@ -1493,6 +1491,8 @@ port_serial_close_force (MMPortSerial *self)
 
     /* If already closed, done */
     if (self->priv->open_count > 0) {
+        mm_obj_dbg (self, "forced to close port");
+
         _close_internal (self, TRUE);
 
         /* Notify about the forced close status */
