@@ -2303,6 +2303,11 @@ cleanup_modem_port (MMBaseModem     *self,
     if (ctx)
         teardown_context_ref (ctx);
 
+    /* No need to close serial ports here as they do not require a specific
+     * shutdown procedure with message exchanges and callbacks. They will be
+     * closed when the modem is invalidated or disposed.
+     */
+
 #if defined WITH_MBIM
     /* We need to close the MBIM port cleanly when disposing the modem object */
     if (MM_IS_PORT_MBIM (port)) {
