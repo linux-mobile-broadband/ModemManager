@@ -310,4 +310,11 @@ gboolean mm_base_modem_sync_finish       (MMBaseModem              *self,
                                           GError                  **error);
 #endif
 
+void     mm_base_modem_teardown_ports        (MMBaseModem         *self,
+                                              GAsyncReadyCallback  callback,
+                                              gpointer             user_data);
+gboolean mm_base_modem_teardown_ports_finish (MMBaseModem          *self,
+                                              GAsyncResult         *res,
+                                              GError              **error);
+
 #endif /* MM_BASE_MODEM_H */

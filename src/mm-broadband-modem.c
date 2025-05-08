@@ -324,24 +324,31 @@ ports_context_ref (PortsContext *ctx)
 }
 
 static void
+ports_context_dispose (PortsContext *ctx)
+{
+    if (ctx->primary && ctx->primary_open) {
+        mm_port_serial_close (MM_PORT_SERIAL (ctx->primary));
+        ctx->primary_open = FALSE;
+    }
+    if (ctx->secondary && ctx->secondary_open) {
+        mm_port_serial_close (MM_PORT_SERIAL (ctx->secondary));
+        ctx->secondary_open = FALSE;
+    }
+    if (ctx->qcdm && ctx->qcdm_open) {
+        mm_port_serial_close (MM_PORT_SERIAL (ctx->qcdm));
+        ctx->qcdm_open = FALSE;
+    }
+}
+
+static void
 ports_context_unref (PortsContext *ctx)
 {
     if (g_atomic_int_dec_and_test (&ctx->ref_count)) {
-        if (ctx->primary) {
-            if (ctx->primary_open)
-                mm_port_serial_close (MM_PORT_SERIAL (ctx->primary));
-            g_object_unref (ctx->primary);
-        }
-        if (ctx->secondary) {
-            if (ctx->secondary_open)
-                mm_port_serial_close (MM_PORT_SERIAL (ctx->secondary));
-            g_object_unref (ctx->secondary);
-        }
-        if (ctx->qcdm) {
-            if (ctx->qcdm_open)
-                mm_port_serial_close (MM_PORT_SERIAL (ctx->qcdm));
-            g_object_unref (ctx->qcdm);
-        }
+        ports_context_dispose (ctx);
+        g_clear_object (&ctx->primary);
+        g_clear_object (&ctx->secondary);
+        g_clear_object (&ctx->qcdm);
+
         g_free (ctx);
     }
 }
@@ -14279,6 +14286,13 @@ dispose (GObject *object)
     g_clear_object (&self->priv->modem_voice_call_list);
     g_clear_object (&self->priv->modem_simple_status);
     g_clear_object (&self->priv->modem_cell_broadcast_cbm_list);
+
+    if (self->priv->enabled_ports_ctx)
+        ports_context_dispose (self->priv->enabled_ports_ctx);
+    if (self->priv->sim_hot_swap_ports_ctx)
+        ports_context_dispose (self->priv->sim_hot_swap_ports_ctx);
+    if (self->priv->in_call_ports_ctx)
+        ports_context_dispose (self->priv->in_call_ports_ctx);
 
     G_OBJECT_CLASS (mm_broadband_modem_parent_class)->dispose (object);
 }
