@@ -1121,8 +1121,10 @@ response_processor_cops_ignore_at_errors (MMBaseModem   *self,
     vid = mm_base_modem_get_vendor_id (self);
     pid = mm_base_modem_get_product_id (self);
 
-    if (!(vid == 0x1bc7 && (pid == 0x110a || pid == 0x110b))) {
-        /* AcT for non-LPWA modems would be checked by other command */
+    if (!(vid == 0x1bc7 && (pid == 0x110a || pid == 0x110b ||
+                            pid == 0x7020 || pid == 0x7021))) {
+        /* LE910Q1/ELS63-I do not support #PSNT or +SERVICE
+         * AcT for non-LPWA modems would be checked by other command */
         return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
     }
 
@@ -1170,6 +1172,9 @@ response_processor_cops_ignore_at_errors (MMBaseModem   *self,
     switch (actval) {
     case 0:
         *result = g_variant_new_uint32 (MM_MODEM_ACCESS_TECHNOLOGY_GSM);
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
+    case 7:
+        *result = g_variant_new_uint32 (MM_MODEM_ACCESS_TECHNOLOGY_LTE);
         return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
     case 8:
         *result = g_variant_new_uint32 (MM_MODEM_ACCESS_TECHNOLOGY_LTE_CAT_M);
