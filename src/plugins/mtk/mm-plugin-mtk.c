@@ -46,9 +46,9 @@ create_modem (MMPlugin *self,
 {
 #if defined WITH_MBIM
     if (mm_port_probe_list_has_mbim_port (probes)) {
-        /* FM350 support with Fibocom-specific changes */
+        /* Support with MTK-based modem changes */
         if (vendor == 0x14c3 && product == 0x4d75) {
-            mm_obj_dbg (self, "MBIM-powered MTK-based Fibocom modem found...");
+            mm_obj_dbg (self, "MBIM-powered MTK-based modem found...");
             return MM_BASE_MODEM (mm_broadband_modem_mbim_mtk_fibocom_new (uid,
                                                                            physdev,
                                                                            drivers,

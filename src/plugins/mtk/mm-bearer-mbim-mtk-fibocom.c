@@ -133,7 +133,7 @@ reload_stats (MMBaseBearer        *_self,
      * periodically polling for TX/RX stats, as they are not supported in the
      * FM350. */
     g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                             "TX/RX stats loading unsupported in FM350");
+                             "TX/RX stats loading unsupported in modem");
     g_object_unref (task);
 }
 
