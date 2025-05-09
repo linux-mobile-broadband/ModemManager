@@ -148,6 +148,18 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="7011", ENV{.MM_USBIFNUM}=="02", ENV{
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="7011", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="7011", ENV{.MM_USBIFNUM}=="04", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
 
+# LE910Q1/ELS63 (RNDIS)
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="7020", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+# The following port is ignored since it's a diagnostic port for collecting proprietary modem traces (not QCDM)
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="7020", ENV{.MM_USBIFNUM}=="04", SUBSYSTEM=="tty", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="7020", ENV{.MM_USBIFNUM}=="06", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+
+# LE910Q1/ELS63 (ECM)
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="7021", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+# The following port is ignored since it's a diagnostic port for collecting proprietary modem traces (not QCDM)
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="7021", ENV{.MM_USBIFNUM}=="04", SUBSYSTEM=="tty", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="7021", ENV{.MM_USBIFNUM}=="06", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+
 # LM940/960 initial port delay
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{ID_MM_TTY_AT_PROBE_TRIES}="14"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1041", ENV{ID_MM_TTY_AT_PROBE_TRIES}="14"
