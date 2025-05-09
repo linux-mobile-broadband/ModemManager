@@ -14,6 +14,7 @@
  * Copyright (C) 2009 - 2012 Red Hat, Inc.
  * Copyright (C) 2012 Google, Inc.
  * Copyright (c) 2021 Qualcomm Innovation Center, Inc.
+ * Copyright (C) 2024 JUCR GmbH
  */
 
 #include <config.h>
@@ -2339,13 +2340,89 @@ mm_3gpp_parse_crsm_response (const gchar *reply,
 /*************************************************************************/
 /* CGCONTRDP=N response parser */
 
+static gchar *
+dots_to_v6_address (const gchar   *str,
+                    gsize          len,
+                    GError      **error)
+{
+    g_autoptr(GRegex)       r = NULL;
+    g_autoptr(GMatchInfo)   match_info = NULL;
+    guint                   i;
+    g_autoptr(GString)      addr = NULL;
+    g_autoptr(GInetAddress) normalized = NULL;
+
+    r = g_regex_new ("(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    if (!g_regex_match_full (r, str, len, 0, 0, &match_info, error))
+        return NULL;
+
+    /* Remember that g_match_info_get_match_count() includes match #0 */
+    if (g_match_info_get_match_count (match_info) < 17) {
+        g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                             "Failed to match IPv6 address");
+        return NULL;
+    }
+
+    addr = g_string_sized_new (40);
+
+    for (i = 1; i <= 16; i += 2) {
+        guint num1 = 0, num2 = 0;
+
+        if (!mm_get_uint_from_match_info (match_info, i, &num1) ||
+            !mm_get_uint_from_match_info (match_info, i + 1, &num2)) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                         "Failed to parse uint from IPv6 regex match %d or %d",
+                         i,
+                         i + 1);
+            return NULL;
+        }
+        g_string_append_printf (addr, "%s%02x%02x", i > 1 ? ":" : "", num1, num2);
+    }
+
+    normalized = g_inet_address_new_from_string (addr->str);
+    if (!normalized) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Failed to parse IP address '%s'",
+                     addr->str);
+        return NULL;
+    }
+
+    return g_inet_address_to_string (normalized);
+}
+
+static guint
+count_separators (const gchar  *str,
+                  const gchar   separator,
+                  const gchar **middle)
+{
+    const gchar *found;
+    guint        count = 0;
+
+    found = str;
+    while ((found = strchr (found, separator))) {
+        count++;
+        if (count == 4) { /* middle of v4 address+mask */
+            if (middle)
+                *middle = found;
+        } else if (count == 16) /* middle of v6 address+mask */
+            if (middle)
+                *middle = found;
+        found++;
+    }
+
+    return count;
+}
+
 static gboolean
 split_local_address_and_subnet (const gchar  *str,
                                 gchar       **local_address,
-                                gchar       **subnet)
+                                gchar       **subnet,
+                                gboolean     *is_ipv6,
+                                GError      **error)
 {
-    const gchar *separator;
-    guint count = 0;
+    const gchar *middle = NULL;
+    guint        num_dots = 0;
 
     /* E.g. split: "2.43.2.44.255.255.255.255"
      * into:
@@ -2355,35 +2432,93 @@ split_local_address_and_subnet (const gchar  *str,
     g_assert (str);
     g_assert (local_address);
     g_assert (subnet);
+    g_assert (is_ipv6);
 
-    separator = str;
-    while (1) {
-        separator = strchr (separator, '.');
-        if (separator) {
-            count++;
-            if (count == 4) {
-                if (local_address)
-                    *local_address = g_strndup (str, (separator - str));
-                if (subnet)
-                    *subnet = g_strdup (++separator);
+    /* Count number of dots to determine IPv4 or IPv6. Cases are:
+     * 0: might be IPv6 address formatted with AT+CGPIAF
+     * 3: IPv4 address
+     * 7: IPv4 address and subnet mask
+     * 15: IPv6 address
+     * 31: IPv6 address and mask/prefix
+     */
+    num_dots = count_separators (str, '.', &middle);
+    if (num_dots == 0) {
+        if (strchr (str, ':')) {
+            g_autoptr(GInetAddress) a = NULL;
+
+            /* May already be v6-formatted due to AT+CGPIAF */
+            if ((a = g_inet_address_new_from_string (str))) {
+                *local_address = g_inet_address_to_string (a);
+                *is_ipv6 = TRUE;
                 return TRUE;
             }
-            separator++;
-            continue;
         }
-
-        /* Not even the full IP? report error parsing */
-        if (count < 3)
-            return FALSE;
-
-        if (count == 3) {
-            if (local_address)
-                *local_address = g_strdup (str);
-            if (subnet)
-                *subnet = NULL;
-            return TRUE;
-        }
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Error parsing IP address '%s'", str);
+        return FALSE;
     }
+
+    switch (num_dots) {
+    case 3:
+        *local_address = g_strdup (str);
+        *subnet = NULL;
+        return TRUE;
+    case 7:
+        *local_address = g_strndup (str, (middle - str));
+        *subnet = g_strdup (++middle);
+        return TRUE;
+    case 15:
+        *local_address = dots_to_v6_address (str, -1, error);
+        *subnet = NULL;
+        *is_ipv6 = TRUE;
+        return (!!*local_address);
+    case 31:
+        *local_address = dots_to_v6_address (str, (middle - str), error);
+        if (!*local_address)
+            return FALSE;
+        *subnet = dots_to_v6_address (++middle, -1, error);
+        *is_ipv6 = TRUE;
+        return (!!*subnet);
+    default:
+        break;
+    }
+
+    g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                 "Error parsing IP address '%s'", str);
+    return FALSE;
+}
+
+static gboolean
+get_normalized_address_from_match_info (GMatchInfo   *match_info,
+                                        guint         field_index,
+                                        gchar       **out_address,
+                                        GError      **error)
+{
+    g_autoptr(GInetAddress)  a = NULL;
+    g_autofree gchar        *address = NULL;
+
+    g_assert (out_address && !*out_address);
+
+    /* Missing match is not fatal */
+    address = mm_get_string_unquoted_from_match_info (match_info, field_index);
+    if (!address)
+        return TRUE;
+
+    if (count_separators (address, '.', NULL) == 15) {
+        *out_address = dots_to_v6_address (address, -1, error);
+        return TRUE;
+    }
+
+    a = g_inet_address_new_from_string (address);
+    if (!a) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Error normalizing IP address '%s'",
+                     address);
+        return FALSE;
+    }
+
+    *out_address = g_inet_address_to_string (a);
+    return TRUE;
 }
 
 gboolean
@@ -2411,6 +2546,7 @@ mm_3gpp_parse_cgcontrdp_response (const gchar  *response,
     g_autofree gchar      *dns_primary_address = NULL;
     g_autofree gchar      *dns_secondary_address = NULL;
     guint                  field_format_extra_index = 0;
+    gboolean               is_ipv6 = FALSE;
 
     /* Response may be e.g.:
      * +CGCONTRDP: 4,5,"ibox.tim.it.mnc001.mcc222.gprs","2.197.17.49.255.255.255.255","2.197.17.49","10.207.43.46","10.206.56.132","0.0.0.0","0.0.0.0",0
@@ -2467,20 +2603,35 @@ mm_3gpp_parse_cgcontrdp_response (const gchar  *response,
      * the subnet in its own comma-separated field. Try to detect that.
      */
     local_address_and_subnet = mm_get_string_unquoted_from_match_info (match_info, 4);
-    if (local_address_and_subnet && !split_local_address_and_subnet (local_address_and_subnet, &local_address, &subnet)) {
-        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing local address and subnet");
+    if (local_address_and_subnet && !split_local_address_and_subnet (local_address_and_subnet, &local_address, &subnet, &is_ipv6, error))
         return FALSE;
-    }
 
-    /* If we don't have a subnet in field 4, we're using the old format with subnet in an extra field */
-    if (!subnet) {
+    /* If we have a field 4 but it doesn't contain a subnet, we're using the old
+     * format with subnet in an extra field. Except for IPv6, which has no subnets.
+     */
+    if (local_address_and_subnet && !subnet && !is_ipv6) {
         subnet = mm_get_string_unquoted_from_match_info (match_info, 5);
         field_format_extra_index = 1;
     }
 
-    gateway_address = mm_get_string_unquoted_from_match_info (match_info, 5 + field_format_extra_index);
-    dns_primary_address = mm_get_string_unquoted_from_match_info (match_info, 6 + field_format_extra_index);
-    dns_secondary_address = mm_get_string_unquoted_from_match_info (match_info, 7 + field_format_extra_index);
+    if (!get_normalized_address_from_match_info (match_info,
+                                                 5 + field_format_extra_index,
+                                                 &gateway_address,
+                                                 error)) {
+        return FALSE;
+    }
+    if (!get_normalized_address_from_match_info (match_info,
+                                                 6 + field_format_extra_index,
+                                                 &dns_primary_address,
+                                                 error)) {
+        return FALSE;
+    }
+    if (!get_normalized_address_from_match_info (match_info,
+                                                 7 + field_format_extra_index,
+                                                 &dns_secondary_address,
+                                                 error)) {
+        return FALSE;
+    }
 
     if (out_cid)
         *out_cid = cid;
