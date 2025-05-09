@@ -2261,6 +2261,47 @@ test_cind_response_moto_v3m (void *f, gpointer d)
 }
 
 /*****************************************************************************/
+/* Test CGEREP test responses */
+
+static void
+test_cgerep_response (const gchar      *str,
+                      MM3gppCgerepMode  expected_modes)
+{
+    gboolean          ret;
+    MM3gppCgerepMode  modes = MM_3GPP_CGEREP_MODE_NONE;
+    GError           *error = NULL;
+
+    ret = mm_3gpp_parse_cgerep_test_response (str, NULL, &modes, &error);
+    g_assert_no_error (error);
+    g_assert (ret);
+
+    g_assert_cmpuint (modes, ==, expected_modes);
+}
+
+static void
+test_cgerep_response_telit_le910q1 (void)
+{
+    static const gchar *str = "+CGEREP: (0,1),(0)";
+    static const MM3gppCgerepMode expected_modes = ( \
+        MM_3GPP_CGEREP_MODE_DISCARD_URCS |           \
+        MM_3GPP_CGEREP_MODE_DISCARD_URCS_IF_LINK_RESERVED);
+
+    test_cgerep_response (str, expected_modes);
+}
+
+static void
+test_cgerep_response_telit_ln920 (void)
+{
+    static const gchar *str = "+CGEREP: (0-2),(0,1)";
+    static const MM3gppCgerepMode expected_modes = (        \
+        MM_3GPP_CGEREP_MODE_DISCARD_URCS |                  \
+        MM_3GPP_CGEREP_MODE_DISCARD_URCS_IF_LINK_RESERVED | \
+        MM_3GPP_CGEREP_MODE_BUFFER_URCS_IF_LINK_RESERVED);
+
+    test_cgerep_response (str, expected_modes);
+}
+
+/*****************************************************************************/
 /* Test +CGEV indication parsing */
 
 typedef struct {
@@ -5193,6 +5234,9 @@ int main (int argc, char **argv)
 
     g_test_suite_add (suite, TESTCASE (test_cind_response_linktop_lw273, NULL));
     g_test_suite_add (suite, TESTCASE (test_cind_response_moto_v3m, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_cgerep_response_telit_le910q1, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cgerep_response_telit_ln920, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cgev_indication, NULL));
 

@@ -301,6 +301,19 @@ gint         mm_3gpp_cind_response_get_max       (MM3gppCindResponse *r);
 GByteArray *mm_3gpp_parse_cind_read_response (const gchar *reply,
                                               GError **error);
 
+/* AT+CGEREP=? (Packet Domain Event Reporting) response parser */
+typedef enum {  /*< underscore_name=mm_3gpp_cgerep_mode >*/
+    MM_3GPP_CGEREP_MODE_NONE                          = 0,
+    MM_3GPP_CGEREP_MODE_DISCARD_URCS                  = 1 << 0,
+    MM_3GPP_CGEREP_MODE_DISCARD_URCS_IF_LINK_RESERVED = 1 << 1,
+    MM_3GPP_CGEREP_MODE_BUFFER_URCS_IF_LINK_RESERVED  = 1 << 2,
+} MM3gppCgerepMode;
+gchar    *mm_3gpp_build_cgerep_set_request   (MM3gppCgerepMode   mode);
+gboolean  mm_3gpp_parse_cgerep_test_response (const gchar       *reply,
+                                              gpointer           log_object,
+                                              MM3gppCgerepMode  *supported_modes,
+                                              GError           **error);
+
 /* +CGEV indication parser */
 typedef enum {
     MM_3GPP_CGEV_UNKNOWN,

@@ -202,6 +202,8 @@ struct _MMBroadbandModemPrivate {
     MM3gppCmerMode modem_cmer_disable_mode;
     MM3gppCmerInd modem_cmer_ind;
     gboolean modem_cgerep_support_checked;
+    MM3gppCgerepMode modem_cgerep_enable_mode;
+    MM3gppCgerepMode modem_cgerep_disable_mode;
     gboolean modem_cgerep_supported;
     MMFlowControl flow_control;
 
@@ -3727,19 +3729,32 @@ cgerep_format_check_ready (MMBroadbandModem *self,
                            GAsyncResult     *res,
                            GTask            *task)
 {
-    GError *error = NULL;
-    const gchar *result;
+    MM3gppCgerepMode  supported_modes = MM_3GPP_CGEREP_MODE_NONE;
+    GError           *error = NULL;
+    const gchar      *result;
+    gchar            *aux;
 
     result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (!result) {
+    if (error || !mm_3gpp_parse_cgerep_test_response (result, self, &supported_modes, &error)) {
         mm_obj_dbg (self, "+CGEREP check failed: %s", error->message);
         mm_obj_dbg (self, "packet domain event reporting is unsupported");
         g_error_free (error);
         goto out;
     }
 
-    mm_obj_dbg (self, "packet domain event reporting is supported");
+    aux = mm_3gpp_cgerep_mode_build_string_from_mask (supported_modes);
+    mm_obj_dbg (self, "supported +CGEREP modes: %s", aux);
+    g_free (aux);
+
     self->priv->modem_cgerep_supported = TRUE;
+
+    if (supported_modes & MM_3GPP_CGEREP_MODE_BUFFER_URCS_IF_LINK_RESERVED)
+        self->priv->modem_cgerep_enable_mode = MM_3GPP_CGEREP_MODE_BUFFER_URCS_IF_LINK_RESERVED;
+    else if (supported_modes & MM_3GPP_CGEREP_MODE_DISCARD_URCS_IF_LINK_RESERVED)
+        self->priv->modem_cgerep_enable_mode = MM_3GPP_CGEREP_MODE_DISCARD_URCS_IF_LINK_RESERVED;
+
+    if (supported_modes & MM_3GPP_CGEREP_MODE_DISCARD_URCS)
+        self->priv->modem_cgerep_disable_mode = MM_3GPP_CGEREP_MODE_DISCARD_URCS;
 
 out:
     /* go on with remaining checks */
@@ -4081,7 +4096,7 @@ modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *_self,
         ctx->cmer_command = mm_3gpp_build_cmer_set_request (self->priv->modem_cmer_enable_mode, self->priv->modem_cmer_ind);
 
     if (self->priv->modem_cgerep_support_checked && self->priv->modem_cgerep_supported)
-        ctx->cgerep_command = g_strdup ("+CGEREP=2");
+        ctx->cgerep_command = mm_3gpp_build_cgerep_set_request (self->priv->modem_cgerep_enable_mode);
 
     run_unsolicited_events_setup (task);
 }
@@ -4106,7 +4121,7 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *_self,
         ctx->cmer_command = mm_3gpp_build_cmer_set_request (self->priv->modem_cmer_disable_mode, MM_3GPP_CMER_IND_NONE);
 
     if (self->priv->modem_cgerep_support_checked && self->priv->modem_cgerep_supported)
-        ctx->cgerep_command = g_strdup ("+CGEREP=0");
+        ctx->cgerep_command = mm_3gpp_build_cgerep_set_request (self->priv->modem_cgerep_disable_mode);
 
     run_unsolicited_events_setup (task);
 }
@@ -14215,6 +14230,8 @@ mm_broadband_modem_init (MMBroadbandModem *self)
     self->priv->modem_cmer_enable_mode = MM_3GPP_CMER_MODE_NONE;
     self->priv->modem_cmer_disable_mode = MM_3GPP_CMER_MODE_NONE;
     self->priv->modem_cmer_ind = MM_3GPP_CMER_IND_NONE;
+    self->priv->modem_cgerep_enable_mode = MM_3GPP_CGEREP_MODE_NONE;
+    self->priv->modem_cgerep_disable_mode = MM_3GPP_CGEREP_MODE_NONE;
     self->priv->flow_control = MM_FLOW_CONTROL_NONE;
     self->priv->initial_eps_bearer_cid = -1;
 }
