@@ -25,26 +25,24 @@
 #include <libmm-glib.h>
 
 #include "mm-base-cbm.h"
-#include "mm-broadband-modem.h"
-#include "mm-iface-modem.h"
-#include "mm-iface-modem-cell-broadcast.h"
 #include "mm-cbm-part.h"
-#include "mm-base-modem-at.h"
-#include "mm-base-modem.h"
 #include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-error-helpers.h"
+#include "mm-bind.h"
 
 static void log_object_iface_init (MMLogObjectInterface *iface);
+static void bind_iface_init (MMBindInterface *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBaseCbm, mm_base_cbm, MM_GDBUS_TYPE_CBM_SKELETON, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_BIND, bind_iface_init))
 
 enum {
     PROP_0,
     PROP_PATH,
     PROP_CONNECTION,
-    PROP_MODEM,
+    PROP_BIND_TO,
     PROP_MAX_PARTS,
     PROP_SERIAL,
     PROP_LAST
@@ -57,8 +55,9 @@ struct _MMBaseCbmPrivate {
     GDBusConnection *connection;
     guint            dbus_id;
 
-    /* The modem which owns this CBM */
-    MMBaseModem *modem;
+    /* The object this CBM is bound to */
+    GObject *bind_to;
+
     /* The path where the CBM object is exported */
     gchar *path;
 
@@ -323,15 +322,15 @@ mm_base_cbm_take_part (MMBaseCbm *self,
 }
 
 MMBaseCbm *
-mm_base_cbm_new (MMBaseModem *modem)
+mm_base_cbm_new (GObject *bind_to)
 {
     return MM_BASE_CBM (g_object_new (MM_TYPE_BASE_CBM,
-                                      MM_BASE_CBM_MODEM, modem,
+                                      MM_BIND_TO, bind_to,
                                       NULL));
 }
 
 MMBaseCbm *
-mm_base_cbm_new_with_part (MMBaseModem *modem,
+mm_base_cbm_new_with_part (GObject *bind_to,
                            MMCbmState state,
                            guint max_parts,
                            MMCbmPart *first_part,
@@ -339,13 +338,11 @@ mm_base_cbm_new_with_part (MMBaseModem *modem,
 {
     MMBaseCbm *self;
 
-    g_assert (MM_IS_IFACE_MODEM_CELL_BROADCAST (modem));
-
     if (state == MM_CBM_STATE_RECEIVED)
         state = MM_CBM_STATE_RECEIVING;
 
     /* Create a CBM object as defined by the interface */
-    self = mm_iface_modem_cell_broadcast_create_cbm (MM_IFACE_MODEM_CELL_BROADCAST (modem));
+    self = mm_base_cbm_new (bind_to);
     g_object_set (self,
                   MM_BASE_CBM_MAX_PARTS,           max_parts,
                   "state",                         state,
@@ -405,18 +402,10 @@ set_property (GObject *object,
         else if (self->priv->path)
             cbm_dbus_export (self);
         break;
-    case PROP_MODEM:
-        g_clear_object (&self->priv->modem);
-        self->priv->modem = g_value_dup_object (value);
-        if (self->priv->modem) {
-            /* Set owner ID */
-            mm_log_object_set_owner_id (MM_LOG_OBJECT (self), mm_log_object_get_id (MM_LOG_OBJECT (self->priv->modem)));
-            /* Bind the modem's connection (which is set when it is exported,
-             * and unset when unexported) to the CBM's connection */
-            g_object_bind_property (self->priv->modem, MM_BASE_MODEM_CONNECTION,
-                                    self, MM_BASE_CBM_CONNECTION,
-                                    G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
-        }
+    case PROP_BIND_TO:
+        g_clear_object (&self->priv->bind_to);
+        self->priv->bind_to = g_value_dup_object (value);
+        mm_bind_to (MM_BIND (self), MM_BASE_CBM_CONNECTION, self->priv->bind_to);
         break;
     case PROP_MAX_PARTS:
         self->priv->max_parts = g_value_get_uint (value);
@@ -445,8 +434,8 @@ get_property (GObject *object,
     case PROP_CONNECTION:
         g_value_set_object (value, self->priv->connection);
         break;
-    case PROP_MODEM:
-        g_value_set_object (value, self->priv->modem);
+    case PROP_BIND_TO:
+        g_value_set_object (value, self->priv->bind_to);
         break;
     case PROP_MAX_PARTS:
         g_value_set_uint (value, self->priv->max_parts);
@@ -496,7 +485,7 @@ dispose (GObject *object)
         g_clear_object (&self->priv->connection);
     }
 
-    g_clear_object (&self->priv->modem);
+    g_clear_object (&self->priv->bind_to);
 
     G_OBJECT_CLASS (mm_base_cbm_parent_class)->dispose (object);
 }
@@ -505,6 +494,11 @@ static void
 log_object_iface_init (MMLogObjectInterface *iface)
 {
     iface->build_id = log_object_build_id;
+}
+
+static void
+bind_iface_init (MMBindInterface *iface)
+{
 }
 
 static void
@@ -534,12 +528,7 @@ mm_base_cbm_class_init (MMBaseCbmClass *klass)
                              NULL,
                              G_PARAM_READWRITE);
 
-    properties[PROP_MODEM] =
-        g_param_spec_object (MM_BASE_CBM_MODEM,
-                             "Modem",
-                             "The Modem which owns this CBM",
-                             MM_TYPE_BASE_MODEM,
-                             G_PARAM_READWRITE);
+    g_object_class_override_property (object_class, PROP_BIND_TO, MM_BIND_TO);
 
     properties[PROP_MAX_PARTS] =
         g_param_spec_uint (MM_BASE_CBM_MAX_PARTS,

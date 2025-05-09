@@ -25,6 +25,7 @@
 #include <libmm-glib.h>
 
 #include "mm-sim-option.h"
+#include "mm-bind.h"
 
 G_DEFINE_TYPE (MMSimOption, mm_sim_option, MM_TYPE_BASE_SIM)
 
@@ -62,6 +63,7 @@ mm_sim_option_new (MMBaseModem         *modem,
                                 callback,
                                 user_data,
                                 MM_BASE_SIM_MODEM, modem,
+                                MM_BIND_TO, G_OBJECT (modem),
                                 "active", TRUE, /* by default always active */
                                 NULL);
 }

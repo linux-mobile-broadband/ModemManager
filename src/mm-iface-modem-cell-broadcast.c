@@ -79,13 +79,14 @@ set_channels_ready (MMIfaceModemCellBroadcast             *self,
 }
 
 static void
-handle_set_channels_auth_ready (MMBaseModem                           *self,
+handle_set_channels_auth_ready (MMIfaceAuth                           *_self,
                                 GAsyncResult                          *res,
                                 HandleSetChannelsCellBroadcastContext *ctx)
 {
+    MMIfaceModemCellBroadcast *self = MM_IFACE_MODEM_CELL_BROADCAST (_self);
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_channels_context_free (ctx);
         return;
@@ -128,7 +129,8 @@ handle_set_channels (MmGdbusModemCellBroadcast *skeleton,
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
     ctx->channels = mm_common_cell_broadcast_channels_variant_to_garray (channels);
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_set_channels_auth_ready,
@@ -173,14 +175,15 @@ handle_delete_ready (MMCbmList           *list,
 }
 
 static void
-handle_delete_auth_ready (MMBaseModem         *self,
+handle_delete_auth_ready (MMIfaceAuth         *_self,
                           GAsyncResult        *res,
                           HandleDeleteContext *ctx)
 {
+    MMIfaceModemCellBroadcast *self = MM_IFACE_MODEM_CELL_BROADCAST (_self);
     g_autoptr(MMCbmList)  list = NULL;
     GError               *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_delete_context_free (ctx);
         return;
@@ -229,7 +232,7 @@ handle_delete (MmGdbusModemCellBroadcast *skeleton,
     ctx->self = g_object_ref (self);
     ctx->path = g_strdup (path);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_CELL_BROADCAST,
                              (GAsyncReadyCallback)handle_delete_auth_ready,
@@ -268,16 +271,6 @@ handle_list (MmGdbusModemCellBroadcast *skeleton,
                                                  (const gchar *const *)paths);
     mm_obj_info (self, "reported %u CBM messages available", paths ? g_strv_length (paths) : 0);
     return TRUE;
-}
-
-/*****************************************************************************/
-
-MMBaseCbm *
-mm_iface_modem_cell_broadcast_create_cbm (MMIfaceModemCellBroadcast *self)
-{
-    g_assert (MM_IFACE_MODEM_CELL_BROADCAST_GET_IFACE (self)->create_cbm != NULL);
-
-    return MM_IFACE_MODEM_CELL_BROADCAST_GET_IFACE (self)->create_cbm (self);
 }
 
 /*****************************************************************************/
@@ -637,7 +630,7 @@ interface_enabling_step (GTask *task)
     case ENABLING_STEP_FIRST: {
         g_autoptr (MMCbmList) list = NULL;
 
-        list = mm_cbm_list_new (MM_BASE_MODEM (self));
+        list = mm_cbm_list_new (MM_BASE_MODEM (self), G_OBJECT (self));
         g_object_set (self,
                       MM_IFACE_MODEM_CELL_BROADCAST_CBM_LIST, list,
                       NULL);
@@ -739,22 +732,22 @@ mm_iface_modem_cell_broadcast_enable (MMIfaceModemCellBroadcast *self,
 /*****************************************************************************/
 
 gboolean
-mm_iface_modem_cell_broadcast_take_part (MMIfaceModemCellBroadcast *self,
-                                         MMCbmPart                 *cbm_part,
-                                         MMCbmState                 state)
+mm_iface_modem_cell_broadcast_take_part (MMIfaceModemCellBroadcast  *self,
+                                         GObject                    *bind_to,
+                                         MMCbmPart                  *cbm_part,
+                                         MMCbmState                  state,
+                                         GError                    **error)
 {
     g_autoptr(MMCbmList) list = NULL;
-    g_autoptr(GError)    error = NULL;
     gboolean             added = FALSE;
 
     g_object_get (self,
                   MM_IFACE_MODEM_CELL_BROADCAST_CBM_LIST, &list,
                   NULL);
-
     if (list) {
-        added = mm_cbm_list_take_part (list, cbm_part, state, &error);
+        added = mm_cbm_list_take_part (list, bind_to, cbm_part, state, error);
         if (!added)
-            mm_obj_dbg (self, "Can't take part in CBM list: %s", error->message);
+            g_prefix_error (error, "couldn't take part in CBM list: ");
     }
 
     /* If part wasn't taken, we need to free the part ourselves */

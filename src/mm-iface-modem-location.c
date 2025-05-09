@@ -924,10 +924,11 @@ setup_gathering_ready (MMIfaceModemLocation *self,
 }
 
 static void
-handle_setup_auth_ready (MMBaseModem        *self,
+handle_setup_auth_ready (MMIfaceAuth        *_self,
                          GAsyncResult       *res,
                          HandleSetupContext *ctx)
 {
+    MMIfaceModemLocation  *self = MM_IFACE_MODEM_LOCATION (_self);
     GError                *error = NULL;
     MMModemState           modem_state;
     MMModemLocationSource  not_supported;
@@ -935,7 +936,7 @@ handle_setup_auth_ready (MMBaseModem        *self,
     LocationContext       *location_ctx;
     g_autofree gchar      *str = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_setup_context_free (ctx);
         return;
@@ -1018,7 +1019,7 @@ handle_setup (MmGdbusModemLocation  *skeleton,
     ctx->sources = sources;
     ctx->signal_location = signal_location;
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_setup_auth_ready,
@@ -1063,13 +1064,14 @@ set_supl_server_ready (MMIfaceModemLocation       *self,
 }
 
 static void
-handle_set_supl_server_auth_ready (MMBaseModem                *self,
+handle_set_supl_server_auth_ready (MMIfaceAuth                *_self,
                                    GAsyncResult               *res,
                                    HandleSetSuplServerContext *ctx)
 {
+    MMIfaceModemLocation *self = MM_IFACE_MODEM_LOCATION (_self);
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_supl_server_context_free (ctx);
         return;
@@ -1122,7 +1124,7 @@ handle_set_supl_server (MmGdbusModemLocation  *skeleton,
     ctx->self = g_object_ref (self);
     ctx->supl = g_strdup (supl);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_set_supl_server_auth_ready,
@@ -1164,15 +1166,16 @@ inject_assistance_data_ready (MMIfaceModemLocation              *self,
 }
 
 static void
-handle_inject_assistance_data_auth_ready (MMBaseModem                       *self,
+handle_inject_assistance_data_auth_ready (MMIfaceAuth                       *_self,
                                           GAsyncResult                      *res,
                                           HandleInjectAssistanceDataContext *ctx)
 {
+    MMIfaceModemLocation *self = MM_IFACE_MODEM_LOCATION (_self);
     GError       *error = NULL;
     const guint8 *data;
     gsize         data_size;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_inject_assistance_data_context_free (ctx);
         return;
@@ -1221,7 +1224,7 @@ handle_inject_assistance_data (MmGdbusModemLocation  *skeleton,
     ctx->self       = g_object_ref (self);
     ctx->datav      = g_variant_ref (datav);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_inject_assistance_data_auth_ready,
@@ -1248,13 +1251,14 @@ handle_set_gps_refresh_rate_context_free (HandleSetGpsRefreshRateContext *ctx)
 }
 
 static void
-handle_set_gps_refresh_rate_auth_ready (MMBaseModem                    *self,
+handle_set_gps_refresh_rate_auth_ready (MMIfaceAuth                    *_self,
                                         GAsyncResult                   *res,
                                         HandleSetGpsRefreshRateContext *ctx)
 {
+    MMIfaceModemLocation *self = MM_IFACE_MODEM_LOCATION (_self);
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_gps_refresh_rate_context_free (ctx);
         return;
@@ -1290,7 +1294,7 @@ handle_set_gps_refresh_rate (MmGdbusModemLocation  *skeleton,
     ctx->self = g_object_ref (self);
     ctx->rate = rate;
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_set_gps_refresh_rate_auth_ready,
@@ -1316,14 +1320,15 @@ handle_get_location_context_free (HandleGetLocationContext *ctx)
 }
 
 static void
-handle_get_location_auth_ready (MMBaseModem              *self,
+handle_get_location_auth_ready (MMIfaceAuth              *_self,
                                 GAsyncResult             *res,
                                 HandleGetLocationContext *ctx)
 {
+    MMIfaceModemLocation *self = MM_IFACE_MODEM_LOCATION (_self);
     LocationContext *location_ctx;
     GError          *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_get_location_context_free (ctx);
         return;
@@ -1354,7 +1359,7 @@ handle_get_location (MmGdbusModemLocation  *skeleton,
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_LOCATION,
                              (GAsyncReadyCallback)handle_get_location_auth_ready,

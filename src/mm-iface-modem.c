@@ -33,6 +33,7 @@
 #include "mm-log-object.h"
 #include "mm-log-helpers.h"
 #include "mm-context.h"
+#include "mm-iface-op-lock.h"
 #include "mm-dispatcher-fcc-unlock.h"
 #if defined WITH_QMI
 # include "mm-broadband-modem-qmi.h"
@@ -362,8 +363,8 @@ mm_iface_modem_process_sim_event (MMIfaceModem *self)
      * allow any additional lock request any more. */
     mm_base_modem_set_reprobe (MM_BASE_MODEM (self), TRUE);
     mm_base_modem_disable (MM_BASE_MODEM (self),
-                           MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
-                           MM_BASE_MODEM_OPERATION_PRIORITY_OVERRIDE,
+                           MM_OPERATION_LOCK_REQUIRED,
+                           MM_OPERATION_PRIORITY_OVERRIDE,
                            (GAsyncReadyCallback) after_sim_event_disable_ready,
                            NULL);
 }
@@ -1050,14 +1051,14 @@ handle_create_bearer_ready (MMIfaceModem              *self,
 }
 
 static void
-handle_create_bearer_auth_ready (MMBaseModem               *self,
+handle_create_bearer_auth_ready (MMIfaceAuth               *self,
                                  GAsyncResult              *res,
                                  HandleCreateBearerContext *ctx)
 {
     g_autoptr(MMBearerProperties)  properties = NULL;
     GError                        *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_create_bearer_context_free (ctx);
         return;
@@ -1099,7 +1100,7 @@ handle_create_bearer (MmGdbusModem          *skeleton,
     ctx->self = g_object_ref (self);
     ctx->dictionary = g_variant_ref (dictionary);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_create_bearer_auth_ready,
@@ -1148,13 +1149,13 @@ command_ready (MMIfaceModem         *self,
 }
 
 static void
-handle_command_auth_ready (MMBaseModem          *self,
+handle_command_auth_ready (MMIfaceAuth          *self,
                            GAsyncResult         *res,
                            HandleCommandContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_command_context_free (ctx);
         return;
@@ -1202,7 +1203,7 @@ handle_command (MmGdbusModem          *skeleton,
     ctx->cmd = g_strdup (cmd);
     ctx->timeout = timeout;
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_command_auth_ready,
@@ -1258,13 +1259,13 @@ delete_bearer_disconnect_ready (MMBaseBearer              *bearer,
 }
 
 static void
-handle_delete_bearer_auth_ready (MMBaseModem               *self,
+handle_delete_bearer_auth_ready (MMIfaceAuth               *self,
                                  GAsyncResult              *res,
                                  HandleDeleteBearerContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_delete_bearer_context_free (ctx);
         return;
@@ -1313,7 +1314,7 @@ handle_delete_bearer (MmGdbusModem          *skeleton,
                   MM_IFACE_MODEM_BEARER_LIST, &ctx->list,
                   NULL);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_delete_bearer_auth_ready,
@@ -1396,14 +1397,14 @@ set_primary_sim_slot_ready (MMIfaceModem                   *self,
 }
 
 static void
-handle_set_primary_sim_slot_auth_ready (MMBaseModem                    *self,
+handle_set_primary_sim_slot_auth_ready (MMIfaceAuth                    *self,
                                         GAsyncResult                   *res,
                                         HandleSetPrimarySimSlotContext *ctx)
 {
     GError             *error = NULL;
     const gchar *const *sim_slot_paths;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_primary_sim_slot_context_free (ctx);
         return;
@@ -1448,7 +1449,7 @@ handle_set_primary_sim_slot (MmGdbusModem          *skeleton,
     ctx->self = g_object_ref (self);
     ctx->requested_sim_slot = sim_slot;
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_set_primary_sim_slot_auth_ready,
@@ -1516,13 +1517,13 @@ get_cell_info_ready (MMIfaceModem             *self,
 }
 
 static void
-handle_get_cell_info_auth_ready (MMBaseModem              *self,
+handle_get_cell_info_auth_ready (MMIfaceAuth              *self,
                                  GAsyncResult             *res,
                                  HandleGetCellInfoContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_get_cell_info_context_free (ctx);
         return;
@@ -1560,7 +1561,7 @@ handle_get_cell_info (MmGdbusModem          *skeleton,
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_get_cell_info_auth_ready,
@@ -2294,7 +2295,7 @@ static void
 handle_enable_context_free (HandleEnableContext *ctx)
 {
     if (ctx->operation_id >= 0)
-        mm_base_modem_operation_unlock (MM_BASE_MODEM (ctx->self), ctx->operation_id);
+        mm_iface_op_lock_unlock (MM_IFACE_OP_LOCK (ctx->self), ctx->operation_id);
 
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
@@ -2331,13 +2332,14 @@ enable_ready (MMBaseModem         *self,
 }
 
 static void
-handle_enable_auth_ready (MMBaseModem         *self,
+handle_enable_auth_ready (MMIfaceOpLock       *_self,
                           GAsyncResult        *res,
                           HandleEnableContext *ctx)
 {
+    MMBaseModem *self = MM_BASE_MODEM (_self);
     GError *error = NULL;
 
-    ctx->operation_id = mm_base_modem_authorize_and_operation_lock_finish (self, res, &error);
+    ctx->operation_id = mm_iface_op_lock_authorize_and_lock_finish (_self, res, &error);
     if (ctx->operation_id < 0) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_enable_context_free (ctx);
@@ -2352,14 +2354,14 @@ handle_enable_auth_ready (MMBaseModem         *self,
     if (ctx->enable) {
         mm_obj_info (self, "processing user request to enable modem...");
         mm_base_modem_enable (self,
-                              MM_BASE_MODEM_OPERATION_LOCK_ALREADY_ACQUIRED,
+                              MM_OPERATION_LOCK_ALREADY_ACQUIRED,
                               (GAsyncReadyCallback)enable_ready,
                               ctx);
     } else {
         mm_obj_info (self, "processing user request to disable modem...");
         mm_base_modem_disable (self,
-                               MM_BASE_MODEM_OPERATION_LOCK_ALREADY_ACQUIRED,
-                               MM_BASE_MODEM_OPERATION_PRIORITY_UNKNOWN,
+                               MM_OPERATION_LOCK_ALREADY_ACQUIRED,
+                               MM_OPERATION_PRIORITY_UNKNOWN,
                                (GAsyncReadyCallback)enable_ready,
                                ctx);
     }
@@ -2380,13 +2382,13 @@ handle_enable (MmGdbusModem          *skeleton,
     ctx->enable = enable;
     ctx->operation_id = -1;
 
-    mm_base_modem_authorize_and_operation_lock (MM_BASE_MODEM (self),
-                                                invocation,
-                                                MM_AUTHORIZATION_DEVICE_CONTROL,
-                                                MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
-                                                enable ? "enable" : "disable",
-                                                (GAsyncReadyCallback)handle_enable_auth_ready,
-                                                ctx);
+    mm_iface_op_lock_authorize_and_lock (MM_IFACE_OP_LOCK (self),
+                                         invocation,
+                                         MM_AUTHORIZATION_DEVICE_CONTROL,
+                                         MM_OPERATION_PRIORITY_DEFAULT,
+                                         enable ? "enable" : "disable",
+                                         (GAsyncReadyCallback)handle_enable_auth_ready,
+                                         ctx);
     return TRUE;
 }
 
@@ -2406,7 +2408,7 @@ static void
 handle_set_power_state_context_free (HandleSetPowerStateContext *ctx)
 {
     if (ctx->operation_id >= 0)
-        mm_base_modem_operation_unlock (MM_BASE_MODEM (ctx->self), ctx->operation_id);
+        mm_iface_op_lock_unlock (MM_IFACE_OP_LOCK (ctx->self), ctx->operation_id);
 
     g_assert (!ctx->saved_error);
     g_object_unref (ctx->skeleton);
@@ -2442,8 +2444,8 @@ disable_after_low (MMIfaceModem               *self,
 {
     mm_obj_info (self, "automatically disable modem after low-power mode...");
     mm_base_modem_disable (MM_BASE_MODEM (self),
-                           MM_BASE_MODEM_OPERATION_LOCK_ALREADY_ACQUIRED,
-                           MM_BASE_MODEM_OPERATION_PRIORITY_UNKNOWN,
+                           MM_OPERATION_LOCK_ALREADY_ACQUIRED,
+                           MM_OPERATION_PRIORITY_UNKNOWN,
                            (GAsyncReadyCallback)disable_after_low_ready,
                            ctx);
 }
@@ -2477,14 +2479,15 @@ set_power_state_ready (MMIfaceModem               *self,
 }
 
 static void
-handle_set_power_state_auth_ready (MMBaseModem                *self,
+handle_set_power_state_auth_ready (MMIfaceOpLock              *_self,
                                    GAsyncResult               *res,
                                    HandleSetPowerStateContext *ctx)
 {
+    MMBaseModem  *self = MM_BASE_MODEM (_self);
     MMModemState  modem_state;
     GError       *error = NULL;
 
-    ctx->operation_id = mm_base_modem_authorize_and_operation_lock_finish (self, res, &error);
+    ctx->operation_id = mm_iface_op_lock_authorize_and_lock_finish (_self, res, &error);
     if (ctx->operation_id < 0) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_power_state_context_free (ctx);
@@ -2559,13 +2562,13 @@ handle_set_power_state (MmGdbusModem          *skeleton,
     }
 
     operation_name = g_strdup_printf ("set-power-state-%s", mm_modem_power_state_get_string (ctx->power_state));
-    mm_base_modem_authorize_and_operation_lock (MM_BASE_MODEM (self),
-                                                invocation,
-                                                MM_AUTHORIZATION_DEVICE_CONTROL,
-                                                MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
-                                                operation_name,
-                                                (GAsyncReadyCallback)handle_set_power_state_auth_ready,
-                                                ctx);
+    mm_iface_op_lock_authorize_and_lock (MM_IFACE_OP_LOCK (self),
+                                         invocation,
+                                         MM_AUTHORIZATION_DEVICE_CONTROL,
+                                         MM_OPERATION_PRIORITY_DEFAULT,
+                                         operation_name,
+                                         (GAsyncReadyCallback)handle_set_power_state_auth_ready,
+                                         ctx);
     return TRUE;
 }
 
@@ -2582,7 +2585,7 @@ static void
 handle_reset_context_free (HandleResetContext *ctx)
 {
     if (ctx->operation_id >= 0)
-        mm_base_modem_operation_unlock (MM_BASE_MODEM (ctx->self), ctx->operation_id);
+        mm_iface_op_lock_unlock (MM_IFACE_OP_LOCK (ctx->self), ctx->operation_id);
 
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
@@ -2609,13 +2612,14 @@ handle_reset_ready (MMIfaceModem       *self,
 }
 
 static void
-handle_reset_auth_ready (MMBaseModem        *self,
+handle_reset_auth_ready (MMIfaceOpLock      *_self,
                          GAsyncResult       *res,
                          HandleResetContext *ctx)
 {
-    GError *error = NULL;
+    MMBaseModem *self = MM_BASE_MODEM (_self);
+    GError      *error = NULL;
 
-    ctx->operation_id = mm_base_modem_authorize_and_operation_lock_finish (self, res, &error);
+    ctx->operation_id = mm_iface_op_lock_authorize_and_lock_finish (_self, res, &error);
     if (ctx->operation_id < 0) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_reset_context_free (ctx);
@@ -2649,13 +2653,13 @@ handle_reset (MmGdbusModem          *skeleton,
     ctx->self = g_object_ref (self);
     ctx->operation_id = -1;
 
-    mm_base_modem_authorize_and_operation_lock (MM_BASE_MODEM (self),
-                                                invocation,
-                                                MM_AUTHORIZATION_DEVICE_CONTROL,
-                                                MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
-                                                "reset",
-                                                (GAsyncReadyCallback)handle_reset_auth_ready,
-                                                ctx);
+    mm_iface_op_lock_authorize_and_lock (MM_IFACE_OP_LOCK (self),
+                                         invocation,
+                                         MM_AUTHORIZATION_DEVICE_CONTROL,
+                                         MM_OPERATION_PRIORITY_DEFAULT,
+                                         "reset",
+                                         (GAsyncReadyCallback)handle_reset_auth_ready,
+                                         ctx);
 
     return TRUE;
 }
@@ -2674,7 +2678,7 @@ static void
 handle_factory_reset_context_free (HandleFactoryResetContext *ctx)
 {
     if (ctx->operation_id >= 0)
-        mm_base_modem_operation_unlock (MM_BASE_MODEM (ctx->self), ctx->operation_id);
+        mm_iface_op_lock_unlock (MM_IFACE_OP_LOCK (ctx->self), ctx->operation_id);
 
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
@@ -2702,13 +2706,14 @@ handle_factory_reset_ready (MMIfaceModem              *self,
 }
 
 static void
-handle_factory_reset_auth_ready (MMBaseModem               *self,
+handle_factory_reset_auth_ready (MMIfaceOpLock             *_self,
                                  GAsyncResult              *res,
                                  HandleFactoryResetContext *ctx)
 {
-    GError *error = NULL;
+    MMBaseModem *self = MM_BASE_MODEM (_self);
+    GError      *error = NULL;
 
-    ctx->operation_id = mm_base_modem_authorize_and_operation_lock_finish (self, res, &error);
+    ctx->operation_id = mm_iface_op_lock_authorize_and_lock_finish (_self, res, &error);
     if (ctx->operation_id < 0) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_factory_reset_context_free (ctx);
@@ -2745,13 +2750,13 @@ handle_factory_reset (MmGdbusModem          *skeleton,
     ctx->code = g_strdup (code);
     ctx->operation_id = -1;
 
-    mm_base_modem_authorize_and_operation_lock (MM_BASE_MODEM (self),
-                                                invocation,
-                                                MM_AUTHORIZATION_DEVICE_CONTROL,
-                                                MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
-                                                "factory-reset",
-                                                (GAsyncReadyCallback)handle_factory_reset_auth_ready,
-                                                ctx);
+    mm_iface_op_lock_authorize_and_lock (MM_IFACE_OP_LOCK (self),
+                                         invocation,
+                                         MM_AUTHORIZATION_DEVICE_CONTROL,
+                                         MM_OPERATION_PRIORITY_DEFAULT,
+                                         "factory-reset",
+                                         (GAsyncReadyCallback)handle_factory_reset_auth_ready,
+                                         ctx);
 
     return TRUE;
 }
@@ -2777,7 +2782,7 @@ static void
 handle_set_current_capabilities_context_free (HandleSetCurrentCapabilitiesContext *ctx)
 {
     if (ctx->operation_id >= 0)
-        mm_base_modem_operation_unlock (MM_BASE_MODEM (ctx->self), ctx->operation_id);
+        mm_iface_op_lock_unlock (MM_IFACE_OP_LOCK (ctx->self), ctx->operation_id);
 
     g_free (ctx->capabilities_str);
     g_object_unref (ctx->skeleton);
@@ -2807,16 +2812,17 @@ set_current_capabilities_ready (MMIfaceModem                        *self,
 }
 
 static void
-handle_set_current_capabilities_auth_ready (MMBaseModem                         *self,
+handle_set_current_capabilities_auth_ready (MMIfaceOpLock                       *_self,
                                             GAsyncResult                        *res,
                                             HandleSetCurrentCapabilitiesContext *ctx)
 {
+    MMBaseModem       *self = MM_BASE_MODEM (_self);
     GError            *error = NULL;
     g_autoptr(GArray)  supported = NULL;
     gboolean           matched = FALSE;
     guint              i;
 
-    ctx->operation_id = mm_base_modem_authorize_and_operation_lock_finish (self, res, &error);
+    ctx->operation_id = mm_iface_op_lock_authorize_and_lock_finish (_self, res, &error);
     if (ctx->operation_id < 0) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_current_capabilities_context_free (ctx);
@@ -2890,13 +2896,13 @@ handle_set_current_capabilities (MmGdbusModem          *skeleton,
     ctx->capabilities = capabilities;
     ctx->operation_id = -1;
 
-    mm_base_modem_authorize_and_operation_lock (MM_BASE_MODEM (self),
-                                                invocation,
-                                                MM_AUTHORIZATION_DEVICE_CONTROL,
-                                                MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
-                                                "set-current-capabilities",
-                                                (GAsyncReadyCallback)handle_set_current_capabilities_auth_ready,
-                                                ctx);
+    mm_iface_op_lock_authorize_and_lock (MM_IFACE_OP_LOCK (self),
+                                         invocation,
+                                         MM_AUTHORIZATION_DEVICE_CONTROL,
+                                         MM_OPERATION_PRIORITY_DEFAULT,
+                                         "set-current-capabilities",
+                                         (GAsyncReadyCallback)handle_set_current_capabilities_auth_ready,
+                                         ctx);
     return TRUE;
 }
 
@@ -3267,7 +3273,7 @@ static void
 handle_set_current_bands_context_free (HandleSetCurrentBandsContext *ctx)
 {
     if (ctx->operation_id >= 0)
-        mm_base_modem_operation_unlock (MM_BASE_MODEM (ctx->self), ctx->operation_id);
+        mm_iface_op_lock_unlock (MM_IFACE_OP_LOCK (ctx->self), ctx->operation_id);
 
     g_free (ctx->bands_str);
     g_variant_unref (ctx->bands);
@@ -3298,14 +3304,15 @@ handle_set_current_bands_ready (MMIfaceModem                 *self,
 }
 
 static void
-handle_set_current_bands_auth_ready (MMBaseModem                  *self,
+handle_set_current_bands_auth_ready (MMIfaceOpLock                *_self,
                                      GAsyncResult                 *res,
                                      HandleSetCurrentBandsContext *ctx)
 {
+    MMBaseModem       *self = MM_BASE_MODEM (_self);
     g_autoptr(GArray)  bands_array = NULL;
     GError            *error = NULL;
 
-    ctx->operation_id = mm_base_modem_authorize_and_operation_lock_finish (self, res, &error);
+    ctx->operation_id = mm_iface_op_lock_authorize_and_lock_finish (_self, res, &error);
     if (ctx->operation_id < 0) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_current_bands_context_free (ctx);
@@ -3342,13 +3349,13 @@ handle_set_current_bands (MmGdbusModem          *skeleton,
     ctx->bands = g_variant_ref (bands_variant);
     ctx->operation_id = -1;
 
-    mm_base_modem_authorize_and_operation_lock (MM_BASE_MODEM (self),
-                                                invocation,
-                                                MM_AUTHORIZATION_DEVICE_CONTROL,
-                                                MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
-                                                "set-current-bands",
-                                                (GAsyncReadyCallback)handle_set_current_bands_auth_ready,
-                                                ctx);
+    mm_iface_op_lock_authorize_and_lock (MM_IFACE_OP_LOCK (self),
+                                         invocation,
+                                         MM_AUTHORIZATION_DEVICE_CONTROL,
+                                         MM_OPERATION_PRIORITY_DEFAULT,
+                                         "set-current-bands",
+                                         (GAsyncReadyCallback)handle_set_current_bands_auth_ready,
+                                         ctx);
     return TRUE;
 }
 
@@ -3672,7 +3679,7 @@ static void
 handle_set_current_modes_context_free (HandleSetCurrentModesContext *ctx)
 {
     if (ctx->operation_id >= 0)
-        mm_base_modem_operation_unlock (MM_BASE_MODEM (ctx->self), ctx->operation_id);
+        mm_iface_op_lock_unlock (MM_IFACE_OP_LOCK (ctx->self), ctx->operation_id);
 
     g_free (ctx->preferred_str);
     g_free (ctx->allowed_str);
@@ -3705,13 +3712,14 @@ handle_set_current_modes_ready (MMIfaceModem                 *self,
 }
 
 static void
-handle_set_current_modes_auth_ready (MMBaseModem                  *self,
+handle_set_current_modes_auth_ready (MMIfaceOpLock                *_self,
                                      GAsyncResult                 *res,
                                      HandleSetCurrentModesContext *ctx)
 {
-    GError *error = NULL;
+    MMBaseModem *self = MM_BASE_MODEM (_self);
+    GError      *error = NULL;
 
-    ctx->operation_id = mm_base_modem_authorize_and_operation_lock_finish (self, res, &error);
+    ctx->operation_id = mm_iface_op_lock_authorize_and_lock_finish (_self, res, &error);
     if (ctx->operation_id < 0) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_current_modes_context_free (ctx);
@@ -3753,13 +3761,13 @@ handle_set_current_modes (MmGdbusModem          *skeleton,
                    &ctx->allowed,
                    &ctx->preferred);
 
-    mm_base_modem_authorize_and_operation_lock (MM_BASE_MODEM (self),
-                                                invocation,
-                                                MM_AUTHORIZATION_DEVICE_CONTROL,
-                                                MM_BASE_MODEM_OPERATION_PRIORITY_DEFAULT,
-                                                "set-current-modes",
-                                                (GAsyncReadyCallback)handle_set_current_modes_auth_ready,
-                                                ctx);
+    mm_iface_op_lock_authorize_and_lock (MM_IFACE_OP_LOCK (self),
+                                         invocation,
+                                         MM_AUTHORIZATION_DEVICE_CONTROL,
+                                         MM_OPERATION_PRIORITY_DEFAULT,
+                                         "set-current-modes",
+                                         (GAsyncReadyCallback)handle_set_current_modes_auth_ready,
+                                         ctx);
     return TRUE;
 }
 
@@ -3784,7 +3792,7 @@ restart_initialize_idle (MMIfaceModem *self)
     priv = get_private (self);
 
     mm_base_modem_initialize (MM_BASE_MODEM (self),
-                              MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
+                              MM_OPERATION_LOCK_REQUIRED,
                               (GAsyncReadyCallback) reinitialize_ready,
                               NULL);
 

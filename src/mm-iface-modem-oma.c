@@ -182,15 +182,16 @@ setup_ready (MMIfaceModemOma *self,
 }
 
 static void
-handle_setup_auth_ready (MMBaseModem *self,
+handle_setup_auth_ready (MMIfaceAuth *_self,
                          GAsyncResult *res,
                          HandleSetupContext *ctx)
 {
+    MMIfaceModemOma *self = MM_IFACE_MODEM_OMA (_self);
     GError *error = NULL;
     MMModemState modem_state;
     gchar *str;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_setup_context_free (ctx);
         return;
@@ -240,7 +241,7 @@ handle_setup (MmGdbusModemOma *skeleton,
     ctx->self = g_object_ref (self);
     ctx->features = features;
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_setup_auth_ready,
@@ -287,14 +288,15 @@ start_client_initiated_session_ready (MMIfaceModemOma *self,
 }
 
 static void
-handle_start_client_initiated_session_auth_ready (MMBaseModem *self,
+handle_start_client_initiated_session_auth_ready (MMIfaceAuth *_self,
                                                   GAsyncResult *res,
                                                   HandleStartClientInitiatedSessionContext *ctx)
 {
+    MMIfaceModemOma *self = MM_IFACE_MODEM_OMA (_self);
     GError *error = NULL;
     MMModemState modem_state;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_start_client_initiated_session_context_free (ctx);
         return;
@@ -355,7 +357,7 @@ handle_start_client_initiated_session (MmGdbusModemOma *skeleton,
     ctx->self = g_object_ref (self);
     ctx->session_type = session_type;
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_start_client_initiated_session_auth_ready,
@@ -441,14 +443,15 @@ get_pending_network_initiated_session_type (MMIfaceModemOma *self,
 }
 
 static void
-handle_accept_network_initiated_session_auth_ready (MMBaseModem *self,
+handle_accept_network_initiated_session_auth_ready (MMIfaceAuth *_self,
                                                     GAsyncResult *res,
                                                     HandleAcceptNetworkInitiatedSessionContext *ctx)
 {
+    MMIfaceModemOma *self = MM_IFACE_MODEM_OMA (_self);
     GError *error = NULL;
     MMModemState modem_state;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_accept_network_initiated_session_context_free (ctx);
         return;
@@ -514,7 +517,7 @@ handle_accept_network_initiated_session (MmGdbusModemOma *skeleton,
     ctx->session_id = session_id;
     ctx->accept = accept;
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_accept_network_initiated_session_auth_ready,
@@ -561,14 +564,15 @@ cancel_session_ready (MMIfaceModemOma *self,
 }
 
 static void
-handle_cancel_session_auth_ready (MMBaseModem *self,
+handle_cancel_session_auth_ready (MMIfaceAuth *_self,
                                   GAsyncResult *res,
                                   HandleCancelSessionContext *ctx)
 {
+    MMIfaceModemOma *self = MM_IFACE_MODEM_OMA (_self);
     GError *error = NULL;
     MMModemState modem_state;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_cancel_session_context_free (ctx);
         return;
@@ -612,7 +616,7 @@ handle_cancel_session (MmGdbusModemOma *skeleton,
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_cancel_session_auth_ready,

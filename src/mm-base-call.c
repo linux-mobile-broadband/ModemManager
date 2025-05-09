@@ -35,16 +35,20 @@
 #include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-error-helpers.h"
+#include "mm-bind.h"
 
 static void log_object_iface_init (MMLogObjectInterface *iface);
+static void bind_iface_init (MMBindInterface *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBaseCall, mm_base_call, MM_GDBUS_TYPE_CALL_SKELETON, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_BIND, bind_iface_init))
 
 enum {
     PROP_0,
     PROP_PATH,
     PROP_CONNECTION,
+    PROP_BIND_TO,
     PROP_MODEM,
     PROP_SKIP_INCOMING_TIMEOUT,
     PROP_SUPPORTS_DIALING_TO_RINGING,
@@ -58,6 +62,13 @@ struct _MMBaseCallPrivate {
     /* The connection to the system bus */
     GDBusConnection *connection;
     guint            dbus_id;
+
+    /* The authorization provider */
+    MMAuthProvider *authp;
+    GCancellable   *authp_cancellable;
+
+    /* The object this Call is bound to */
+    GObject *bind_to;
 
     /* The modem which owns this call */
     MMBaseModem *modem;
@@ -139,7 +150,6 @@ mm_base_call_change_audio_settings (MMBaseCall        *self,
 
 typedef struct {
     MMBaseCall *self;
-    MMBaseModem *modem;
     GDBusMethodInvocation *invocation;
 } HandleStartContext;
 
@@ -147,7 +157,6 @@ static void
 handle_start_context_free (HandleStartContext *ctx)
 {
     g_object_unref (ctx->invocation);
-    g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_free (ctx);
 }
@@ -203,14 +212,14 @@ handle_start_ready (MMBaseCall         *self,
 }
 
 static void
-handle_start_auth_ready (MMBaseModem *modem,
+handle_start_auth_ready (MMAuthProvider *authp,
                          GAsyncResult *res,
                          HandleStartContext *ctx)
 {
     MMCallState state;
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+    if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_base_call_change_state (ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_UNKNOWN);
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_start_context_free (ctx);
@@ -230,7 +239,7 @@ handle_start_auth_ready (MMBaseModem *modem,
     mm_obj_info (ctx->self, "processing user request to start voice call...");
 
     /* Disallow non-emergency calls when in emergency-only state */
-    if (!mm_iface_modem_voice_authorize_outgoing_call (MM_IFACE_MODEM_VOICE (modem), ctx->self, &error)) {
+    if (!mm_iface_modem_voice_authorize_outgoing_call (MM_IFACE_MODEM_VOICE (ctx->self->priv->modem), ctx->self, &error)) {
         mm_base_call_change_state (ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_UNKNOWN);
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_start_context_free (ctx);
@@ -268,15 +277,13 @@ handle_start (MMBaseCall *self,
     ctx = g_new0 (HandleStartContext, 1);
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
-    g_object_get (self,
-                  MM_BASE_CALL_MODEM, &ctx->modem,
-                  NULL);
 
-    mm_base_modem_authorize (ctx->modem,
-                             invocation,
-                             MM_AUTHORIZATION_VOICE,
-                             (GAsyncReadyCallback)handle_start_auth_ready,
-                             ctx);
+    mm_auth_provider_authorize (self->priv->authp,
+                                invocation,
+                                MM_AUTHORIZATION_VOICE,
+                                self->priv->authp_cancellable,
+                                (GAsyncReadyCallback)handle_start_auth_ready,
+                                ctx);
     return TRUE;
 }
 
@@ -285,7 +292,6 @@ handle_start (MMBaseCall *self,
 
 typedef struct {
     MMBaseCall *self;
-    MMBaseModem *modem;
     GDBusMethodInvocation *invocation;
 } HandleAcceptContext;
 
@@ -293,7 +299,6 @@ static void
 handle_accept_context_free (HandleAcceptContext *ctx)
 {
     g_object_unref (ctx->invocation);
-    g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_free (ctx);
 }
@@ -324,14 +329,14 @@ handle_accept_ready (MMBaseCall *self,
 }
 
 static void
-handle_accept_auth_ready (MMBaseModem *modem,
+handle_accept_auth_ready (MMAuthProvider *authp,
                           GAsyncResult *res,
                           HandleAcceptContext *ctx)
 {
     MMCallState state;
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+    if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_accept_context_free (ctx);
         return;
@@ -372,13 +377,11 @@ handle_accept (MMBaseCall *self,
     ctx = g_new0 (HandleAcceptContext, 1);
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
-    g_object_get (self,
-                  MM_BASE_CALL_MODEM, &ctx->modem,
-                  NULL);
 
-    mm_base_modem_authorize (ctx->modem,
+    mm_auth_provider_authorize (self->priv->authp,
                              invocation,
                              MM_AUTHORIZATION_VOICE,
+                             self->priv->authp_cancellable,
                              (GAsyncReadyCallback)handle_accept_auth_ready,
                              ctx);
     return TRUE;
@@ -389,7 +392,6 @@ handle_accept (MMBaseCall *self,
 
 typedef struct {
     MMBaseCall            *self;
-    MMBaseModem           *modem;
     GDBusMethodInvocation *invocation;
     gchar                 *number;
 } HandleDeflectContext;
@@ -399,7 +401,6 @@ handle_deflect_context_free (HandleDeflectContext *ctx)
 {
     g_free (ctx->number);
     g_object_unref (ctx->invocation);
-    g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_slice_free (HandleDeflectContext, ctx);
 }
@@ -425,14 +426,14 @@ handle_deflect_ready (MMBaseCall           *self,
 }
 
 static void
-handle_deflect_auth_ready (MMBaseModem          *modem,
+handle_deflect_auth_ready (MMAuthProvider       *authp,
                            GAsyncResult         *res,
                            HandleDeflectContext *ctx)
 {
     MMCallState state;
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+    if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_deflect_context_free (ctx);
         return;
@@ -475,15 +476,13 @@ handle_deflect (MMBaseCall            *self,
     ctx->self       = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
     ctx->number     = g_strdup (number);
-    g_object_get (self,
-                  MM_BASE_CALL_MODEM, &ctx->modem,
-                  NULL);
 
-    mm_base_modem_authorize (ctx->modem,
-                             invocation,
-                             MM_AUTHORIZATION_VOICE,
-                             (GAsyncReadyCallback)handle_deflect_auth_ready,
-                             ctx);
+    mm_auth_provider_authorize (self->priv->authp,
+                                invocation,
+                                MM_AUTHORIZATION_VOICE,
+                                self->priv->authp_cancellable,
+                                (GAsyncReadyCallback)handle_deflect_auth_ready,
+                                ctx);
     return TRUE;
 }
 
@@ -492,7 +491,6 @@ handle_deflect (MMBaseCall            *self,
 
 typedef struct {
     MMBaseCall            *self;
-    MMBaseModem           *modem;
     GDBusMethodInvocation *invocation;
 } HandleJoinMultipartyContext;
 
@@ -500,7 +498,6 @@ static void
 handle_join_multiparty_context_free (HandleJoinMultipartyContext *ctx)
 {
     g_object_unref (ctx->invocation);
-    g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_free (ctx);
 }
@@ -520,13 +517,13 @@ modem_voice_join_multiparty_ready (MMIfaceModemVoice           *modem,
 }
 
 static void
-handle_join_multiparty_auth_ready (MMBaseModem                  *modem,
-                                   GAsyncResult                 *res,
+handle_join_multiparty_auth_ready (MMAuthProvider              *authp,
+                                   GAsyncResult                *res,
                                    HandleJoinMultipartyContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+    if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_join_multiparty_context_free (ctx);
         return;
@@ -537,7 +534,7 @@ handle_join_multiparty_auth_ready (MMBaseModem                  *modem,
     /* This action is provided in the Call API, but implemented in the Modem.Voice interface
      * logic, because the action affects not only one call object, but all call objects that
      * are part of the multiparty call. */
-    mm_iface_modem_voice_join_multiparty (MM_IFACE_MODEM_VOICE (ctx->modem),
+    mm_iface_modem_voice_join_multiparty (MM_IFACE_MODEM_VOICE (ctx->self->priv->modem),
                                           ctx->self,
                                           (GAsyncReadyCallback)modem_voice_join_multiparty_ready,
                                           ctx);
@@ -552,15 +549,13 @@ handle_join_multiparty (MMBaseCall            *self,
     ctx = g_new0 (HandleJoinMultipartyContext, 1);
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
-    g_object_get (self,
-                  MM_BASE_CALL_MODEM, &ctx->modem,
-                  NULL);
 
-    mm_base_modem_authorize (ctx->modem,
-                             invocation,
-                             MM_AUTHORIZATION_VOICE,
-                             (GAsyncReadyCallback)handle_join_multiparty_auth_ready,
-                             ctx);
+    mm_auth_provider_authorize (self->priv->authp,
+                                invocation,
+                                MM_AUTHORIZATION_VOICE,
+                                self->priv->authp_cancellable,
+                                (GAsyncReadyCallback)handle_join_multiparty_auth_ready,
+                                ctx);
     return TRUE;
 }
 
@@ -569,7 +564,6 @@ handle_join_multiparty (MMBaseCall            *self,
 
 typedef struct {
     MMBaseCall            *self;
-    MMBaseModem           *modem;
     GDBusMethodInvocation *invocation;
 } HandleLeaveMultipartyContext;
 
@@ -577,7 +571,6 @@ static void
 handle_leave_multiparty_context_free (HandleLeaveMultipartyContext *ctx)
 {
     g_object_unref (ctx->invocation);
-    g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_free (ctx);
 }
@@ -598,13 +591,13 @@ modem_voice_leave_multiparty_ready (MMIfaceModemVoice            *modem,
 }
 
 static void
-handle_leave_multiparty_auth_ready (MMBaseModem                  *modem,
+handle_leave_multiparty_auth_ready (MMAuthProvider               *authp,
                                     GAsyncResult                 *res,
                                     HandleLeaveMultipartyContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+    if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_leave_multiparty_context_free (ctx);
         return;
@@ -615,7 +608,7 @@ handle_leave_multiparty_auth_ready (MMBaseModem                  *modem,
     /* This action is provided in the Call API, but implemented in the Modem.Voice interface
      * logic, because the action affects not only one call object, but all call objects that
      * are part of the multiparty call. */
-    mm_iface_modem_voice_leave_multiparty (MM_IFACE_MODEM_VOICE (ctx->modem),
+    mm_iface_modem_voice_leave_multiparty (MM_IFACE_MODEM_VOICE (ctx->self->priv->modem),
                                            ctx->self,
                                            (GAsyncReadyCallback)modem_voice_leave_multiparty_ready,
                                            ctx);
@@ -630,15 +623,13 @@ handle_leave_multiparty (MMBaseCall            *self,
     ctx = g_new0 (HandleLeaveMultipartyContext, 1);
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
-    g_object_get (self,
-                  MM_BASE_CALL_MODEM, &ctx->modem,
-                  NULL);
 
-    mm_base_modem_authorize (ctx->modem,
-                             invocation,
-                             MM_AUTHORIZATION_VOICE,
-                             (GAsyncReadyCallback)handle_leave_multiparty_auth_ready,
-                             ctx);
+    mm_auth_provider_authorize (self->priv->authp,
+                                invocation,
+                                MM_AUTHORIZATION_VOICE,
+                                self->priv->authp_cancellable,
+                                (GAsyncReadyCallback)handle_leave_multiparty_auth_ready,
+                                ctx);
     return TRUE;
 }
 
@@ -647,7 +638,6 @@ handle_leave_multiparty (MMBaseCall            *self,
 
 typedef struct {
     MMBaseCall *self;
-    MMBaseModem *modem;
     GDBusMethodInvocation *invocation;
 } HandleHangupContext;
 
@@ -655,7 +645,6 @@ static void
 handle_hangup_context_free (HandleHangupContext *ctx)
 {
     g_object_unref (ctx->invocation);
-    g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_free (ctx);
 }
@@ -681,14 +670,14 @@ handle_hangup_ready (MMBaseCall *self,
 }
 
 static void
-handle_hangup_auth_ready (MMBaseModem *modem,
+handle_hangup_auth_ready (MMAuthProvider *authp,
                           GAsyncResult *res,
                           HandleHangupContext *ctx)
 {
     MMCallState state;
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+    if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_hangup_context_free (ctx);
         return;
@@ -728,15 +717,13 @@ handle_hangup (MMBaseCall *self,
     ctx = g_new0 (HandleHangupContext, 1);
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
-    g_object_get (self,
-                  MM_BASE_CALL_MODEM, &ctx->modem,
-                  NULL);
 
-    mm_base_modem_authorize (ctx->modem,
-                             invocation,
-                             MM_AUTHORIZATION_VOICE,
-                             (GAsyncReadyCallback)handle_hangup_auth_ready,
-                             ctx);
+    mm_auth_provider_authorize (self->priv->authp,
+                                invocation,
+                                MM_AUTHORIZATION_VOICE,
+                                self->priv->authp_cancellable,
+                                (GAsyncReadyCallback)handle_hangup_auth_ready,
+                                ctx);
     return TRUE;
 }
 
@@ -745,7 +732,6 @@ handle_hangup (MMBaseCall *self,
 
 typedef struct {
     MMBaseCall *self;
-    MMBaseModem *modem;
     GDBusMethodInvocation *invocation;
     gchar *dtmf;
 } HandleSendDtmfContext;
@@ -754,7 +740,6 @@ static void
 handle_send_dtmf_context_free (HandleSendDtmfContext *ctx)
 {
     g_object_unref (ctx->invocation);
-    g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_free (ctx->dtmf);
     g_free (ctx);
@@ -777,14 +762,14 @@ handle_send_dtmf_ready (MMBaseCall *self,
 }
 
 static void
-handle_send_dtmf_auth_ready (MMBaseModem *modem,
+handle_send_dtmf_auth_ready (MMAuthProvider *authp,
                              GAsyncResult *res,
                              HandleSendDtmfContext *ctx)
 {
     MMCallState state;
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+    if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_send_dtmf_context_free (ctx);
         return;
@@ -825,17 +810,14 @@ handle_send_dtmf (MMBaseCall *self,
     ctx = g_new0 (HandleSendDtmfContext, 1);
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
-
     ctx->dtmf = g_strdup (dtmf);
-    g_object_get (self,
-                  MM_BASE_CALL_MODEM, &ctx->modem,
-                  NULL);
 
-    mm_base_modem_authorize (ctx->modem,
-                             invocation,
-                             MM_AUTHORIZATION_VOICE,
-                             (GAsyncReadyCallback)handle_send_dtmf_auth_ready,
-                             ctx);
+    mm_auth_provider_authorize (self->priv->authp,
+                                invocation,
+                                MM_AUTHORIZATION_VOICE,
+                                self->priv->authp_cancellable,
+                                (GAsyncReadyCallback)handle_send_dtmf_auth_ready,
+                                ctx);
     return TRUE;
 }
 
@@ -1329,6 +1311,7 @@ log_object_build_id (MMLogObject *_self)
 
 MMBaseCall *
 mm_base_call_new (MMBaseModem     *modem,
+                  GObject         *bind_to,
                   MMCallDirection  direction,
                   const gchar     *number,
                   gboolean         skip_incoming_timeout,
@@ -1337,6 +1320,7 @@ mm_base_call_new (MMBaseModem     *modem,
 {
     return MM_BASE_CALL (g_object_new (MM_TYPE_BASE_CALL,
                                        MM_BASE_CALL_MODEM, modem,
+                                       MM_BIND_TO,         bind_to,
                                        "direction",        direction,
                                        "number",           number,
                                        MM_BASE_CALL_SKIP_INCOMING_TIMEOUT,       skip_incoming_timeout,
@@ -1376,18 +1360,14 @@ set_property (GObject *object,
         else if (self->priv->path)
             call_dbus_export (self);
         break;
+    case PROP_BIND_TO:
+        g_clear_object (&self->priv->bind_to);
+        self->priv->bind_to = g_value_dup_object (value);
+        mm_bind_to (MM_BIND (self), MM_BASE_CALL_CONNECTION, self->priv->bind_to);
+        break;
     case PROP_MODEM:
         g_clear_object (&self->priv->modem);
         self->priv->modem = g_value_dup_object (value);
-        if (self->priv->modem) {
-            /* Set owner ID */
-            mm_log_object_set_owner_id (MM_LOG_OBJECT (self), mm_log_object_get_id (MM_LOG_OBJECT (self->priv->modem)));
-            /* Bind the modem's connection (which is set when it is exported,
-             * and unset when unexported) to the call's connection */
-            g_object_bind_property (self->priv->modem, MM_BASE_MODEM_CONNECTION,
-                                    self, MM_BASE_CALL_CONNECTION,
-                                    G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
-        }
         break;
     case PROP_SKIP_INCOMING_TIMEOUT:
         self->priv->skip_incoming_timeout = g_value_get_boolean (value);
@@ -1419,6 +1399,9 @@ get_property (GObject *object,
     case PROP_CONNECTION:
         g_value_set_object (value, self->priv->connection);
         break;
+    case PROP_BIND_TO:
+        g_value_set_object (value, self->priv->bind_to);
+        break;
     case PROP_MODEM:
         g_value_set_object (value, self->priv->modem);
         break;
@@ -1447,6 +1430,10 @@ mm_base_call_init (MMBaseCall *self)
 
     /* Each call is given a unique id to build its own DBus path */
     self->priv->dbus_id = id++;
+
+    /* Setup authorization provider */
+    self->priv->authp = mm_auth_provider_get ();
+    self->priv->authp_cancellable = g_cancellable_new ();
 }
 
 static void
@@ -1480,6 +1467,9 @@ dispose (GObject *object)
     }
 
     g_clear_object (&self->priv->modem);
+    g_clear_object (&self->priv->bind_to);
+    g_cancellable_cancel (self->priv->authp_cancellable);
+    g_clear_object (&self->priv->authp_cancellable);
 
     G_OBJECT_CLASS (mm_base_call_parent_class)->dispose (object);
 }
@@ -1488,6 +1478,11 @@ static void
 log_object_iface_init (MMLogObjectInterface *iface)
 {
     iface->build_id = log_object_build_id;
+}
+
+static void
+bind_iface_init (MMBindInterface *iface)
+{
 }
 
 static void
@@ -1529,6 +1524,8 @@ mm_base_call_class_init (MMBaseCallClass *klass)
                              NULL,
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_PATH, properties[PROP_PATH]);
+
+    g_object_class_override_property (object_class, PROP_BIND_TO, MM_BIND_TO);
 
     properties[PROP_MODEM] =
         g_param_spec_object (MM_BASE_CALL_MODEM,

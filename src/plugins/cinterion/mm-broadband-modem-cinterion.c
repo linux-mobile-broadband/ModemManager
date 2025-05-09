@@ -3128,7 +3128,9 @@ cinterion_simlocal_unsolicited_handler (MMPortSerialAt            *port,
 
         if (sim == NULL && is_available) {
             mm_obj_info (self, "SIM in slot %i inserted", i + 1);
-            sim = mm_base_sim_new_initialized (MM_BASE_MODEM (self), i + 1, FALSE,
+            sim = mm_base_sim_new_initialized (MM_BASE_MODEM (self),
+                                               G_OBJECT (self),
+                                               i + 1, FALSE,
                                                NULL, NULL, NULL, NULL, NULL, NULL);
             mm_iface_modem_modify_sim (MM_IFACE_MODEM (self), i, sim);
         } else if (sim != NULL && !is_available) {
@@ -3185,7 +3187,9 @@ cinterion_slot_availability_init_ready (MMBaseModem  *_self,
         is_available = g_array_index (available, gboolean, i);
 
         if (is_available)
-            sim = mm_base_sim_new_initialized (MM_BASE_MODEM (self), i + 1, FALSE,
+            sim = mm_base_sim_new_initialized (MM_BASE_MODEM (self),
+                                               G_OBJECT (self),
+                                               i + 1, FALSE,
                                                NULL, NULL, NULL, NULL, NULL, NULL);
         g_ptr_array_add (ctx->sim_slots, sim);
     }

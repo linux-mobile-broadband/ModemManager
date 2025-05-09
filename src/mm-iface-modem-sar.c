@@ -98,13 +98,14 @@ enable_ready (MMIfaceModemSar     *self,
 }
 
 static void
-handle_enable_auth_ready (MMBaseModem         *self,
+handle_enable_auth_ready (MMIfaceAuth         *_self,
                           GAsyncResult        *res,
                           HandleEnableContext *ctx)
 {
+    MMIfaceModemSar *self = MM_IFACE_MODEM_SAR (_self);
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_enable_context_free (ctx);
         return;
@@ -146,7 +147,7 @@ handle_enable (MmGdbusModemSar       *skeleton,
     ctx->self = g_object_ref (self);
     ctx->enable = enable;
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_enable_auth_ready,
@@ -193,13 +194,14 @@ set_power_level_ready (MMIfaceModemSar            *self,
 }
 
 static void
-handle_set_power_level_auth_ready (MMBaseModem                *self,
+handle_set_power_level_auth_ready (MMIfaceAuth                *_self,
                                    GAsyncResult               *res,
                                    HandleSetPowerLevelContext *ctx)
 {
+    MMIfaceModemSar *self = MM_IFACE_MODEM_SAR (_self);
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (_self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_power_level_context_free (ctx);
         return;
@@ -248,7 +250,7 @@ handle_set_power_level (MmGdbusModemSar       *skeleton,
     ctx->self = g_object_ref (self);
     ctx->power_level = level;
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_set_power_level_auth_ready,

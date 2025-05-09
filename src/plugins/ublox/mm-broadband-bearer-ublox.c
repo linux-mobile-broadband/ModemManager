@@ -32,6 +32,7 @@
 #include "mm-ublox-enums-types.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-ublox.h"
+#include "mm-bind.h"
 
 G_DEFINE_TYPE (MMBroadbandBearerUblox, mm_broadband_bearer_ublox, MM_TYPE_BROADBAND_BEARER)
 
@@ -927,6 +928,7 @@ mm_broadband_bearer_ublox_new (MMBroadbandModem      *modem,
         callback,
         user_data,
         MM_BASE_BEARER_MODEM, modem,
+        MM_BIND_TO, modem,
         MM_BASE_BEARER_CONFIG, config,
         MM_BROADBAND_BEARER_UBLOX_USB_PROFILE, profile,
         MM_BROADBAND_BEARER_UBLOX_NETWORKING_MODE, mode,

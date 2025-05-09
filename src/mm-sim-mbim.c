@@ -31,6 +31,7 @@
 #include "mm-log-object.h"
 #include "mm-modem-helpers-mbim.h"
 #include "mm-sim-mbim.h"
+#include "mm-bind.h"
 
 #define MS_UICC_LOW_LEVEL_SUPPORTED_VERSION 0x01
 
@@ -1734,6 +1735,7 @@ mm_sim_mbim_new (MMBaseModem *modem,
                                 callback,
                                 user_data,
                                 MM_BASE_SIM_MODEM, modem,
+                                MM_BIND_TO, G_OBJECT (modem),
                                 "active", TRUE, /* by default always active */
                                 NULL);
 }
@@ -1755,6 +1757,7 @@ mm_sim_mbim_new_initialized (MMBaseModem *modem,
 
     sim = MM_BASE_SIM (g_object_new (MM_TYPE_SIM_MBIM,
                                      MM_BASE_SIM_MODEM,       modem,
+                                     MM_BIND_TO,              G_OBJECT (modem),
                                      MM_BASE_SIM_SLOT_NUMBER, slot_number,
                                      "active",                active,
                                      "sim-type",              sim_type,

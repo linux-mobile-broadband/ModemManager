@@ -596,14 +596,15 @@ handle_delete_context_free (HandleDeleteContext *ctx)
 }
 
 static void
-handle_delete_auth_ready (MMBaseModem *self,
+handle_delete_auth_ready (MMIfaceAuth *auth,
                           GAsyncResult *res,
                           HandleDeleteContext *ctx)
 {
+    MMIfaceModemVoice *self = MM_IFACE_MODEM_VOICE (auth);
     MMCallList *list = NULL;
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (auth, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_delete_context_free (ctx);
         return;
@@ -643,7 +644,7 @@ handle_delete (MmGdbusModemVoice *skeleton,
     ctx->self = g_object_ref (self);
     ctx->path = g_strdup (path);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_VOICE,
                              (GAsyncReadyCallback)handle_delete_auth_ready,
@@ -671,16 +672,17 @@ handle_create_context_free (HandleCreateContext *ctx)
 }
 
 static void
-handle_create_auth_ready (MMBaseModem *self,
+handle_create_auth_ready (MMIfaceAuth *auth,
                           GAsyncResult *res,
                           HandleCreateContext *ctx)
 {
+    MMIfaceModemVoice *self = MM_IFACE_MODEM_VOICE (auth);
     MMCallList *list = NULL;
     GError *error = NULL;
     MMCallProperties *properties;
     MMBaseCall *call;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (auth, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_create_context_free (ctx);
         return;
@@ -746,7 +748,7 @@ handle_create (MmGdbusModemVoice *skeleton,
     ctx->self = g_object_ref (self);
     ctx->dictionary = g_variant_ref (dictionary);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_VOICE,
                              (GAsyncReadyCallback)handle_create_auth_ready,
@@ -855,14 +857,15 @@ prepare_hold_and_accept_foreach (MMBaseCall                 *call,
 }
 
 static void
-handle_hold_and_accept_auth_ready (MMBaseModem                *self,
+handle_hold_and_accept_auth_ready (MMIfaceAuth                *auth,
                                    GAsyncResult               *res,
                                    HandleHoldAndAcceptContext *ctx)
 {
+    MMIfaceModemVoice *self = MM_IFACE_MODEM_VOICE (auth);
     GError     *error = NULL;
     MMCallList *list = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (auth, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_hold_and_accept_context_free (ctx);
         return;
@@ -907,7 +910,7 @@ handle_hold_and_accept (MmGdbusModemVoice     *skeleton,
     ctx->invocation = g_object_ref (invocation);
     ctx->self       = g_object_ref (self);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_VOICE,
                              (GAsyncReadyCallback)handle_hold_and_accept_auth_ready,
@@ -986,14 +989,15 @@ prepare_hangup_and_accept_foreach (MMBaseCall                   *call,
 }
 
 static void
-handle_hangup_and_accept_auth_ready (MMBaseModem                  *self,
+handle_hangup_and_accept_auth_ready (MMIfaceAuth                  *auth,
                                      GAsyncResult                 *res,
                                      HandleHangupAndAcceptContext *ctx)
 {
+    MMIfaceModemVoice *self = MM_IFACE_MODEM_VOICE (auth);
     GError     *error = NULL;
     MMCallList *list = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (auth, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_hangup_and_accept_context_free (ctx);
         return;
@@ -1038,7 +1042,7 @@ handle_hangup_and_accept (MmGdbusModemVoice     *skeleton,
     ctx->invocation = g_object_ref (invocation);
     ctx->self       = g_object_ref (self);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_VOICE,
                              (GAsyncReadyCallback)handle_hangup_and_accept_auth_ready,
@@ -1127,14 +1131,15 @@ prepare_hangup_all_foreach (MMBaseCall             *call,
 }
 
 static void
-handle_hangup_all_auth_ready (MMBaseModem            *self,
+handle_hangup_all_auth_ready (MMIfaceAuth            *auth,
                               GAsyncResult           *res,
                               HandleHangupAllContext *ctx)
 {
+    MMIfaceModemVoice *self = MM_IFACE_MODEM_VOICE (auth);
     GError     *error = NULL;
     MMCallList *list = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (auth, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_hangup_all_context_free (ctx);
         return;
@@ -1179,7 +1184,7 @@ handle_hangup_all (MmGdbusModemVoice     *skeleton,
     ctx->invocation = g_object_ref (invocation);
     ctx->self       = g_object_ref (self);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_VOICE,
                              (GAsyncReadyCallback)handle_hangup_all_auth_ready,
@@ -1248,14 +1253,15 @@ prepare_transfer_foreach (MMBaseCall            *call,
 }
 
 static void
-handle_transfer_auth_ready (MMBaseModem           *self,
+handle_transfer_auth_ready (MMIfaceAuth           *auth,
                             GAsyncResult          *res,
                             HandleTransferContext *ctx)
 {
+    MMIfaceModemVoice *self = MM_IFACE_MODEM_VOICE (auth);
     GError     *error = NULL;
     MMCallList *list = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (auth, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_transfer_context_free (ctx);
         return;
@@ -1300,7 +1306,7 @@ handle_transfer (MmGdbusModemVoice     *skeleton,
     ctx->invocation = g_object_ref (invocation);
     ctx->self       = g_object_ref (self);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_VOICE,
                              (GAsyncReadyCallback)handle_transfer_auth_ready,
@@ -1344,13 +1350,14 @@ call_waiting_setup_ready (MMIfaceModemVoice             *self,
 }
 
 static void
-handle_call_waiting_setup_auth_ready (MMBaseModem                   *self,
+handle_call_waiting_setup_auth_ready (MMIfaceAuth                   *auth,
                                       GAsyncResult                  *res,
                                       HandleCallWaitingSetupContext *ctx)
 {
+    MMIfaceModemVoice *self = MM_IFACE_MODEM_VOICE (auth);
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (auth, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_call_waiting_setup_context_free (ctx);
         return;
@@ -1386,7 +1393,7 @@ handle_call_waiting_setup (MmGdbusModemVoice     *skeleton,
     ctx->self       = g_object_ref (self);
     ctx->enable     = enable;
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_VOICE,
                              (GAsyncReadyCallback)handle_call_waiting_setup_auth_ready,
@@ -1431,13 +1438,14 @@ call_waiting_query_ready (MMIfaceModemVoice             *self,
 }
 
 static void
-handle_call_waiting_query_auth_ready (MMBaseModem                   *self,
+handle_call_waiting_query_auth_ready (MMIfaceAuth                   *auth,
                                       GAsyncResult                  *res,
                                       HandleCallWaitingQueryContext *ctx)
 {
+    MMIfaceModemVoice *self = MM_IFACE_MODEM_VOICE (auth);
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (auth, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_call_waiting_query_context_free (ctx);
         return;
@@ -1470,7 +1478,7 @@ handle_call_waiting_query (MmGdbusModemVoice     *skeleton,
     ctx->invocation = g_object_ref (invocation);
     ctx->self       = g_object_ref (self);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_VOICE,
                              (GAsyncReadyCallback)handle_call_waiting_query_auth_ready,

@@ -10959,7 +10959,7 @@ add_new_read_cbm_part (MMIfaceModemCellBroadcast *self,
                        GArray                    *data)
 {
     MMCbmPart *part = NULL;
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
 
     switch (format) {
         /* Cell Broadcasts need to be broadcast messages */
@@ -10968,6 +10968,10 @@ add_new_read_cbm_part (MMIfaceModemCellBroadcast *self,
                                                 data->len,
                                                 self,
                                                 &error);
+        if (error) {
+            /* Don't treat the error as critical */
+            mm_obj_dbg (self, "error parsing PDU: %s", error->message);
+        }
         break;
     case QMI_WMS_MESSAGE_FORMAT_MWI:
     case QMI_WMS_MESSAGE_FORMAT_GSM_WCDMA_POINT_TO_POINT:
@@ -10979,13 +10983,14 @@ add_new_read_cbm_part (MMIfaceModemCellBroadcast *self,
 
     if (part) {
         mm_obj_dbg (self, "correctly parsed PDU");
-        mm_iface_modem_cell_broadcast_take_part (self,
-                                                 part,
-                                                 mm_cbm_state_from_qmi_message_tag (tag));
-    } else if (error) {
-        /* Don't treat the error as critical */
-        mm_obj_dbg (self, "error parsing PDU: %s", error->message);
-        g_error_free (error);
+        if (!mm_iface_modem_cell_broadcast_take_part (self,
+                                                      G_OBJECT (self),
+                                                      part,
+                                                      mm_cbm_state_from_qmi_message_tag (tag),
+                                                      &error)) {
+            /* Don't treat the error as critical */
+            mm_obj_dbg (self, "error adding CBM: %s", error->message);
+        }
     }
 }
 
@@ -11535,22 +11540,6 @@ cell_broadcast_set_channels (MMIfaceModemCellBroadcast *_self,
                                          NULL,
                                          (GAsyncReadyCallback)cell_broadcast_set_broadcast_config_ready,
                                          g_task_new (self, NULL, callback, user_data));
-}
-
-/*****************************************************************************/
-/* Create CBM (CellBroadcast interface) */
-
-static MMBaseCbm *
-cell_broadcast_create_cbm (MMIfaceModemCellBroadcast *_self)
-{
-    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-
-    /* Handle AT URC only fallback */
-    if (self->priv->cell_broadcast_fallback_at_only) {
-        return iface_modem_cell_broadcast_parent->create_cbm (_self);
-    }
-
-    return mm_base_cbm_new (MM_BASE_MODEM (self));
 }
 
 /*****************************************************************************/
@@ -15316,7 +15305,6 @@ iface_modem_cell_broadcast_init (MMIfaceModemCellBroadcastInterface *iface)
     iface->cleanup_unsolicited_events_finish = cell_broadcast_cleanup_unsolicited_events_finish;
     iface->set_channels = cell_broadcast_set_channels;
     iface->set_channels_finish = cell_broadcast_set_channels_finish;
-    iface->create_cbm = cell_broadcast_create_cbm;
 }
 
 static void

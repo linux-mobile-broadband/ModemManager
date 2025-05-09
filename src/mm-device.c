@@ -27,6 +27,7 @@
 #include "mm-plugin.h"
 #include "mm-log-object.h"
 #include "mm-daemon-enums-types.h"
+#include "mm-bind.h"
 
 static void log_object_iface_init (MMLogObjectInterface *iface);
 
@@ -341,7 +342,7 @@ unexport_modem (MMDevice *self)
     if (path != NULL) {
         g_dbus_object_manager_server_unexport (self->priv->object_manager, path);
         g_object_set (self->priv->modem,
-                      MM_BASE_MODEM_CONNECTION, NULL,
+                      MM_BINDABLE_CONNECTION, NULL,
                       NULL);
         mm_obj_dbg (self, "unexported modem from path '%s'", path);
         g_free (path);
@@ -389,7 +390,7 @@ export_modem (MMDevice *self)
     path = g_strdup_printf (MM_DBUS_MODEM_PREFIX "/%d", mm_base_modem_get_dbus_id (self->priv->modem));
     g_object_set (self->priv->modem,
                   "g-object-path", path,
-                  MM_BASE_MODEM_CONNECTION, connection,
+                  MM_BINDABLE_CONNECTION, connection,
                   NULL);
 
     g_dbus_object_manager_server_export (self->priv->object_manager,
@@ -436,7 +437,7 @@ mm_device_initialize_modem (MMDevice *self)
 
     mm_obj_dbg (self, "modem initializing...");
     mm_base_modem_initialize (modem,
-                              MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
+                              MM_OPERATION_LOCK_REQUIRED,
                               (GAsyncReadyCallback)initialize_ready,
                               g_object_ref (self));
 }
@@ -868,8 +869,8 @@ mm_device_inhibit (MMDevice            *self,
      * an exclusive lock marked as override, so the modem object will not
      * allow any additional lock request any more. */
     mm_base_modem_disable (self->priv->modem,
-                           MM_BASE_MODEM_OPERATION_LOCK_REQUIRED,
-                           MM_BASE_MODEM_OPERATION_PRIORITY_OVERRIDE,
+                           MM_OPERATION_LOCK_REQUIRED,
+                           MM_OPERATION_PRIORITY_OVERRIDE,
                            (GAsyncReadyCallback)inhibit_disable_ready,
                            task);
 }

@@ -21,6 +21,7 @@
 
 #include "mm-log-object.h"
 #include "mm-bearer-mbim-mtk-fibocom.h"
+#include "mm-bind.h"
 
 G_DEFINE_TYPE (MMBearerMbimMtkFibocom, mm_bearer_mbim_mtk_fibocom, MM_TYPE_BEARER_MBIM)
 
@@ -151,6 +152,7 @@ mm_bearer_mbim_mtk_fibocom_new (MMBroadbandModemMbim *modem,
      * g_object_new() here */
     self = g_object_new (MM_TYPE_BEARER_MBIM_MTK_FIBOCOM,
                          MM_BASE_BEARER_MODEM,  modem,
+                         MM_BIND_TO, modem,
                          MM_BASE_BEARER_CONFIG, config,
                          MM_BEARER_MBIM_ASYNC_SLAAC, is_async_slaac_supported,
                          NULL);

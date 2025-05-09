@@ -1109,13 +1109,13 @@ list_profiles_ready (MMIfaceModem3gppProfileManager *self,
 }
 
 static void
-handle_list_auth_ready (MMBaseModem       *self,
+handle_list_auth_ready (MMIfaceAuth       *self,
                         GAsyncResult      *res,
                         HandleListContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_list_context_free (ctx);
         return;
@@ -1150,7 +1150,7 @@ handle_list (MmGdbusModem3gppProfileManager *skeleton,
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_list_auth_ready,
@@ -1208,7 +1208,7 @@ set_profile_ready (MMIfaceModem3gppProfileManager *self,
 }
 
 static void
-handle_set_auth_ready (MMBaseModem      *self,
+handle_set_auth_ready (MMIfaceAuth      *self,
                        GAsyncResult     *res,
                        HandleSetContext *ctx)
 {
@@ -1216,7 +1216,7 @@ handle_set_auth_ready (MMBaseModem      *self,
     GError                   *error = NULL;
     g_autoptr(MM3gppProfile)  profile_requested = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_set_context_free (ctx);
         return;
@@ -1276,7 +1276,7 @@ handle_set (MmGdbusModem3gppProfileManager *skeleton,
     ctx->self = g_object_ref (self);
     ctx->requested_dictionary = requested_dictionary ? g_variant_ref (requested_dictionary) : NULL;
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_set_auth_ready,
@@ -1325,7 +1325,7 @@ delete_profile_ready (MMIfaceModem3gppProfileManager *self,
 }
 
 static void
-handle_delete_auth_ready (MMBaseModem         *self,
+handle_delete_auth_ready (MMIfaceAuth         *self,
                           GAsyncResult        *res,
                           HandleDeleteContext *ctx)
 {
@@ -1335,7 +1335,7 @@ handle_delete_auth_ready (MMBaseModem         *self,
     gint                      profile_id = MM_3GPP_PROFILE_ID_UNKNOWN;
     MMBearerApnType           apn_type = MM_BEARER_APN_TYPE_NONE;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_delete_context_free (ctx);
         return;
@@ -1428,7 +1428,7 @@ handle_delete (MmGdbusModem3gppProfileManager *skeleton,
     ctx->self = g_object_ref (self);
     ctx->dictionary = g_variant_ref (dictionary);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_delete_auth_ready,

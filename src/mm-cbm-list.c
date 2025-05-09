@@ -32,14 +32,18 @@
 #include "mm-cbm-list.h"
 #include "mm-base-cbm.h"
 #include "mm-log-object.h"
+#include "mm-bind.h"
 
 static void log_object_iface_init (MMLogObjectInterface *iface);
+static void bind_iface_init (MMBindInterface *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMCbmList, mm_cbm_list, G_TYPE_OBJECT, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_BIND, bind_iface_init))
 
 enum {
     PROP_0,
+    PROP_BIND_TO,
     PROP_MODEM,
     PROP_LAST
 };
@@ -53,6 +57,8 @@ enum {
 static guint signals[SIGNAL_LAST];
 
 struct _MMCbmListPrivate {
+    /* The object this CBM list is bound to */
+    GObject *bind_to;
     /* The owner modem */
     MMBaseModem *modem;
     /* List of cbm objects */
@@ -173,6 +179,7 @@ cmp_cbm_by_serial_and_id (MMBaseCbm *cbm,
 
 static gboolean
 take_part (MMCbmList *self,
+           GObject *bind_to,
            MMCbmPart *part,
            MMCbmState state,
            GError **error)
@@ -196,7 +203,7 @@ take_part (MMCbmList *self,
     }
 
     /* Create new cbm */
-    cbm = mm_base_cbm_new_with_part (self->priv->modem,
+    cbm = mm_base_cbm_new_with_part (bind_to,
                                      state,
                                      mm_cbm_part_get_num_parts (part),
                                      part,
@@ -250,6 +257,7 @@ mm_cbm_list_has_part (MMCbmList *self,
 
 gboolean
 mm_cbm_list_take_part (MMCbmList *self,
+                       GObject *bind_to,
                        MMCbmPart *part,
                        MMCbmState state,
                        GError   **error)
@@ -269,7 +277,7 @@ mm_cbm_list_take_part (MMCbmList *self,
         return FALSE;
     }
 
-    return take_part (self, part, state, error);
+    return take_part (self, bind_to, part, state, error);
 }
 
 /*****************************************************************************/
@@ -283,11 +291,12 @@ log_object_build_id (MMLogObject *_self)
 /*****************************************************************************/
 
 MMCbmList *
-mm_cbm_list_new (MMBaseModem *modem)
+mm_cbm_list_new (MMBaseModem *modem, GObject *bind_to)
 {
     /* Create the object */
     return g_object_new  (MM_TYPE_CBM_LIST,
                           MM_CBM_LIST_MODEM, modem,
+                          MM_BIND_TO, bind_to,
                           NULL);
 }
 
@@ -300,14 +309,14 @@ set_property (GObject *object,
     MMCbmList *self = MM_CBM_LIST (object);
 
     switch (prop_id) {
+    case PROP_BIND_TO:
+        g_clear_object (&self->priv->bind_to);
+        self->priv->bind_to = g_value_dup_object (value);
+        mm_bind_to (MM_BIND (self), NULL, self->priv->bind_to);
+        break;
     case PROP_MODEM:
         g_clear_object (&self->priv->modem);
         self->priv->modem = g_value_dup_object (value);
-        if (self->priv->modem) {
-            /* Set owner ID */
-            mm_log_object_set_owner_id (MM_LOG_OBJECT (self),
-                                        mm_log_object_get_id (MM_LOG_OBJECT (self->priv->modem)));
-        }
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -324,6 +333,9 @@ get_property (GObject *object,
     MMCbmList *self = MM_CBM_LIST (object);
 
     switch (prop_id) {
+    case PROP_BIND_TO:
+        g_value_set_object (value, self->priv->bind_to);
+        break;
     case PROP_MODEM:
         g_value_set_object (value, self->priv->modem);
         break;
@@ -348,6 +360,7 @@ dispose (GObject *object)
     MMCbmList *self = MM_CBM_LIST (object);
 
     g_clear_object (&self->priv->modem);
+    g_clear_object (&self->priv->bind_to);
     g_list_free_full (self->priv->list, g_object_unref);
     self->priv->list = NULL;
 
@@ -358,6 +371,11 @@ static void
 log_object_iface_init (MMLogObjectInterface *iface)
 {
     iface->build_id = log_object_build_id;
+}
+
+static void
+bind_iface_init (MMBindInterface *iface)
+{
 }
 
 static void
@@ -380,6 +398,8 @@ mm_cbm_list_class_init (MMCbmListClass *klass)
                              MM_TYPE_BASE_MODEM,
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_MODEM, properties[PROP_MODEM]);
+
+    g_object_class_override_property (object_class, PROP_BIND_TO, MM_BIND_TO);
 
     /* Signals */
     signals[SIGNAL_ADDED] =

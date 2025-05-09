@@ -57,7 +57,8 @@ struct _MMCbmListClass {
 GType mm_cbm_list_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMCbmList, g_object_unref)
 
-MMCbmList *mm_cbm_list_new (MMBaseModem *modem);
+MMCbmList *mm_cbm_list_new (MMBaseModem *modem,
+                            GObject     *bind_to);
 
 GStrv mm_cbm_list_get_paths (MMCbmList *self);
 guint mm_cbm_list_get_count (MMCbmList *self);
@@ -68,6 +69,7 @@ gboolean mm_cbm_list_has_part (MMCbmList *self,
                                guint8     part_num);
 
 gboolean mm_cbm_list_take_part (MMCbmList *self,
+                                GObject *bind_to,
                                 MMCbmPart *part,
                                 MMCbmState state,
                                 GError **error);

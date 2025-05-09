@@ -79,13 +79,13 @@ handle_cancel_ready (MMIfaceModem3gppUssd *self,
 }
 
 static void
-handle_cancel_auth_ready (MMBaseModem *self,
+handle_cancel_auth_ready (MMIfaceAuth *self,
                           GAsyncResult *res,
                           HandleCancelContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_cancel_context_free (ctx);
         return;
@@ -120,7 +120,7 @@ handle_cancel (MmGdbusModem3gppUssd *skeleton,
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_USSD,
                              (GAsyncReadyCallback)handle_cancel_auth_ready,
@@ -168,13 +168,13 @@ handle_respond_ready (MMIfaceModem3gppUssd *self,
 }
 
 static void
-handle_respond_auth_ready (MMBaseModem *self,
+handle_respond_auth_ready (MMIfaceAuth *self,
                            GAsyncResult *res,
                            HandleRespondContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_respond_context_free (ctx);
         return;
@@ -230,7 +230,7 @@ handle_respond (MmGdbusModem3gppUssd *skeleton,
     ctx->self = g_object_ref (self);
     ctx->command = g_strdup (command);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_USSD,
                              (GAsyncReadyCallback)handle_respond_auth_ready,
@@ -278,13 +278,13 @@ handle_initiate_ready (MMIfaceModem3gppUssd *self,
 }
 
 static void
-handle_initiate_auth_ready (MMBaseModem *self,
+handle_initiate_auth_ready (MMIfaceAuth *self,
                             GAsyncResult *res,
                             HandleInitiateContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+    if (!mm_iface_auth_authorize_finish (self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_initiate_context_free (ctx);
         return;
@@ -340,7 +340,7 @@ handle_initiate (MmGdbusModem3gppUssd *skeleton,
     ctx->self = g_object_ref (self);
     ctx->command = g_strdup (command);
 
-    mm_base_modem_authorize (MM_BASE_MODEM (self),
+    mm_iface_auth_authorize (MM_IFACE_AUTH (self),
                              invocation,
                              MM_AUTHORIZATION_USSD,
                              (GAsyncReadyCallback)handle_initiate_auth_ready,

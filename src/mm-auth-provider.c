@@ -22,6 +22,7 @@
 #include "mm-log-object.h"
 #include "mm-utils.h"
 #include "mm-auth-provider.h"
+#include "mm-context.h"
 
 #if defined WITH_POLKIT
 # include <polkit/polkit.h>
@@ -128,6 +129,13 @@ mm_auth_provider_authorize (MMAuthProvider        *self,
 
     task = g_task_new (self, cancellable, callback, user_data);
 
+    /* When running in the session bus for tests, default to always allow */
+    if (mm_context_get_test_session ()) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
 #if defined WITH_POLKIT
     {
         AuthorizeContext *ctx;
@@ -218,3 +226,40 @@ mm_auth_provider_class_init (MMAuthProviderClass *class)
 }
 
 MM_DEFINE_SINGLETON_GETTER (MMAuthProvider, mm_auth_provider_get, MM_TYPE_AUTH_PROVIDER)
+
+/*****************************************************************************/
+/* Auth interface */
+
+G_DEFINE_INTERFACE (MMIfaceAuth, mm_iface_auth, G_TYPE_OBJECT)
+
+void
+mm_iface_auth_authorize (MMIfaceAuth            *self,
+                         GDBusMethodInvocation  *invocation,
+                         const gchar            *authorization,
+                         GAsyncReadyCallback     callback,
+                         gpointer                user_data)
+{
+    g_assert (MM_IFACE_AUTH_GET_IFACE (self)->authorize != NULL);
+
+    MM_IFACE_AUTH_GET_IFACE (self)->authorize (self,
+                                               invocation,
+                                               authorization,
+                                               callback,
+                                               user_data);
+}
+
+gboolean
+mm_iface_auth_authorize_finish (MMIfaceAuth            *self,
+                                GAsyncResult           *res,
+                                GError                **error)
+{
+    g_assert (MM_IFACE_AUTH_GET_IFACE (self)->authorize_finish != NULL);
+
+    return MM_IFACE_AUTH_GET_IFACE (self)->authorize_finish (self, res, error);
+}
+
+static void
+mm_iface_auth_default_init (MMIfaceAuthInterface *iface)
+{
+}
+

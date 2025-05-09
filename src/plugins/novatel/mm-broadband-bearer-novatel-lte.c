@@ -32,6 +32,7 @@
 #include "mm-broadband-bearer-novatel-lte.h"
 #include "mm-log-object.h"
 #include "mm-modem-helpers.h"
+#include "mm-bind.h"
 
 #define QMISTATUS_TAG "$NWQMISTATUS:"
 
@@ -551,6 +552,7 @@ mm_broadband_bearer_novatel_lte_new (MMBroadbandModemNovatelLte *modem,
         callback,
         user_data,
         MM_BASE_BEARER_MODEM, modem,
+        MM_BIND_TO, modem,
         MM_BASE_BEARER_CONFIG, config,
         NULL);
 }

@@ -32,6 +32,7 @@
 #include "mm-iface-modem-3gpp.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
+#include "mm-bind.h"
 
 #define CONNECTION_CHECK_TIMEOUT_SEC 5
 #define STATCM_TAG "%STATCM:"
@@ -340,6 +341,7 @@ mm_broadband_bearer_altair_lte_new (MMBroadbandModemAltairLte *modem,
         callback,
         user_data,
         MM_BASE_BEARER_MODEM, modem,
+        MM_BIND_TO, G_OBJECT (modem),
         MM_BASE_BEARER_CONFIG, config,
         NULL);
 }

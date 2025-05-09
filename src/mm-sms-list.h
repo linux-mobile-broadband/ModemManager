@@ -57,7 +57,8 @@ struct _MMSmsListClass {
 GType mm_sms_list_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMSmsList, g_object_unref)
 
-MMSmsList *mm_sms_list_new (MMBaseModem *modem);
+MMSmsList *mm_sms_list_new (MMBaseModem *modem,
+                            GObject     *bind_to);
 
 GStrv mm_sms_list_get_paths (MMSmsList *self);
 guint mm_sms_list_get_count (MMSmsList *self);

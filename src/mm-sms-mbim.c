@@ -31,6 +31,7 @@
 #include "mm-base-modem.h"
 #include "mm-log-object.h"
 #include "mm-sms-part-3gpp.h"
+#include "mm-bind.h"
 
 G_DEFINE_TYPE (MMSmsMbim, mm_sms_mbim, MM_TYPE_BASE_SMS)
 
@@ -345,6 +346,7 @@ mm_sms_mbim_new (MMBaseModem *modem)
 {
     return MM_BASE_SMS (g_object_new (MM_TYPE_SMS_MBIM,
                                       MM_BASE_SMS_MODEM, modem,
+                                      MM_BIND_TO, G_OBJECT (modem),
                                       NULL));
 }
 

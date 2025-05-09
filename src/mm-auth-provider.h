@@ -56,4 +56,39 @@ gboolean mm_auth_provider_authorize_finish (MMAuthProvider         *self,
                                             GAsyncResult           *res,
                                             GError                **error);
 
+/*****************************************************************************/
+/* Auth interface
+ *
+ * Implemented by objects (mainly MMBaseModem) that provide authorization
+ * capability to other interfaces (MMIfaceModem) since GLib interfaces don't
+ * have private data to store the singletone.
+ */
+
+#define MM_TYPE_IFACE_AUTH mm_iface_auth_get_type ()
+G_DECLARE_INTERFACE (MMIfaceAuth, mm_iface_auth, MM, IFACE_AUTH, GObject)
+
+struct _MMIfaceAuthInterface {
+    GTypeInterface g_iface;
+
+    void (* authorize) (MMIfaceAuth            *self,
+                        GDBusMethodInvocation  *invocation,
+                        const gchar            *authorization,
+                        GAsyncReadyCallback     callback,
+                        gpointer                user_data);
+
+    gboolean (* authorize_finish) (MMIfaceAuth   *self,
+                                   GAsyncResult  *res,
+                                   GError       **error);
+};
+
+void     mm_iface_auth_authorize        (MMIfaceAuth            *self,
+                                         GDBusMethodInvocation  *invocation,
+                                         const gchar            *authorization,
+                                         GAsyncReadyCallback     callback,
+                                         gpointer                user_data);
+
+gboolean mm_iface_auth_authorize_finish (MMIfaceAuth            *self,
+                                         GAsyncResult           *res,
+                                         GError                **error);
+
 #endif /* MM_AUTH_PROVIDER_H */

@@ -31,6 +31,7 @@
 #include "mm-sim-qmi.h"
 #include "mm-modem-helpers-qmi.h"
 #include "mm-shared-qmi.h"
+#include "mm-bind.h"
 
 G_DEFINE_TYPE (MMSimQmi, mm_sim_qmi, MM_TYPE_BASE_SIM)
 
@@ -1819,6 +1820,7 @@ mm_sim_qmi_new (MMBaseModem         *modem,
                                 callback,
                                 user_data,
                                 MM_BASE_SIM_MODEM, modem,
+                                MM_BIND_TO, G_OBJECT (modem),
                                 MM_SIM_QMI_DMS_UIM_DEPRECATED, dms_uim_deprecated,
                                 "active", TRUE, /* by default always active */
                                 NULL);
@@ -1840,6 +1842,7 @@ mm_sim_qmi_new_initialized (MMBaseModem *modem,
 
     sim = MM_BASE_SIM (g_object_new (MM_TYPE_SIM_QMI,
                                      MM_BASE_SIM_MODEM,             modem,
+                                     MM_BIND_TO,                    G_OBJECT (modem),
                                      MM_SIM_QMI_DMS_UIM_DEPRECATED, dms_uim_deprecated,
                                      MM_BASE_SIM_SLOT_NUMBER,       slot_number,
                                      "active",                      active,

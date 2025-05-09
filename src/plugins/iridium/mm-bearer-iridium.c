@@ -26,6 +26,7 @@
 
 #include "mm-bearer-iridium.h"
 #include "mm-base-modem-at.h"
+#include "mm-bind.h"
 
 /* Allow up to 200s to get a proper IP connection */
 #define BEARER_IRIDIUM_IP_TIMEOUT_DEFAULT 200
@@ -234,6 +235,7 @@ mm_bearer_iridium_new (MMBroadbandModemIridium *modem,
      * g_object_get() here */
     bearer = g_object_new (MM_TYPE_BEARER_IRIDIUM,
                            MM_BASE_BEARER_MODEM, modem,
+                           MM_BIND_TO, modem,
                            MM_BASE_BEARER_CONFIG, config,
                            "ip-timeout", BEARER_IRIDIUM_IP_TIMEOUT_DEFAULT,
                            NULL);

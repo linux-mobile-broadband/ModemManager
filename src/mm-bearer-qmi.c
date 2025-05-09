@@ -37,6 +37,7 @@
 #include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-context.h"
+#include "mm-bind.h"
 
 G_DEFINE_TYPE (MMBearerQmi, mm_bearer_qmi, MM_TYPE_BASE_BEARER)
 
@@ -2959,6 +2960,7 @@ mm_bearer_qmi_new (MMBroadbandModemQmi *modem,
      * g_object_new() here */
     bearer = g_object_new (MM_TYPE_BEARER_QMI,
                            MM_BASE_BEARER_MODEM, modem,
+                           MM_BIND_TO, G_OBJECT (modem),
                            MM_BASE_BEARER_CONFIG, config,
                            NULL);
 
