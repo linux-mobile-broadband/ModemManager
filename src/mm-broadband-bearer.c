@@ -634,7 +634,13 @@ select_profile_3gpp_get_profile_ready (MMIfaceModem3gppProfileManager *modem,
     profile = mm_iface_modem_3gpp_profile_manager_get_profile_finish (modem, res, &error);
     if (!profile)
         g_task_return_error (task, error);
-    else
+    else if (!mm_3gpp_profile_get_enabled (profile)) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Profile '%d' is internally disabled",
+                                 ctx->profile_id);
+    } else
         g_task_return_int (task, ctx->profile_id);
     g_object_unref (task);
 }
