@@ -215,6 +215,7 @@ if plugins_shared['telit']
     'telit/mm-common-telit.c',
     'telit/mm-shared.c',
     'telit/mm-shared-telit.c',
+    'telit/mm-broadband-bearer-telit-ecm.c'
   )
 
   enums_types = 'mm-telit-enums-types'

@@ -32,6 +32,7 @@
 #include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-location.h"
 #include "mm-broadband-modem-telit.h"
+#include "mm-broadband-bearer-telit-ecm.h"
 #include "mm-modem-helpers-telit.h"
 #include "mm-telit-enums-types.h"
 #include "mm-shared-telit.h"
@@ -67,6 +68,7 @@ struct _MMBroadbandModemTelitPrivate {
     guint csim_lock_timeout_id;
     gboolean parse_qss;
     MMModemLocationSource enabled_sources;
+    FeatureSupport ecm_support;
 };
 
 typedef struct {
@@ -1519,6 +1521,135 @@ modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp    *self,
 }
 
 /*****************************************************************************/
+/* Create Bearer (Modem interface) */
+
+static MMBaseBearer *
+modem_create_bearer_finish (MMIfaceModem  *self,
+                            GAsyncResult  *res,
+                            GError       **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+broadband_bearer_telit_ecm_new_ready (GObject      *source,
+                                      GAsyncResult *res,
+                                      GTask        *task)
+{
+    MMBaseBearer *bearer = NULL;
+    GError       *error = NULL;
+
+    bearer = mm_broadband_bearer_telit_ecm_new_finish (res, &error);
+    if (!bearer)
+        g_task_return_error (task, error);
+    else
+        g_task_return_pointer (task, bearer, g_object_unref);
+    g_object_unref (task);
+}
+
+static void
+broadband_bearer_new_ready (GObject      *source,
+                            GAsyncResult *res,
+                            GTask        *task)
+{
+    MMBaseBearer *bearer = NULL;
+    GError       *error = NULL;
+
+    bearer = mm_broadband_bearer_new_finish (res, &error);
+    if (!bearer)
+        g_task_return_error (task, error);
+    else
+        g_task_return_pointer (task, bearer, g_object_unref);
+    g_object_unref (task);
+}
+
+static void
+common_create_bearer (GTask *task)
+{
+    MMBroadbandModemTelit *self;
+
+    self = g_task_get_source_object (task);
+
+    switch (self->priv->ecm_support) {
+    case FEATURE_SUPPORTED:
+        mm_broadband_bearer_telit_ecm_new (self,
+                                           g_task_get_task_data (task),
+                                           NULL, /* cancellable */
+                                           (GAsyncReadyCallback) broadband_bearer_telit_ecm_new_ready,
+                                           task);
+        return;
+    case FEATURE_NOT_SUPPORTED:
+        mm_broadband_bearer_new (MM_BROADBAND_MODEM (self),
+                                 g_task_get_task_data (task),
+                                 NULL, /* cancellable */
+                                 (GAsyncReadyCallback) broadband_bearer_new_ready,
+                                 task);
+        return;
+    case FEATURE_SUPPORT_UNKNOWN:
+    default:
+        g_assert_not_reached ();
+    }
+}
+
+static void
+ecm_test_ready (MMBaseModem  *_self,
+                GAsyncResult *res,
+                GTask        *task)
+{
+    MMBroadbandModemTelit *self = MM_BROADBAND_MODEM_TELIT (_self);
+
+    if (!mm_base_modem_at_command_finish (_self, res, NULL)) {
+        mm_obj_dbg (self, "#ECM unsupported");
+        self->priv->ecm_support = FEATURE_NOT_SUPPORTED;
+    } else {
+        self->priv->ecm_support = FEATURE_SUPPORTED;
+    }
+
+    common_create_bearer (task);
+}
+
+static void
+modem_create_bearer (MMIfaceModem        *_self,
+                     MMBearerProperties  *properties,
+                     GAsyncReadyCallback  callback,
+                     gpointer             user_data)
+{
+    MMBroadbandModemTelit *self = MM_BROADBAND_MODEM_TELIT (_self);
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, g_object_ref (properties), g_object_unref);
+
+    if (self->priv->ecm_support != FEATURE_SUPPORT_UNKNOWN) {
+        common_create_bearer (task);
+        return;
+    }
+
+    if (!(mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)) == 0x1bc7 &&
+          mm_base_modem_get_product_id (MM_BASE_MODEM (self)) == 0x7021)) {
+        /* ECM supported just in LE910Q1/ELS63-I composition 0x7021 */
+        self->priv->ecm_support = FEATURE_NOT_SUPPORTED;
+        common_create_bearer (task);
+        return;
+    }
+
+    if (!mm_base_modem_peek_best_data_port (MM_BASE_MODEM (self), MM_PORT_TYPE_NET)) {
+        mm_obj_dbg (self, "skipping #ECM check as no data port is available");
+        self->priv->ecm_support = FEATURE_NOT_SUPPORTED;
+        common_create_bearer (task);
+        return;
+    }
+
+    mm_obj_dbg (self, "checking #ECM support...");
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "#ECM=?",
+                              3,
+                              TRUE,
+                              (GAsyncReadyCallback) ecm_test_ready,
+                              task);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemTelit *
 mm_broadband_modem_telit_new (const gchar *device,
@@ -1536,7 +1667,7 @@ mm_broadband_modem_telit_new (const gchar *device,
                          MM_BASE_MODEM_VENDOR_ID, vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
                          /* Generic bearer supports AT only */
-                         MM_BASE_MODEM_DATA_NET_SUPPORTED, FALSE,
+                         MM_BASE_MODEM_DATA_NET_SUPPORTED, TRUE,
                          MM_BASE_MODEM_DATA_TTY_SUPPORTED, TRUE,
                          MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, TRUE,
                          NULL);
@@ -1553,6 +1684,7 @@ mm_broadband_modem_telit_init (MMBroadbandModemTelit *self)
     self->priv->csim_lock_state = CSIM_LOCK_STATE_UNKNOWN;
     self->priv->qss_status = QSS_STATUS_UNKNOWN;
     self->priv->parse_qss = TRUE;
+    self->priv->ecm_support = FEATURE_SUPPORT_UNKNOWN;
 }
 
 static void
@@ -1587,6 +1719,8 @@ iface_modem_init (MMIfaceModemInterface *iface)
     iface->setup_sim_hot_swap = modem_setup_sim_hot_swap;
     iface->setup_sim_hot_swap_finish = modem_setup_sim_hot_swap_finish;
     iface->cleanup_sim_hot_swap = modem_cleanup_sim_hot_swap;
+    iface->create_bearer = modem_create_bearer;
+    iface->create_bearer_finish = modem_create_bearer_finish;
 }
 
 static void
