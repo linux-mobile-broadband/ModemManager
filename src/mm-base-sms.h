@@ -25,7 +25,6 @@
 #include <libmm-glib.h>
 
 #include "mm-sms-part.h"
-#include "mm-base-modem.h"
 
 /*****************************************************************************/
 
@@ -46,12 +45,19 @@ typedef struct _MMBaseSms MMBaseSms;
 typedef struct _MMBaseSmsClass MMBaseSmsClass;
 typedef struct _MMBaseSmsPrivate MMBaseSmsPrivate;
 
+/* Properties */
 #define MM_BASE_SMS_PATH                "sms-path"
 #define MM_BASE_SMS_CONNECTION          "sms-connection"
-#define MM_BASE_SMS_MODEM               "sms-modem"
 #define MM_BASE_SMS_IS_MULTIPART        "sms-is-multipart"
 #define MM_BASE_SMS_MAX_PARTS           "sms-max-parts"
 #define MM_BASE_SMS_MULTIPART_REFERENCE "sms-multipart-reference"
+#define MM_BASE_SMS_IS_3GPP             "sms-is-3gpp"
+#define MM_BASE_SMS_DEFAULT_STORAGE     "sms-default-storage"
+#define MM_BASE_SMS_SUPPORTED_STORAGES  "sms-supported-storages"
+#define MM_BASE_SMS_CONNECTION_PARENT_PROPERTY_NAME "sms-connection-parent-property-name"
+
+/* Signals */
+#define MM_BASE_SMS_SET_LOCAL_MULTIPART_REFERENCE "sms-set-local-multipart-reference"
 
 struct _MMBaseSms {
     MmGdbusSmsSkeleton parent;
@@ -85,28 +91,31 @@ struct _MMBaseSmsClass {
     gboolean (* delete_finish) (MMBaseSms *self,
                                 GAsyncResult *res,
                                 GError **error);
+
+    /* Signal */
+    void (*set_local_multipart_reference) (MMBaseSms   *self,
+                                           const gchar *number);
 };
 
 GType mm_base_sms_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBaseSms, g_object_unref)
 
-/* This one can be overridden by plugins */
-MMBaseSms *mm_base_sms_new                 (MMBaseModem *modem);
-MMBaseSms *mm_base_sms_new_from_properties (MMBaseModem *modem,
-                                            MMSmsProperties *properties,
-                                            GError **error);
-MMBaseSms *mm_base_sms_singlepart_new      (MMBaseModem *modem,
-                                            MMSmsState state,
-                                            MMSmsStorage storage,
-                                            MMSmsPart *part,
-                                            GError **error);
-MMBaseSms *mm_base_sms_multipart_new       (MMBaseModem *modem,
-                                            MMSmsState state,
-                                            MMSmsStorage storage,
-                                            guint reference,
-                                            guint max_parts,
-                                            MMSmsPart *first_part,
-                                            GError **error);
+gboolean   mm_base_sms_init_from_properties (MMBaseSms        *self,
+                                             MMSmsProperties  *properties,
+                                             GError          **error);
+gboolean   mm_base_sms_singlepart_init      (MMBaseSms     *self,
+                                             MMSmsState     state,
+                                             MMSmsStorage   storage,
+                                             MMSmsPart     *part,
+                                             GError       **error);
+gboolean   mm_base_sms_multipart_init       (MMBaseSms     *self,
+                                             MMSmsState     state,
+                                             MMSmsStorage   storage,
+                                             guint          reference,
+                                             guint          max_parts,
+                                             MMSmsPart     *first_part,
+                                             GError       **error);
+
 gboolean   mm_base_sms_multipart_take_part (MMBaseSms *self,
                                             MMSmsPart *part,
                                             GError **error);
@@ -123,6 +132,8 @@ GList       *mm_base_sms_get_parts      (MMBaseSms *self);
 gboolean     mm_base_sms_is_multipart            (MMBaseSms *self);
 guint        mm_base_sms_get_max_parts           (MMBaseSms *self);
 guint        mm_base_sms_get_multipart_reference (MMBaseSms *self);
+void         mm_base_sms_set_multipart_reference (MMBaseSms *self,
+                                                  guint      reference);
 gboolean     mm_base_sms_multipart_is_complete   (MMBaseSms *self);
 gboolean     mm_base_sms_multipart_is_assembled  (MMBaseSms *self);
 

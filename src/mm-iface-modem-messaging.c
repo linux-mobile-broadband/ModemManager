@@ -22,6 +22,7 @@
 #include "mm-sms-list.h"
 #include "mm-error-helpers.h"
 #include "mm-log-object.h"
+#include "mm-broadband-modem.h"
 
 #define SUPPORT_CHECKED_TAG "messaging-support-checked-tag"
 #define SUPPORTED_TAG       "messaging-supported-tag"
@@ -35,54 +36,6 @@ G_DEFINE_INTERFACE (MMIfaceModemMessaging, mm_iface_modem_messaging, MM_TYPE_IFA
 
 /*****************************************************************************/
 
-guint8
-mm_iface_modem_messaging_get_local_multipart_reference (MMIfaceModemMessaging *self,
-                                                        const gchar *number,
-                                                        GError **error)
-{
-    MMSmsList *list = NULL;
-    guint8 reference;
-    guint8 first;
-
-    /* Start by looking for a random number */
-    reference = g_random_int_range (1,255);
-
-    /* Then, look for the given reference in user-created messages */
-    g_object_get (self,
-                  MM_IFACE_MODEM_MESSAGING_SMS_LIST, &list,
-                  NULL);
-    if (!list)
-        return reference;
-
-    first = reference;
-    do {
-        if (!mm_sms_list_has_local_multipart_reference (list, number, reference)) {
-            g_object_unref (list);
-            return reference;
-        }
-
-        if (reference == 255)
-            reference = 1;
-        else
-            reference++;
-    }
-    while (reference != first);
-
-    g_object_unref (list);
-
-    /* We were not able to find a new valid multipart reference :/
-     * return an error */
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_TOO_MANY,
-                 "Cannot create multipart SMS: No valid multipart reference "
-                 "available for destination number '%s'",
-                 number);
-    return 0;
-}
-
-/*****************************************************************************/
-
 void
 mm_iface_modem_messaging_bind_simple_status (MMIfaceModemMessaging *self,
                                              MMSimpleStatus *status)
@@ -91,12 +44,45 @@ mm_iface_modem_messaging_bind_simple_status (MMIfaceModemMessaging *self,
 
 /*****************************************************************************/
 
-MMBaseSms *
-mm_iface_modem_messaging_create_sms (MMIfaceModemMessaging *self)
+void
+mm_iface_modem_messaging_lock_storages (MMIfaceModemMessaging *self,
+                                        MMSmsStorage           mem1,
+                                        MMSmsStorage           mem2,
+                                        GAsyncReadyCallback    callback,
+                                        gpointer               user_data)
 {
-    g_assert (MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->create_sms != NULL);
+    g_assert (MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->lock_storages != NULL);
 
-    return MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->create_sms (self);
+    MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->lock_storages (self,
+                                                              mem1,
+                                                              mem2,
+                                                              callback,
+                                                              user_data);
+}
+
+gboolean
+mm_iface_modem_messaging_lock_storages_finish (MMIfaceModemMessaging  *self,
+                                               GAsyncResult           *res,
+                                               GError                **error)
+
+{
+    g_assert (MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->lock_storages_finish != NULL);
+
+    return MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->lock_storages_finish (self,
+                                                                            res,
+                                                                            error);
+}
+
+void
+mm_iface_modem_messaging_unlock_storages (MMIfaceModemMessaging *self,
+                                          gboolean               mem1,
+                                          gboolean               mem2)
+{
+    g_assert (MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->unlock_storages != NULL);
+
+    MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->unlock_storages (self,
+                                                                mem1,
+                                                                mem2);
 }
 
 /*****************************************************************************/
@@ -296,8 +282,8 @@ handle_create_auth_ready (MMIfaceAuth         *auth,
         return;
     }
 
-    sms = mm_base_sms_new_from_properties (MM_BASE_MODEM (self), properties, &error);
-    if (!sms) {
+    sms = mm_broadband_modem_create_sms (MM_BROADBAND_MODEM (self));
+    if (!mm_base_sms_init_from_properties (sms, properties, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_create_context_free (ctx);
         return;
@@ -399,7 +385,8 @@ handle_set_default_storage_ready (MMIfaceModemMessaging          *self,
                                   GAsyncResult                   *res,
                                   HandleSetDefaultStorageContext *ctx)
 {
-    GError *error = NULL;
+    GError               *error = NULL;
+    g_autoptr(MMSmsList)  list = NULL;
 
     if (!MM_IFACE_MODEM_MESSAGING_GET_IFACE (self)->set_default_storage_finish (self, res, &error)) {
         mm_obj_warn (self, "could not set default storage: %s", error->message);
@@ -411,6 +398,13 @@ handle_set_default_storage_ready (MMIfaceModemMessaging          *self,
     g_object_set (self,
                   MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE, ctx->storage,
                   NULL);
+
+    /* Update default storage in all SMSs too */
+    g_object_get (self,
+                  MM_IFACE_MODEM_MESSAGING_SMS_LIST, &list,
+                  NULL);
+    if (list)
+        mm_sms_list_set_default_storage (list, ctx->storage);
 
     mm_obj_info (self, "set the default storage successfully");
     mm_gdbus_modem_messaging_complete_set_default_storage (ctx->skeleton, ctx->invocation);
@@ -482,13 +476,14 @@ handle_set_default_storage (MmGdbusModemMessaging *skeleton,
 /*****************************************************************************/
 
 gboolean
-mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,
-                                    MMSmsPart             *sms_part,
-                                    MMSmsState             state,
-                                    MMSmsStorage           storage)
+mm_iface_modem_messaging_take_part (MMIfaceModemMessaging  *self,
+                                    MMBaseSms              *uninitialized_sms,
+                                    MMSmsPart              *sms_part,
+                                    MMSmsState              state,
+                                    MMSmsStorage            storage,
+                                    GError                **error)
 {
     g_autoptr(MMSmsList) list = NULL;
-    g_autoptr(GError)    error = NULL;
     gboolean             added = FALSE;
 
     g_object_get (self,
@@ -496,14 +491,19 @@ mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,
                   NULL);
 
     if (list) {
-        added = mm_sms_list_take_part (list, sms_part, state, storage, &error);
+        added = mm_sms_list_take_part (list, uninitialized_sms, sms_part, state, storage, error);
         if (!added)
-            mm_obj_dbg (self, "couldn't take part in SMS list: %s", error->message);
+            g_prefix_error (error, "couldn't take part in SMS list: ");
     }
 
-    /* If part wasn't taken, we need to free the part ourselves */
+    /* If part wasn't taken, we need to free the part and SMS ourselves */
     if (!added)
         mm_sms_part_free (sms_part);
+
+    /* Always drop original ref to the uninialized SMS, as MMSmsList will have
+     * taken a reference to the SMS if it wants to keep it around.
+     */
+    g_object_unref (uninitialized_sms);
 
     return added;
 }
@@ -556,6 +556,18 @@ mm_iface_modem_messaging_is_storage_supported_for_receiving (MMIfaceModemMessagi
                                  storage,
                                  "receiving",
                                  error);
+}
+
+MMSmsStorage
+mm_iface_modem_messaging_get_default_storage (MMIfaceModemMessaging *self)
+{
+    MMSmsStorage storage = MM_SMS_STORAGE_UNKNOWN;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE, &storage,
+                  NULL);
+    g_assert (storage != MM_SMS_STORAGE_UNKNOWN);
+    return storage;
 }
 
 /*****************************************************************************/
@@ -1008,7 +1020,7 @@ interface_enabling_step (GTask *task)
     case ENABLING_STEP_FIRST: {
         MMSmsList *list;
 
-        list = mm_sms_list_new (MM_BASE_MODEM (self), G_OBJECT (self));
+        list = mm_sms_list_new (G_OBJECT (self));
         g_object_set (self,
                       MM_IFACE_MODEM_MESSAGING_SMS_LIST, list,
                       NULL);

@@ -27,6 +27,7 @@
 #include "mm-modem-helpers.h"
 #include "mm-charsets.h"
 #include "mm-base-modem.h"
+#include "mm-base-sms.h"
 
 #define MM_TYPE_BROADBAND_MODEM            (mm_broadband_modem_get_type ())
 #define MM_BROADBAND_MODEM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_BROADBAND_MODEM, MMBroadbandModem))
@@ -105,6 +106,9 @@ struct _MMBroadbandModemClass {
     gint (* load_initial_eps_bearer_cid_finish) (MMBroadbandModem     *self,
                                                  GAsyncResult         *res,
                                                  GError              **error);
+
+    /* Create SMS objects */
+    MMBaseSms * (* create_sms) (MMBroadbandModem *self);
 };
 
 GType mm_broadband_modem_get_type (void);
@@ -126,18 +130,6 @@ gchar *mm_broadband_modem_create_device_identifier (MMBroadbandModem  *self,
                                                     const gchar       *ati1,
                                                     GError           **error);
 
-/* Locking/unlocking SMS storages */
-void     mm_broadband_modem_lock_sms_storages        (MMBroadbandModem *self,
-                                                      MMSmsStorage mem1, /* reading/listing/deleting */
-                                                      MMSmsStorage mem2, /* storing/sending */
-                                                      GAsyncReadyCallback callback,
-                                                      gpointer user_data);
-gboolean mm_broadband_modem_lock_sms_storages_finish (MMBroadbandModem *self,
-                                                      GAsyncResult *res,
-                                                      GError **error);
-void     mm_broadband_modem_unlock_sms_storages      (MMBroadbandModem *self,
-                                                      gboolean mem1,
-                                                      gboolean mem2);
 /* Helper to update SIM hot swap */
 gboolean mm_broadband_modem_sim_hot_swap_ports_context_init  (MMBroadbandModem  *self,
                                                               GError           **error);
@@ -151,5 +143,8 @@ gboolean mm_broadband_modem_get_active_multiplexed_bearers (MMBroadbandModem  *s
 
 /* Helper to manage initial EPS bearer */
 gint mm_broadband_modem_get_initial_eps_bearer_cid (MMBroadbandModem *self);
+
+/* Helper to create a new modem-specific SMS object */
+MMBaseSms *mm_broadband_modem_create_sms (MMBroadbandModem *self);
 
 #endif /* MM_BROADBAND_MODEM_H */

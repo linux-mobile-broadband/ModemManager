@@ -19,7 +19,7 @@
 #include <glib.h>
 #include <glib-object.h>
 
-#include "mm-base-modem.h"
+#include "mm-base-sms.h"
 #include "mm-sms-part.h"
 
 #define MM_TYPE_SMS_LIST            (mm_sms_list_get_type ())
@@ -32,8 +32,6 @@
 typedef struct _MMSmsList MMSmsList;
 typedef struct _MMSmsListClass MMSmsListClass;
 typedef struct _MMSmsListPrivate MMSmsListPrivate;
-
-#define MM_SMS_LIST_MODEM "sms-list-modem"
 
 #define MM_SMS_ADDED     "sms-added"
 #define MM_SMS_DELETED   "sms-deleted"
@@ -57,8 +55,7 @@ struct _MMSmsListClass {
 GType mm_sms_list_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMSmsList, g_object_unref)
 
-MMSmsList *mm_sms_list_new (MMBaseModem *modem,
-                            GObject     *bind_to);
+MMSmsList *mm_sms_list_new (GObject     *bind_to);
 
 GStrv mm_sms_list_get_paths (MMSmsList *self);
 guint mm_sms_list_get_count (MMSmsList *self);
@@ -68,6 +65,7 @@ gboolean mm_sms_list_has_part (MMSmsList *self,
                                guint index);
 
 gboolean mm_sms_list_take_part (MMSmsList *self,
+                                MMBaseSms *uninitialized_sms,
                                 MMSmsPart *part,
                                 MMSmsState state,
                                 MMSmsStorage storage,
@@ -87,5 +85,8 @@ gboolean mm_sms_list_delete_sms_finish (MMSmsList *self,
 gboolean mm_sms_list_has_local_multipart_reference (MMSmsList *self,
                                                     const gchar *number,
                                                     guint8 reference);
+
+void mm_sms_list_set_default_storage (MMSmsList *self,
+                                      MMSmsStorage default_storage);
 
 #endif /* MM_SMS_LIST_H */

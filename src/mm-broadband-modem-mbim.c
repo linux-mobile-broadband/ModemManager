@@ -5840,6 +5840,7 @@ static gboolean process_pdu_messages (MMBroadbandModemMbim       *self,
                                       guint32                     messages_count,
                                       MbimSmsPduReadRecordArray  *pdu_messages,
                                       guint                       expected_index,
+                                      gboolean                    unstored,
                                       GError                    **error);
 
 static void
@@ -5864,6 +5865,7 @@ sms_notification_read_flash_sms (MMBroadbandModemMbim *self,
                                messages_count,
                                pdu_messages,
                                SMS_PART_INVALID_INDEX,
+                               TRUE,
                                &error))
         mm_obj_dbg (self, "flash SMS message reading failed: %s", error->message);
 }
@@ -5943,6 +5945,7 @@ alert_sms_read_query_ready (MbimDevice             *device,
                                messages_count,
                                pdu_messages,
                                ctx->expected_index,
+                               FALSE,
                                &error))
         mm_obj_dbg (ctx->self, "SMS message reading failed: %s", error->message);
 
@@ -9024,35 +9027,45 @@ load_initial_sms_parts_finish (MMIfaceModemMessaging  *self,
 static void
 add_sms_part (MMBroadbandModemMbim       *self,
               const MbimSmsPduReadRecord *pdu,
+              guint                       part_index,
               guint                       expected_index)
 {
     MMSmsPart         *part;
     g_autoptr(GError)  error = NULL;
 
-    part = mm_sms_part_3gpp_new_from_binary_pdu (pdu->message_index,
+    part = mm_sms_part_3gpp_new_from_binary_pdu (part_index,
                                                  pdu->pdu_data,
                                                  pdu->pdu_data_size,
                                                  self,
                                                  FALSE,
                                                  &error);
-    if (part) {
-        mm_obj_dbg (self, "correctly parsed PDU (%d)", pdu->message_index);
-        if (expected_index != SMS_PART_INVALID_INDEX && (expected_index != mm_sms_part_get_index (part))) {
-            /* Some Fibocom L850 modems report an invalid part index (always 1) in the response
-             * message. Because we know which message part was requested, we can use that value
-             * instead to workaround this bug. */
-            mm_obj_dbg (self, "Expected SMS part index '%u' but device reports index '%u': using the expected one",
-                        expected_index, mm_sms_part_get_index (part));
-            mm_sms_part_set_index (part, expected_index);
-        }
-        mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
-                                            part,
-                                            mm_sms_state_from_mbim_message_status (pdu->message_status),
-                                            MM_SMS_STORAGE_MT);
-    } else {
+    if (!part) {
         /* Don't treat the error as critical */
         mm_obj_dbg (self, "error parsing PDU (%d): %s",
                     pdu->message_index, error->message);
+        return;
+    }
+
+    mm_obj_dbg (self, "correctly parsed PDU (%d)", pdu->message_index);
+    if (expected_index != SMS_PART_INVALID_INDEX && (expected_index != mm_sms_part_get_index (part))) {
+        /* Some Fibocom L850 modems report an invalid part index (always 1) in the response
+         * message. Because we know which message part was requested, we can use that value
+         * instead to workaround this bug. */
+        mm_obj_dbg (self, "Expected SMS part index '%u' but device reports index '%u': using the expected one",
+                    expected_index, mm_sms_part_get_index (part));
+        mm_sms_part_set_index (part, expected_index);
+    }
+
+    if (!mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
+                                             mm_broadband_modem_create_sms (MM_BROADBAND_MODEM (self)),
+                                             part,
+                                             mm_sms_state_from_mbim_message_status (pdu->message_status),
+                                             MM_SMS_STORAGE_MT,
+                                             &error)) {
+        /* Don't treat the error as critical */
+        mm_obj_dbg (self, "error adding SMS (%d): %s",
+                    pdu->message_index, error->message);
+        return;
     }
 }
 
@@ -9062,6 +9075,7 @@ process_pdu_messages (MMBroadbandModemMbim       *self,
                       guint32                     messages_count,
                       MbimSmsPduReadRecordArray  *pdu_messages,
                       guint                       expected_index,
+                      gboolean                    unstored,
                       GError                    **error)
 {
     guint i;
@@ -9087,11 +9101,26 @@ process_pdu_messages (MMBroadbandModemMbim       *self,
 
     mm_obj_dbg (self, "%u SMS PDUs reported", messages_count);
     for (i = 0; i < messages_count; i++) {
-        if (pdu_messages[i]) {
-            mm_obj_dbg (self, "processing SMS PDU %u/%u...", i+1, messages_count);
-            add_sms_part (self, pdu_messages[i], expected_index);
-        } else
+        guint message_index;
+
+        if (!pdu_messages[i]) {
             mm_obj_dbg (self, "ignoring invalid SMS PDU %u/%u...", i+1, messages_count);
+            continue;
+        }
+
+        mm_obj_dbg (self, "processing SMS PDU %u/%u...", i+1, messages_count);
+
+        message_index = pdu_messages[i]->message_index;
+        if (unstored && message_index != 0) {
+            mm_obj_warn (self,
+                         "processed unstored PDU with non-zero message index (%u)",
+                         message_index);
+        }
+
+        add_sms_part (self,
+                      pdu_messages[i],
+                      unstored ? SMS_PART_INVALID_INDEX : message_index,
+                      expected_index);
     }
 
     return TRUE;
@@ -9126,6 +9155,7 @@ sms_read_query_ready (MbimDevice   *device,
                                messages_count,
                                pdu_messages,
                                SMS_PART_INVALID_INDEX,
+                               FALSE,
                                &error))
         g_task_return_error (task, error);
     else
@@ -9231,9 +9261,14 @@ enable_unsolicited_events_messaging (MMIfaceModemMessaging *_self,
 /* Create SMS (Messaging interface) */
 
 static MMBaseSms *
-messaging_create_sms (MMIfaceModemMessaging *self)
+messaging_create_sms (MMBroadbandModem *self)
 {
-    return mm_sms_mbim_new (MM_BASE_MODEM (self));
+    MMSmsStorage default_storage;
+
+    default_storage = mm_iface_modem_messaging_get_default_storage (MM_IFACE_MODEM_MESSAGING (self));
+    return mm_sms_mbim_new (MM_BASE_MODEM (self),
+                            mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)),
+                            default_storage);
 }
 
 /*****************************************************************************/
@@ -10716,7 +10751,6 @@ iface_modem_messaging_init (MMIfaceModemMessagingInterface *iface)
     iface->enable_unsolicited_events_finish = common_enable_disable_unsolicited_events_messaging_finish;
     iface->disable_unsolicited_events = disable_unsolicited_events_messaging;
     iface->disable_unsolicited_events_finish = common_enable_disable_unsolicited_events_messaging_finish;
-    iface->create_sms = messaging_create_sms;
 }
 
 static void
@@ -10786,6 +10820,7 @@ mm_broadband_modem_mbim_class_init (MMBroadbandModemMbimClass *klass)
     /* Do not initialize the MBIM modem through AT commands */
     broadband_modem_class->enabling_modem_init = NULL;
     broadband_modem_class->enabling_modem_init_finish = NULL;
+    broadband_modem_class->create_sms = messaging_create_sms;
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     g_object_class_install_property (object_class, PROP_QMI_UNSUPPORTED,

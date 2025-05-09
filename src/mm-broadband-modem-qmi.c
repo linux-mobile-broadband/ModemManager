@@ -7938,8 +7938,8 @@ add_new_read_sms_part (MMIfaceModemMessaging *self,
                        gboolean transfer_route,
                        GArray *data)
 {
-    MMSmsPart *part = NULL;
-    GError *error = NULL;
+    MMSmsPart         *part = NULL;
+    g_autoptr(GError)  error = NULL;
 
     switch (format) {
     case QMI_WMS_MESSAGE_FORMAT_CDMA:
@@ -7967,16 +7967,21 @@ add_new_read_sms_part (MMIfaceModemMessaging *self,
         break;
     }
 
-    if (part) {
-        mm_obj_dbg (self, "correctly parsed PDU (%d)", index);
-        mm_iface_modem_messaging_take_part (self,
-                                            part,
-                                            mm_sms_state_from_qmi_message_tag (tag),
-                                            mm_sms_storage_from_qmi_storage_type (storage));
-    } else if (error) {
+    if (!part) {
         /* Don't treat the error as critical */
         mm_obj_dbg (self, "error parsing PDU (%d): %s", index, error->message);
-        g_error_free (error);
+        return;
+    }
+
+    mm_obj_dbg (self, "correctly parsed PDU (%d)", index);
+    if (!mm_iface_modem_messaging_take_part (self,
+                                             mm_broadband_modem_create_sms (MM_BROADBAND_MODEM (self)),
+                                             part,
+                                             mm_sms_state_from_qmi_message_tag (tag),
+                                             mm_sms_storage_from_qmi_storage_type (storage),
+                                             &error)) {
+        /* Don't treat the error as critical */
+        mm_obj_dbg (self, "error adding SMS (%d): %s", index, error->message);
     }
 }
 
@@ -8409,7 +8414,6 @@ messaging_event_report_indication_cb (QmiClientNas *client,
     QmiWmsAckIndicator ack_ind;
     guint32 transaction_id;
     QmiWmsMessageFormat msg_format;
-    QmiWmsMessageTagType tag;
     GArray *raw_data = NULL;
 
     /* Handle transfer-route MT messages */
@@ -8454,13 +8458,10 @@ messaging_event_report_indication_cb (QmiClientNas *client,
         }
 
         /* Defaults for transfer-route messages, which are not stored anywhere */
-        storage = QMI_WMS_STORAGE_TYPE_NONE;
-        memory_index = 0;
-        tag = QMI_WMS_MESSAGE_TAG_TYPE_MT_NOT_READ;
         add_new_read_sms_part (MM_IFACE_MODEM_MESSAGING (self),
-                               storage,
-                               memory_index,
-                               tag,
+                               QMI_WMS_STORAGE_TYPE_NONE,
+                               SMS_PART_INVALID_INDEX,
+                               QMI_WMS_MESSAGE_TAG_TYPE_MT_NOT_READ,
                                msg_format,
                                TRUE,
                                raw_data);
@@ -8870,19 +8871,23 @@ messaging_enable_unsolicited_events (MMIfaceModemMessaging *_self,
 }
 
 /*****************************************************************************/
-/* Create SMS (Messaging interface) */
+/* Create SMS */
 
 static MMBaseSms *
-messaging_create_sms (MMIfaceModemMessaging *_self)
+messaging_create_sms (MMBroadbandModem *_self)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    MMSmsStorage         default_storage;
 
     /* Handle AT URC only fallback */
     if (self->priv->messaging_fallback_at_only) {
-        return iface_modem_messaging_parent->create_sms (_self);
+        return MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_qmi_parent_class)->create_sms (_self);
     }
 
-    return mm_sms_qmi_new (MM_BASE_MODEM (self));
+    default_storage = mm_iface_modem_messaging_get_default_storage (MM_IFACE_MODEM_MESSAGING (self));
+    return mm_sms_qmi_new (MM_BASE_MODEM (self),
+                           mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)),
+                           default_storage);
 }
 
 
@@ -15330,7 +15335,6 @@ iface_modem_messaging_init (MMIfaceModemMessagingInterface *iface)
     iface->enable_unsolicited_events_finish = messaging_enable_unsolicited_events_finish;
     iface->disable_unsolicited_events = messaging_disable_unsolicited_events;
     iface->disable_unsolicited_events_finish = messaging_disable_unsolicited_events_finish;
-    iface->create_sms = messaging_create_sms;
     iface->init_current_storages = messaging_init_current_storages;
     iface->init_current_storages_finish = messaging_init_current_storages_finish;
 }
@@ -15469,4 +15473,5 @@ mm_broadband_modem_qmi_class_init (MMBroadbandModemQmiClass *klass)
     /* Do not initialize the QMI modem through AT commands */
     broadband_modem_class->enabling_modem_init = NULL;
     broadband_modem_class->enabling_modem_init_finish = NULL;
+    broadband_modem_class->create_sms = messaging_create_sms;
 }

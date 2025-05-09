@@ -210,6 +210,7 @@ libport_dep = declare_dependency(
 sources = files(
   'mm-auth-provider.c',
   'mm-context.c',
+  'mm-bind.c',
 )
 
 incs = [
@@ -237,6 +238,33 @@ libauth_dep = declare_dependency(
   include_directories: ['.', kerneldevice_inc],
   dependencies: deps,
   link_with: libauth,
+)
+
+# SMS library
+sources = files(
+  'mm-sms-list.c',
+  'mm-base-sms.c',
+)
+
+incs = [
+  top_inc,
+]
+
+deps = [libmm_glib_dep, libhelpers_dep, libauth_dep]
+
+private_deps = []
+
+libsms = static_library(
+  'sms',
+  sources: sources,
+  include_directories: incs,
+  dependencies: deps,
+)
+
+libsms_dep = declare_dependency(
+  include_directories: ['.'],
+  dependencies: deps,
+  link_with: libsms,
 )
 
 # Daemon enums, required by plugins
@@ -297,14 +325,12 @@ sources = files(
   'mm-base-modem-at.c',
   'mm-base-modem.c',
   'mm-base-sim.c',
-  'mm-base-sms.c',
-  'mm-bind.c',
+  'mm-sms-at.c',
   'mm-bearer-list.c',
   'mm-broadband-bearer.c',
   'mm-broadband-modem.c',
   'mm-call-list.c',
   'mm-cbm-list.c',
-  'mm-context.c',
   'mm-device.c',
   'mm-dispatcher.c',
   'mm-dispatcher-connection.c',
@@ -333,7 +359,6 @@ sources = files(
   'mm-port-probe.c',
   'mm-port-probe-at.c',
   'mm-private-boxed-types.c',
-  'mm-sms-list.c',
   'mm-sleep-context.c',
 )
 
@@ -343,6 +368,7 @@ deps = [
   gmodule_dep,
   libport_dep,
   libqcdm_dep,
+  libsms_dep,
   libauth_dep,
 ]
 

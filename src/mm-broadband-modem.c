@@ -52,6 +52,7 @@
 #include "mm-cbm-part.h"
 #include "mm-sms-list.h"
 #include "mm-sms-part-3gpp.h"
+#include "mm-sms-at.h"
 #include "mm-call-list.h"
 #include "mm-base-sim.h"
 #include "mm-log-object.h"
@@ -7185,11 +7186,13 @@ modem_messaging_init_current_storages (MMIfaceModemMessaging *self,
  * the default one if needed.
  */
 
-void
-mm_broadband_modem_unlock_sms_storages (MMBroadbandModem *self,
-                                        gboolean mem1,
-                                        gboolean mem2)
+static void
+modem_messaging_unlock_storages (MMIfaceModemMessaging *_self,
+                                 gboolean               mem1,
+                                 gboolean               mem2)
 {
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
+
     if (mem1) {
         g_assert (self->priv->mem1_storage_locked);
         self->priv->mem1_storage_locked = FALSE;
@@ -7201,10 +7204,10 @@ mm_broadband_modem_unlock_sms_storages (MMBroadbandModem *self,
     }
 }
 
-gboolean
-mm_broadband_modem_lock_sms_storages_finish (MMBroadbandModem *self,
-                                             GAsyncResult *res,
-                                             GError **error)
+static gboolean
+modem_messaging_lock_storages_finish (MMIfaceModemMessaging  *self,
+                                      GAsyncResult           *res,
+                                      GError                **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
@@ -7246,13 +7249,14 @@ lock_storages_cpms_set_ready (MMBaseModem *_self,
     g_object_unref (task);
 }
 
-void
-mm_broadband_modem_lock_sms_storages (MMBroadbandModem *self,
-                                      MMSmsStorage mem1, /* reading/listing/deleting */
-                                      MMSmsStorage mem2, /* storing/sending */
-                                      GAsyncReadyCallback callback,
-                                      gpointer user_data)
+static void
+modem_messaging_lock_storages (MMIfaceModemMessaging *_self,
+                               MMSmsStorage           mem1, /* reading/listing/deleting */
+                               MMSmsStorage           mem2, /* storing/sending */
+                               GAsyncReadyCallback    callback,
+                               gpointer               user_data)
 {
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
     LockSmsStoragesContext *ctx;
     GTask *task;
     gchar *cmd = NULL;
@@ -7267,7 +7271,7 @@ mm_broadband_modem_lock_sms_storages (MMBroadbandModem *self,
             self,
             callback,
             user_data,
-            mm_broadband_modem_lock_sms_storages,
+            modem_messaging_lock_storages,
             MM_CORE_ERROR,
             MM_CORE_ERROR_RETRY,
             "SMS storage currently locked, try again later");
@@ -7541,13 +7545,13 @@ sms_part_ready (MMBroadbandModem *self,
                 GTask *task)
 {
     SmsPartContext *ctx;
-    MMSmsPart *part;
-    MM3gppPduInfo *info;
-    const gchar *response;
-    GError *error = NULL;
+    MMSmsPart      *part;
+    MM3gppPduInfo  *info;
+    const gchar    *response;
+    GError         *error = NULL;
 
     /* Always always always unlock mem1 storage. Warned you've been. */
-    mm_broadband_modem_unlock_sms_storages (self, TRUE, FALSE);
+    mm_iface_modem_messaging_unlock_storages (MM_IFACE_MODEM_MESSAGING (self), TRUE, FALSE);
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
@@ -7570,16 +7574,22 @@ sms_part_ready (MMBroadbandModem *self,
     }
 
     part = mm_sms_part_3gpp_new_from_pdu (info->index, info->pdu, self, &error);
-    if (part) {
-        mm_obj_dbg (self, "correctly parsed PDU (%d)", ctx->idx);
-        mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
-                                            part,
-                                            MM_SMS_STATE_RECEIVED,
-                                            self->priv->modem_messaging_sms_default_storage);
-    } else {
+    if (!part) {
         /* Don't treat the error as critical */
         mm_obj_dbg (self, "error parsing PDU (%d): %s", ctx->idx, error->message);
         g_error_free (error);
+    } else {
+        mm_obj_dbg (self, "correctly parsed PDU (%d)", ctx->idx);
+        if (!mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
+                                                 mm_broadband_modem_create_sms (MM_BROADBAND_MODEM (self)),
+                                                 part,
+                                                 MM_SMS_STATE_RECEIVED,
+                                                 self->priv->modem_messaging_sms_default_storage,
+                                                 &error)) {
+            /* Don't treat the error as critical */
+            mm_obj_dbg (self, "error adding SMS (%d): %s", ctx->idx, error->message);
+            g_error_free (error);
+        }
     }
 
     /* All done */
@@ -7589,15 +7599,15 @@ sms_part_ready (MMBroadbandModem *self,
 }
 
 static void
-indication_lock_storages_ready (MMBroadbandModem *self,
-                                GAsyncResult *res,
-                                GTask *task)
+indication_lock_storages_ready (MMIfaceModemMessaging *messaging,
+                                GAsyncResult          *res,
+                                GTask                 *task)
 {
     SmsPartContext *ctx;
     gchar *command;
     GError *error = NULL;
 
-    if (!mm_broadband_modem_lock_sms_storages_finish (self, res, &error)) {
+    if (!mm_iface_modem_messaging_lock_storages_finish (messaging, res, &error)) {
         /* TODO: we should either make this lock() never fail, by automatically
          * retrying after some time, or otherwise retry here. */
         g_task_return_error (task, error);
@@ -7610,7 +7620,7 @@ indication_lock_storages_ready (MMBroadbandModem *self,
     /* Retrieve the message */
     ctx = g_task_get_task_data (task);
     command = g_strdup_printf ("+CMGR=%d", ctx->idx);
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
+    mm_base_modem_at_command (MM_BASE_MODEM (messaging),
                               command,
                               10,
                               FALSE,
@@ -7658,11 +7668,11 @@ cmti_received (MMPortSerialAt *port,
     g_task_set_task_data (task, ctx, g_free);
 
     /* First, request to set the proper storage to read from */
-    mm_broadband_modem_lock_sms_storages (self,
-                                          storage,
-                                          MM_SMS_STORAGE_UNKNOWN,
-                                          (GAsyncReadyCallback)indication_lock_storages_ready,
-                                          task);
+    mm_iface_modem_messaging_lock_storages (MM_IFACE_MODEM_MESSAGING (self),
+                                            storage,
+                                            MM_SMS_STORAGE_UNKNOWN,
+                                            (GAsyncReadyCallback)indication_lock_storages_ready,
+                                            task);
 }
 
 static void
@@ -7670,10 +7680,10 @@ cds_received (MMPortSerialAt *port,
               GMatchInfo *info,
               MMBroadbandModem *self)
 {
-    GError *error = NULL;
-    MMSmsPart *part;
-    guint length;
-    gchar *pdu;
+    g_autoptr(GError)  error = NULL;
+    MMSmsPart         *part;
+    guint              length;
+    gchar             *pdu;
 
     mm_obj_dbg (self, "got new non-stored message indication");
 
@@ -7685,16 +7695,20 @@ cds_received (MMPortSerialAt *port,
         return;
 
     part = mm_sms_part_3gpp_new_from_pdu (SMS_PART_INVALID_INDEX, pdu, self, &error);
-    if (part) {
-        mm_obj_dbg (self, "correctly parsed non-stored PDU");
-        mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
-                                            part,
-                                            MM_SMS_STATE_RECEIVED,
-                                            MM_SMS_STORAGE_UNKNOWN);
-    } else {
+    if (!part) {
         /* Don't treat the error as critical */
         mm_obj_dbg (self, "error parsing non-stored PDU: %s", error->message);
-        g_error_free (error);
+    } else {
+        mm_obj_dbg (self, "correctly parsed non-stored PDU");
+        if (!mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
+                                                 mm_broadband_modem_create_sms (MM_BROADBAND_MODEM (self)),
+                                                 part,
+                                                 MM_SMS_STATE_RECEIVED,
+                                                 MM_SMS_STORAGE_UNKNOWN,
+                                                 &error)) {
+            /* Don't treat the error as critical */
+            mm_obj_dbg (self, "error adding SMS: %s", error->message);
+        }
     }
 }
 
@@ -8078,10 +8092,16 @@ sms_text_part_list_ready (MMBroadbandModem *self,
         mm_sms_part_set_class (part, -1);
 
         mm_obj_dbg (self, "correctly parsed SMS list entry (%d)", idx);
-        mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
-                                            part,
-                                            sms_state_from_str (stat),
-                                            ctx->list_storage);
+        if (!mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
+                                                 mm_broadband_modem_create_sms (MM_BROADBAND_MODEM (self)),
+                                                 part,
+                                                 sms_state_from_str (stat),
+                                                 ctx->list_storage,
+                                                 &error)) {
+            mm_obj_dbg (self, "failed to add SMS: %s", inner_error->message);
+            goto next;
+        }
+
 next:
         g_match_info_next (match_info, NULL);
     }
@@ -8120,7 +8140,7 @@ sms_pdu_part_list_ready (MMBroadbandModem *self,
     GList *l;
 
     /* Always always always unlock mem1 storage. Warned you've been. */
-    mm_broadband_modem_unlock_sms_storages (self, TRUE, FALSE);
+    mm_iface_modem_messaging_unlock_storages (MM_IFACE_MODEM_MESSAGING (self), TRUE, FALSE);
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
@@ -8143,16 +8163,22 @@ sms_pdu_part_list_ready (MMBroadbandModem *self,
         MMSmsPart *part;
 
         part = mm_sms_part_3gpp_new_from_pdu (info->index, info->pdu, self, &error);
-        if (part) {
-            mm_obj_dbg (self, "correctly parsed PDU (%d)", info->index);
-            mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
-                                                part,
-                                                sms_state_from_index (info->status),
-                                                ctx->list_storage);
-        } else {
+        if (!part) {
             /* Don't treat the error as critical */
             mm_obj_dbg (self, "error parsing PDU (%d): %s", info->index, error->message);
             g_clear_error (&error);
+        } else {
+            mm_obj_dbg (self, "correctly parsed PDU (%d)", info->index);
+            if (!mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
+                                                     mm_broadband_modem_create_sms (MM_BROADBAND_MODEM (self)),
+                                                     part,
+                                                     sms_state_from_index (info->status),
+                                                     ctx->list_storage,
+                                                     &error)) {
+                /* Don't treat the error as critical */
+                mm_obj_dbg (self, "error adding SMS (%d): %s", info->index, error->message);
+                g_clear_error (&error);
+            }
         }
     }
 
@@ -8164,13 +8190,13 @@ sms_pdu_part_list_ready (MMBroadbandModem *self,
 }
 
 static void
-list_parts_lock_storages_ready (MMBroadbandModem *self,
-                                GAsyncResult *res,
-                                GTask *task)
+list_parts_lock_storages_ready (MMIfaceModemMessaging *self,
+                                GAsyncResult          *res,
+                                GTask                 *task)
 {
     GError *error = NULL;
 
-    if (!mm_broadband_modem_lock_sms_storages_finish (self, res, &error)) {
+    if (!mm_iface_modem_messaging_lock_storages_finish (self, res, &error)) {
         /* TODO: we should either make this lock() never fail, by automatically
          * retrying after some time, or otherwise retry here. */
         g_task_return_error (task, error);
@@ -8212,20 +8238,33 @@ modem_messaging_load_initial_sms_parts (MMIfaceModemMessaging *self,
     mm_obj_dbg (self, "listing SMS parts in storage '%s'", mm_sms_storage_get_string (storage));
 
     /* First, request to set the proper storage to read from */
-    mm_broadband_modem_lock_sms_storages (MM_BROADBAND_MODEM (self),
-                                          storage,
-                                          MM_SMS_STORAGE_UNKNOWN,
-                                          (GAsyncReadyCallback)list_parts_lock_storages_ready,
-                                          task);
+    mm_iface_modem_messaging_lock_storages (self,
+                                            storage,
+                                            MM_SMS_STORAGE_UNKNOWN,
+                                            (GAsyncReadyCallback)list_parts_lock_storages_ready,
+                                            task);
 }
 
 /*****************************************************************************/
-/* Create SMS (Messaging interface) */
+/* Create SMS */
+
+MMBaseSms *
+mm_broadband_modem_create_sms (MMBroadbandModem *self)
+{
+    g_assert (MM_BROADBAND_MODEM_GET_CLASS (self)->create_sms != NULL);
+
+    return MM_BROADBAND_MODEM_GET_CLASS (self)->create_sms (self);
+}
 
 static MMBaseSms *
-modem_messaging_create_sms (MMIfaceModemMessaging *self)
+modem_messaging_create_sms (MMBroadbandModem *self)
 {
-    return mm_base_sms_new (MM_BASE_MODEM (self));
+    MMSmsStorage default_storage;
+
+    default_storage = mm_iface_modem_messaging_get_default_storage (MM_IFACE_MODEM_MESSAGING (self));
+    return mm_sms_at_new (MM_BASE_MODEM (self),
+                          mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)),
+                          default_storage);
 }
 
 /*****************************************************************************/
@@ -14537,9 +14576,11 @@ iface_modem_messaging_init (MMIfaceModemMessagingInterface *iface)
     iface->enable_unsolicited_events_finish = modem_messaging_enable_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = modem_messaging_cleanup_unsolicited_events;
     iface->cleanup_unsolicited_events_finish = modem_messaging_setup_cleanup_unsolicited_events_finish;
-    iface->create_sms = modem_messaging_create_sms;
     iface->init_current_storages = modem_messaging_init_current_storages;
     iface->init_current_storages_finish = modem_messaging_init_current_storages_finish;
+    iface->lock_storages = modem_messaging_lock_storages;
+    iface->lock_storages_finish = modem_messaging_lock_storages_finish;
+    iface->unlock_storages = modem_messaging_unlock_storages;
 }
 
 static void
@@ -14656,6 +14697,7 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     klass->disabling_stopped = disabling_stopped;
     klass->load_initial_eps_bearer_cid = load_initial_eps_bearer_cid;
     klass->load_initial_eps_bearer_cid_finish = load_initial_eps_bearer_cid_finish;
+    klass->create_sms = modem_messaging_create_sms;
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_DBUS_SKELETON,
