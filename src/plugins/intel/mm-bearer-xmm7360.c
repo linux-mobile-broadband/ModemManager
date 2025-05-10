@@ -26,6 +26,7 @@
 #include "mm-broadband-modem-xmm7360.h"
 #include "mm-broadband-modem-xmm7360-rpc.h"
 #include "mm-port-serial-xmmrpc-xmm7360.h"
+#include "mm-bind.h"
 
 G_DEFINE_TYPE (MMBearerXmm7360, mm_bearer_xmm7360, MM_TYPE_BASE_BEARER)
 
@@ -731,6 +732,7 @@ mm_bearer_xmm7360_new (MMBroadbandModemXmm7360 *modem,
      * g_object_new here */
     bearer = g_object_new (MM_TYPE_BEARER_XMM7360,
                            MM_BASE_BEARER_MODEM, modem,
+                           MM_BIND_TO, modem,
                            MM_BASE_BEARER_CONFIG, config,
                            NULL);
 
