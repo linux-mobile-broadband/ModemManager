@@ -582,8 +582,15 @@ endif
 
 # plugin: intel
 if plugins_options['intel']
+  intel_inc = include_directories('intel')
+
   sources = files(
     'intel/mm-plugin-intel.c',
+    'intel/mm-broadband-modem-xmm7360.c',
+    'intel/mm-broadband-modem-xmm7360-rpc.c',
+    'intel/mm-port-serial-xmmrpc-xmm7360.c',
+    'intel/mm-bearer-xmm7360.c',
+    'intel/mm-sim-xmm7360.c',
   )
 
   if enable_mbim
@@ -592,9 +599,40 @@ if plugins_options['intel']
 
   common_c_args = '-DMM_MODULE_NAME="intel"'
 
+  headers = files('intel/mm-port-serial-xmmrpc-xmm7360.h')
+
+  enums_types = 'mm-intel-enums-types'
+
+  sources += custom_target(
+    enums_types + '.c',
+    input: headers,
+    output: enums_types + '.c',
+    command: [
+      python,
+      mm_mkenums,
+      '--fhead', '#include "' + enums_types + '.h"\n',
+      '--template', files(templates_dir / enums_types + '.c.template'),
+      '@INPUT@'],
+    capture: true,
+  )
+
+  sources += custom_target(
+    enums_types + '.h',
+    input: headers,
+    output: enums_types + '.h',
+    command: [
+      python,
+      mm_mkenums,
+      '--fhead', '#include "mm-port-serial-xmmrpc-xmm7360.h"\n#ifndef __MM_XMM7360_ENUMS_TYPES_H__\n#define __MM_XMM7360_ENUMS_TYPES_H__\n',
+      '--template', files(templates_dir / enums_types + '.h.template'),
+      '--ftail', '#endif /* __MM_XMM7360_ENUMS_TYPES_H__ */\n',
+      '@INPUT@'],
+    capture: true,
+  )
+
   plugins += {'plugin-intel': {
     'plugin': true,
-    'module': {'sources': sources, 'include_directories': plugins_incs + [xmm_inc], 'c_args': common_c_args},
+    'module': {'sources': sources, 'include_directories': plugins_incs + [xmm_inc, intel_inc], 'c_args': common_c_args},
   }}
 endif
 

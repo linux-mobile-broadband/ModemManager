@@ -15,6 +15,7 @@ examples = files(
   '1199',
   '14c3',
   '2c7c',
+  '8086:7360',
 )
 
 install_data(

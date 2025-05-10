@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2021-2022 Intel Corporation
+ * Copyright (c) 2024 Thomas Vogt
  */
 
 #include <stdio.h>
@@ -23,6 +24,7 @@
 #include "mm-log-object.h"
 #include "mm-broadband-modem.h"
 
+#include "mm-broadband-modem-xmm7360.h"
 #if defined WITH_MBIM
 #include "mm-broadband-modem-mbim-intel.h"
 #endif
@@ -57,14 +59,18 @@ create_modem (MMPlugin      *self,
 #endif
 
     if (mm_port_probe_list_has_xmmrpc_port (probes)) {
-        mm_obj_dbg (self, "Intel modem with RPC control port found...");
         if (product == 0x7360) {
-            g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                 "Intel XMM7360 in RPC mode not supported");
-            return NULL;
+            mm_obj_dbg (self, "Intel XMM7360 in RPC mode found...");
+            return MM_BASE_MODEM (mm_broadband_modem_xmm7360_new (uid,
+                                                                  physdev,
+                                                                  drivers,
+                                                                  mm_plugin_get_name (self),
+                                                                  vendor,
+                                                                  product));
+        } else {
+            mm_obj_dbg (self, "Ignoring unknown XMMRPC control port...");
         }
     }
-
 
     mm_obj_dbg (self, "Generic Intel modem found...");
     return MM_BASE_MODEM (mm_broadband_modem_new (uid,
