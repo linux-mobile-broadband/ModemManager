@@ -84,6 +84,7 @@ typedef struct {
     gulong                                   cancelled_id;
     GCancellable                            *parent_cancellable;
     const MMBroadbandModemXmm7360RpcCommand *current;
+    gboolean                                 current_retry;
     const MMBroadbandModemXmm7360RpcCommand *sequence;
     guint                                    next_command_wait_id;
 } RpcSequenceContext;
@@ -152,6 +153,7 @@ rpc_sequence_parse_response (MMPortSerialXmmrpcXmm7360 *port,
     RpcSequenceContext                                *ctx;
     Xmm7360RpcResponse                                *response = NULL;
     g_autoptr(GError)                                  command_error = NULL;
+    gboolean                                           command_retry = FALSE;
 
     response = mm_port_serial_xmmrpc_xmm7360_command_finish (port, res, &command_error);
 
@@ -173,6 +175,20 @@ rpc_sequence_parse_response (MMPortSerialXmmrpcXmm7360 *port,
                                                              next->callid ? FALSE : TRUE,  /* Last command in sequence? */
                                                              command_error,
                                                              &result_error);
+
+        if (processor_result == MM_BROADBAND_MODEM_XMM7360_RPC_RESPONSE_PROCESSOR_RESULT_FAILURE
+            && ctx->current->allow_retry_once && !ctx->current_retry) {
+            mm_obj_warn (port, "Command failed (%s), retrying once",
+                         result_error ? result_error->message : "UNKNOWN");
+
+            if (response)
+                xmm7360_rpc_response_free (response);
+            g_clear_error (&result_error);
+
+            command_retry = TRUE;
+            goto skip_result;
+        }
+
         switch (processor_result) {
             case MM_BROADBAND_MODEM_XMM7360_RPC_RESPONSE_PROCESSOR_RESULT_CONTINUE:
                 g_assert (!result_error);
@@ -195,8 +211,14 @@ rpc_sequence_parse_response (MMPortSerialXmmrpcXmm7360 *port,
         }
     }
 
-    if (processor_result == MM_BROADBAND_MODEM_XMM7360_RPC_RESPONSE_PROCESSOR_RESULT_CONTINUE) {
-        ctx->current++;
+skip_result:
+    if (processor_result == MM_BROADBAND_MODEM_XMM7360_RPC_RESPONSE_PROCESSOR_RESULT_CONTINUE ||
+        command_retry) {
+        if (!command_retry) {
+            ctx->current++;
+        }
+        ctx->current_retry = command_retry;
+
         if (ctx->current->callid) {
             g_assert (!ctx->next_command_wait_id);
             ctx->next_command_wait_id = g_timeout_add_seconds (ctx->current->wait_seconds,
@@ -204,6 +226,7 @@ rpc_sequence_parse_response (MMPortSerialXmmrpcXmm7360 *port,
                                                                task);
             return;
         }
+        g_assert (!command_retry);
         /* On last command, end. */
     }
 

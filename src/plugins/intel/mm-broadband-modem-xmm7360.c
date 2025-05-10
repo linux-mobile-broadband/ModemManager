@@ -1090,14 +1090,14 @@ static const Xmm7360RpcMsgArg set_radio_signal_reporting_args[] = {
 };
 
 static const MMBroadbandModemXmm7360RpcCommand init_sequence[] = {
-    { XMM7360_RPC_CALL_UTA_MS_SMS_INIT, FALSE, NULL, 3, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
-    { XMM7360_RPC_CALL_UTA_MS_CBS_INIT, FALSE, NULL, 3, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
-    { XMM7360_RPC_CALL_UTA_MS_NET_OPEN, FALSE, NULL, 3, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
-    { XMM7360_RPC_CALL_UTA_MS_NET_SET_RADIO_SIGNAL_REPORTING, FALSE, set_radio_signal_reporting_args, 3, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success},
-    { XMM7360_RPC_CALL_UTA_MS_CALL_CS_INIT, FALSE, NULL, 3, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
-    { XMM7360_RPC_CALL_UTA_MS_CALL_PS_INITIALIZE, FALSE, NULL, 3, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
-    { XMM7360_RPC_CALL_UTA_MS_SS_INIT, FALSE, NULL, 3, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
-    { XMM7360_RPC_CALL_UTA_MS_SIM_OPEN_REQ, FALSE, NULL, 3, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_final },
+    { XMM7360_RPC_CALL_UTA_MS_SMS_INIT, FALSE, NULL, 3, FALSE, TRUE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
+    { XMM7360_RPC_CALL_UTA_MS_CBS_INIT, FALSE, NULL, 3, FALSE, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
+    { XMM7360_RPC_CALL_UTA_MS_NET_OPEN, FALSE, NULL, 3, FALSE, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
+    { XMM7360_RPC_CALL_UTA_MS_NET_SET_RADIO_SIGNAL_REPORTING, FALSE, set_radio_signal_reporting_args, 3, FALSE, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success},
+    { XMM7360_RPC_CALL_UTA_MS_CALL_CS_INIT, FALSE, NULL, 3, FALSE, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
+    { XMM7360_RPC_CALL_UTA_MS_CALL_PS_INITIALIZE, FALSE, NULL, 3, FALSE, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
+    { XMM7360_RPC_CALL_UTA_MS_SS_INIT, FALSE, NULL, 3, FALSE, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
+    { XMM7360_RPC_CALL_UTA_MS_SIM_OPEN_REQ, FALSE, NULL, 3, FALSE, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_final },
     { 0 }
 };
 

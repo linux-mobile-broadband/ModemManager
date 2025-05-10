@@ -674,6 +674,7 @@ static const MMBroadbandModemXmm7360RpcCommand disconnect_sequence[] = {
         },
         3,
         FALSE,
+        FALSE,
         mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success
         /* response will be: L(0x0) L(0x0) L(0x5dffffff) L(0x0) (meaning unknown) */
     },
@@ -686,6 +687,7 @@ static const MMBroadbandModemXmm7360RpcCommand disconnect_sequence[] = {
             { XMM7360_RPC_MSG_ARG_TYPE_UNKNOWN },
         },
         3,
+        FALSE,
         FALSE,
         mm_broadband_modem_xmm7360_rpc_response_processor_final
         /* response will be: L(0x0) (meaning unknown) */
