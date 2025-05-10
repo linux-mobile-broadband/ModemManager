@@ -3041,6 +3041,10 @@ mm_base_sim_init (MMBaseSim *self)
 
     /* Each SIM is given a unique id to build its own DBus path */
     self->priv->dbus_id = id++;
+
+    /* Setup authorization provider */
+    self->priv->authp = mm_auth_provider_get ();
+    self->priv->authp_cancellable = g_cancellable_new ();
 }
 
 static void
