@@ -63,7 +63,7 @@ mm_log_object_get_id (MMLogObject *self)
         gchar *self_id;
 
         self_id = MM_LOG_OBJECT_GET_IFACE (self)->build_id (self);
-        if (priv->owner_id) {
+        if (self_id && priv->owner_id) {
             priv->id = g_strdup_printf ("%s/%s", priv->owner_id, self_id);
             g_free (self_id);
         } else
