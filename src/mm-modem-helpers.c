@@ -2001,10 +2001,10 @@ item_is_lac_not_stat (GMatchInfo *info, guint32 item)
     gchar *str;
     gboolean is_lac = FALSE;
 
-    /* A <stat> will always be a single digit, without quotes */
+    /* A <stat> will always be a digit < 100, without quotes */
     str = g_match_info_fetch (info, item);
     g_assert (str);
-    is_lac = (strchr (str, '"') || strlen (str) > 1);
+    is_lac = (strchr (str, '"') || strlen (str) > 2);
     g_free (str);
     return is_lac;
 }
