@@ -1207,6 +1207,16 @@ test_creg1_unsolicited (void *f, gpointer d)
 }
 
 static void
+test_creg1_multidigit_stat_unsolicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "\r\n+CREG: 11\r\n";
+    const CregResult result = { MM_MODEM_3GPP_REGISTRATION_STATE_ATTACHED_RLOS, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 0, FALSE, FALSE, FALSE };
+
+    test_creg_match ("CREG=1 with multidigit \"stat\" value", FALSE, reply, data, &result);
+}
+
+static void
 test_creg2_mercury_solicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
@@ -1224,6 +1234,16 @@ test_creg2_mercury_unsolicited (void *f, gpointer d)
     const CregResult result = { MM_MODEM_3GPP_REGISTRATION_STATE_HOME, 0x84cd, 0xd30156, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 2, FALSE, FALSE, FALSE };
 
     test_creg_match ("Sierra Mercury CREG=2", FALSE, reply, data, &result);
+}
+
+static void
+test_creg2_multidigit_stat_unsolicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "\r\n+CREG: 11,\"33FE\",\"a3fb477\"\r\n";
+    const CregResult result = { MM_MODEM_3GPP_REGISTRATION_STATE_ATTACHED_RLOS, 0x33FE, 0xa3fb477, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 2, FALSE, FALSE, FALSE };
+
+    test_creg_match ("CREG=2 with multidigit \"stat\" value", FALSE, reply, data, &result);
 }
 
 static void
@@ -1348,6 +1368,26 @@ test_creg2_leading_zeros_unsolicited (void *f, gpointer d)
 }
 
 static void
+test_creg2_multidigit_stat_no_leading_zeros_unsolicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "\r\n+CREG: 10,0001,0010,0\r\n";
+    const CregResult result = { MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED, 0x0001, 0x0010, MM_MODEM_ACCESS_TECHNOLOGY_GSM, 5, FALSE, FALSE, FALSE };
+
+    test_creg_match ("unsolicited CREG=2 with no leading zeros in integer fields and multidigit \"stat\" value", FALSE, reply, data, &result);
+}
+
+static void
+test_creg2_multidigit_stat_leading_zeros_unsolicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "\r\n+CREG: 0011,\"0001\",\"0010\",000\r\n";
+    const CregResult result = { MM_MODEM_3GPP_REGISTRATION_STATE_ATTACHED_RLOS, 0x0001, 0x0010, MM_MODEM_ACCESS_TECHNOLOGY_GSM, 6, FALSE, FALSE, FALSE };
+
+    test_creg_match ("unsolicited CREG=2 with leading zeros in integer fields and multidigit \"stat\" value", FALSE, reply, data, &result);
+}
+
+static void
 test_creg2_ublox_solicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
@@ -1469,6 +1509,16 @@ test_creg2_s8500_wave_unsolicited (void *f, gpointer d)
 }
 
 static void
+test_creg2_s8500_wave_multidigit_stat_unsolicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "\r\n+CREG: 2,11,003F,8FE3, B, C2816\r\n";
+    const CregResult result = { MM_MODEM_3GPP_REGISTRATION_STATE_ATTACHED_RLOS, 0x003F, 0x8FE3, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 8, FALSE, FALSE, FALSE };
+
+    test_creg_match ("Samsung Wave S8500 CREG=2 with multidigit \"stat\" value", FALSE, reply, data, &result);
+}
+
+static void
 test_creg2_gobi_weird_solicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
@@ -1486,6 +1536,36 @@ test_cgreg2_unsolicited_with_rac (void *f, gpointer d)
     const CregResult result = { MM_MODEM_3GPP_REGISTRATION_STATE_HOME, 0x1422, 0x0142, MM_MODEM_ACCESS_TECHNOLOGY_EDGE, 9, TRUE, FALSE, FALSE };
 
     test_creg_match ("CGREG=2 with RAC", FALSE, reply, data, &result);
+}
+
+static void
+test_cgreg2_multidigit_stat_with_rac_unsolicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "\r\n+CGREG: 11,\"B092\",\"00000697\",3,\"00\"\r\n";
+    const CregResult result = { MM_MODEM_3GPP_REGISTRATION_STATE_ATTACHED_RLOS, 0xB092, 0x0697, MM_MODEM_ACCESS_TECHNOLOGY_EDGE, 9, TRUE, FALSE, FALSE };
+
+    test_creg_match ("CGREG=2 with multidigit \"stat\" value and RAC", FALSE, reply, data, &result);
+}
+
+static void
+test_cgreg2_multidigit_stat_no_leading_zeros_solicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "+CGREG:2,10,ebbd,f025";
+    const CregResult result = { MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED, 0xebbd, 0xf025, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 3, TRUE, FALSE, FALSE };
+
+    test_creg_match ("solicited CGREG=2 with no leading zeros in integer fields and multidigit \"stat\" value", TRUE, reply, data, &result);
+}
+
+static void
+test_cgreg2_multidigit_stat_leading_zeros_solicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "+CGREG:002,0011,\"0f0d\",\"14c3\"";
+    const CregResult result = { MM_MODEM_3GPP_REGISTRATION_STATE_ATTACHED_RLOS, 0x0f0d, 0x14c3, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 4, TRUE, FALSE, FALSE };
+
+    test_creg_match ("solicited CGREG=2 with leading zeros in integer fields and multidigit \"stat\" value", TRUE, reply, data, &result);
 }
 
 static void
@@ -1526,6 +1606,36 @@ test_cereg2_unsolicited (void *f, gpointer d)
     const CregResult result = { MM_MODEM_3GPP_REGISTRATION_STATE_HOME, 0x1F00, 0x79D903, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 5, FALSE, TRUE, FALSE };
 
     test_creg_match ("CEREG=2", FALSE, reply, data, &result);
+}
+
+static void
+test_cereg2_multidigit_stat_solicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "\r\n+CEREG: 2,10,\"8d83\",\"671f98a\",7\r\n";
+    const CregResult result = { MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED, 0x8d83, 0x671f98a, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 7, FALSE, TRUE, FALSE };
+
+    test_creg_match ("CEREG=2 with multidigit \"stat\" value", TRUE, reply, data, &result);
+}
+
+static void
+test_cereg2_multidigit_stat_with_rac_solicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "\r\n+CEREG: 2,10, 2CA8, 20 ,B5583D ,7\r\n";
+    const CregResult result = { MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED, 0x2ca8, 0xB5583D, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 11, FALSE, TRUE, FALSE };
+
+    test_creg_match ("CEREG=2 with multidigit \"stat\" value and RAC", TRUE, reply, data, &result);
+}
+
+static void
+test_cereg2_multidigit_stat_with_rac_unsolicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "\r\n+CEREG: 11, 78FE, 20 ,14419E ,7\r\n";
+    const CregResult result = { MM_MODEM_3GPP_REGISTRATION_STATE_ATTACHED_RLOS, 0x78FE, 0x14419E, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 10, FALSE, TRUE, FALSE };
+
+    test_creg_match ("CEREG=2 with multidigit \"stat\" value and RAC", FALSE, reply, data, &result);
 }
 
 static void
@@ -1596,6 +1706,16 @@ test_c5greg1_solicited (void *f, gpointer d)
     const CregResult result = { MM_MODEM_3GPP_REGISTRATION_STATE_DENIED, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 1, FALSE, FALSE, TRUE };
 
     test_creg_match ("C5GREG=1", TRUE, reply, data, &result);
+}
+
+static void
+test_c5greg1_multidigit_stat_solicited (void *f, gpointer d)
+{
+    RegTestData *data = (RegTestData *) d;
+    const char *reply = "\r\n+C5GREG: 1, 10\r\n";
+    const CregResult result = { MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 1, FALSE, FALSE, TRUE };
+
+    test_creg_match ("C5GREG=1 with multidigit \"stat\" value", TRUE, reply, data, &result);
 }
 
 static void
@@ -5001,8 +5121,10 @@ int main (int argc, char **argv)
 
     g_test_suite_add (suite, TESTCASE (test_creg1_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg1_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg1_multidigit_stat_unsolicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg2_mercury_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg2_mercury_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_multidigit_stat_unsolicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg2_sek850i_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg2_sek850i_unsolicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg2_e160g_solicited_unregistered, reg_data));
@@ -5012,12 +5134,15 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_creg2_xu870_unsolicited_unregistered, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg2_md400_unsolicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg2_s8500_wave_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_s8500_wave_multidigit_stat_unsolicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg2_gobi_weird_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg2_iridium_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg2_no_leading_zeros_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg2_leading_zeros_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg2_no_leading_zeros_unsolicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg2_leading_zeros_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_multidigit_stat_no_leading_zeros_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_multidigit_stat_leading_zeros_unsolicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg2_ublox_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_creg2_ublox_unsolicited, reg_data));
 
@@ -5028,6 +5153,9 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cgreg2_md400_unsolicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_cgreg2_x220_unsolicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_cgreg2_unsolicited_with_rac, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_cgreg2_multidigit_stat_with_rac_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_cgreg2_multidigit_stat_no_leading_zeros_solicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_cgreg2_multidigit_stat_leading_zeros_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_cgreg2_thuraya_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_cgreg2_thuraya_unsolicited, reg_data));
 
@@ -5035,12 +5163,16 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cereg1_unsolicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_cereg2_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_cereg2_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_cereg2_multidigit_stat_solicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_cereg2_multidigit_stat_with_rac_solicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_cereg2_multidigit_stat_with_rac_unsolicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_cereg2_altair_lte_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_cereg2_altair_lte_unsolicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_cereg2_novatel_lte_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_cereg2_novatel_lte_unsolicited, reg_data));
 
     g_test_suite_add (suite, TESTCASE (test_c5greg1_solicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_c5greg1_multidigit_stat_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_c5greg1_unsolicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_c5greg2_solicited, reg_data));
     g_test_suite_add (suite, TESTCASE (test_c5greg2_unsolicited, reg_data));
