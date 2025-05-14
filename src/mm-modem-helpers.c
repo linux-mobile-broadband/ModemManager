@@ -854,28 +854,28 @@ mm_modem_3gpp_registration_state_is_registered (MMModem3gppRegistrationState sta
 
 static const gchar *creg_regex[] = {
     /* +CREG: <stat>                      (GSM 07.07 CREG=1 unsolicited) */
-    [0] = "\\+(CREG|CGREG|CEREG|C5GREG):\\s*0*([0-9])",
+    [0] = "\\+(CREG|CGREG|CEREG|C5GREG):\\s*0*([0-9]+)",
     /* +CREG: <n>,<stat>                  (GSM 07.07 CREG=1 solicited) */
-    [1] = "\\+(CREG|CGREG|CEREG|C5GREG):\\s*0*([0-9]),\\s*0*([0-9])",
+    [1] = "\\+(CREG|CGREG|CEREG|C5GREG):\\s*0*([0-9]),\\s*0*([0-9]+)",
     /* +CREG: <stat>,<lac>,<ci>           (GSM 07.07 CREG=2 unsolicited) */
-    [2] = "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]),\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)",
+    [2] = "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]+),\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)",
     /* +CREG: <n>,<stat>,<lac>,<ci>       (GSM 07.07 solicited and some CREG=2 unsolicited) */
-    [3] = "\\+(CREG|CGREG|CEREG):\\s*([0-9]),\\s*([0-9])\\s*,\\s*([^,]*)\\s*,\\s*([^,\\s]*)",
-    [4] = "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*(\"[^,]*\")\\s*,\\s*(\"[^,\\s]*\")",
+    [3] = "\\+(CREG|CGREG|CEREG):\\s*([0-9]),\\s*([0-9]|[1-9][0-9]+)\\s*,\\s*([^,]*)\\s*,\\s*([^,\\s]*)",
+    [4] = "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]),\\s*0*([0-9]+)\\s*,\\s*(\"[^,]*\")\\s*,\\s*(\"[^,\\s]*\")",
     /* +CREG: <stat>,<lac>,<ci>,<AcT>     (ETSI 27.007 CREG=2 unsolicited) */
-    [5] = "\\+(CREG|CGREG|CEREG):\\s*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([0-9])",
-    [6] = "\\+(CREG|CGREG|CEREG):\\s*0*([0-9])\\s*,\\s*(\"[^,\\s]*\")\\s*,\\s*(\"[^,\\s]*\")\\s*,\\s*0*([0-9])",
+    [5] = "\\+(CREG|CGREG|CEREG):\\s*([0-9]|[1-9][0-9]+)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([0-9])",
+    [6] = "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]+)\\s*,\\s*(\"[^,\\s]*\")\\s*,\\s*(\"[^,\\s]*\")\\s*,\\s*0*([0-9])",
     /* +CREG: <n>,<stat>,<lac>,<ci>,<AcT> (ETSI 27.007 solicited and some CREG=2 unsolicited) */
-    [7] = "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])",
+    [7] = "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]),\\s*0*([0-9]+)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])",
     /* +CREG: <n>,<stat>,<lac>,<ci>,<AcT?>,<something> (Samsung Wave S8500) */
     /* '<CR><LF>+CREG: 2,1,000B,2816, B, C2816<CR><LF><CR><LF>OK<CR><LF>' */
-    [8] = "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*[^,\\s]*",
+    [8] = "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*0*([0-9]+)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*[^,\\s]*",
     /* +CREG: <stat>,<lac>,<ci>,<AcT>,<RAC> (ETSI 27.007 v9.20 CREG=2 unsolicited with RAC) */
-    [9] = "\\+(CREG|CGREG):\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])\\s*,\\s*([^,\\s]*)",
+    [9] = "\\+(CREG|CGREG):\\s*0*([0-9]+)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])\\s*,\\s*([^,\\s]*)",
     /* +CEREG: <stat>,<lac>,<rac>,<ci>,<AcT>     (ETSI 27.007 v8.6 CREG=2 unsolicited with RAC) */
-    [10] = "\\+(CEREG):\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])",
+    [10] = "\\+(CEREG):\\s*0*([0-9]+)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])",
     /* +CEREG: <n>,<stat>,<lac>,<rac>,<ci>,<AcT> (ETSI 27.007 v8.6 CREG=2 solicited with RAC) */
-    [11] = "\\+(CEREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])",
+    [11] = "\\+(CEREG):\\s*0*([0-9]),\\s*0*([0-9]+)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])",
     /* +C5GREG: <stat>,<lac>,<ci>,<AcT>,<Allowed_NSSAI_length>,<Allowed_NSSAI>   (ETSI 27.007 CREG=2 unsolicited) */
     [12] = "\\+(C5GREG):\\s*([0-9]+)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([0-9]+)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)",
     /* +C5GREG: <n>,<stat>,<lac>,<ci>,<AcT>,<Allowed_NSSAI_length>,<Allowed_NSSAI> (ETSI 27.007 solicited) */
@@ -2001,10 +2001,10 @@ item_is_lac_not_stat (GMatchInfo *info, guint32 item)
     gchar *str;
     gboolean is_lac = FALSE;
 
-    /* A <stat> will always be a single digit, without quotes */
+    /* A <stat> will always be a digit < 100, without quotes */
     str = g_match_info_fetch (info, item);
     g_assert (str);
-    is_lac = (strchr (str, '"') || strlen (str) > 1);
+    is_lac = (strchr (str, '"') || strlen (str) > 2);
     g_free (str);
     return is_lac;
 }
