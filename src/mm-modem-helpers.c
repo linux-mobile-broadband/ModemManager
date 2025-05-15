@@ -5807,3 +5807,67 @@ mm_string_uint_map_lookup (const MMStringUintMap *map,
     }
     return default_value;
 }
+
+/*****************************************************************************/
+
+typedef struct {
+    const gchar *result;
+    const MMModemLock code;
+} CPinResult;
+
+static const CPinResult unlock_results[] = {
+    /* Longer entries first so we catch the correct one with strcmp() */
+    { "READY",         MM_MODEM_LOCK_NONE           },
+    { "SIM PIN2",      MM_MODEM_LOCK_SIM_PIN2       },
+    { "SIM PUK2",      MM_MODEM_LOCK_SIM_PUK2       },
+    { "SIM PIN",       MM_MODEM_LOCK_SIM_PIN        },
+    { "SIM PUK",       MM_MODEM_LOCK_SIM_PUK        },
+    { "PH-NETSUB PIN", MM_MODEM_LOCK_PH_NETSUB_PIN  },
+    { "PH-NETSUB PUK", MM_MODEM_LOCK_PH_NETSUB_PUK  },
+    { "PH-FSIM PIN",   MM_MODEM_LOCK_PH_FSIM_PIN    },
+    { "PH-FSIM PUK",   MM_MODEM_LOCK_PH_FSIM_PUK    },
+    { "PH-CORP PIN",   MM_MODEM_LOCK_PH_CORP_PIN    },
+    { "PH-CORP PUK",   MM_MODEM_LOCK_PH_CORP_PUK    },
+    { "PH-SIM PIN",    MM_MODEM_LOCK_PH_SIM_PIN     },
+    { "PH-NET PIN",    MM_MODEM_LOCK_PH_NET_PIN     },
+    { "PH-NET PUK",    MM_MODEM_LOCK_PH_NET_PUK     },
+    { "PH-SP PIN",     MM_MODEM_LOCK_PH_SP_PIN      },
+    { "PH-SP PUK",     MM_MODEM_LOCK_PH_SP_PUK      },
+    { NULL }
+};
+
+MMModemLock
+mm_parse_cpin_response (const gchar *response,
+                        gboolean     expect_cpin_prefix)
+{
+    const CPinResult *iter = &unlock_results[0];
+
+    if (expect_cpin_prefix) {
+        const gchar *p;
+
+        p = strstr (response, "+CPIN:");
+        if (!p)
+            return MM_MODEM_LOCK_UNKNOWN;
+
+        /* Advance past the +CPIN: */
+        response = p + 6;
+    }
+
+    /* Skip possible whitespaces after '+CPIN:' and before the response */
+    while (*response == ' ')
+        response++;
+
+    /* Some phones (Motorola EZX models) seem to quote the response */
+    if (response[0] == '"')
+        response++;
+
+    /* Translate the reply */
+    while (iter->result) {
+        if (g_str_has_prefix (response, iter->result)) {
+            return iter->code;
+        }
+        iter++;
+    }
+
+    return MM_MODEM_LOCK_UNKNOWN;
+}

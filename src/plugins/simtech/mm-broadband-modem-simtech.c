@@ -72,31 +72,6 @@ struct _MMBroadbandModemSimtechPrivate {
     MMModemLock     sim_lock;
 };
 
-typedef struct {
-    const gchar *result;
-    MMModemLock code;
-} CPinResult;
-
-static CPinResult unlock_results[] = {
-    { "READY",         MM_MODEM_LOCK_NONE           },
-    { "SIM PIN2",      MM_MODEM_LOCK_SIM_PIN2       },
-    { "SIM PUK2",      MM_MODEM_LOCK_SIM_PUK2       },
-    { "SIM PIN",       MM_MODEM_LOCK_SIM_PIN        },
-    { "SIM PUK",       MM_MODEM_LOCK_SIM_PUK        },
-    { "PH-NETSUB PIN", MM_MODEM_LOCK_PH_NETSUB_PIN  },
-    { "PH-NETSUB PUK", MM_MODEM_LOCK_PH_NETSUB_PUK  },
-    { "PH-FSIM PIN",   MM_MODEM_LOCK_PH_FSIM_PIN    },
-    { "PH-FSIM PUK",   MM_MODEM_LOCK_PH_FSIM_PUK    },
-    { "PH-CORP PIN",   MM_MODEM_LOCK_PH_CORP_PIN    },
-    { "PH-CORP PUK",   MM_MODEM_LOCK_PH_CORP_PUK    },
-    { "PH-SIM PIN",    MM_MODEM_LOCK_PH_SIM_PIN     },
-    { "PH-NET PIN",    MM_MODEM_LOCK_PH_NET_PIN     },
-    { "PH-NET PUK",    MM_MODEM_LOCK_PH_NET_PUK     },
-    { "PH-SP PIN",     MM_MODEM_LOCK_PH_SP_PIN      },
-    { "PH-SP PUK",     MM_MODEM_LOCK_PH_SP_PUK      },
-    { NULL }
-};
-
 /*****************************************************************************/
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
@@ -158,20 +133,10 @@ simtech_cpin_changed (MMPortSerialAt *port,
                       MMBroadbandModemSimtech *self)
 {
     g_autofree gchar *str = NULL;
-    CPinResult *iter;
 
     str = mm_get_string_unquoted_from_match_info (match_info, 1);
-    if (str) {
-        iter = &unlock_results[0];
-        /* Translate the reply */
-        while (iter->result) {
-            if (g_str_has_prefix (str, iter->result)) {
-                self->priv->sim_lock = iter->code;
-                return;
-            }
-            iter++;
-        }
-    }
+    if (str)
+        self->priv->sim_lock = mm_parse_cpin_response (str, FALSE);
 }
 
 static void
