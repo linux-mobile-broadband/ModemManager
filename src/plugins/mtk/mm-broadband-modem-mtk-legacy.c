@@ -55,6 +55,101 @@ struct _MMBroadbandModemMtkLegacyPrivate {
 };
 
 /*****************************************************************************/
+/* Check unlock required (Modem interface) */
+
+static MMModemLock
+load_unlock_required_finish (MMIfaceModem *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    GError *inner_error = NULL;
+    gssize value;
+
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_LOCK_UNKNOWN;
+    }
+    return (MMModemLock)value;
+}
+
+static void
+unlock_required_cimi_query_ready (MMIfaceModem *self,
+                                  GAsyncResult *res,
+                                  GTask *task)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error)
+        g_task_return_error (task, error);
+    else {
+        /* Assume unlocked if we can successfully read the IMSI */
+        g_task_return_int (task, MM_MODEM_LOCK_NONE);
+    }
+    g_object_unref (task);
+}
+
+static void
+cpin_query_ready (MMIfaceModem *self,
+                  GAsyncResult *res,
+                  GTask *task)
+{
+    MMModemLock  lock = MM_MODEM_LOCK_UNKNOWN;
+    const gchar *result;
+    GError      *error = NULL;
+
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        /* Some older MTK-based phones reply to +CPIN with CME ERROR 100,
+         * but to even boot up they require the SIM PIN and so must be
+         * unlocked. Double-check by reading the IMSI though.
+         */
+        if (g_error_matches (error,
+                             MM_MOBILE_EQUIPMENT_ERROR,
+                             MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN)) {
+            mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                      "+CIMI",
+                                      10,
+                                      FALSE,
+                                      (GAsyncReadyCallback)unlock_required_cimi_query_ready,
+                                      task);
+            return;
+        }
+
+        /* Otherwise just return the error */
+        g_task_return_error (task, error);
+    } else {
+        if (result)
+            lock = mm_parse_cpin_response (result, TRUE);
+        g_task_return_int (task, lock);
+    }
+
+    g_object_unref (task);
+}
+
+static void
+load_unlock_required (MMIfaceModem *self,
+                      gboolean last_attempt,
+                      GCancellable *cancellable,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, cancellable, callback, user_data);
+
+    mm_obj_dbg (self, "checking if unlock required...");
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CPIN?",
+                              10,
+                              FALSE,
+                              (GAsyncReadyCallback)cpin_query_ready,
+                              task);
+}
+
+/*****************************************************************************/
+
 static gboolean
 modem_after_sim_unlock_finish (MMIfaceModem *self,
                                GAsyncResult *res,
@@ -835,6 +930,8 @@ iface_modem_init (MMIfaceModemInterface *iface)
 {
     iface_modem_parent = g_type_interface_peek_parent (iface);
 
+    iface->load_unlock_required = load_unlock_required;
+    iface->load_unlock_required_finish = load_unlock_required_finish;
     iface->modem_after_sim_unlock = modem_after_sim_unlock;
     iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
     iface->load_supported_modes = load_supported_modes;
