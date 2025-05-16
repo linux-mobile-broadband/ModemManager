@@ -46,6 +46,8 @@ static const EchoRemovalTest echo_removal_tests[] = {
     { "echo echo\r\nthis is valid\r\nand so is this", "\r\nthis is valid\r\nand so is this" },
     { "\r\nthis is valid\r\nand so is this", "\r\nthis is valid\r\nand so is this" },
     { "\r\nthis is valid\r\nand so is this\r\n", "\r\nthis is valid\r\nand so is this\r\n" },
+    { "\nNO CARRIER\r\n", "\nNO CARRIER\r\n" },
+    { "\nCONNECT\r\n", "\nCONNECT\r\n" },
 };
 
 static const ParseResponseTest parse_ok_tests[] = {

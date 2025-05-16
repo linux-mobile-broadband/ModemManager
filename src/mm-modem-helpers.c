@@ -487,8 +487,12 @@ mm_call_end_regex_get (void)
 {
     /* Example:
      * <CR><LF>NO ANSWER<CR><LF>
+     * <LF>NO CARRIER<CR><LF>
+     * <CR><LF>BUSY<CR><LF>
+     *
+     * Some Sierra devices omit the leading <CR> for in-call responses.
      */
-    return g_regex_new ("\\r\\n(NO CARRIER)|(BUSY)|(NO ANSWER)|(NO DIALTONE)\\r\\n",
+    return g_regex_new ("(\\r)?\\n(NO CARRIER)|(BUSY)|(NO ANSWER)|(NO DIALTONE)\\r\\n",
                         G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW | G_REGEX_OPTIMIZE,
                         0,
                         NULL);
