@@ -483,6 +483,20 @@ mm_at_quote_string (const gchar *input)
 /*****************************************************************************/
 
 GRegex *
+mm_call_end_regex_get (void)
+{
+    /* Example:
+     * <CR><LF>NO ANSWER<CR><LF>
+     */
+    return g_regex_new ("\\r\\n(NO CARRIER)|(BUSY)|(NO ANSWER)|(NO DIALTONE)\\r\\n",
+                        G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW | G_REGEX_OPTIMIZE,
+                        0,
+                        NULL);
+}
+
+/*****************************************************************************/
+
+GRegex *
 mm_voice_ring_regex_get (void)
 {
     /* Example:
