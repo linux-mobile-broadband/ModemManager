@@ -518,6 +518,27 @@ PROPERTY_ERROR_DEFINE_FAILABLE (connection_error,
 /*****************************************************************************/
 
 /**
+ * mm_bearer_get_disconnect_request:
+ * @self: A #MMBearer.
+ *
+ * Gets whether a disconnect request is pending for this bearer
+ *
+ * Returns: %TRUE if the #MMBearer is waiting for disconnection,
+ * #FALSE otherwise.
+ *
+ * Since: 1.26
+ */
+gboolean
+mm_bearer_get_disconnect_request (MMBearer *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER (self), FALSE);
+
+    return mm_gdbus_bearer_get_disconnect_request (MM_GDBUS_BEARER (self));
+}
+
+/*****************************************************************************/
+
+/**
  * mm_bearer_connect_finish:
  * @self: A #MMBearer.
  * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to

@@ -472,7 +472,7 @@ dispatcher_connection_run_ready (MMDispatcherConnection *dispatcher,
 
 static void
 bearer_run_dispatcher_scripts (MMBaseBearer *self,
-                               gboolean      connected)
+                               MMDispatcherConnectionEvent event)
 {
     MMDispatcherConnection *dispatcher;
     const gchar *interface;
@@ -486,7 +486,7 @@ bearer_run_dispatcher_scripts (MMBaseBearer *self,
                                   g_dbus_object_get_object_path (G_DBUS_OBJECT (self->priv->modem)),
                                   self->priv->path,
                                   interface,
-                                  connected,
+                                  event,
                                   NULL, /* cancellable */
                                   (GAsyncReadyCallback)dispatcher_connection_run_ready,
                                   g_object_ref (self));
@@ -500,6 +500,7 @@ bearer_reset_interface_status (MMBaseBearer *self)
     mm_gdbus_bearer_set_profile_id (MM_GDBUS_BEARER (self), MM_3GPP_PROFILE_ID_UNKNOWN);
     mm_gdbus_bearer_set_multiplexed (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (self), FALSE);
+    mm_gdbus_bearer_set_disconnect_request (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_suspended (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (self), NULL);
     mm_gdbus_bearer_set_ip4_config (
@@ -531,7 +532,7 @@ bearer_update_status (MMBaseBearer *self,
         g_autoptr(GString) report = NULL;
 
         /* Report disconnection via dispatcher scripts, before resetting the interface */
-        bearer_run_dispatcher_scripts (self, FALSE);
+        bearer_run_dispatcher_scripts (self, MM_DISPATCHER_CONNECTION_EVENT_DISCONNECTED);
 
         bearer_reset_interface_status (self);
         /* Cleanup flag to ignore disconnection reports */
@@ -599,7 +600,7 @@ bearer_update_status_connected (MMBaseBearer     *self,
     connection_monitor_start (self);
 
     /* Run dispatcher scripts */
-    bearer_run_dispatcher_scripts (self, TRUE);
+    bearer_run_dispatcher_scripts (self, MM_DISPATCHER_CONNECTION_EVENT_CONNECTED);
 }
 
 /*****************************************************************************/
@@ -1491,11 +1492,14 @@ mm_base_bearer_disconnect_force (MMBaseBearer *self)
         return;
 
     if (self->priv->ignore_disconnection_reports) {
-        mm_obj_dbg (self, "disconnection should be forced but it's explicitly ignored");
+        mm_obj_msg (self, "disconnection should be forced, but we can't. Request disconnection instead.");
+        mm_gdbus_bearer_set_disconnect_request (MM_GDBUS_BEARER(self), TRUE);
+        bearer_run_dispatcher_scripts (self,
+                                       MM_DISPATCHER_CONNECTION_EVENT_DISCONNECT_REQUEST);
         return;
     }
 
-    mm_obj_dbg (self, "forcing disconnection");
+    mm_obj_msg (self, "forcing disconnection");
 
     /* If currently connecting, try to cancel that operation. */
     if (self->priv->status == MM_BEARER_STATUS_CONNECTING) {

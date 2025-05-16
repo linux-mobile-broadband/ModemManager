@@ -242,6 +242,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_BEARER_STATUS_CONNECTED]                  = { "bearer.status.connected",                         "connected",                MMC_S_BEARER_STATUS,              },
     [MMC_F_BEARER_STATUS_CONNECTION_ERROR_NAME]      = { "bearer.status.connection-error.name",             "connection error name",    MMC_S_BEARER_STATUS,              },
     [MMC_F_BEARER_STATUS_CONNECTION_ERROR_MESSAGE]   = { "bearer.status.connection-error.message",          "connection error message", MMC_S_BEARER_STATUS,              },
+    [MMC_F_BEARER_STATUS_DISCONNECT_REQUEST]         = { "bearer.status.disconnect-request",                "disconnect request",       MMC_S_BEARER_STATUS,              },
     [MMC_F_BEARER_STATUS_SUSPENDED]                  = { "bearer.status.suspended",                         "suspended",                MMC_S_BEARER_STATUS,              },
     [MMC_F_BEARER_STATUS_MULTIPLEXED]                = { "bearer.status.multiplexed",                       "multiplexed",              MMC_S_BEARER_STATUS,              },
     [MMC_F_BEARER_STATUS_INTERFACE]                  = { "bearer.status.interface",                         "interface",                MMC_S_BEARER_STATUS,              },

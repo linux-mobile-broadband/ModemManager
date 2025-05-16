@@ -31,8 +31,6 @@
 #endif
 
 #define OPERATION_DESCRIPTION "connection status report"
-#define CONNECTED_STRING      "connected"
-#define DISCONNECTED_STRING   "disconnected"
 
 /* Maximum time a connection dispatcher command is allowed to run before
  * us killing it */
@@ -51,14 +49,29 @@ G_DEFINE_TYPE (MMDispatcherConnection, mm_dispatcher_connection, MM_TYPE_DISPATC
 /*****************************************************************************/
 
 typedef struct {
-    gchar    *modem_dbus_path;
-    gchar    *bearer_dbus_path;
-    gchar    *data_port;
-    gboolean  connected;
-    GList    *dispatcher_scripts;
-    GFile    *current;
-    guint     n_failures;
+    gchar                      *modem_dbus_path;
+    gchar                      *bearer_dbus_path;
+    gchar                      *data_port;
+    MMDispatcherConnectionEvent event;
+    GList                      *dispatcher_scripts;
+    GFile                      *current;
+    guint                       n_failures;
 } ConnectionRunContext;
+
+static gchar *
+mm_dispatcher_connection_event_to_string (MMDispatcherConnectionEvent event)
+{
+    switch (event) {
+    case MM_DISPATCHER_CONNECTION_EVENT_CONNECTED:
+        return g_strdup ("connected");
+    case MM_DISPATCHER_CONNECTION_EVENT_DISCONNECTED:
+        return g_strdup ("disconnected");
+    case MM_DISPATCHER_CONNECTION_EVENT_DISCONNECT_REQUEST:
+        return g_strdup ("disconnect-request");
+    default:
+        return NULL;
+    }
+}
 
 static void
 connection_run_context_free (ConnectionRunContext *ctx)
@@ -137,7 +150,7 @@ connection_run_next (GTask *task)
     g_ptr_array_add (aux, g_strdup (ctx->modem_dbus_path));
     g_ptr_array_add (aux, g_strdup (ctx->bearer_dbus_path));
     g_ptr_array_add (aux, g_strdup (ctx->data_port));
-    g_ptr_array_add (aux, g_strdup (ctx->connected ? CONNECTED_STRING : DISCONNECTED_STRING));
+    g_ptr_array_add (aux, mm_dispatcher_connection_event_to_string (ctx->event));
     g_ptr_array_add (aux, NULL);
     argv = (GStrv) g_ptr_array_free (aux, FALSE);
 
@@ -168,7 +181,7 @@ mm_dispatcher_connection_run (MMDispatcherConnection *self,
                               const gchar            *modem_dbus_path,
                               const gchar            *bearer_dbus_path,
                               const gchar            *data_port,
-                              gboolean                connected,
+                              MMDispatcherConnectionEvent event,
                               GCancellable           *cancellable,
                               GAsyncReadyCallback     callback,
                               gpointer                user_data)
@@ -187,7 +200,7 @@ mm_dispatcher_connection_run (MMDispatcherConnection *self,
     ctx->modem_dbus_path = g_strdup (modem_dbus_path);
     ctx->bearer_dbus_path = g_strdup (bearer_dbus_path);
     ctx->data_port = g_strdup (data_port);
-    ctx->connected = connected;
+    ctx->event = event;
     g_task_set_task_data (task, ctx, (GDestroyNotify)connection_run_context_free);
 
     /* Iterate over all enabled dirs and collect all dispatcher script paths */

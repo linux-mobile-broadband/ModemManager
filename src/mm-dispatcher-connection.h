@@ -32,13 +32,19 @@ typedef struct _MMDispatcherConnection        MMDispatcherConnection;
 typedef struct _MMDispatcherConnectionClass   MMDispatcherConnectionClass;
 typedef struct _MMDispatcherConnectionPrivate MMDispatcherConnectionPrivate;
 
+typedef enum { /*< underscore_name=mm_dispatcher_connection_event >*/
+    MM_DISPATCHER_CONNECTION_EVENT_CONNECTED,
+    MM_DISPATCHER_CONNECTION_EVENT_DISCONNECTED,
+    MM_DISPATCHER_CONNECTION_EVENT_DISCONNECT_REQUEST,
+} MMDispatcherConnectionEvent;
+
 GType                   mm_dispatcher_connection_get_type   (void);
 MMDispatcherConnection *mm_dispatcher_connection_get        (void);
 void                    mm_dispatcher_connection_run        (MMDispatcherConnection *self,
                                                              const gchar            *modem_dbus_path,
                                                              const gchar            *bearer_dbus_path,
                                                              const gchar            *data_port,
-                                                             gboolean                connected,
+                                                             MMDispatcherConnectionEvent event,
                                                              GCancellable           *cancellable,
                                                              GAsyncReadyCallback     callback,
                                                              gpointer                user_data);

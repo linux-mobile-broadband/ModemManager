@@ -76,6 +76,8 @@ gchar        *mm_bearer_dup_interface   (MMBearer *self);
 
 gboolean      mm_bearer_get_connected   (MMBearer *self);
 
+gboolean      mm_bearer_get_disconnect_request (MMBearer *self);
+
 gboolean      mm_bearer_get_reload_stats_supported (MMBearer *self);
 
 gboolean      mm_bearer_get_suspended   (MMBearer *self);
