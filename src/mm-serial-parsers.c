@@ -160,6 +160,27 @@ mm_serial_parser_v1_add_filter (gpointer data,
     parser->filter_user_data = user_data;
 }
 
+void
+mm_serial_parser_v1_remove_echo (gpointer    data,
+                                 GByteArray *response)
+{
+    guint i;
+
+    if (response->len <= 2)
+        return;
+
+    for (i = 0; i < (response->len - 1); i++) {
+        /* If there is any content before the first
+         * <CR><LF>, assume it's echo or garbage, and skip it */
+        if (response->data[i] == '\r' && response->data[i + 1] == '\n') {
+            if (i > 0)
+                g_byte_array_remove_range (response, 0, i);
+            /* else, good, we're already started with <CR><LF> */
+            break;
+        }
+    }
+}
+
 gboolean
 mm_serial_parser_v1_parse (gpointer   data,
                            GString   *response,

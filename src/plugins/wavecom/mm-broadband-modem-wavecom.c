@@ -1245,6 +1245,7 @@ setup_ports (MMBroadbandModem *self)
 
     mm_port_serial_at_set_response_parser (MM_PORT_SERIAL_AT (primary),
                                            mm_serial_parser_v1_parse,
+                                           mm_serial_parser_v1_remove_echo,
                                            parser,
                                            mm_serial_parser_v1_destroy);
 }

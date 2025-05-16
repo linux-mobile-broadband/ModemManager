@@ -468,6 +468,7 @@ base_modem_internal_grab_port (MMBaseModem         *self,
     if (MM_IS_PORT_SERIAL_AT (port)) {
         mm_port_serial_at_set_response_parser (MM_PORT_SERIAL_AT (port),
                                                mm_serial_parser_v1_parse,
+                                               mm_serial_parser_v1_remove_echo,
                                                mm_serial_parser_v1_new (),
                                                mm_serial_parser_v1_destroy);
         /* Prefer plugin-provided flags to the generic ones */

@@ -65,6 +65,9 @@ typedef void (*MMPortSerialAtUnsolicitedMsgFn) (MMPortSerialAt *port,
                                                 GMatchInfo *match_info,
                                                 gpointer user_data);
 
+typedef void (*MMPortSerialAtRemoveEchoFn)     (gpointer    user_data,
+                                                GByteArray *response);
+
 #define MM_PORT_SERIAL_AT_REMOVE_ECHO           "remove-echo"
 #define MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED "init-sequence-enabled"
 #define MM_PORT_SERIAL_AT_INIT_SEQUENCE         "init-sequence"
@@ -97,6 +100,7 @@ void     mm_port_serial_at_enable_unsolicited_msg_handler (MMPortSerialAt *self,
 
 void     mm_port_serial_at_set_response_parser (MMPortSerialAt *self,
                                                 MMPortSerialAtResponseParserFn fn,
+                                                MMPortSerialAtRemoveEchoFn echo_fn,
                                                 gpointer user_data,
                                                 GDestroyNotify notify);
 
@@ -113,8 +117,6 @@ gchar *mm_port_serial_at_command_finish       (MMPortSerialAt *self,
                                                GError **error);
 
 /* Just for unit tests */
-void     mm_port_serial_at_remove_echo (GByteArray *response);
-
 void     mm_port_serial_at_set_flags (MMPortSerialAt *self,
                                       MMPortSerialAtFlag flags);
 
