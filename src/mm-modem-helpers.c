@@ -3590,7 +3590,6 @@ mm_3gpp_parse_cmer_test_response (const gchar     *response,
     GError          *inner_error = NULL;
     GArray          *array_supported_modes = NULL;
     GArray          *array_supported_inds = NULL;
-    gchar           *aux   = NULL;
     gboolean         ret = FALSE;
     MM3gppCmerMode   supported_modes = 0;
     MM3gppCmerInd    supported_inds = 0;
@@ -3622,12 +3621,10 @@ mm_3gpp_parse_cmer_test_response (const gchar     *response,
     /* Modes in 1st group */
     if (!(array_supported_modes = mm_parse_uint_list (split[0], &inner_error)))
         goto out;
-    g_clear_pointer (&aux, g_free);
 
     /* Ind settings in 4th group */
     if (!(array_supported_inds = mm_parse_uint_list (split[3], &inner_error)))
         goto out;
-    g_clear_pointer (&aux, g_free);
 
     for (i = 0; i < array_supported_modes->len; i++) {
         guint mode_val;
@@ -3661,7 +3658,6 @@ out:
         g_array_unref (array_supported_modes);
     if (array_supported_inds)
         g_array_unref (array_supported_inds);
-    g_clear_pointer (&aux, g_free);
 
     g_strfreev (split);
 
@@ -3862,6 +3858,89 @@ mm_3gpp_parse_cind_read_response (const gchar *reply,
     }
 
     return array;
+}
+
+/*************************************************************************/
+
+gchar *
+mm_3gpp_build_cgerep_set_request (MM3gppCgerepMode mode)
+{
+    guint mode_val;
+
+    if (mode == MM_3GPP_CGEREP_MODE_DISCARD_URCS)
+        return g_strdup ("+CGEREP=0");
+    if (mode < MM_3GPP_CGEREP_MODE_DISCARD_URCS || mode > MM_3GPP_CGEREP_MODE_BUFFER_URCS_IF_LINK_RESERVED)
+        return NULL;
+    mode_val = mm_find_bit_set (mode);
+
+    return g_strdup_printf ("+CGEREP=%u", mode_val);
+}
+
+gboolean
+mm_3gpp_parse_cgerep_test_response (const gchar       *response,
+                                    gpointer           log_object,
+                                    MM3gppCgerepMode  *out_supported_modes,
+                                    GError           **error)
+{
+    gchar            **split;
+    GError            *inner_error = NULL;
+    GArray            *array_supported_modes = NULL;
+    gboolean           ret = FALSE;
+    MM3gppCgerepMode   supported_modes = 0;
+    guint              i;
+
+    /*
+     * AT+CGEREP=?
+     *  +CGEREP: (0,1),(0)
+     *
+     * AT+CGEREP=?
+     *  +CGEREP: (0,2),(0-1)
+     *
+     * AT+CGEREP=?
+     *  +CGEREP: (0,2),(0,1)
+     */
+
+    split = mm_split_string_groups (mm_strip_tag (response, "+CGEREP:"));
+    if (!split) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't split +CGEREP test response in groups");
+        goto out;
+    }
+
+    /* We want the 1st group */
+    if (g_strv_length (split) < 1) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Missing groups in +CGEREP test response (%u < 1)", g_strv_length (split));
+        goto out;
+    }
+
+    /* Modes in 1st group */
+    if (!(array_supported_modes = mm_parse_uint_list (split[0], &inner_error)))
+        goto out;
+
+    for (i = 0; i < array_supported_modes->len; i++) {
+        guint mode_val;
+
+        mode_val = g_array_index (array_supported_modes, guint, i);
+        if (mode_val <= 2)
+            supported_modes |= (MM3gppCgerepMode) (1 << mode_val);
+        else
+            mm_obj_dbg (log_object, "unknown +CGEREP mode reported: %u", mode_val);
+    }
+
+    if (out_supported_modes)
+        *out_supported_modes = supported_modes;
+    ret = TRUE;
+
+out:
+
+    if (array_supported_modes)
+        g_array_unref (array_supported_modes);
+
+    g_strfreev (split);
+
+    if (inner_error)
+        g_propagate_error (error, inner_error);
+
+    return ret;
 }
 
 /*************************************************************************/
