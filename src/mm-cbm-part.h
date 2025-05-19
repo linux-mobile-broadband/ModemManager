@@ -67,5 +67,6 @@ const char *mm_cbm_part_get_text (MMCbmPart *part);
 
 guint16     mm_cbm_part_get_serial (MMCbmPart *part);
 guint16     mm_cbm_part_get_channel (MMCbmPart *part);
+const char *mm_cbm_part_get_language (MMCbmPart *part);
 
 #endif

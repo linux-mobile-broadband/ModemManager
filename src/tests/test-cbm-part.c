@@ -68,6 +68,8 @@ test_cbm_ca (void)
 
     g_assert_cmpstr (mm_cbm_part_get_text (part), ==,
                      "This is a test of the Ontario Alert Ready System. There is no danger to your health or safety" );
+
+    g_assert_null (mm_cbm_part_get_language (part));
 }
 
 static void
@@ -109,6 +111,8 @@ test_cbm_ucs2 (void)
 
     g_assert_cmpstr (mm_cbm_part_get_text (part), ==,
                      " Протягом дня є висока імовірність ракетнᘁ");
+
+    g_assert_null (mm_cbm_part_get_language (part));
 }
 
 
@@ -153,6 +157,8 @@ test_cbm_eu (void)
 
     g_assert_cmpstr (mm_cbm_part_get_text (part), ==,
                      "TEST ALERT, NATIONWIDE ALERT DAY 2022 Thu 2022/12/08 - 10:59 am - Test alert - for Deutschlan");
+
+    g_assert_cmpstr (mm_cbm_part_get_language (part), ==, "en");
 }
 
 static void
@@ -194,6 +200,7 @@ test_cbm_nl_2023 (void)
     g_assert_cmpstr (mm_cbm_part_get_text (part), ==,
                      "NL-Alert 04-12-2023 12:00: TESTBERICHT. De overheid waarschuwt je tijdens noodsituaties via N");
     mm_cbm_part_free (part);
+    g_assert_null (mm_cbm_part_get_language (part));
 
     parse_cbm ("\r\n+CBM: 88\r\n46A011130523CC56905D96D35D206519C42E97E7741039EC06DDC37490BA0C6ABFCB7410F95D7683CA6ED03D1C9683D46550BB5C9683D26EF35BDE0ED3D365D03AEC06D9D36E72D9ED02A9542A10B538A5829AC5E9347804\r\n", &part);
     serial = mm_cbm_part_get_serial (part);
@@ -208,6 +215,7 @@ test_cbm_nl_2023 (void)
     g_assert_cmpstr (mm_cbm_part_get_text (part), ==,
                      "L-Alert. Je leest dan wat je moet doen en waar je meer informatie kan vinden. *** TEST MESSAG");
     mm_cbm_part_free (part);
+    g_assert_null (mm_cbm_part_get_language (part));
 
     parse_cbm ("\r\n+CBM: 65\r\n46A0111305334590B34C4797E5ECB09B3C071DDFF6B2DCDD2EBBE920685DCC4E8F41D7B0DC9D769F41D3FC9C5E6EBB40CE37283CA6A7DF6E90BC1CAFA7E565B2AB\r\n", &part);
     serial = mm_cbm_part_get_serial (part);
@@ -222,6 +230,7 @@ test_cbm_nl_2023 (void)
     g_assert_cmpstr (mm_cbm_part_get_text (part), ==,
                      "E Netherlands Government Public Warning System. No action required." );
     mm_cbm_part_free (part);
+    g_assert_null (mm_cbm_part_get_language (part));
 }
 
 
