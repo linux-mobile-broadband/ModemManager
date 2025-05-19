@@ -224,6 +224,52 @@ test_cbm_nl_2023 (void)
     mm_cbm_part_free (part);
 }
 
+
+static void
+test_cbm_gsm7bit_with_lang (void)
+{
+    g_autoptr(GError) err = NULL;
+    MMCbmPart *part;
+
+    static const guint8 pdu[] = {
+        0x40, 0xC0, 0x11, 0x1F, 0x10 /* GSM 7Bit with language */, 0x13,
+        0x64 /* d */, 0x65 /* e */, 0x0D /* \r */, 0x0A, 0x0A, 0x32, 0x8B, 0x52,
+        0x2A, 0x0B, 0xE4, 0x0C, 0x52, 0x93, 0x4F, 0xE7,
+    };
+
+    part = mm_cbm_part_new_from_binary_pdu (pdu, G_N_ELEMENTS (pdu), NULL, &err);
+    g_assert_no_error (err);
+    g_assert_nonnull (part);
+
+    g_assert_cmpuint (mm_cbm_part_get_channel (part), ==, 4383);
+    g_assert_cmpuint (mm_cbm_part_get_num_parts (part), ==, 3);
+    g_assert_cmpuint (mm_cbm_part_get_part_num (part), ==, 1);
+    g_assert_cmpstr (mm_cbm_part_get_language (part), ==, "de");
+}
+
+
+static void
+test_cbm_ucs2_with_7bit_lang (void)
+{
+    g_autoptr(GError) err = NULL;
+    MMCbmPart *part;
+
+    static const guint8 pdu [] = {
+        0x63, 0x40, 0x00, 0x32, 0x11 /* UCS2 with 7Bit language */, 0x14,
+        0xF2 /* ru …*/ , 0x7A /* … in GSM 7bit */, 0x04, 0x1f, 0x04, 0x40, 0x04, 0x3e,
+    };
+
+    part = mm_cbm_part_new_from_binary_pdu (pdu, G_N_ELEMENTS (pdu), NULL, &err);
+    g_assert_no_error (err);
+    g_assert_nonnull (part);
+
+    g_assert_cmpuint (mm_cbm_part_get_channel (part), ==, 50);
+    g_assert_cmpuint (mm_cbm_part_get_num_parts (part), ==, 4);
+    g_assert_cmpuint (mm_cbm_part_get_part_num (part), ==, 1);
+    g_assert_cmpstr (mm_cbm_part_get_language (part), ==, "ru");
+}
+
+
 int main (int argc, char **argv)
 {
     setlocale (LC_ALL, "");
@@ -242,6 +288,10 @@ int main (int argc, char **argv)
     /* 2023 NL alert: */
     /* https://gitlab.freedesktop.org/mobile-broadband/ModemManager/-/issues/253#note_2192474 */
     g_test_add_func ("/MM/CBM/PDU-Parser/CBM-NL", test_cbm_nl_2023);
+    /* GSM7 bit encoding with language in the first 3 bytes of the message */
+    g_test_add_func ("/MM/CBM/PDU-Parser/has-lang", test_cbm_gsm7bit_with_lang);
+    /* UCS2 encoding with 7bit language in first 2 bytes of the message */
+    g_test_add_func ("/MM/CBM/PDU-Parser/has-7bit-lang", test_cbm_ucs2_with_7bit_lang);
 
     return g_test_run ();
 }

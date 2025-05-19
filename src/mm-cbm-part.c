@@ -80,6 +80,7 @@ mm_cbm_part_new_from_binary_pdu (const guint8  *pdu,
     guint16 serial, group;
     int len;
     g_autofree gchar *text = NULL;
+    gboolean has_lang = FALSE, has_7bit_lang = FALSE;
 
     cbm_part = mm_cbm_part_new ();
 
@@ -136,12 +137,10 @@ mm_cbm_part_new_from_binary_pdu (const guint8  *pdu,
     if (group == CBS_DATA_CODING_LANG_GSM7) {
         cbm_part->encoding = MM_SMS_ENCODING_GSM7;
     } else if (pdu[offset] == CBS_DATA_CODING_GSM7) {
-        PDU_SIZE_CHECK (offset + 4, "cannot skip lang");
-        offset += 3;
+        has_lang = TRUE;
         cbm_part->encoding = MM_SMS_ENCODING_GSM7;
     } else if (pdu[offset] == CBS_DATA_CODING_UCS2) {
-        PDU_SIZE_CHECK (offset + 3, "cannot skip lang");
-        offset += 2;
+        has_7bit_lang = TRUE;
         cbm_part->encoding = MM_SMS_ENCODING_UCS2;
     } else if ((group == CBS_DATA_CODING_GENERAL_CLASS) ||
                (group == CBS_DATA_CODING_GENERAL_NO_CLASS) ||
@@ -166,6 +165,14 @@ mm_cbm_part_new_from_binary_pdu (const guint8  *pdu,
     cbm_part->num_parts = (pdu[offset] & 0x0F);
     cbm_part->part_num = (pdu[offset] & 0xF0) >> 4;
     offset++;
+
+    if (has_lang) {
+        PDU_SIZE_CHECK (offset + 4, "cannot skip lang");
+        offset += 3;
+    } else if (has_7bit_lang) {
+        PDU_SIZE_CHECK (offset + 3, "cannot skip 7bit lang");
+        offset += 2;
+    }
 
     switch (cbm_part->encoding) {
     case MM_SMS_ENCODING_GSM7:
