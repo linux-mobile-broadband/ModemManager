@@ -74,7 +74,7 @@ mm_cbm_part_new_from_binary_pdu (const guint8  *pdu,
                                  gpointer       log_object,
                                  GError       **error)
 {
-    MMCbmPart *cbm_part;
+    g_autoptr (MMCbmPart) cbm_part = NULL;
     MMCbmGeoScope scope;
     guint offset = 0;
     guint16 serial, group;
@@ -94,7 +94,6 @@ mm_cbm_part_new_from_binary_pdu (const guint8  *pdu,
                      check_descr_str,                                  \
                      pdu_len,                                          \
                      required_size);                                   \
-        mm_cbm_part_free (cbm_part);                                   \
         return NULL;                                                   \
     }
 
@@ -116,7 +115,6 @@ mm_cbm_part_new_from_binary_pdu (const guint8  *pdu,
         mm_obj_dbg (log_object, "  immediate cell cbm scope");
         break;
     default:
-        mm_cbm_part_free (cbm_part);
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
@@ -155,7 +153,6 @@ mm_cbm_part_new_from_binary_pdu (const guint8  *pdu,
         else if (charset == CBS_DATA_CODING_GENERAL_UCS2)
             cbm_part->encoding = MM_SMS_ENCODING_UCS2;
     } else {
-        mm_cbm_part_free (cbm_part);
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
@@ -190,12 +187,11 @@ mm_cbm_part_new_from_binary_pdu (const guint8  *pdu,
                                log_object,
                                error);
     if (!text) {
-        mm_cbm_part_free (cbm_part);
         return NULL;
     }
     cbm_part->text = g_steal_pointer (&text);
 
-    return cbm_part;
+    return g_steal_pointer (&cbm_part);
 }
 
 MMCbmPart *
