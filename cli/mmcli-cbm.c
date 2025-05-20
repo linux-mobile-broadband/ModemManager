@@ -115,6 +115,7 @@ mmcli_cbm_shutdown (void)
 static void
 print_cbm_info (MMCbm *cbm)
 {
+    const gchar *lang;
     gchar *channel;
     gchar *update;
     gchar *code;
@@ -122,9 +123,12 @@ print_cbm_info (MMCbm *cbm)
     update = g_strdup_printf ("%u", mm_cbm_get_update (cbm));
     channel = g_strdup_printf ("%u", mm_cbm_get_channel (cbm));
     code = g_strdup_printf ("%u", mm_cbm_get_message_code (cbm));
+    lang = mm_cbm_get_language (cbm);
 
     mmcli_output_string           (MMC_F_CBM_GENERAL_DBUS_PATH,           mm_cbm_get_path (cbm));
     mmcli_output_string           (MMC_F_CBM_CONTENT_TEXT,                mm_cbm_get_text (cbm));
+    if (lang)
+        mmcli_output_string       (MMC_F_CBM_PROPERTIES_LANG,             mm_cbm_get_language (cbm));
     mmcli_output_string_take      (MMC_F_CBM_PROPERTIES_CHANNEL,          channel);
     mmcli_output_string_take      (MMC_F_CBM_PROPERTIES_UPDATE,           update);
     mmcli_output_string_take      (MMC_F_CBM_PROPERTIES_MESSAGE_CODE,     code);
