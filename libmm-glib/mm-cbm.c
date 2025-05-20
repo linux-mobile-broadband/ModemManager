@@ -215,6 +215,52 @@ mm_cbm_get_update (MMCbm *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_cbm_get_language:
+ * @self: A #MMCbm.
+ *
+ * Gets the language the message is in as ISO639 two letter code
+ *
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_cbm_dup_language() if on another thread.</warning>
+ *
+ * Returns: (transfer none): The message's language, or %NULL if unknown
+ *
+ * Since: 1.26
+ */
+const gchar *
+mm_cbm_get_language (MMCbm *self)
+{
+    g_return_val_if_fail (MM_IS_CBM (self), NULL);
+
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_cbm_get_language (MM_GDBUS_CBM (self)));
+}
+
+/**
+ * mm_cbm_dup_language:
+ * @self: A #MMCbm.
+ *
+ * Gets the language the message is in as ISO639 two letter code
+ *
+ * Returns: (transfer full): The message lang, or %NULL if it doesn't contain
+ * any (e.g. contains data instead). The returned value should be freed with
+ * g_free().
+ *
+ * Since: 1.26
+ */
+gchar *
+mm_cbm_dup_language (MMCbm *self)
+{
+    g_return_val_if_fail (MM_IS_CBM (self), NULL);
+
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_cbm_dup_language (MM_GDBUS_CBM (self)));
+}
+
+/*****************************************************************************/
+
 static void
 mm_cbm_init (MMCbm *self)
 {
