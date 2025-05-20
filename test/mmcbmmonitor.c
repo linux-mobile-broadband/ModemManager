@@ -75,8 +75,16 @@ print_cbm (MMCbm *cbm)
     g_print ("[%s] new cbm: %s\n",
              mm_cbm_get_path (cbm),
              mm_cbm_state_get_string (mm_cbm_get_state (cbm)));
-    if (mm_cbm_get_state (cbm) == MM_CBM_STATE_RECEIVED)
-        g_print("    %u: %s\n", mm_cbm_get_channel (cbm), mm_cbm_get_text (cbm));
+    if (mm_cbm_get_state (cbm) == MM_CBM_STATE_RECEIVED) {
+        const char *lang = mm_cbm_get_language (cbm);
+        g_autofree gchar *lang_info = g_strdup ("");
+
+        if (lang) {
+            g_free (lang_info);
+            lang_info = g_strdup_printf ("[%s]", lang);
+        }
+        g_print("    %u%s: %s\n", mm_cbm_get_channel (cbm), lang_info, mm_cbm_get_text (cbm));
+    }
 }
 
 
