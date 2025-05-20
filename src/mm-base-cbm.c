@@ -173,6 +173,7 @@ initialize_cbm (MMBaseCbm *self)
                   "channel",              mm_cbm_part_get_channel (part),
                   "update",               CBM_SERIAL_MESSAGE_CODE_UPDATE (serial),
                   "message-code",         CBM_SERIAL_MESSAGE_CODE (serial),
+                  "language",             mm_cbm_part_get_language (part),
                   NULL);
 }
 
