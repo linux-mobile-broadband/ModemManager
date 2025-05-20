@@ -3335,7 +3335,7 @@ mm_3gpp_parse_cpms_test_response (const gchar  *reply,
  * +CPMS: <memr>,<usedr>,<totalr>,<memw>,<usedw>,<totalw>, <mems>,<useds>,<totals>
  */
 
-#define CPMS_QUERY_REGEX "\\+CPMS:\\s*\"(?P<memr>.*)\",[0-9]+,[0-9]+,\"(?P<memw>.*)\",[0-9]+,[0-9]+,\"(?P<mems>.*)\",[0-9]+,[0-9]"
+#define CPMS_QUERY_REGEX "\\+CPMS:\\s*\"(?P<memr>.*)\",\\s*[0-9]+,\\s*[0-9]+,\\s*\"(?P<memw>.*)\",\\s*[0-9]+,\\s*[0-9]+,\\s*\"(?P<mems>.*)\",\\s*[0-9]+,\\s*[0-9]"
 
 gboolean
 mm_3gpp_parse_cpms_query_response (const gchar *reply,

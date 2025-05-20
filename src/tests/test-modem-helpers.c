@@ -3330,7 +3330,7 @@ CpmsQueryTest cpms_query_test[] = {
     {"+CPMS: \"SM\",100,100,\"SR\",5,10,\"TA\",1,100", 1, 4},
     {"+CPMS: \"XX\",100,100,\"BM\",5,10,\"TA\",1,100", 0, 5},
     {"+CPMS: \"XX\",100,100,\"YY\",5,10,\"TA\",1,100", 0, 0},
-    {NULL, 0, 0}
+    {"+CPMS: \"MT\", 0, 100, \"MT\", 0, 100, \"MT\", 0, 100", 3, 3},
 };
 
 static void
@@ -3339,13 +3339,14 @@ test_cpms_query_response (void *f, gpointer d) {
     MMSmsStorage mem2;
     gboolean ret;
     GError *error = NULL;
-    int i;
+    guint i;
 
-    for (i = 0; cpms_query_test[i].query != NULL; i++){
+    for (i = 0; i < G_N_ELEMENTS (cpms_query_test); i++){
         ret = mm_3gpp_parse_cpms_query_response (cpms_query_test[i].query,
                                                  &mem1,
                                                  &mem2,
                                                  &error);
+        g_assert_no_error (error);
         g_assert (ret);
         g_assert_no_error (error);
         g_assert_cmpuint (cpms_query_test[i].mem1_want, ==, mem1);
