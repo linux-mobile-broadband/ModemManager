@@ -11259,10 +11259,11 @@ cell_broadcast_get_broadcast_config_ready (QmiClientWms *client,
         if (!elem.selected)
             continue;
 
-        if (elem.start >  elem.end || elem.end >= G_MAXUINT16) {
+        if (elem.start > elem.end) {
             g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                          "Couldn't parse channel interval '%d-%d'", elem.start, elem.end);
             g_task_return_error (task, error);
+            return;
         }
 
         ch.start = elem.start;
