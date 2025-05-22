@@ -520,6 +520,7 @@ mm_base_cbm_class_init (MMBaseCbmClass *klass)
                              "GDBus connection to the system bus.",
                              G_TYPE_DBUS_CONNECTION,
                              G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_CONNECTION, properties[PROP_CONNECTION]);
 
     properties[PROP_PATH] =
         g_param_spec_string (MM_BASE_CBM_PATH,
@@ -527,6 +528,7 @@ mm_base_cbm_class_init (MMBaseCbmClass *klass)
                              "DBus path of the CBM",
                              NULL,
                              G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_PATH, properties[PROP_PATH]);
 
     g_object_class_override_property (object_class, PROP_BIND_TO, MM_BIND_TO);
 
@@ -536,6 +538,7 @@ mm_base_cbm_class_init (MMBaseCbmClass *klass)
                            "Maximum number of parts composing this CBM",
                            1, 255, 1,
                            G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_MAX_PARTS, properties[PROP_MAX_PARTS]);
 
     properties[PROP_SERIAL] =
         g_param_spec_uint (MM_BASE_CBM_SERIAL,
@@ -543,8 +546,7 @@ mm_base_cbm_class_init (MMBaseCbmClass *klass)
                            "The serial of this CBM",
                            0, G_MAXUINT16, 0,
                            G_PARAM_READWRITE);
-
-    g_object_class_install_properties (object_class, PROP_LAST, properties);
+    g_object_class_install_property (object_class, PROP_SERIAL, properties[PROP_SERIAL]);
 }
 
 guint16
