@@ -46,6 +46,8 @@ static const EchoRemovalTest echo_removal_tests[] = {
     { "echo echo\r\nthis is valid\r\nand so is this", "\r\nthis is valid\r\nand so is this" },
     { "\r\nthis is valid\r\nand so is this", "\r\nthis is valid\r\nand so is this" },
     { "\r\nthis is valid\r\nand so is this\r\n", "\r\nthis is valid\r\nand so is this\r\n" },
+    { "\nNO CARRIER\r\n", "\nNO CARRIER\r\n" },
+    { "\nCONNECT\r\n", "\nCONNECT\r\n" },
 };
 
 static const ParseResponseTest parse_ok_tests[] = {
@@ -89,6 +91,7 @@ at_serial_echo_removal (void)
     guint i;
 
     for (i = 0; i < G_N_ELEMENTS (echo_removal_tests); i++) {
+        gpointer    parser;
         GByteArray *ba;
 
         /* Note that we add last NUL also to the byte array, so that we can compare
@@ -98,7 +101,9 @@ at_serial_echo_removal (void)
                               (guint8 *)echo_removal_tests[i].original,
                               strlen (echo_removal_tests[i].original) + 1);
 
-        mm_port_serial_at_remove_echo (ba);
+        parser = mm_serial_parser_v1_new ();
+        mm_serial_parser_v1_remove_echo (parser, ba);
+        mm_serial_parser_v1_destroy (parser);
 
         g_assert_cmpstr ((gchar *)ba->data, ==, echo_removal_tests[i].without_echo);
 
@@ -119,6 +124,7 @@ _run_parse_test (const ParseResponseTest tests[], guint number_of_tests)
         parser = mm_serial_parser_v1_new ();
         response = g_string_new (tests[i].response);
         found = mm_serial_parser_v1_parse (parser, response, NULL, &error);
+        mm_serial_parser_v1_destroy (parser);
 
         /* Verify if we expect a match or not */
         g_assert_cmpint (found, ==, tests[i].found);

@@ -17,8 +17,11 @@
 #include <string.h>
 #include <stdlib.h>
 
+#define _LIBMM_INSIDE_MM
+
 #include "mm-error-helpers.h"
 #include "mm-serial-parsers.h"
+#include "mm-modem-helpers.h"
 #include "mm-log-object.h"
 
 /* Clean up the response by removing control characters like <CR><LF> etc */
@@ -92,7 +95,8 @@ typedef struct {
     GRegex *regex_cms_error_str;
     GRegex *regex_ezx_error;
     GRegex *regex_unknown_error;
-    GRegex *regex_connect_failed;
+    GRegex *regex_call_start;
+    GRegex *regex_call_end;
     GRegex *regex_na;
     GRegex *regex_custom_error;
     /* User-provided parser filter */
@@ -117,7 +121,8 @@ mm_serial_parser_v1_new (void)
     parser->regex_cms_error_str = g_regex_new ("\\r\\n\\+CMS ERROR:\\s*([^\\n\\r]+)\\r\\n", flags, 0, NULL);
     parser->regex_ezx_error = g_regex_new ("\\r\\nMODEM ERROR:\\s*(\\d+)\\r\\n", flags, 0, NULL);
     parser->regex_unknown_error = g_regex_new ("\\r\\n(ERROR)|(COMMAND NOT SUPPORT)\\r\\n", flags, 0, NULL);
-    parser->regex_connect_failed = g_regex_new ("\\r\\n(NO CARRIER)|(BUSY)|(NO ANSWER)|(NO DIALTONE)\\r\\n", flags, 0, NULL);
+    parser->regex_call_start = g_regex_new ("(\\r)?\\n(CONNECT)\\r\\n", flags, 0, NULL);
+    parser->regex_call_end = mm_call_end_regex_get ();
     /* Samsung Z810 may reply "NA" to report a not-available error */
     parser->regex_na = g_regex_new ("\\r\\nNA\\r\\n", flags, 0, NULL);
 
@@ -158,6 +163,49 @@ mm_serial_parser_v1_add_filter (gpointer data,
 
     parser->filter_callback = callback;
     parser->filter_user_data = user_data;
+}
+
+void
+mm_serial_parser_v1_remove_echo (gpointer    data,
+                                 GByteArray *response)
+{
+    MMSerialParserV1 *parser = (MMSerialParserV1 *) data;
+    guint i;
+
+    if (response->len <= 2)
+        return;
+
+    /* Some devices omit the leading <CR> from call end responses which would
+     * otherwise fail the <CR><LF> checks below and be removed. We want to leave
+     * them in the response.
+     */
+    if (g_regex_match_full (parser->regex_call_end,
+                            (const gchar *) response->data,
+                            response->len,
+                            0,
+                            0,
+                            NULL,
+                            NULL))
+        return;
+    if (g_regex_match_full (parser->regex_call_start,
+                            (const gchar *) response->data,
+                            response->len,
+                            0,
+                            0,
+                            NULL,
+                            NULL))
+        return;
+
+    for (i = 0; i < (response->len - 1); i++) {
+        /* If there is any content before the first
+         * <CR><LF>, assume it's echo or garbage, and skip it */
+        if (response->data[i] == '\r' && response->data[i + 1] == '\n') {
+            if (i > 0)
+                g_byte_array_remove_range (response, 0, i);
+            /* else, good, we're already started with <CR><LF> */
+            break;
+        }
+    }
 }
 
 gboolean
@@ -316,7 +364,7 @@ mm_serial_parser_v1_parse (gpointer   data,
     g_clear_pointer (&match_info, g_match_info_free);
 
     /* Connection failures */
-    found = g_regex_match_full (parser->regex_connect_failed,
+    found = g_regex_match_full (parser->regex_call_end,
                                 response->str, response->len,
                                 0, 0, &match_info, NULL);
     if (found) {
@@ -396,7 +444,8 @@ mm_serial_parser_v1_destroy (gpointer data)
     g_regex_unref (parser->regex_cms_error_str);
     g_regex_unref (parser->regex_ezx_error);
     g_regex_unref (parser->regex_unknown_error);
-    g_regex_unref (parser->regex_connect_failed);
+    g_regex_unref (parser->regex_call_start);
+    g_regex_unref (parser->regex_call_end);
     g_regex_unref (parser->regex_na);
 
     if (parser->regex_custom_successful)

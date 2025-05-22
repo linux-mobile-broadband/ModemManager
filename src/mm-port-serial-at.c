@@ -42,6 +42,7 @@ enum {
 struct _MMPortSerialAtPrivate {
     /* Response parser data */
     MMPortSerialAtResponseParserFn response_parser_fn;
+    MMPortSerialAtRemoveEchoFn     remove_echo_fn;
     gpointer response_parser_user_data;
     GDestroyNotify response_parser_notify;
 
@@ -61,6 +62,7 @@ struct _MMPortSerialAtPrivate {
 void
 mm_port_serial_at_set_response_parser (MMPortSerialAt *self,
                                        MMPortSerialAtResponseParserFn fn,
+                                       MMPortSerialAtRemoveEchoFn echo_fn,
                                        gpointer user_data,
                                        GDestroyNotify notify)
 {
@@ -70,28 +72,9 @@ mm_port_serial_at_set_response_parser (MMPortSerialAt *self,
         self->priv->response_parser_notify (self->priv->response_parser_user_data);
 
     self->priv->response_parser_fn = fn;
+    self->priv->remove_echo_fn = echo_fn;
     self->priv->response_parser_user_data = user_data;
     self->priv->response_parser_notify = notify;
-}
-
-void
-mm_port_serial_at_remove_echo (GByteArray *response)
-{
-    guint i;
-
-    if (response->len <= 2)
-        return;
-
-    for (i = 0; i < (response->len - 1); i++) {
-        /* If there is any content before the first
-         * <CR><LF>, assume it's echo or garbage, and skip it */
-        if (response->data[i] == '\r' && response->data[i + 1] == '\n') {
-            if (i > 0)
-                g_byte_array_remove_range (response, 0, i);
-            /* else, good, we're already started with <CR><LF> */
-            break;
-        }
-    }
 }
 
 static MMPortSerialResponseType
@@ -109,7 +92,7 @@ parse_response (MMPortSerial *port,
 
     /* Remove echo */
     if (self->priv->remove_echo)
-        mm_port_serial_at_remove_echo (response);
+        self->priv->remove_echo_fn (self->priv->response_parser_user_data, response);
 
     /* If there's no response to receive, we're done; e.g. if we only got
      * unsolicited messages */
@@ -243,7 +226,7 @@ parse_unsolicited (MMPortSerial *port, GByteArray *response)
 
     /* Remove echo */
     if (self->priv->remove_echo)
-        mm_port_serial_at_remove_echo (response);
+        self->priv->remove_echo_fn (self->priv->response_parser_user_data, response);
 
     for (iter = self->priv->unsolicited_msg_handlers; iter; iter = iter->next) {
         MMAtUnsolicitedMsgHandler *handler = (MMAtUnsolicitedMsgHandler *) iter->data;
