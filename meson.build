@@ -259,14 +259,34 @@ config_h.set('WITH_BUILTIN_PLUGINS', enable_builtin_plugins)
 # MBIM support (enabled by default)
 enable_mbim = get_option('mbim')
 if enable_mbim
-  mbim_glib_dep = dependency('mbim-glib', version: '>= 1.32.0')
+  mbim_glib_dep = dependency('mbim-glib', version: '>= 1.32.0',
+                             required: not get_option('subproject-fallback'))
+  if not mbim_glib_dep.found() and get_option('subproject-fallback')
+    mbim_glib_proj = subproject('libmbim',
+                                default_options: ['man=false',
+                                                  'introspection=false',
+                                                  'bash_completion=false',
+						 ])
+    mbim_glib_dep = mbim_glib_proj.get_variable('libmbim_glib_dep')
+  endif
 endif
 config_h.set('WITH_MBIM', enable_mbim)
 
 # QMI support (enabled by default)
 enable_qmi = get_option('qmi')
 if enable_qmi
-  qmi_glib_dep = dependency('qmi-glib', version: '>= 1.36.0')
+  qmi_glib_dep = dependency('qmi-glib', version: '>= 1.36.0',
+                            required: not get_option('subproject-fallback'))
+
+  if not qmi_glib_dep.found() and get_option('subproject-fallback')
+    qmi_glib_proj = subproject('libqmi',
+                               default_options: ['man=false',
+                                                 'mbim_qmux=false',
+                                                 'introspection=false',
+                                                 'bash_completion=false',
+						])
+    qmi_glib_dep = qmi_glib_proj.get_variable('libqmi_glib_dep')
+  endif
 endif
 config_h.set('WITH_QMI', enable_qmi)
 
@@ -274,7 +294,12 @@ config_h.set('WITH_QMI', enable_qmi)
 enable_qrtr = get_option('qrtr')
 if enable_qrtr
   assert(enable_qmi, 'QRTR support requires QMI enabled')
-  assert(qmi_glib_dep.get_pkgconfig_variable('qmi_qrtr_supported').to_int().is_odd(), 'Couldn\'t find QRTR support in qmi-glib.')
+  if qmi_glib_dep.type_name() == 'internal'
+    qmi_qrtr_supported = qmi_glib_proj.get_variable('enable_qrtr')
+  else
+    qmi_qrtr_supported = qmi_glib_dep.get_pkgconfig_variable('qmi_qrtr_supported')
+  endif
+  assert(qmi_qrtr_supported.to_int().is_odd(), 'Couldn\'t find QRTR support in qmi-glib.')
   qrtr_glib_dep = dependency('qrtr-glib', version: '>= 1.0.0')
 endif
 config_h.set('WITH_QRTR', enable_qrtr)

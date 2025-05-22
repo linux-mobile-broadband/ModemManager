@@ -1,0 +1,5 @@
+[wrap-git]
+directory=libqmi
+url=https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
+revision=main
+
