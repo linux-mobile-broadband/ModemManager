@@ -369,6 +369,11 @@
     <allow send_destination="org.freedesktop.ModemManager1"
            send_interface="org.freedesktop.ModemManager1.Modem.CellBroadcast"
            send_member="Delete"/>
+
+    <!-- Protected by the Device.Control policy rule -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.CellBroadcast"
+           send_member="SetChannels"/>
   </policy>
 
   <policy user="root">
