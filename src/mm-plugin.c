@@ -285,8 +285,7 @@ apply_pre_probing_filters (MMPlugin       *self,
     if (self->priv->drivers ||
         self->priv->forbidden_drivers ||
         !self->priv->qmi ||
-        !self->priv->mbim ||
-        !self->priv->xmmrpc) {
+        !self->priv->mbim) {
         static const gchar *virtual_drivers [] = { "virtual", NULL };
         const gchar **drivers;
 
