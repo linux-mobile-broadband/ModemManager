@@ -319,6 +319,8 @@ mm_broadband_modem_mbim_cinterion_new (const gchar *device,
                          MM_BASE_MODEM_PLUGIN, plugin,
                          MM_BASE_MODEM_VENDOR_ID, vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
+                         /* include carrier information */
+                         MM_IFACE_MODEM_FIRMWARE_IGNORE_CARRIER, TRUE,
                          /* MBIM bearer supports NET only */
                          MM_BASE_MODEM_DATA_NET_SUPPORTED, TRUE,
                          MM_BASE_MODEM_DATA_TTY_SUPPORTED, FALSE,
