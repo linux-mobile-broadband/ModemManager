@@ -358,6 +358,22 @@
            send_interface="org.freedesktop.ModemManager1.Modem.Time"
            send_member="GetNetworkTime"/>
 
+    <!-- org.freedesktop.ModemManager1.Modem.CellBroadcast.xml -->
+
+    <!-- Allowed for everyone -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.CellBroadcast"
+           send_member="List"/>
+
+    <!-- Protected by the CellBroadcast policy rule -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.CellBroadcast"
+           send_member="Delete"/>
+
+    <!-- Protected by the Device.Control policy rule -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.CellBroadcast"
+           send_member="SetChannels"/>
   </policy>
 
   <policy user="root">

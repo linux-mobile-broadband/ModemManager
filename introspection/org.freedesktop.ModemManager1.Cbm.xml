@@ -65,5 +65,14 @@
     -->
     <property name="Update" type="u" access="read" />
 
+    <!--
+        Language:
+
+        The language of the CBM as ISO639 two letter code
+
+        Since: 1.26
+    -->
+    <property name="Language" type="s" access="read" />
+
   </interface>
 </node>

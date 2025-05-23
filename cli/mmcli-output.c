@@ -298,6 +298,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_CBM_PROPERTIES_CHANNEL]                   = { "cbm.properties.channel",                          "channel",                  MMC_S_CBM_PROPERTIES,             },
     [MMC_F_CBM_PROPERTIES_UPDATE]                    = { "cbm.properties.update",                           "update",                   MMC_S_CBM_PROPERTIES,             },
     [MMC_F_CBM_PROPERTIES_MESSAGE_CODE]              = { "cbm.properties.message-code",                     "message code",             MMC_S_CBM_PROPERTIES,             },
+    [MMC_F_CBM_PROPERTIES_LANG        ]              = { "cbm.properties.lang",                             "lang",                     MMC_S_CBM_PROPERTIES,             },
     [MMC_F_SMS_GENERAL_DBUS_PATH]                    = { "sms.dbus-path",                                   "path",                     MMC_S_SMS_GENERAL,                },
     [MMC_F_SMS_CONTENT_NUMBER]                       = { "sms.content.number",                              "number",                   MMC_S_SMS_CONTENT,                },
     [MMC_F_SMS_CONTENT_TEXT]                         = { "sms.content.text",                                "text",                     MMC_S_SMS_CONTENT,                },

@@ -27,9 +27,17 @@
 #include "mm-sms-part-3gpp.h"
 
 #define CBS_DATA_CODING_GROUP_MASK           0b11110000
+#define CBS_DATA_CODING_LANG_MASK            0b00001111
 #define CBS_DATA_CODING_LANG_GSM7            0b00000000
 #define CBS_DATA_CODING_GSM7                 0b00010000
 #define CBS_DATA_CODING_UCS2                 0b00010001
+#define CBS_DATA_CODING_OTHER                0b00100000
+#define CBS_DATA_CODING_OTHER_CZECH          0b00100000
+#define CBS_DATA_CODING_OTHER_HEBREW         0b00100001
+#define CBS_DATA_CODING_OTHER_ARABIC         0b00100010
+#define CBS_DATA_CODING_OTHER_RUSSIAN        0b00100011
+#define CBS_DATA_CODING_OTHER_ICELANDIC      0b00100100
+#define CBS_DATA_CODING_UNSPECIFIED          0b00110000
 #define CBS_DATA_CODING_GENERAL_NO_CLASS     0b01000000
 #define CBS_DATA_CODING_GENERAL_CLASS        0b01010000
 #define CBS_DATA_CODING_GENERAL_CHARSET_MASK 0b00001100
@@ -46,8 +54,46 @@ struct _MMCbmPart {
     guint8 part_num;
 
     gchar *text;
+    gchar *language;
     MMSmsEncoding encoding;
 };
+
+
+static gchar *
+mm_cbm_part_coding_group_to_language (guint8 group)
+{
+    switch (group & CBS_DATA_CODING_LANG_MASK) {
+    case 0b0000:
+        return g_strdup ("de");
+    case 0b0001:
+        return g_strdup ("en");
+    case 0b0010:
+        return g_strdup ("it");
+    case 0b0011:
+        return g_strdup ("fr");
+    case 0b0100:
+        return g_strdup ("es");
+    case 0b0101:
+        return g_strdup ("nl");
+    case 0b0110:
+        return g_strdup ("sv");
+    case 0b0111:
+        return g_strdup ("dk");
+    case 0b1000:
+        return g_strdup ("pt");
+    case 0b1001:
+        return g_strdup ("fi");
+    case 0b1010:
+        return g_strdup ("no");
+    case 0b1011:
+        return g_strdup ("el");
+    case 0b1110:
+        return g_strdup ("pl");
+    case 0b1111:
+    default:
+        return NULL;
+    };
+}
 
 
 MMCbmPart *
@@ -74,12 +120,13 @@ mm_cbm_part_new_from_binary_pdu (const guint8  *pdu,
                                  gpointer       log_object,
                                  GError       **error)
 {
-    MMCbmPart *cbm_part;
+    g_autoptr (MMCbmPart) cbm_part = NULL;
     MMCbmGeoScope scope;
     guint offset = 0;
     guint16 serial, group;
     int len;
     g_autofree gchar *text = NULL;
+    gboolean has_lang = FALSE, has_7bit_lang = FALSE;
 
     cbm_part = mm_cbm_part_new ();
 
@@ -94,7 +141,6 @@ mm_cbm_part_new_from_binary_pdu (const guint8  *pdu,
                      check_descr_str,                                  \
                      pdu_len,                                          \
                      required_size);                                   \
-        mm_cbm_part_free (cbm_part);                                   \
         return NULL;                                                   \
     }
 
@@ -116,7 +162,6 @@ mm_cbm_part_new_from_binary_pdu (const guint8  *pdu,
         mm_obj_dbg (log_object, "  immediate cell cbm scope");
         break;
     default:
-        mm_cbm_part_free (cbm_part);
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
@@ -137,14 +182,40 @@ mm_cbm_part_new_from_binary_pdu (const guint8  *pdu,
     /* Order matches 3GPP TS 23.038 Chapter 5 */
     if (group == CBS_DATA_CODING_LANG_GSM7) {
         cbm_part->encoding = MM_SMS_ENCODING_GSM7;
+        cbm_part->language = mm_cbm_part_coding_group_to_language (pdu[offset]);
     } else if (pdu[offset] == CBS_DATA_CODING_GSM7) {
-        PDU_SIZE_CHECK (offset + 4, "cannot skip lang");
-        offset += 3;
+        has_lang = TRUE;
         cbm_part->encoding = MM_SMS_ENCODING_GSM7;
     } else if (pdu[offset] == CBS_DATA_CODING_UCS2) {
-        PDU_SIZE_CHECK (offset + 3, "cannot skip lang");
-        offset += 2;
+        has_7bit_lang = TRUE;
         cbm_part->encoding = MM_SMS_ENCODING_UCS2;
+    } else if (group == CBS_DATA_CODING_OTHER) {
+        switch (group) {
+        case CBS_DATA_CODING_OTHER_CZECH:
+            cbm_part->encoding = MM_SMS_ENCODING_GSM7;
+            cbm_part->language = g_strdup ("cz");
+            break;
+        case CBS_DATA_CODING_OTHER_HEBREW:
+            cbm_part->encoding = MM_SMS_ENCODING_UCS2;
+            cbm_part->language = g_strdup ("he");
+            break;
+        case CBS_DATA_CODING_OTHER_ARABIC:
+            cbm_part->encoding = MM_SMS_ENCODING_UCS2;
+            cbm_part->language = g_strdup ("ar");
+            break;
+        case CBS_DATA_CODING_OTHER_RUSSIAN:
+            cbm_part->encoding = MM_SMS_ENCODING_UCS2;
+            cbm_part->language = g_strdup ("ru");
+            break;
+        case CBS_DATA_CODING_OTHER_ICELANDIC:
+            cbm_part->encoding = MM_SMS_ENCODING_GSM7;
+            cbm_part->language = g_strdup ("is");
+            break;
+        default:
+            cbm_part->encoding = MM_SMS_ENCODING_GSM7;
+        }
+    } else if (group == CBS_DATA_CODING_UNSPECIFIED) {
+        cbm_part->encoding = MM_SMS_ENCODING_GSM7;
     } else if ((group == CBS_DATA_CODING_GENERAL_CLASS) ||
                (group == CBS_DATA_CODING_GENERAL_NO_CLASS) ||
                (group == CBS_DATA_CODING_UDH)) {
@@ -155,7 +226,6 @@ mm_cbm_part_new_from_binary_pdu (const guint8  *pdu,
         else if (charset == CBS_DATA_CODING_GENERAL_UCS2)
             cbm_part->encoding = MM_SMS_ENCODING_UCS2;
     } else {
-        mm_cbm_part_free (cbm_part);
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
@@ -169,6 +239,35 @@ mm_cbm_part_new_from_binary_pdu (const guint8  *pdu,
     cbm_part->num_parts = (pdu[offset] & 0x0F);
     cbm_part->part_num = (pdu[offset] & 0xF0) >> 4;
     offset++;
+
+    if (has_lang) {
+        PDU_SIZE_CHECK (offset + 4, "cannot read lang");
+        if (pdu[offset+2] != '\r') {
+            g_set_error_literal (error,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Failed to parse lang");
+            return NULL;
+        }
+        cbm_part->language = g_strdup_printf ("%c%c", pdu[offset], pdu[offset+1]);
+        offset += 3;
+    } else if (has_7bit_lang) {
+        PDU_SIZE_CHECK (offset + 3, "cannot read 7bit lang");
+        cbm_part->language = mm_sms_decode_text (&pdu[offset],
+                                                 2,
+                                                 MM_SMS_ENCODING_GSM7,
+                                                 0,
+                                                 log_object,
+                                                 NULL);
+        if (!cbm_part->language) {
+            g_set_error_literal (error,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Failed to parse lang");
+            return NULL;
+        }
+        offset += 2;
+    }
 
     switch (cbm_part->encoding) {
     case MM_SMS_ENCODING_GSM7:
@@ -190,12 +289,11 @@ mm_cbm_part_new_from_binary_pdu (const guint8  *pdu,
                                log_object,
                                error);
     if (!text) {
-        mm_cbm_part_free (cbm_part);
         return NULL;
     }
     cbm_part->text = g_steal_pointer (&text);
 
-    return cbm_part;
+    return g_steal_pointer (&cbm_part);
 }
 
 MMCbmPart *
@@ -207,6 +305,7 @@ mm_cbm_part_new (void)
 void
 mm_cbm_part_free (MMCbmPart *part)
 {
+  g_clear_pointer (&part->language, g_free);
   g_clear_pointer (&part->text, g_free);
   g_slice_free (MMCbmPart, part);
 }
@@ -223,3 +322,4 @@ PART_GET_FUNC (guint, num_parts)
 PART_GET_FUNC (const char *, text)
 PART_GET_FUNC (guint16, channel)
 PART_GET_FUNC (guint16, serial)
+PART_GET_FUNC (const char *, language)

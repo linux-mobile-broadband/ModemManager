@@ -59,11 +59,14 @@ MMCbmPart *mm_cbm_part_new_from_binary_pdu (const guint8  *pdu,
 MMCbmPart  *mm_cbm_part_new (void);
 void        mm_cbm_part_free (MMCbmPart *part);
 
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMCbmPart, mm_cbm_part_free)
+
 guint       mm_cbm_part_get_part_num (MMCbmPart *part);
 guint       mm_cbm_part_get_num_parts (MMCbmPart *part);
 const char *mm_cbm_part_get_text (MMCbmPart *part);
 
 guint16     mm_cbm_part_get_serial (MMCbmPart *part);
 guint16     mm_cbm_part_get_channel (MMCbmPart *part);
+const char *mm_cbm_part_get_language (MMCbmPart *part);
 
 #endif

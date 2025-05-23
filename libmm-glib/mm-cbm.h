@@ -75,6 +75,9 @@ guint         mm_cbm_get_channel                 (MMCbm *self);
 guint         mm_cbm_get_message_code            (MMCbm *self);
 guint         mm_cbm_get_update                  (MMCbm *self);
 
+const gchar  *mm_cbm_get_language                (MMCbm *self);
+gchar        *mm_cbm_dup_language                (MMCbm *self);
+
 G_END_DECLS
 
 #endif /* _MM_CBM_H_ */

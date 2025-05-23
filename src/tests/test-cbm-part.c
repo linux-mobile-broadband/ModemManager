@@ -68,6 +68,8 @@ test_cbm_ca (void)
 
     g_assert_cmpstr (mm_cbm_part_get_text (part), ==,
                      "This is a test of the Ontario Alert Ready System. There is no danger to your health or safety" );
+
+    g_assert_null (mm_cbm_part_get_language (part));
 }
 
 static void
@@ -109,6 +111,8 @@ test_cbm_ucs2 (void)
 
     g_assert_cmpstr (mm_cbm_part_get_text (part), ==,
                      " Протягом дня є висока імовірність ракетнᘁ");
+
+    g_assert_null (mm_cbm_part_get_language (part));
 }
 
 
@@ -153,6 +157,8 @@ test_cbm_eu (void)
 
     g_assert_cmpstr (mm_cbm_part_get_text (part), ==,
                      "TEST ALERT, NATIONWIDE ALERT DAY 2022 Thu 2022/12/08 - 10:59 am - Test alert - for Deutschlan");
+
+    g_assert_cmpstr (mm_cbm_part_get_language (part), ==, "en");
 }
 
 static void
@@ -194,6 +200,7 @@ test_cbm_nl_2023 (void)
     g_assert_cmpstr (mm_cbm_part_get_text (part), ==,
                      "NL-Alert 04-12-2023 12:00: TESTBERICHT. De overheid waarschuwt je tijdens noodsituaties via N");
     mm_cbm_part_free (part);
+    g_assert_null (mm_cbm_part_get_language (part));
 
     parse_cbm ("\r\n+CBM: 88\r\n46A011130523CC56905D96D35D206519C42E97E7741039EC06DDC37490BA0C6ABFCB7410F95D7683CA6ED03D1C9683D46550BB5C9683D26EF35BDE0ED3D365D03AEC06D9D36E72D9ED02A9542A10B538A5829AC5E9347804\r\n", &part);
     serial = mm_cbm_part_get_serial (part);
@@ -208,6 +215,7 @@ test_cbm_nl_2023 (void)
     g_assert_cmpstr (mm_cbm_part_get_text (part), ==,
                      "L-Alert. Je leest dan wat je moet doen en waar je meer informatie kan vinden. *** TEST MESSAG");
     mm_cbm_part_free (part);
+    g_assert_null (mm_cbm_part_get_language (part));
 
     parse_cbm ("\r\n+CBM: 65\r\n46A0111305334590B34C4797E5ECB09B3C071DDFF6B2DCDD2EBBE920685DCC4E8F41D7B0DC9D769F41D3FC9C5E6EBB40CE37283CA6A7DF6E90BC1CAFA7E565B2AB\r\n", &part);
     serial = mm_cbm_part_get_serial (part);
@@ -222,7 +230,54 @@ test_cbm_nl_2023 (void)
     g_assert_cmpstr (mm_cbm_part_get_text (part), ==,
                      "E Netherlands Government Public Warning System. No action required." );
     mm_cbm_part_free (part);
+    g_assert_null (mm_cbm_part_get_language (part));
 }
+
+
+static void
+test_cbm_gsm7bit_with_lang (void)
+{
+    g_autoptr(GError) err = NULL;
+    MMCbmPart *part;
+
+    static const guint8 pdu[] = {
+        0x40, 0xC0, 0x11, 0x1F, 0x10 /* GSM 7Bit with language */, 0x13,
+        0x64 /* d */, 0x65 /* e */, 0x0D /* \r */, 0x0A, 0x0A, 0x32, 0x8B, 0x52,
+        0x2A, 0x0B, 0xE4, 0x0C, 0x52, 0x93, 0x4F, 0xE7,
+    };
+
+    part = mm_cbm_part_new_from_binary_pdu (pdu, G_N_ELEMENTS (pdu), NULL, &err);
+    g_assert_no_error (err);
+    g_assert_nonnull (part);
+
+    g_assert_cmpuint (mm_cbm_part_get_channel (part), ==, 4383);
+    g_assert_cmpuint (mm_cbm_part_get_num_parts (part), ==, 3);
+    g_assert_cmpuint (mm_cbm_part_get_part_num (part), ==, 1);
+    g_assert_cmpstr (mm_cbm_part_get_language (part), ==, "de");
+}
+
+
+static void
+test_cbm_ucs2_with_7bit_lang (void)
+{
+    g_autoptr(GError) err = NULL;
+    MMCbmPart *part;
+
+    static const guint8 pdu [] = {
+        0x63, 0x40, 0x00, 0x32, 0x11 /* UCS2 with 7Bit language */, 0x14,
+        0xF2 /* ru …*/ , 0x7A /* … in GSM 7bit */, 0x04, 0x1f, 0x04, 0x40, 0x04, 0x3e,
+    };
+
+    part = mm_cbm_part_new_from_binary_pdu (pdu, G_N_ELEMENTS (pdu), NULL, &err);
+    g_assert_no_error (err);
+    g_assert_nonnull (part);
+
+    g_assert_cmpuint (mm_cbm_part_get_channel (part), ==, 50);
+    g_assert_cmpuint (mm_cbm_part_get_num_parts (part), ==, 4);
+    g_assert_cmpuint (mm_cbm_part_get_part_num (part), ==, 1);
+    g_assert_cmpstr (mm_cbm_part_get_language (part), ==, "ru");
+}
+
 
 int main (int argc, char **argv)
 {
@@ -242,6 +297,10 @@ int main (int argc, char **argv)
     /* 2023 NL alert: */
     /* https://gitlab.freedesktop.org/mobile-broadband/ModemManager/-/issues/253#note_2192474 */
     g_test_add_func ("/MM/CBM/PDU-Parser/CBM-NL", test_cbm_nl_2023);
+    /* GSM7 bit encoding with language in the first 3 bytes of the message */
+    g_test_add_func ("/MM/CBM/PDU-Parser/has-lang", test_cbm_gsm7bit_with_lang);
+    /* UCS2 encoding with 7bit language in first 2 bytes of the message */
+    g_test_add_func ("/MM/CBM/PDU-Parser/has-7bit-lang", test_cbm_ucs2_with_7bit_lang);
 
     return g_test_run ();
 }
