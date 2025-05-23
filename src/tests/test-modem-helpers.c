@@ -5089,6 +5089,37 @@ test_string_to_access_tech (void)
 
 /*****************************************************************************/
 
+typedef struct {
+    const gchar       *str;
+    const gboolean     expect_prefix;
+    const MMModemLock  expected_lock;
+} TestCpinResponse;
+
+static const TestCpinResponse test_cpin_responses[] = {
+    { "+CME ERROR: 100",    TRUE,  MM_MODEM_LOCK_UNKNOWN },
+    { "+CPIN: SIM PIN",     TRUE,  MM_MODEM_LOCK_SIM_PIN },
+    { "+CPIN: SIM PUK2",    TRUE,  MM_MODEM_LOCK_SIM_PUK2 },
+    { "   SIM PUK",         FALSE, MM_MODEM_LOCK_SIM_PUK },
+    { "   SIM PUK2",        FALSE, MM_MODEM_LOCK_SIM_PUK2 },
+    { "+CPIN: \"SIM PIN\"", TRUE,  MM_MODEM_LOCK_SIM_PIN },
+    { "+CPIN: PH-NET PIN",  TRUE,  MM_MODEM_LOCK_PH_NET_PIN },
+};
+
+static void
+test_cpin_response (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (test_cpin_responses); i++) {
+        MMModemLock lock;
+
+        lock = mm_parse_cpin_response (test_cpin_responses[i].str, test_cpin_responses[i].expect_prefix);
+        g_assert_cmpint (lock, ==, test_cpin_responses[i].expected_lock);
+    }
+}
+
+/*****************************************************************************/
+
 #define TESTCASE(t, d) g_test_create_case (#t, 0, d, NULL, (GTestFixtureFunc) t, NULL)
 
 int main (int argc, char **argv)
@@ -5350,6 +5381,8 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_mnc_length, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_string_to_access_tech, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_cpin_response, NULL));
 
     result = g_test_run ();
 

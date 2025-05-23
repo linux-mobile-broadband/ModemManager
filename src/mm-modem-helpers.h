@@ -638,4 +638,9 @@ guint mm_string_uint_map_lookup (const MMStringUintMap *map,
                                  const gchar           *str,
                                  const guint            default_value);
 
+/*****************************************************************************/
+
+MMModemLock mm_parse_cpin_response (const gchar *response,
+                                    gboolean     expect_cpin_prefix);
+
 #endif  /* MM_MODEM_HELPERS_H */

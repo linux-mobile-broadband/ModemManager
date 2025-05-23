@@ -1505,32 +1505,6 @@ modem_load_own_numbers (MMIfaceModem *self,
 /*****************************************************************************/
 /* Check if unlock required (Modem interface) */
 
-typedef struct {
-    const gchar *result;
-    MMModemLock code;
-} CPinResult;
-
-static CPinResult unlock_results[] = {
-    /* Longer entries first so we catch the correct one with strcmp() */
-    { "READY",         MM_MODEM_LOCK_NONE           },
-    { "SIM PIN2",      MM_MODEM_LOCK_SIM_PIN2       },
-    { "SIM PUK2",      MM_MODEM_LOCK_SIM_PUK2       },
-    { "SIM PIN",       MM_MODEM_LOCK_SIM_PIN        },
-    { "SIM PUK",       MM_MODEM_LOCK_SIM_PUK        },
-    { "PH-NETSUB PIN", MM_MODEM_LOCK_PH_NETSUB_PIN  },
-    { "PH-NETSUB PUK", MM_MODEM_LOCK_PH_NETSUB_PUK  },
-    { "PH-FSIM PIN",   MM_MODEM_LOCK_PH_FSIM_PIN    },
-    { "PH-FSIM PUK",   MM_MODEM_LOCK_PH_FSIM_PUK    },
-    { "PH-CORP PIN",   MM_MODEM_LOCK_PH_CORP_PIN    },
-    { "PH-CORP PUK",   MM_MODEM_LOCK_PH_CORP_PUK    },
-    { "PH-SIM PIN",    MM_MODEM_LOCK_PH_SIM_PIN     },
-    { "PH-NET PIN",    MM_MODEM_LOCK_PH_NET_PIN     },
-    { "PH-NET PUK",    MM_MODEM_LOCK_PH_NET_PUK     },
-    { "PH-SP PIN",     MM_MODEM_LOCK_PH_SP_PIN      },
-    { "PH-SP PUK",     MM_MODEM_LOCK_PH_SP_PUK      },
-    { NULL }
-};
-
 static MMModemLock
 modem_load_unlock_required_finish (MMIfaceModem *self,
                                    GAsyncResult *res,
@@ -1553,42 +1527,19 @@ cpin_query_ready (MMIfaceModem *self,
                   GTask *task)
 {
 
-    MMModemLock lock = MM_MODEM_LOCK_UNKNOWN;
+    MMModemLock  lock = MM_MODEM_LOCK_UNKNOWN;
     const gchar *result;
-    GError *error = NULL;
+    GError      *error = NULL;
 
     result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
         g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
+    } else {
+        if (result)
+            lock = mm_parse_cpin_response (result, TRUE);
+        g_task_return_int (task, lock);
     }
 
-    if (result &&
-        strstr (result, "+CPIN:")) {
-        CPinResult *iter = &unlock_results[0];
-        const gchar *str;
-
-        str = strstr (result, "+CPIN:") + 6;
-        /* Skip possible whitespaces after '+CPIN:' and before the response */
-        while (*str == ' ')
-            str++;
-
-        /* Some phones (Motorola EZX models) seem to quote the response */
-        if (str[0] == '"')
-            str++;
-
-        /* Translate the reply */
-        while (iter->result) {
-            if (g_str_has_prefix (str, iter->result)) {
-                lock = iter->code;
-                break;
-            }
-            iter++;
-        }
-    }
-
-    g_task_return_int (task, lock);
     g_object_unref (task);
 }
 
