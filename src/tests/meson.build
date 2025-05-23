@@ -8,6 +8,7 @@ test_units = {
   'error-helpers': libhelpers_dep,
   'kernel-device-helpers': libkerneldevice_dep,
   'modem-helpers': libhelpers_dep,
+  'port-scheduler': libport_dep,
   'sms-part-3gpp': libhelpers_dep,
   'sms-part-cdma': libhelpers_dep,
   'sms-list': libsms_dep,

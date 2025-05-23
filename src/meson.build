@@ -134,6 +134,8 @@ headers = files(
   'mm-iface-port-at.h',
   'mm-port.h',
   'mm-port-serial-at.h',
+  'mm-port-scheduler.h',
+  'mm-port-scheduler-rr.h',
 )
 
 sources = files(
@@ -146,6 +148,8 @@ sources = files(
   'mm-port-serial-gps.c',
   'mm-port-serial-qcdm.c',
   'mm-serial-parsers.c',
+  'mm-port-scheduler.c',
+  'mm-port-scheduler-rr.c',
 )
 
 deps = [libkerneldevice_dep]

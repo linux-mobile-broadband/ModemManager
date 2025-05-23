@@ -40,6 +40,7 @@
 #define MM_PORT_SERIAL_FD           "fd" /* Construct-only */
 #define MM_PORT_SERIAL_SPEW_CONTROL "spew-control"
 #define MM_PORT_SERIAL_FLASH_OK     "flash-ok"
+#define MM_PORT_SERIAL_SCHEDULER    "scheduler"
 
 typedef enum {
     MM_PORT_SERIAL_RESPONSE_NONE,

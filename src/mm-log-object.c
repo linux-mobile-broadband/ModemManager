@@ -63,7 +63,7 @@ mm_log_object_get_id (MMLogObject *self)
         gchar *self_id;
 
         self_id = MM_LOG_OBJECT_GET_IFACE (self)->build_id (self);
-        if (priv->owner_id) {
+        if (self_id && priv->owner_id) {
             priv->id = g_strdup_printf ("%s/%s", priv->owner_id, self_id);
             g_free (self_id);
         } else
@@ -81,6 +81,17 @@ mm_log_object_set_owner_id (MMLogObject *self,
     priv = get_private (self);
     g_free (priv->owner_id);
     priv->owner_id = g_strdup (owner_id);
+
+    mm_log_object_reset_id (self);
+}
+
+void
+mm_log_object_reset_id (MMLogObject *self)
+{
+    Private *priv;
+
+    priv = get_private (self);
+    g_clear_pointer (&priv->id, g_free);
 }
 
 static void

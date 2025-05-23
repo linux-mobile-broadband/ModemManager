@@ -132,6 +132,9 @@ log_object_build_id (MMLogObject *_self)
     MMPort *self;
 
     self = MM_PORT (_self);
+    if (!self->priv->device || !self->priv->ptype)
+        return NULL;
+
     return g_strdup_printf ("%s/%s",
                             mm_port_get_device (self),
                             mm_port_type_get_string (mm_port_get_port_type (self)));

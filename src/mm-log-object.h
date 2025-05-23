@@ -34,5 +34,6 @@ struct _MMLogObjectInterface
 const gchar *mm_log_object_get_id       (MMLogObject *self);
 void         mm_log_object_set_owner_id (MMLogObject *self,
                                          const gchar *owner_id);
+void         mm_log_object_reset_id     (MMLogObject *self);
 
 #endif /* MM_LOG_OBJECT_H */
