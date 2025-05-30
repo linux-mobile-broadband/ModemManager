@@ -5120,6 +5120,44 @@ test_cpin_response (void)
 
 /*****************************************************************************/
 
+typedef struct {
+    const char *desc;
+    const char *dtmf;
+    const char *expected[5];
+} DtmfTestData;
+
+static const DtmfTestData test_dtmf_data[] = {
+    { "/MM/ModemHelpers/DTMF/empty",     "",         { NULL } },
+    { "/MM/ModemHelpers/DTMF/one",       "1",        { "1", NULL } },
+    { "/MM/ModemHelpers/DTMF/no-pause",  "1234",     { "1234", NULL } },
+    { "/MM/ModemHelpers/DTMF/mid-pause", "123,,456", { "123", ",", ",", "456", NULL } },
+    { "/MM/ModemHelpers/DTMF/end-pause", "123,,",    { "123", ",", ",", NULL } },
+};
+
+static void
+test_dtmf_split (gpointer user_data)
+{
+    DtmfTestData *td = user_data;
+    GPtrArray *split;
+    guint expected_len;
+    guint i;
+
+    split = mm_dtmf_split (td->dtmf);
+
+    expected_len = g_strv_length ((gchar **) td->expected);
+    if (expected_len == 0)
+        g_assert_true (split == NULL);
+    else {
+        g_assert_true (split != NULL);
+        g_assert_cmpint (split->len, ==, expected_len);
+    }
+
+    for (i = 0; i < expected_len; i++)
+        g_assert_cmpstr (td->expected[i], ==, g_ptr_array_index (split, i));
+}
+
+/*****************************************************************************/
+
 #define TESTCASE(t, d) g_test_create_case (#t, 0, d, NULL, (GTestFixtureFunc) t, NULL)
 
 int main (int argc, char **argv)
@@ -5128,6 +5166,7 @@ int main (int argc, char **argv)
     RegTestData *reg_data;
     gint result;
     DevidItem *item = &devids[0];
+    guint i;
 
     g_test_init (&argc, &argv, NULL);
 
@@ -5383,6 +5422,12 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_string_to_access_tech, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cpin_response, NULL));
+
+    for (i = 0; i < G_N_ELEMENTS (test_dtmf_data); i++) {
+        g_test_add_data_func (test_dtmf_data[i].desc,
+                              &test_dtmf_data[i],
+                              (GTestDataFunc) test_dtmf_split);
+    }
 
     result = g_test_run ();
 

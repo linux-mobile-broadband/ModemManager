@@ -35,6 +35,11 @@
 
 G_DEFINE_TYPE (MMCallQmi, mm_call_qmi, MM_TYPE_BASE_CALL)
 
+struct _MMCallQmiPrivate {
+    /* The modem which owns this call */
+    MMBaseModem *modem;
+};
+
 /*****************************************************************************/
 
 static gboolean
@@ -48,12 +53,7 @@ ensure_qmi_client (MMCallQmi            *self,
     QmiClient   *client;
     MMPortQmi   *port;
 
-    g_object_get (self,
-                  MM_BASE_CALL_MODEM, &modem,
-                  NULL);
-    g_assert (MM_IS_BASE_MODEM (modem));
-
-    port = mm_broadband_modem_qmi_peek_port_qmi (MM_BROADBAND_MODEM_QMI (modem));
+    port = mm_broadband_modem_qmi_peek_port_qmi (MM_BROADBAND_MODEM_QMI (self->priv->modem));
     g_object_unref (modem);
 
     if (!port) {
@@ -331,22 +331,41 @@ call_hangup (MMBaseCall          *self,
 }
 
 /*****************************************************************************/
-/* Send DTMF character */
+/* DTMF handling */
 
-typedef struct {
-    QmiClient *client;
-    guint8     call_id;
-} SendDtmfContext;
-
-static void
-send_dtmf_context_free (SendDtmfContext *ctx)
+static gboolean
+get_client_and_call_id (MMCallQmi            *self,
+                        GAsyncReadyCallback   callback,
+                        gpointer              user_data,
+                        QmiClient           **client,
+                        guint                *call_id)
 {
-    g_clear_object (&ctx->client);
-    g_slice_free (SendDtmfContext, ctx);
+    g_return_val_if_fail (client, FALSE);
+    g_return_val_if_fail (call_id, FALSE);
+
+    /* Ensure Voice client */
+    if (!ensure_qmi_client (self,
+                            QMI_SERVICE_VOICE, client,
+                            callback, user_data))
+        return FALSE;
+
+    *call_id = mm_base_call_get_index (MM_BASE_CALL (self));
+    if (*call_id == 0) {
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 (gpointer) __func__,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_INVALID_ARGS,
+                                 "Invalid call index");
+        return FALSE;
+    }
+
+    return TRUE;
 }
 
 static gboolean
-call_send_dtmf_finish (MMBaseCall    *self,
+call_stop_dtmf_finish (MMBaseCall    *call,
                        GAsyncResult  *res,
                        GError       **error)
 {
@@ -366,35 +385,59 @@ voice_stop_continuous_dtmf_ready (QmiClientVoice *client,
         g_prefix_error (&error, "QMI operation failed: ");
         g_task_return_error (task, error);
     } else if (!qmi_message_voice_stop_continuous_dtmf_output_get_result (output, &error)) {
-        g_prefix_error (&error, "Couldn't send DTMF character: ");
+        g_prefix_error (&error, "Couldn't stop DTMF character: ");
         g_task_return_error (task, error);
     } else {
         g_task_return_boolean (task, TRUE);
     }
-
     g_object_unref (task);
 }
 
-static gboolean
-voice_stop_continuous_dtmf (GTask *task)
+static void
+call_stop_dtmf (MMBaseCall          *_self,
+                GAsyncReadyCallback  callback,
+                gpointer             user_data)
 {
-    SendDtmfContext                                    *ctx;
-    GError                                             *error = NULL;
-    g_autoptr (QmiMessageVoiceStopContinuousDtmfInput)  input = NULL;
+    MMCallQmi       *self = MM_CALL_QMI (_self);
+    GTask           *task;
+    QmiClient       *client = NULL;
+    guint            call_id = 0;
+    GError          *error = NULL;
+    g_autoptr (QmiMessageVoiceStopContinuousDtmfInput) input = NULL;
 
-    ctx = g_task_get_task_data (task);
+    if (!get_client_and_call_id (self,
+                                 callback,
+                                 user_data,
+                                 &client,
+                                 &call_id))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
 
     input = qmi_message_voice_stop_continuous_dtmf_input_new ();
-    qmi_message_voice_stop_continuous_dtmf_input_set_data (input, ctx->call_id, &error);
+    if (!qmi_message_voice_stop_continuous_dtmf_input_set_data (input,
+                                                                call_id,
+                                                                &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
 
-    qmi_client_voice_stop_continuous_dtmf (QMI_CLIENT_VOICE (ctx->client),
+    /* Stop sending DTMF tone */
+    qmi_client_voice_stop_continuous_dtmf (QMI_CLIENT_VOICE (client),
                                            input,
                                            5,
                                            NULL,
                                            (GAsyncReadyCallback) voice_stop_continuous_dtmf_ready,
                                            task);
+}
 
-    return G_SOURCE_REMOVE;
+static gssize
+call_send_dtmf_finish (MMBaseCall    *call,
+                       GAsyncResult  *res,
+                       GError       **error)
+{
+    return g_task_propagate_int (G_TASK (res), error);
 }
 
 static void
@@ -402,80 +445,55 @@ voice_start_continuous_dtmf_ready (QmiClientVoice *client,
                                    GAsyncResult   *res,
                                    GTask          *task)
 {
-    g_autoptr(QmiMessageVoiceStartContinuousDtmfOutput)  output = NULL;
-    GError                                              *error = NULL;
+    g_autoptr (QmiMessageVoiceStartContinuousDtmfOutput)  output = NULL;
+    GError                                               *error = NULL;
 
     output = qmi_client_voice_start_continuous_dtmf_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
         g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
-    if (!qmi_message_voice_start_continuous_dtmf_output_get_result (output, &error)) {
+    } else if (!qmi_message_voice_start_continuous_dtmf_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't send DTMF character: ");
+        g_task_return_error (task, error);
+    } else {
+        g_task_return_int (task, 1);
+    }
+    g_object_unref (task);
+}
+
+static void
+call_send_dtmf (MMBaseCall          *_self,
+                const gchar         *dtmf,
+                GAsyncReadyCallback  callback,
+                gpointer             user_data)
+{
+    MMCallQmi       *self = MM_CALL_QMI (_self);
+    GTask           *task;
+    QmiClient       *client = NULL;
+    guint            call_id = 0;
+    GError          *error = NULL;
+    g_autoptr (QmiMessageVoiceStartContinuousDtmfInput) input = NULL;
+
+    if (!get_client_and_call_id (self,
+                                 callback,
+                                 user_data,
+                                 &client,
+                                 &call_id))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    input = qmi_message_voice_start_continuous_dtmf_input_new ();
+    if (!qmi_message_voice_start_continuous_dtmf_input_set_data (input,
+                                                                 call_id,
+                                                                 dtmf[0],
+                                                                 &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
     }
 
-    /* Disable DTMF press after 500 ms */
-    g_timeout_add (500, (GSourceFunc) voice_stop_continuous_dtmf, task);
-}
-
-static void
-call_send_dtmf (MMBaseCall          *self,
-                const gchar         *dtmf,
-                GAsyncReadyCallback  callback,
-                gpointer             user_data)
-{
-    GTask                                               *task;
-    GError                                              *error = NULL;
-    SendDtmfContext                                     *ctx;
-    QmiClient                                           *client = NULL;
-    guint8                                               call_id;
-    g_autoptr (QmiMessageVoiceStartContinuousDtmfInput)  input = NULL;
-
-    /* Ensure Voice client */
-    if (!ensure_qmi_client (MM_CALL_QMI (self),
-                            QMI_SERVICE_VOICE, &client,
-                            callback, user_data))
-        return;
-
-    task = g_task_new (self, NULL, callback, user_data);
-
-    call_id = mm_base_call_get_index (self);
-    if (call_id == 0) {
-        g_task_return_new_error (task,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_INVALID_ARGS,
-                                 "Invalid call index");
-        g_object_unref (task);
-        return;
-    }
-
-    ctx = g_slice_new0 (SendDtmfContext);
-    ctx->client = g_object_ref (client);
-    ctx->call_id = call_id;
-
-    g_task_set_task_data (task, ctx, (GDestroyNotify) send_dtmf_context_free);
-
     /* Send DTMF character as ASCII number */
-    input = qmi_message_voice_start_continuous_dtmf_input_new ();
-    qmi_message_voice_start_continuous_dtmf_input_set_data (input,
-                                                            call_id,
-                                                            (guint8) dtmf[0],
-                                                            &error);
-    if (error) {
-        g_task_return_new_error (task,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_INVALID_ARGS,
-                                 "DTMF data build failed");
-        g_object_unref (task);
-        return;
-    }
-
     qmi_client_voice_start_continuous_dtmf (QMI_CLIENT_VOICE (client),
                                             input,
                                             5,
@@ -489,28 +507,51 @@ call_send_dtmf (MMBaseCall          *self,
 MMBaseCall *
 mm_call_qmi_new (MMBaseModem     *modem,
                  MMCallDirection  direction,
-                 const gchar     *number)
+                 const gchar     *number,
+                 const guint      dtmf_tone_duration)
 {
-    return MM_BASE_CALL (g_object_new (MM_TYPE_CALL_QMI,
-                                       MM_BASE_CALL_MODEM, modem,
-                                       MM_BIND_TO,         G_OBJECT (modem),
-                                       "direction",        direction,
-                                       "number",           number,
+    MMBaseCall  *call;
+
+    call = MM_BASE_CALL (g_object_new (MM_TYPE_CALL_QMI,
+                                       MM_BASE_CALL_IFACE_MODEM_VOICE,           modem,
+                                       MM_BIND_TO,                               modem,
+                                       MM_CALL_DIRECTION,                        direction,
+                                       MM_CALL_NUMBER,                           number,
+                                       MM_CALL_DTMF_TONE_DURATION,               dtmf_tone_duration,
                                        MM_BASE_CALL_SKIP_INCOMING_TIMEOUT,       TRUE,
                                        MM_BASE_CALL_SUPPORTS_DIALING_TO_RINGING, TRUE,
                                        MM_BASE_CALL_SUPPORTS_RINGING_TO_ACTIVE,  TRUE,
                                        NULL));
+    MM_CALL_QMI (call)->priv->modem = g_object_ref (modem);
+    return call;
 }
 
 static void
 mm_call_qmi_init (MMCallQmi *self)
 {
+    /* Initialize private data */
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_CALL_QMI, MMCallQmiPrivate);
+}
+
+static void
+dispose (GObject *object)
+{
+    MMCallQmi *self = MM_CALL_QMI (object);
+
+    g_clear_object (&self->priv->modem);
+
+    G_OBJECT_CLASS (mm_call_qmi_parent_class)->dispose (object);
 }
 
 static void
 mm_call_qmi_class_init (MMCallQmiClass *klass)
 {
+    GObjectClass    *object_class = G_OBJECT_CLASS (klass);
     MMBaseCallClass *base_call_class = MM_BASE_CALL_CLASS (klass);
+
+    g_type_class_add_private (object_class, sizeof (MMCallQmiPrivate));
+
+    object_class->dispose = dispose;
 
     base_call_class->start = call_start;
     base_call_class->start_finish = call_start_finish;
@@ -520,4 +561,6 @@ mm_call_qmi_class_init (MMCallQmiClass *klass)
     base_call_class->hangup_finish = call_hangup_finish;
     base_call_class->send_dtmf = call_send_dtmf;
     base_call_class->send_dtmf_finish = call_send_dtmf_finish;
+    base_call_class->stop_dtmf = call_stop_dtmf;
+    base_call_class->stop_dtmf_finish = call_stop_dtmf_finish;
 }

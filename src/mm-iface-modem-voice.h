@@ -123,7 +123,8 @@ struct _MMIfaceModemVoiceInterface {
     /* Create call objects */
     MMBaseCall * (* create_call) (MMIfaceModemVoice *self,
                                   MMCallDirection    direction,
-                                  const gchar       *number);
+                                  const gchar       *number,
+                                  const guint        dtmf_tone_duration);
 
     /* Hold and accept */
     void     (* hold_and_accept)        (MMIfaceModemVoice    *self,

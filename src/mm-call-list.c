@@ -24,19 +24,11 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-iface-modem-messaging.h"
 #include "mm-call-list.h"
 #include "mm-base-call.h"
 #include "mm-log.h"
 
 G_DEFINE_TYPE (MMCallList, mm_call_list, G_TYPE_OBJECT)
-
-enum {
-    PROP_0,
-    PROP_MODEM,
-    PROP_LAST
-};
-static GParamSpec *properties[PROP_LAST];
 
 enum {
     SIGNAL_CALL_ADDED,
@@ -46,8 +38,6 @@ enum {
 static guint signals[SIGNAL_LAST];
 
 struct _MMCallListPrivate {
-    /* The owner modem */
-    MMBaseModem *modem;
     /* List of call objects */
     GList *list;
 };
@@ -213,49 +203,10 @@ mm_call_list_add_call (MMCallList *self,
 /*****************************************************************************/
 
 MMCallList *
-mm_call_list_new (MMBaseModem *modem)
+mm_call_list_new (void)
 {
     /* Create the object */
-    return g_object_new (MM_TYPE_CALL_LIST,
-                         MM_CALL_LIST_MODEM, modem,
-                         NULL);
-}
-
-static void
-set_property (GObject *object,
-              guint prop_id,
-              const GValue *value,
-              GParamSpec *pspec)
-{
-    MMCallList *self = MM_CALL_LIST (object);
-
-    switch (prop_id) {
-    case PROP_MODEM:
-        g_clear_object (&self->priv->modem);
-        self->priv->modem = g_value_dup_object (value);
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-        break;
-    }
-}
-
-static void
-get_property (GObject *object,
-              guint prop_id,
-              GValue *value,
-              GParamSpec *pspec)
-{
-    MMCallList *self = MM_CALL_LIST (object);
-
-    switch (prop_id) {
-    case PROP_MODEM:
-        g_value_set_object (value, self->priv->modem);
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-        break;
-    }
+    return g_object_new (MM_TYPE_CALL_LIST, NULL);
 }
 
 static void
@@ -272,7 +223,6 @@ dispose (GObject *object)
 {
     MMCallList *self = MM_CALL_LIST (object);
 
-    g_clear_object (&self->priv->modem);
     g_list_free_full (self->priv->list, g_object_unref);
     self->priv->list = NULL;
 
@@ -287,18 +237,7 @@ mm_call_list_class_init (MMCallListClass *klass)
     g_type_class_add_private (object_class, sizeof (MMCallListPrivate));
 
     /* Virtual methods */
-    object_class->get_property = get_property;
-    object_class->set_property = set_property;
     object_class->dispose = dispose;
-
-    /* Properties */
-    properties[PROP_MODEM] =
-        g_param_spec_object (MM_CALL_LIST_MODEM,
-                             "Modem",
-                             "The Modem which owns this CALL list",
-                             MM_TYPE_BASE_MODEM,
-                             G_PARAM_READWRITE);
-    g_object_class_install_property (object_class, PROP_MODEM, properties[PROP_MODEM]);
 
     /* Signals */
     signals[SIGNAL_CALL_ADDED] =

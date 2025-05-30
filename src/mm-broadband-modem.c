@@ -50,6 +50,7 @@
 #include "mm-bearer-list.h"
 #include "mm-cbm-list.h"
 #include "mm-cbm-part.h"
+#include "mm-call-at.h"
 #include "mm-sms-list.h"
 #include "mm-sms-part-3gpp.h"
 #include "mm-sms-at.h"
@@ -8898,20 +8899,22 @@ modem_voice_disable_unsolicited_events (MMIfaceModemVoice   *self,
 static MMBaseCall *
 modem_voice_create_call (MMIfaceModemVoice *_self,
                          MMCallDirection    direction,
-                         const gchar       *number)
+                         const gchar       *number,
+                         const guint        dtmf_tone_duration)
 {
     MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
 
-    return mm_base_call_new (MM_BASE_MODEM (self),
-                             G_OBJECT (self),
-                             direction,
-                             number,
-                             /* If +CLCC is supported, we want no incoming timeout.
-                              * Also, we're able to support detailed call state updates without
-                              * additional vendor-specific commands. */
-                             self->priv->clcc_supported,   /* skip incoming timeout */
-                             self->priv->clcc_supported,   /* dialing->ringing supported */
-                             self->priv->clcc_supported);  /* ringing->active supported */
+    return mm_call_at_new (MM_BASE_MODEM (self),
+                           G_OBJECT (self),
+                           direction,
+                           number,
+                           dtmf_tone_duration,
+                           /* If +CLCC is supported, we want no incoming timeout.
+                            * Also, we're able to support detailed call state updates without
+                            * additional vendor-specific commands. */
+                           self->priv->clcc_supported,   /* skip incoming timeout */
+                           self->priv->clcc_supported,   /* dialing->ringing supported */
+                           self->priv->clcc_supported);  /* ringing->active supported */
 }
 
 /*****************************************************************************/

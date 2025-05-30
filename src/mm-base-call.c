@@ -28,10 +28,8 @@
 
 #include "mm-base-call.h"
 #include "mm-broadband-modem.h"
-#include "mm-iface-modem.h"
+#include "mm-auth-provider.h"
 #include "mm-iface-modem-voice.h"
-#include "mm-base-modem-at.h"
-#include "mm-base-modem.h"
 #include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-error-helpers.h"
@@ -49,7 +47,7 @@ enum {
     PROP_PATH,
     PROP_CONNECTION,
     PROP_BIND_TO,
-    PROP_MODEM,
+    PROP_IFACE_MODEM_VOICE,
     PROP_SKIP_INCOMING_TIMEOUT,
     PROP_SUPPORTS_DIALING_TO_RINGING,
     PROP_SUPPORTS_RINGING_TO_ACTIVE,
@@ -70,8 +68,8 @@ struct _MMBaseCallPrivate {
     /* The object this Call is bound to */
     GObject *bind_to;
 
-    /* The modem which owns this call */
-    MMBaseModem *modem;
+    /* The voice interface which owns this call */
+    MMIfaceModemVoice *iface;
     /* The path where the call object is exported */
     gchar *path;
     /* Features */
@@ -91,6 +89,9 @@ struct _MMBaseCallPrivate {
      * 'terminated' is coming asynchronously (e.g. via in-call state
      * update notifications) */
     GCancellable *start_cancellable;
+
+    /* DTMF support */
+    GQueue *dtmf_queue;
 };
 
 /*****************************************************************************/
@@ -239,7 +240,7 @@ handle_start_auth_ready (MMAuthProvider *authp,
     mm_obj_info (ctx->self, "processing user request to start voice call...");
 
     /* Disallow non-emergency calls when in emergency-only state */
-    if (!mm_iface_modem_voice_authorize_outgoing_call (MM_IFACE_MODEM_VOICE (ctx->self->priv->modem), ctx->self, &error)) {
+    if (!mm_iface_modem_voice_authorize_outgoing_call (ctx->self->priv->iface, ctx->self, &error)) {
         mm_base_call_change_state (ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_UNKNOWN);
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_start_context_free (ctx);
@@ -534,7 +535,7 @@ handle_join_multiparty_auth_ready (MMAuthProvider              *authp,
     /* This action is provided in the Call API, but implemented in the Modem.Voice interface
      * logic, because the action affects not only one call object, but all call objects that
      * are part of the multiparty call. */
-    mm_iface_modem_voice_join_multiparty (MM_IFACE_MODEM_VOICE (ctx->self->priv->modem),
+    mm_iface_modem_voice_join_multiparty (ctx->self->priv->iface,
                                           ctx->self,
                                           (GAsyncReadyCallback)modem_voice_join_multiparty_ready,
                                           ctx);
@@ -608,7 +609,7 @@ handle_leave_multiparty_auth_ready (MMAuthProvider               *authp,
     /* This action is provided in the Call API, but implemented in the Modem.Voice interface
      * logic, because the action affects not only one call object, but all call objects that
      * are part of the multiparty call. */
-    mm_iface_modem_voice_leave_multiparty (MM_IFACE_MODEM_VOICE (ctx->self->priv->modem),
+    mm_iface_modem_voice_leave_multiparty (ctx->self->priv->iface,
                                            ctx->self,
                                            (GAsyncReadyCallback)modem_voice_leave_multiparty_ready,
                                            ctx);
@@ -730,6 +731,283 @@ handle_hangup (MMBaseCall *self,
 /*****************************************************************************/
 /* Send dtmf (DBus call handling) */
 
+typedef enum {
+    DTMF_STEP_FIRST,
+    DTMF_STEP_START,
+    DTMF_STEP_TIMEOUT,
+    DTMF_STEP_STOP,
+    DTMF_STEP_NEXT,
+    DTMF_STEP_LAST,
+} DtmfStep;
+
+typedef struct {
+    DtmfStep   step;
+    GError    *saved_error;
+    guint8     call_id;
+    /* Array of DTMF runs; split by pauses */
+    GPtrArray *dtmfs;
+    /* index into dtmfs */
+    guint      cur_dtmf;
+    /* index into cur dtmf run string */
+    gchar     *cur_tone;
+    guint      timeout_id;
+} SendDtmfContext;
+
+static void
+send_dtmf_context_clear_timeout (SendDtmfContext *ctx)
+{
+    if (ctx->timeout_id) {
+        g_source_remove (ctx->timeout_id);
+        ctx->timeout_id = 0;
+    }
+}
+
+static void
+send_dtmf_context_free (SendDtmfContext *ctx)
+{
+    send_dtmf_context_clear_timeout (ctx);
+    g_ptr_array_foreach (ctx->dtmfs, (GFunc) g_free, NULL);
+    g_ptr_array_free (ctx->dtmfs, TRUE);
+    g_assert (!ctx->saved_error);
+    g_slice_free (SendDtmfContext, ctx);
+}
+
+static void send_dtmf_task_step_next (GTask *task);
+
+static void
+stop_dtmf_ignore_ready (MMBaseCall     *self,
+                        GAsyncResult   *res,
+                        gpointer        unused)
+{
+    /* Ignore the result and error */
+    MM_BASE_CALL_GET_CLASS (self)->stop_dtmf_finish (self, res, NULL);
+}
+
+static void
+send_dtmf_task_cancel (GTask *task)
+{
+    MMBaseCall      *self;
+    SendDtmfContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+
+    send_dtmf_context_clear_timeout (ctx);
+    if (ctx->step > DTMF_STEP_FIRST && ctx->step < DTMF_STEP_STOP) {
+        if (MM_BASE_CALL_GET_CLASS (self)->stop_dtmf) {
+            MM_BASE_CALL_GET_CLASS (self)->stop_dtmf (self,
+                                                      (GAsyncReadyCallback)stop_dtmf_ignore_ready,
+                                                      NULL);
+        }
+    }
+    g_assert (ctx->step != DTMF_STEP_LAST);
+    ctx->step = DTMF_STEP_LAST;
+    send_dtmf_task_step_next (task);
+}
+
+static void
+stop_dtmf_ready (MMBaseCall     *self,
+                 GAsyncResult   *res,
+                 GTask          *task)
+{
+    SendDtmfContext *ctx;
+    GError          *error = NULL;
+    gboolean         success;
+
+    ctx = g_task_get_task_data (task);
+
+    success = MM_BASE_CALL_GET_CLASS (self)->stop_dtmf_finish (self, res, &error);
+    if (ctx->step == DTMF_STEP_STOP) {
+        if (!success) {
+            g_propagate_error (&ctx->saved_error, error);
+            ctx->step = DTMF_STEP_LAST;
+        } else
+            ctx->step++;
+
+        send_dtmf_task_step_next (task);
+    }
+
+    /* Balance stop_dtmf() */
+    g_object_unref (task);
+}
+
+static gboolean
+dtmf_timeout (GTask *task)
+{
+    SendDtmfContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    /* If this was a pause character; move past it */
+    if (ctx->cur_tone[0] == MM_CALL_DTMF_PAUSE_CHAR)
+        ctx->cur_tone++;
+
+    send_dtmf_context_clear_timeout (ctx);
+    ctx->step++;
+    send_dtmf_task_step_next (task);
+
+    return G_SOURCE_REMOVE;
+}
+
+static void
+send_dtmf_ready (MMBaseCall   *self,
+                 GAsyncResult *res,
+                 GTask        *task)
+{
+    SendDtmfContext *ctx;
+    GError          *error = NULL;
+    gssize           num_sent;
+
+    ctx = g_task_get_task_data (task);
+
+    num_sent = MM_BASE_CALL_GET_CLASS (self)->send_dtmf_finish (self, res, &error);
+    if (ctx->step == DTMF_STEP_START) {
+        if (num_sent < 0) {
+            g_propagate_error (&ctx->saved_error, error);
+            ctx->step = DTMF_STEP_LAST;
+        } else {
+            g_assert (num_sent > 0);
+            g_assert ((guint) num_sent <= strlen (ctx->cur_tone));
+            ctx->cur_tone += num_sent;
+            ctx->step++;
+        }
+
+        send_dtmf_task_step_next (task);
+    }
+
+    /* Balance send_dtmf() */
+    g_object_unref (task);
+}
+
+static void
+send_dtmf_task_step_next (GTask *task)
+{
+    SendDtmfContext *ctx;
+    gboolean         need_stop;
+    MMBaseCall      *self;
+    gboolean         is_pause;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    is_pause = (ctx->cur_tone[0] == MM_CALL_DTMF_PAUSE_CHAR);
+    need_stop = MM_BASE_CALL_GET_CLASS (self)->stop_dtmf &&
+                MM_BASE_CALL_GET_CLASS (self)->stop_dtmf_finish;
+
+    switch (ctx->step) {
+    case DTMF_STEP_FIRST:
+        ctx->step++;
+        /* Fall through */
+    case DTMF_STEP_START:
+        if (!is_pause) {
+            MM_BASE_CALL_GET_CLASS (self)->send_dtmf (self,
+                                                      ctx->cur_tone,
+                                                      (GAsyncReadyCallback)send_dtmf_ready,
+                                                      g_object_ref (task));
+            return;
+        }
+        /* Fall through */
+    case DTMF_STEP_TIMEOUT:
+        if (need_stop || is_pause) {
+            guint duration;
+
+            duration = is_pause ? 2000 : mm_base_call_get_dtmf_tone_duration (self);
+
+            /* Disable DTMF press after DTMF tone duration elapses */
+            ctx->timeout_id = g_timeout_add (duration,
+                                             (GSourceFunc) dtmf_timeout,
+                                             task);
+            return;
+        }
+        /* Fall through */
+    case DTMF_STEP_STOP:
+        send_dtmf_context_clear_timeout (ctx);
+        if (need_stop && !is_pause) {
+            MM_BASE_CALL_GET_CLASS (self)->stop_dtmf (self,
+                                                      (GAsyncReadyCallback)stop_dtmf_ready,
+                                                      g_object_ref (task));
+            return;
+        }
+        /* Fall through */
+    case DTMF_STEP_NEXT:
+        /* Advance to next DTMF run? */
+        if (ctx->cur_tone[0] == '\0') {
+            ctx->cur_dtmf++;
+            if (ctx->cur_dtmf < ctx->dtmfs->len)
+                ctx->cur_tone = g_ptr_array_index (ctx->dtmfs, ctx->cur_dtmf);
+        }
+
+        /* More to send? */
+        if (ctx->cur_tone[0]) {
+            ctx->step = DTMF_STEP_START;
+            send_dtmf_task_step_next (task);
+            return;
+        }
+        /* no more DTMF characters to send */
+        /* Fall through */
+    case DTMF_STEP_LAST:
+        send_dtmf_context_clear_timeout (ctx);
+        if (ctx->saved_error)
+            g_task_return_error (task, g_steal_pointer (&ctx->saved_error));
+        else
+            g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+
+        /* Start the next tone if any are queued */
+        g_queue_remove (self->priv->dtmf_queue, task);
+        task = g_queue_peek_head (self->priv->dtmf_queue);
+        if (task)
+            send_dtmf_task_step_next (task);
+        break;
+    default:
+        g_assert_not_reached ();
+    }
+}
+
+static gboolean
+send_dtmf_task_finish (MMBaseCall    *self,
+                       GAsyncResult  *res,
+                       GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static GTask *
+send_dtmf_task_new (MMBaseCall           *self,
+                    const gchar          *dtmf,
+                    GAsyncReadyCallback   callback,
+                    gpointer              user_data,
+                    GError              **error)
+{
+    GTask            *task;
+    SendDtmfContext  *ctx;
+    guint8            call_id;
+
+    call_id = mm_base_call_get_index (self);
+    if (call_id == 0) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_INVALID_ARGS,
+                     "Invalid call index");
+        return NULL;
+    }
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    ctx = g_slice_new0 (SendDtmfContext);
+    ctx->call_id = call_id;
+    /* Split DTMF into runs of DTMF characters interrupted by pauses */
+    ctx->dtmfs = mm_dtmf_split (dtmf);
+    g_assert (ctx->dtmfs->len > 0);
+    ctx->cur_tone = g_ptr_array_index (ctx->dtmfs, ctx->cur_dtmf);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) send_dtmf_context_free);
+
+    return task;
+}
+
+/*****************************************************************************/
+/* Send DTMF D-Bus request handling */
+
 typedef struct {
     MMBaseCall *self;
     GDBusMethodInvocation *invocation;
@@ -752,7 +1030,7 @@ handle_send_dtmf_ready (MMBaseCall *self,
 {
     GError *error = NULL;
 
-    if (!MM_BASE_CALL_GET_CLASS (self)->send_dtmf_finish (self, res, &error)) {
+    if (!send_dtmf_task_finish (self, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
         mm_gdbus_call_complete_send_dtmf (MM_GDBUS_CALL (ctx->self), ctx->invocation);
@@ -766,8 +1044,9 @@ handle_send_dtmf_auth_ready (MMAuthProvider *authp,
                              GAsyncResult *res,
                              HandleSendDtmfContext *ctx)
 {
-    MMCallState state;
-    GError *error = NULL;
+    MMCallState  state;
+    GError      *error = NULL;
+    GTask       *task;
 
     if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -777,7 +1056,23 @@ handle_send_dtmf_auth_ready (MMAuthProvider *authp,
 
     state = mm_gdbus_call_get_state (MM_GDBUS_CALL (ctx->self));
 
-    /* Check if we do support doing it */
+    /* Ensure there are DTMF characters to send */
+    if (!ctx->dtmf || !ctx->dtmf[0]) {
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                        "No DTMF characters given");
+        handle_send_dtmf_context_free (ctx);
+        return;
+    }
+
+    /* And that there aren't too many */
+    if (strlen (ctx->dtmf) > 50) {
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                        "Too many DTMF characters");
+        handle_send_dtmf_context_free (ctx);
+        return;
+    }
+
+    /* Check if we do support doing DTMF at all */
     if (!MM_BASE_CALL_GET_CLASS (ctx->self)->send_dtmf ||
         !MM_BASE_CALL_GET_CLASS (ctx->self)->send_dtmf_finish) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
@@ -787,7 +1082,7 @@ handle_send_dtmf_auth_ready (MMAuthProvider *authp,
     }
 
     /* We can only send_dtmf when call is in ACTIVE state */
-    if (state != MM_CALL_STATE_ACTIVE ){
+    if (state != MM_CALL_STATE_ACTIVE) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                                         "This call was not active, cannot send dtmf");
         handle_send_dtmf_context_free (ctx);
@@ -795,9 +1090,20 @@ handle_send_dtmf_auth_ready (MMAuthProvider *authp,
     }
 
     mm_obj_info (ctx->self, "processing user request to send DTMF...");
-    MM_BASE_CALL_GET_CLASS (ctx->self)->send_dtmf (ctx->self, ctx->dtmf,
-                                                   (GAsyncReadyCallback)handle_send_dtmf_ready,
-                                                   ctx);
+    task = send_dtmf_task_new (ctx->self,
+                               ctx->dtmf,
+                               (GAsyncReadyCallback)handle_send_dtmf_ready,
+                               ctx,
+                               &error);
+    if (!task) {
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_send_dtmf_context_free (ctx);
+        return;
+    }
+
+    g_queue_push_tail (ctx->self->priv->dtmf_queue, task);
+    if (g_queue_get_length (ctx->self->priv->dtmf_queue) == 1)
+        send_dtmf_task_step_next (task);
 }
 
 static gboolean
@@ -924,6 +1230,20 @@ mm_base_call_set_multiparty (MMBaseCall *self,
     return mm_gdbus_call_set_multiparty (MM_GDBUS_CALL (self), multiparty);
 }
 
+guint
+mm_base_call_get_dtmf_tone_duration (MMBaseCall *self)
+{
+    return mm_dtmf_duration_normalize (mm_gdbus_call_get_dtmf_tone_duration (MM_GDBUS_CALL (self)));
+}
+
+void
+mm_base_call_set_dtmf_tone_duration (MMBaseCall *self,
+                                     guint       duration_ms)
+{
+    return mm_gdbus_call_set_dtmf_tone_duration (MM_GDBUS_CALL (self),
+                                                 mm_dtmf_duration_normalize (duration_ms));
+}
+
 /*****************************************************************************/
 /* Current call index, only applicable while the call is ongoing
  * See 3GPP TS 22.030 [27], subclause 6.5.5.1.
@@ -989,314 +1309,6 @@ mm_base_call_received_dtmf (MMBaseCall *self,
 }
 
 /*****************************************************************************/
-/* Start the CALL */
-
-static gboolean
-call_start_finish (MMBaseCall *self,
-                   GAsyncResult *res,
-                   GError **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
-static void
-call_start_ready (MMBaseModem *modem,
-                  GAsyncResult *res,
-                  GTask *task)
-{
-    GError *error = NULL;
-    const gchar *response = NULL;
-
-    response = mm_base_modem_at_command_finish (modem, res, &error);
-
-    /* check response for error */
-    if (response && response[0])
-        error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                             "Couldn't start the call: Unhandled response '%s'", response);
-
-    if (error)
-        g_task_return_error (task, error);
-    else
-        g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
-}
-
-static void
-call_start (MMBaseCall          *self,
-            GCancellable        *cancellable,
-            GAsyncReadyCallback  callback,
-            gpointer             user_data)
-{
-    GError         *error = NULL;
-    GTask          *task;
-    gchar          *cmd;
-    MMIfacePortAt  *port;
-
-    task = g_task_new (self, NULL, callback, user_data);
-
-    port = mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self->priv->modem), &error);
-    if (!port) {
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
-    cmd = g_strdup_printf ("ATD%s;", mm_gdbus_call_get_number (MM_GDBUS_CALL (self)));
-    mm_base_modem_at_command_full (self->priv->modem,
-                                   port,
-                                   cmd,
-                                   90,
-                                   FALSE, /* no cached */
-                                   FALSE, /* no raw */
-                                   cancellable,
-                                   (GAsyncReadyCallback)call_start_ready,
-                                   task);
-    g_free (cmd);
-}
-
-/*****************************************************************************/
-/* Accept the call */
-
-static gboolean
-call_accept_finish (MMBaseCall    *self,
-                    GAsyncResult  *res,
-                    GError       **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
-static void
-call_accept_ready (MMBaseModem  *modem,
-                   GAsyncResult *res,
-                   GTask        *task)
-{
-    GError      *error = NULL;
-    const gchar *response;
-
-    response = mm_base_modem_at_command_finish (modem, res, &error);
-
-    /* check response for error */
-    if (response && response[0])
-        g_set_error (&error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                     "Couldn't accept the call: Unhandled response '%s'", response);
-
-    if (error)
-        g_task_return_error (task, error);
-    else
-        g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
-}
-
-static void
-call_accept (MMBaseCall          *self,
-             GAsyncReadyCallback  callback,
-             gpointer             user_data)
-{
-    GTask *task;
-
-    task = g_task_new (self, NULL, callback, user_data);
-    mm_base_modem_at_command (self->priv->modem,
-                              "ATA",
-                              2,
-                              FALSE,
-                              (GAsyncReadyCallback)call_accept_ready,
-                              task);
-}
-
-/*****************************************************************************/
-/* Deflect the call */
-
-static gboolean
-call_deflect_finish (MMBaseCall    *self,
-                     GAsyncResult  *res,
-                     GError       **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
-static void
-call_deflect_ready (MMBaseModem  *modem,
-                    GAsyncResult *res,
-                    GTask        *task)
-{
-    GError *error = NULL;
-
-    mm_base_modem_at_command_finish (modem, res, &error);
-    if (error)
-        g_task_return_error (task, error);
-    else
-        g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
-}
-
-static void
-call_deflect (MMBaseCall          *self,
-              const gchar         *number,
-              GAsyncReadyCallback  callback,
-              gpointer             user_data)
-{
-    GTask *task;
-    gchar *cmd;
-
-    task = g_task_new (self, NULL, callback, user_data);
-
-    cmd = g_strdup_printf ("+CTFR=%s", number);
-    mm_base_modem_at_command (self->priv->modem,
-                              cmd,
-                              20,
-                              FALSE,
-                              (GAsyncReadyCallback)call_deflect_ready,
-                              task);
-    g_free (cmd);
-}
-
-/*****************************************************************************/
-/* Hangup the call */
-
-static gboolean
-call_hangup_finish (MMBaseCall    *self,
-                    GAsyncResult  *res,
-                    GError       **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
-static void
-chup_ready (MMBaseModem  *modem,
-            GAsyncResult *res,
-            GTask        *task)
-{
-    GError *error = NULL;
-
-    mm_base_modem_at_command_finish (modem, res, &error);
-    if (error)
-        g_task_return_error (task, error);
-    else
-        g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
-}
-
-static void
-chup_fallback (GTask *task)
-{
-    MMBaseCall *self;
-
-    self = g_task_get_source_object (task);
-    mm_base_modem_at_command (self->priv->modem,
-                              "+CHUP",
-                              2,
-                              FALSE,
-                              (GAsyncReadyCallback)chup_ready,
-                              task);
-}
-
-static void
-chld_hangup_ready (MMBaseModem  *modem,
-                   GAsyncResult *res,
-                   GTask        *task)
-{
-    MMBaseCall *self;
-    GError     *error = NULL;
-
-    self = g_task_get_source_object (task);
-
-    mm_base_modem_at_command_finish (modem, res, &error);
-    if (error) {
-        mm_obj_warn (self, "couldn't hangup single call with call id '%u': %s",
-                     self->priv->index, error->message);
-        g_error_free (error);
-        chup_fallback (task);
-        return;
-    }
-
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
-}
-
-static void
-call_hangup (MMBaseCall          *self,
-             GAsyncReadyCallback  callback,
-             gpointer             user_data)
-{
-    GTask *task;
-
-    task = g_task_new (self, NULL, callback, user_data);
-
-    /* Try to hangup the single call id */
-    if (self->priv->index) {
-        gchar *cmd;
-
-        cmd = g_strdup_printf ("+CHLD=1%u", self->priv->index);
-        mm_base_modem_at_command (self->priv->modem,
-                                  cmd,
-                                  2,
-                                  FALSE,
-                                  (GAsyncReadyCallback)chld_hangup_ready,
-                                  task);
-        g_free (cmd);
-        return;
-    }
-
-    /* otherwise terminate all */
-    chup_fallback (task);
-}
-
-/*****************************************************************************/
-/* Send DTMF tone to call */
-
-static gboolean
-call_send_dtmf_finish (MMBaseCall *self,
-                       GAsyncResult *res,
-                       GError **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
-static void
-call_send_dtmf_ready (MMBaseModem  *modem,
-                      GAsyncResult *res,
-                      GTask        *task)
-{
-    MMBaseCall *self;
-    GError     *error = NULL;
-
-    self = g_task_get_source_object (task);
-
-    mm_base_modem_at_command_finish (modem, res, &error);
-    if (error) {
-        mm_obj_dbg (self, "couldn't send dtmf: %s", error->message);
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
-}
-
-static void
-call_send_dtmf (MMBaseCall *self,
-                const gchar *dtmf,
-                GAsyncReadyCallback callback,
-                gpointer user_data)
-{
-    GTask *task;
-    gchar *cmd;
-
-    task = g_task_new (self, NULL, callback, user_data);
-
-    cmd = g_strdup_printf ("AT+VTS=%c", dtmf[0]);
-    mm_base_modem_at_command (self->priv->modem,
-                              cmd,
-                              3,
-                              FALSE,
-                              (GAsyncReadyCallback)call_send_dtmf_ready,
-                              task);
-
-    g_free (cmd);
-}
-
-/*****************************************************************************/
 
 static gchar *
 log_object_build_id (MMLogObject *_self)
@@ -1305,28 +1317,6 @@ log_object_build_id (MMLogObject *_self)
 
     self = MM_BASE_CALL (_self);
     return g_strdup_printf ("call%u", self->priv->dbus_id);
-}
-
-/*****************************************************************************/
-
-MMBaseCall *
-mm_base_call_new (MMBaseModem     *modem,
-                  GObject         *bind_to,
-                  MMCallDirection  direction,
-                  const gchar     *number,
-                  gboolean         skip_incoming_timeout,
-                  gboolean         supports_dialing_to_ringing,
-                  gboolean         supports_ringing_to_active)
-{
-    return MM_BASE_CALL (g_object_new (MM_TYPE_BASE_CALL,
-                                       MM_BASE_CALL_MODEM, modem,
-                                       MM_BIND_TO,         bind_to,
-                                       "direction",        direction,
-                                       "number",           number,
-                                       MM_BASE_CALL_SKIP_INCOMING_TIMEOUT,       skip_incoming_timeout,
-                                       MM_BASE_CALL_SUPPORTS_DIALING_TO_RINGING, supports_dialing_to_ringing,
-                                       MM_BASE_CALL_SUPPORTS_RINGING_TO_ACTIVE,  supports_ringing_to_active,
-                                       NULL));
 }
 
 /*****************************************************************************/
@@ -1365,9 +1355,9 @@ set_property (GObject *object,
         self->priv->bind_to = g_value_dup_object (value);
         mm_bind_to (MM_BIND (self), MM_BASE_CALL_CONNECTION, self->priv->bind_to);
         break;
-    case PROP_MODEM:
-        g_clear_object (&self->priv->modem);
-        self->priv->modem = g_value_dup_object (value);
+    case PROP_IFACE_MODEM_VOICE:
+        g_clear_object (&self->priv->iface);
+        self->priv->iface = g_value_dup_object (value);
         break;
     case PROP_SKIP_INCOMING_TIMEOUT:
         self->priv->skip_incoming_timeout = g_value_get_boolean (value);
@@ -1402,8 +1392,8 @@ get_property (GObject *object,
     case PROP_BIND_TO:
         g_value_set_object (value, self->priv->bind_to);
         break;
-    case PROP_MODEM:
-        g_value_set_object (value, self->priv->modem);
+    case PROP_IFACE_MODEM_VOICE:
+        g_value_set_object (value, self->priv->iface);
         break;
     case PROP_SKIP_INCOMING_TIMEOUT:
         g_value_set_boolean (value, self->priv->skip_incoming_timeout);
@@ -1434,12 +1424,17 @@ mm_base_call_init (MMBaseCall *self)
     /* Setup authorization provider */
     self->priv->authp = mm_auth_provider_get ();
     self->priv->authp_cancellable = g_cancellable_new ();
+
+    self->priv->dtmf_queue = g_queue_new ();
 }
 
 static void
 finalize (GObject *object)
 {
     MMBaseCall *self = MM_BASE_CALL (object);
+
+    g_assert (g_queue_get_length (self->priv->dtmf_queue) == 0);
+    g_queue_free (g_steal_pointer (&self->priv->dtmf_queue));
 
     g_assert (!self->priv->start_cancellable);
     g_free (self->priv->path);
@@ -1466,10 +1461,13 @@ dispose (GObject *object)
         g_clear_object (&self->priv->connection);
     }
 
-    g_clear_object (&self->priv->modem);
+    g_clear_object (&self->priv->iface);
     g_clear_object (&self->priv->bind_to);
     g_cancellable_cancel (self->priv->authp_cancellable);
     g_clear_object (&self->priv->authp_cancellable);
+
+    g_queue_foreach (self->priv->dtmf_queue, (GFunc) send_dtmf_task_cancel, NULL);
+    g_queue_clear (self->priv->dtmf_queue);
 
     G_OBJECT_CLASS (mm_base_call_parent_class)->dispose (object);
 }
@@ -1498,17 +1496,6 @@ mm_base_call_class_init (MMBaseCallClass *klass)
     object_class->finalize = finalize;
     object_class->dispose = dispose;
 
-    klass->start                      = call_start;
-    klass->start_finish               = call_start_finish;
-    klass->accept                     = call_accept;
-    klass->accept_finish              = call_accept_finish;
-    klass->deflect                    = call_deflect;
-    klass->deflect_finish             = call_deflect_finish;
-    klass->hangup                     = call_hangup;
-    klass->hangup_finish              = call_hangup_finish;
-    klass->send_dtmf                  = call_send_dtmf;
-    klass->send_dtmf_finish           = call_send_dtmf_finish;
-
     properties[PROP_CONNECTION] =
         g_param_spec_object (MM_BASE_CALL_CONNECTION,
                              "Connection",
@@ -1527,13 +1514,13 @@ mm_base_call_class_init (MMBaseCallClass *klass)
 
     g_object_class_override_property (object_class, PROP_BIND_TO, MM_BIND_TO);
 
-    properties[PROP_MODEM] =
-        g_param_spec_object (MM_BASE_CALL_MODEM,
-                             "Modem",
-                             "The Modem which owns this call",
-                             MM_TYPE_BASE_MODEM,
+    properties[PROP_IFACE_MODEM_VOICE] =
+        g_param_spec_object (MM_BASE_CALL_IFACE_MODEM_VOICE,
+                             "Modem Voice Interface",
+                             "The Modem voice interface which owns this call",
+                             MM_TYPE_IFACE_MODEM_VOICE,
                              G_PARAM_READWRITE);
-    g_object_class_install_property (object_class, PROP_MODEM, properties[PROP_MODEM]);
+    g_object_class_install_property (object_class, PROP_IFACE_MODEM_VOICE, properties[PROP_IFACE_MODEM_VOICE]);
 
     properties[PROP_SKIP_INCOMING_TIMEOUT] =
         g_param_spec_boolean (MM_BASE_CALL_SKIP_INCOMING_TIMEOUT,

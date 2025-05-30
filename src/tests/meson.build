@@ -31,6 +31,11 @@ if enable_mbim
   test_units += {'modem-helpers-mbim': libkerneldevice_dep}
 endif
 
+c_args = [
+  '-DTEST_SERVICES="@0@"'.format(build_root / 'data/tests'),
+  '-DTESTUDEVRULESDIR="@0@"'.format(src_dir),
+]
+
 foreach test_unit, test_deps: test_units
   test_name = 'test-' + test_unit
 
@@ -39,11 +44,23 @@ foreach test_unit, test_deps: test_units
     sources: test_name + '.c',
     include_directories: top_inc,
     dependencies: test_deps,
-    c_args: '-DTESTUDEVRULESDIR="@0@"'.format(src_dir)
+    c_args: c_args,
   )
 
   test(test_name, exe)
 endforeach
+
+# base call test
+exe = executable(
+  'test-base-call',
+  sources: [ 'test-base-call.c', 'fake-modem.c', 'fake-call.c' ],
+  include_directories: top_inc,
+  dependencies: libmmbase_dep,
+  c_args: c_args,
+)
+
+test('test-base-call', exe)
+
 
 if get_option('fuzzer')
   fuzzer_tests = ['test-sms-part-3gpp-fuzzer',

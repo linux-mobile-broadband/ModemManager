@@ -68,6 +68,10 @@ void              mm_call_properties_set_number (MMCallProperties *self,
                                                  const gchar *text);
 const gchar      *mm_call_properties_get_number (MMCallProperties *self);
 
+void              mm_call_properties_set_dtmf_tone_duration (MMCallProperties *self,
+                                                             const guint       duration_ms);
+guint             mm_call_properties_get_dtmf_tone_duration (MMCallProperties *self);
+
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */
 

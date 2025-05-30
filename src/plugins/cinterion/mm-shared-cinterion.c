@@ -31,6 +31,7 @@
 #include "mm-base-modem-at.h"
 #include "mm-shared-cinterion.h"
 #include "mm-modem-helpers-cinterion.h"
+#include "mm-call-at.h"
 
 G_DEFINE_INTERFACE (MMSharedCinterion, mm_shared_cinterion, MM_TYPE_IFACE_MODEM)
 
@@ -997,7 +998,8 @@ mm_shared_cinterion_enable_location_gathering (MMIfaceModemLocation  *self,
 MMBaseCall *
 mm_shared_cinterion_create_call (MMIfaceModemVoice *self,
                                  MMCallDirection    direction,
-                                 const gchar       *number)
+                                 const gchar       *number,
+                                 const guint        dtmf_tone_duration)
 {
     Private *priv;
 
@@ -1005,21 +1007,22 @@ mm_shared_cinterion_create_call (MMIfaceModemVoice *self,
     priv = get_private (MM_SHARED_CINTERION (self));
     if (priv->slcc_support == FEATURE_SUPPORTED) {
         mm_obj_dbg (self, "created new call with ^SLCC support");
-        return mm_base_call_new (MM_BASE_MODEM (self),
-                                 G_OBJECT (self),
-                                 direction,
-                                 number,
-                                 /* When SLCC is supported we have support for detailed
-                                  * call list events via call list report URCs */
-                                 TRUE,   /* incoming timeout not required */
-                                 TRUE,   /* dialing->ringing supported */
-                                 TRUE);  /* ringing->active supported */
+        return mm_call_at_new (MM_BASE_MODEM (self),
+                               G_OBJECT (self),
+                               direction,
+                               number,
+                               dtmf_tone_duration,
+                               /* When SLCC is supported we have support for detailed
+                                * call list events via call list report URCs */
+                               TRUE,   /* incoming timeout not required */
+                               TRUE,   /* dialing->ringing supported */
+                               TRUE);  /* ringing->active supported */
     }
 
     /* otherwise, run parent's generic base call logic */
     g_assert (priv->iface_modem_voice_parent);
     g_assert (priv->iface_modem_voice_parent->create_call);
-    return priv->iface_modem_voice_parent->create_call (self, direction, number);
+    return priv->iface_modem_voice_parent->create_call (self, direction, number, dtmf_tone_duration);
 }
 
 /*****************************************************************************/

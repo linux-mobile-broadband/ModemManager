@@ -44,10 +44,12 @@
 
 G_DEFINE_TYPE (MMCallProperties, mm_call_properties, G_TYPE_OBJECT)
 
-#define PROPERTY_NUMBER "number"
+#define PROPERTY_NUMBER             "number"
+#define PROPERTY_DTMF_TONE_DURATION "dtmf-tone-duration"
 
 struct _MMCallPropertiesPrivate {
     gchar *number;
+    guint  dtmf_tone_duration;
 };
 
 /*****************************************************************************/
@@ -92,6 +94,43 @@ mm_call_properties_get_number (MMCallProperties *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_call_properties_set_dtmf_tone_duration:
+ * @self: A #MMCallProperties.
+ * @duration_ms: The desired duration of DTMF tones in milliseconds.
+ *
+ * Sets the DTMF tone duration if supported by the modem.
+ *
+ * Since: 1.26
+ */
+void
+mm_call_properties_set_dtmf_tone_duration (MMCallProperties *self,
+                                           const guint duration_ms)
+{
+    g_return_if_fail (MM_IS_CALL_PROPERTIES (self));
+
+    self->priv->dtmf_tone_duration = duration_ms;
+}
+
+/**
+ * mm_call_properties_get_dtmf_tone_duration:
+ * @self: A #MMCallProperties.
+ *
+ * Gets the desired DTMF tone duration in milliseconds.
+ *
+ * Returns: the DTMF tone duration in milliseconds.
+ *
+ * Since: 1.26
+ */
+guint
+mm_call_properties_get_dtmf_tone_duration (MMCallProperties *self)
+{
+    g_return_val_if_fail (MM_IS_CALL_PROPERTIES (self), 0);
+
+    return self->priv->dtmf_tone_duration;
+}
+
+/*****************************************************************************/
 /*
  * mm_call_properties_get_dictionary: (skip)
  */
@@ -114,6 +153,12 @@ mm_call_properties_get_dictionary (MMCallProperties *self)
                                PROPERTY_NUMBER,
                                g_variant_new_string (self->priv->number));
 
+    if (self->priv->dtmf_tone_duration)
+        g_variant_builder_add (&builder,
+                               "{sv}",
+                               PROPERTY_DTMF_TONE_DURATION,
+                               g_variant_new_uint32 (self->priv->dtmf_tone_duration));
+
     return g_variant_ref_sink (g_variant_builder_end (&builder));
 }
 
@@ -126,6 +171,18 @@ consume_string (MMCallProperties *self,
 {
     if (g_str_equal (key, PROPERTY_NUMBER)) {
         mm_call_properties_set_number (self, value);
+    } else if (g_str_equal (key, PROPERTY_DTMF_TONE_DURATION)) {
+        guint num;
+
+        if (!mm_get_uint_from_str (value, &num)) {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_INVALID_ARGS,
+                         "Failed to parse DTMF tone duration from value '%s'",
+                         value);
+            return FALSE;
+        }
+        mm_call_properties_set_dtmf_tone_duration (self, num);
     } else {
         g_set_error (error,
                      MM_CORE_ERROR,
@@ -189,11 +246,29 @@ consume_variant (MMCallProperties *properties,
                  GVariant *value,
                  GError **error)
 {
-    if (g_str_equal (key, PROPERTY_NUMBER))
+    if (g_str_equal (key, PROPERTY_NUMBER)) {
+        if (!g_variant_is_of_type (value, G_VARIANT_TYPE_STRING)) {
+            g_set_error_literal (error,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_INVALID_ARGS,
+                                 "Invalid properties dictionary; number not a string");
+            return FALSE;
+        }
         mm_call_properties_set_number (
             properties,
             g_variant_get_string (value, NULL));
-    else {
+    } else if (g_str_equal (key, PROPERTY_DTMF_TONE_DURATION)) {
+        if (!g_variant_is_of_type (value, G_VARIANT_TYPE_UINT32)) {
+            g_set_error_literal (error,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_INVALID_ARGS,
+                                 "Invalid properties dictionary; dtmf-tone-duration not a uint32");
+            return FALSE;
+        }
+        mm_call_properties_set_dtmf_tone_duration (
+            properties,
+            g_variant_get_uint32 (value));
+    } else {
         /* Set error */
         g_set_error (error,
                      MM_CORE_ERROR,

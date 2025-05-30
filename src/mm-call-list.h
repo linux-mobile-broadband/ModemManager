@@ -19,7 +19,6 @@
 #include <glib.h>
 #include <glib-object.h>
 
-#include "mm-base-modem.h"
 #include "mm-base-call.h"
 
 #define MM_TYPE_CALL_LIST            (mm_call_list_get_type ())
@@ -32,8 +31,6 @@
 typedef struct _MMCallList MMCallList;
 typedef struct _MMCallListClass MMCallListClass;
 typedef struct _MMCallListPrivate MMCallListPrivate;
-
-#define MM_CALL_LIST_MODEM "call-list-modem"
 
 #define MM_CALL_ADDED     "call-added"
 #define MM_CALL_DELETED   "call-deleted"
@@ -57,7 +54,7 @@ struct _MMCallListClass {
 GType mm_call_list_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMCallList, g_object_unref)
 
-MMCallList *mm_call_list_new (MMBaseModem *modem);
+MMCallList *mm_call_list_new (void);
 
 GStrv mm_call_list_get_paths (MMCallList *self);
 guint mm_call_list_get_count (MMCallList *self);

@@ -161,7 +161,7 @@ create_incoming_call (MMIfaceModemVoice *self,
 
     g_assert (MM_IFACE_MODEM_VOICE_GET_IFACE (self)->create_call != NULL);
 
-    call = MM_IFACE_MODEM_VOICE_GET_IFACE (self)->create_call (self, MM_CALL_DIRECTION_INCOMING, number);
+    call = MM_IFACE_MODEM_VOICE_GET_IFACE (self)->create_call (self, MM_CALL_DIRECTION_INCOMING, number, 0);
     update_audio_settings_in_call (self, call);
     return call;
 }
@@ -173,6 +173,7 @@ create_outgoing_call_from_properties (MMIfaceModemVoice  *self,
 {
     MMBaseCall  *call;
     const gchar *number;
+    guint        dtmf_tone_duration;
 
     /* Don't create CALL from properties if either number is missing */
     number = mm_call_properties_get_number (properties) ;
@@ -184,9 +185,14 @@ create_outgoing_call_from_properties (MMIfaceModemVoice  *self,
         return NULL;
     }
 
+    dtmf_tone_duration = mm_call_properties_get_dtmf_tone_duration (properties) ;
+
     /* Create a call object as defined by the interface */
     g_assert (MM_IFACE_MODEM_VOICE_GET_IFACE (self)->create_call != NULL);
-    call = MM_IFACE_MODEM_VOICE_GET_IFACE (self)->create_call (self, MM_CALL_DIRECTION_OUTGOING, number);
+    call = MM_IFACE_MODEM_VOICE_GET_IFACE (self)->create_call (self,
+                                                               MM_CALL_DIRECTION_OUTGOING,
+                                                               number,
+                                                               dtmf_tone_duration);
     update_audio_settings_in_call (self, call);
     return call;
 }
@@ -3012,7 +3018,7 @@ interface_initialization_step (GTask *task)
         /* Create a new call list if not already available (this initialization
          * may be called multiple times) */
         if (!list) {
-            list = mm_call_list_new (MM_BASE_MODEM (self));
+            list = mm_call_list_new ();
             g_object_set (self,
                           MM_IFACE_MODEM_VOICE_CALL_LIST, list,
                           NULL);

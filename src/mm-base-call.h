@@ -23,8 +23,8 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-base-modem.h"
 #include "mm-call-audio-format.h"
+#include "mm-port.h"
 
 #define MM_TYPE_BASE_CALL            (mm_base_call_get_type ())
 #define MM_BASE_CALL(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_BASE_CALL, MMBaseCall))
@@ -37,9 +37,13 @@ typedef struct _MMBaseCall MMBaseCall;
 typedef struct _MMBaseCallClass MMBaseCallClass;
 typedef struct _MMBaseCallPrivate MMBaseCallPrivate;
 
+#define MM_CALL_DIRECTION          "direction"
+#define MM_CALL_NUMBER             "number"
+#define MM_CALL_DTMF_TONE_DURATION "dtmf-tone-duration"
+
 #define MM_BASE_CALL_PATH                        "call-path"
 #define MM_BASE_CALL_CONNECTION                  "call-connection"
-#define MM_BASE_CALL_MODEM                       "call-modem"
+#define MM_BASE_CALL_IFACE_MODEM_VOICE           "call-iface-modem-voice"
 #define MM_BASE_CALL_SKIP_INCOMING_TIMEOUT       "call-skip-incoming-timeout"
 #define MM_BASE_CALL_SUPPORTS_DIALING_TO_RINGING "call-supports-dialing-to-ringing"
 #define MM_BASE_CALL_SUPPORTS_RINGING_TO_ACTIVE  "call-supports-ringing-to-active"
@@ -86,27 +90,27 @@ struct _MMBaseCallClass {
                                 GAsyncResult *res,
                                 GError **error);
 
-    /* Send a DTMF tone */
-    void     (* send_dtmf)        (MMBaseCall *self,
-                                   const gchar *dtmf,
-                                   GAsyncReadyCallback callback,
-                                   gpointer user_data);
-    gboolean (* send_dtmf_finish) (MMBaseCall *self,
-                                   GAsyncResult *res,
-                                   GError **error);
+    /* DTMF tone handling */
+    void     (* send_dtmf)        (MMBaseCall           *self,
+                                   const gchar          *dtmf,
+                                   GAsyncReadyCallback   callback,
+                                   gpointer              user_data);
+    /* Returns the number of DTMF characters sent, or < 1 on error */
+    gssize   (* send_dtmf_finish) (MMBaseCall           *self,
+                                   GAsyncResult         *res,
+                                   GError              **error);
+
+    void     (* stop_dtmf)        (MMBaseCall           *self,
+                                   GAsyncReadyCallback   callback,
+                                   gpointer              user_data);
+    gboolean (* stop_dtmf_finish) (MMBaseCall           *self,
+                                   GAsyncResult         *res,
+                                   GError              **error);
+
 };
 
 GType mm_base_call_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBaseCall, g_object_unref)
-
-/* This one can be overridden by plugins */
-MMBaseCall *mm_base_call_new (MMBaseModem     *modem,
-                              GObject         *bind_to,
-                              MMCallDirection  direction,
-                              const gchar     *number,
-                              gboolean         skip_incoming_timeout,
-                              gboolean         supports_dialing_to_ringing,
-                              gboolean         supports_ringing_to_active);
 
 void             mm_base_call_export         (MMBaseCall *self);
 void             mm_base_call_unexport       (MMBaseCall *self);
@@ -137,5 +141,10 @@ void         mm_base_call_received_dtmf (MMBaseCall *self,
                                          const gchar *dtmf);
 
 void         mm_base_call_incoming_refresh (MMBaseCall *self);
+
+guint        mm_base_call_get_dtmf_tone_duration (MMBaseCall *self);
+
+void         mm_base_call_set_dtmf_tone_duration (MMBaseCall *self,
+                                                  guint       duration_ms);
 
 #endif /* MM_BASE_CALL_H */
