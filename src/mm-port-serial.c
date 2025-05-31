@@ -1866,6 +1866,49 @@ mm_port_serial_flash (MMPortSerial *self,
 }
 
 /*****************************************************************************/
+/* Flush */
+
+gboolean mm_port_serial_flush (MMPortSerial *self,
+                               MMPortSerialFlushType type,
+                               GError **error)
+{
+    int tcflush_type;
+
+    g_return_val_if_fail (MM_IS_PORT_SERIAL (self), FALSE);
+
+    if (!mm_port_serial_is_open (self)) {
+        g_set_error_literal (error,
+                             MM_SERIAL_ERROR,
+                             MM_SERIAL_ERROR_NOT_OPEN,
+                             "The serial port is not open.");
+        return FALSE;
+    }
+
+    if (type == MM_PORT_SERIAL_FLUSH_RX) {
+        tcflush_type = TCIFLUSH;
+    } else if (type == MM_PORT_SERIAL_FLUSH_TX) {
+        tcflush_type = TCOFLUSH;
+    } else if (type == MM_PORT_SERIAL_FLUSH_BOTH) {
+        tcflush_type = TCIOFLUSH;
+    } else {
+        g_assert_not_reached ();
+        return FALSE;
+    }
+
+    g_assert (self->priv->fd >= 0);
+    if (tcflush (self->priv->fd, tcflush_type) != 0) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Failed to flush (%d) serial port, errno %d",
+                     tcflush_type, errno);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+/*****************************************************************************/
 
 gboolean
 mm_port_serial_set_flow_control (MMPortSerial   *self,

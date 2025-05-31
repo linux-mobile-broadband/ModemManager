@@ -48,6 +48,12 @@ typedef enum {
     MM_PORT_SERIAL_RESPONSE_ERROR,
 } MMPortSerialResponseType;
 
+typedef enum {
+    MM_PORT_SERIAL_FLUSH_RX,
+    MM_PORT_SERIAL_FLUSH_TX,
+    MM_PORT_SERIAL_FLUSH_BOTH,
+} MMPortSerialFlushType;
+
 typedef struct _MMPortSerial MMPortSerial;
 typedef struct _MMPortSerialClass MMPortSerialClass;
 typedef struct _MMPortSerialPrivate MMPortSerialPrivate;
@@ -140,6 +146,10 @@ gboolean mm_port_serial_flash_finish      (MMPortSerial *self,
                                            GAsyncResult *res,
                                            GError **error);
 void     mm_port_serial_flash_cancel      (MMPortSerial *self);
+
+gboolean mm_port_serial_flush             (MMPortSerial *self,
+                                           MMPortSerialFlushType type,
+                                           GError **error);
 
 void        mm_port_serial_command        (MMPortSerial *self,
                                            GByteArray *command,
