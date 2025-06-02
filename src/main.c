@@ -64,10 +64,14 @@ sleeping_cb (MMSleepMonitor *sleep_monitor,
 {
     if (mm_context_get_test_low_power_suspend_resume ()) {
         mm_dbg ("removing devices and setting them in low power mode... (sleeping)");
-        mm_base_manager_shutdown (manager, TRUE, TRUE, TRUE, ctx);
+        mm_base_manager_cleanup (manager,
+                                 MM_BASE_MANAGER_CLEANUP_DISABLE |
+                                     MM_BASE_MANAGER_CLEANUP_LOW_POWER |
+                                     MM_BASE_MANAGER_CLEANUP_REMOVE,
+                                 ctx);
     } else {
         mm_dbg ("removing devices... (sleeping)");
-        mm_base_manager_shutdown (manager, FALSE, FALSE, TRUE, ctx);
+        mm_base_manager_cleanup (manager, MM_BASE_MANAGER_CLEANUP_REMOVE, ctx);
     }
 }
 
@@ -84,7 +88,10 @@ sleeping_quick_cb (MMSleepMonitor *sleep_monitor,
 {
     if (mm_context_get_test_low_power_suspend_resume ()) {
         mm_dbg ("setting modem in low power mode... (sleeping)");
-        mm_base_manager_shutdown (manager, TRUE, TRUE, FALSE, ctx);
+        mm_base_manager_cleanup (manager,
+                                 MM_BASE_MANAGER_CLEANUP_DISABLE |
+                                     MM_BASE_MANAGER_CLEANUP_LOW_POWER,
+                                 ctx);
     } else {
         /* Don't need to wait for anything; just suspend */
         mm_dbg ("leaving modem powered... (sleeping)");
@@ -268,7 +275,9 @@ main (int argc, char *argv[])
                                           (GCallback)shutdown_done,
                                           inner);
 
-        mm_base_manager_shutdown (manager, TRUE, FALSE, TRUE, ctx);
+        mm_base_manager_cleanup (manager,
+                                 MM_BASE_MANAGER_CLEANUP_DISABLE | MM_BASE_MANAGER_CLEANUP_REMOVE,
+                                 ctx);
 
         /* Wait for all modems to be disabled and removed, but don't wait
          * forever: if disabling the modems takes longer than 20s, just
