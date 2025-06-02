@@ -53,6 +53,7 @@ typedef struct {
     /* voice */
     MMIfaceModemVoiceInterface *iface_modem_voice_parent;
     FeatureSupport              cpcmfrm_support;
+    gboolean                    audio_16k_enabled;
     FeatureSupport              cpcmreg_support;
     FeatureSupport              clcc_urc_support;
     GRegex                     *clcc_urc_regex;
@@ -1051,8 +1052,12 @@ mm_shared_simtech_voice_setup_in_call_audio_channel_finish (MMIfaceModemVoice  *
     if (!g_task_propagate_boolean (G_TASK (res), error))
         return FALSE;
 
-    if (audio_format)
-        *audio_format = NULL;
+    if (audio_format) {
+        *audio_format = mm_call_audio_format_new ();
+        mm_call_audio_format_set_encoding   (*audio_format, "pcm");
+        mm_call_audio_format_set_resolution (*audio_format, "s16le");
+        mm_call_audio_format_set_rate       (*audio_format, priv->audio_16k_enabled ? 16000 : 8000);
+    }
 
     if (audio_port) {
         if (priv->cpcmreg_support == FEATURE_SUPPORTED)
@@ -1170,12 +1175,16 @@ cpcmfrm_set_ready (MMBaseModem  *self,
                    GAsyncResult *res,
                    GTask        *task)
 {
-    GError *error = NULL;
+    GError  *error = NULL;
+    Private *priv;
+
+    priv = get_private (MM_SHARED_SIMTECH (self));
 
     if (!mm_base_modem_at_command_finish (self, res, &error))
         g_task_return_error (task, error);
     else {
         g_task_return_boolean (task, TRUE);
+        priv->audio_16k_enabled = TRUE;
         mm_obj_dbg (self, "USB audio 16k sample rate turned on");
     }
     g_object_unref (task);
