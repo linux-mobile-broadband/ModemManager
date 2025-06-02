@@ -329,6 +329,7 @@ static const gchar *serial_error_messages[] = {
     [MM_SERIAL_ERROR_NOT_OPEN]              = "Not open",
     [MM_SERIAL_ERROR_PARSE_FAILED]          = "Parse failed",
     [MM_SERIAL_ERROR_FRAME_NOT_FOUND]       = "Frame not found",
+    [MM_SERIAL_ERROR_SEND_TIMEOUT]          = "Send timeout",
 };
 
 static const gchar *

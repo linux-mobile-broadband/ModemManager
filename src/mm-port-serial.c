@@ -596,7 +596,7 @@ port_serial_process_command (MMPortSerial *self,
                 self->priv->n_consecutive_timeouts++;
                 g_signal_emit_by_name (self, MM_PORT_SIGNAL_TIMED_OUT, self->priv->n_consecutive_timeouts);
 
-                g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
+                g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_TIMEOUT,
                              "Sending command failed: '%s'", g_strerror (errno));
                 return FALSE;
             }
@@ -631,7 +631,7 @@ port_serial_process_command (MMPortSerial *self,
                 /* If we reach the limit of EAGAIN errors, treat as a timeout error. */
                 self->priv->n_consecutive_timeouts++;
                 g_signal_emit_by_name (self, MM_PORT_SIGNAL_TIMED_OUT, self->priv->n_consecutive_timeouts);
-                g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
+                g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_TIMEOUT,
                              "Sending command failed: '%s'", g_strerror (errno));
                 return FALSE;
             }
