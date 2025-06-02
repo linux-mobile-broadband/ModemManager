@@ -2163,8 +2163,7 @@ call_list_foreach_audio_settings (MMBaseCall         *call,
                                   InCallEventContext *ctx)
 {
     if (mm_base_call_get_state (call) != MM_CALL_STATE_TERMINATED)
-        return;
-    mm_base_call_change_audio_settings (call, ctx->audio_port, ctx->audio_format);
+        mm_base_call_change_audio_settings (call, ctx->audio_port, ctx->audio_format);
 }
 
 static void
