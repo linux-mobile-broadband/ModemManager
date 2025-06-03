@@ -74,7 +74,9 @@ create_modem (MMPlugin     *self,
                                                                    drivers,
                                                                    mm_plugin_get_name (self),
                                                                    vendor,
-                                                                   product));
+                                                                   product,
+                                                                   subsystem_vendor,
+                                                                   subsystem_device));
     }
 #endif
 
@@ -97,16 +99,22 @@ mm_plugin_create_foxconn (void)
         0x0489, /* usb vid */
         0x105b, /* pci vid */
         0 };
+    static const mm_uint16_pair subsystem_vendor_ids[] = {
+        {0x17cb, 0x105b }, /* QC VID, Foxconn Sub-VID*/
+        {0x105b, 0x105b }, /* Foxconn VID, Foxconn Sub-VID*/
+        {0, 0 }
+    };
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_FOXCONN,
-                      MM_PLUGIN_NAME,               MM_MODULE_NAME,
-                      MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
-                      MM_PLUGIN_ALLOWED_VENDOR_IDS, vendor_ids,
-                      MM_PLUGIN_ALLOWED_AT,         TRUE,
-                      MM_PLUGIN_ALLOWED_QCDM,       TRUE,
-                      MM_PLUGIN_ALLOWED_QMI,        TRUE,
-                      MM_PLUGIN_ALLOWED_MBIM,       TRUE,
+                      MM_PLUGIN_NAME,                         MM_MODULE_NAME,
+                      MM_PLUGIN_ALLOWED_SUBSYSTEMS,           subsystems,
+                      MM_PLUGIN_ALLOWED_VENDOR_IDS,           vendor_ids,
+                      MM_PLUGIN_ALLOWED_SUBSYSTEM_VENDOR_IDS, subsystem_vendor_ids,
+                      MM_PLUGIN_ALLOWED_AT,                   TRUE,
+                      MM_PLUGIN_ALLOWED_QCDM,                 TRUE,
+                      MM_PLUGIN_ALLOWED_QMI,                  TRUE,
+                      MM_PLUGIN_ALLOWED_MBIM,                 TRUE,
                       NULL));
 }
 
