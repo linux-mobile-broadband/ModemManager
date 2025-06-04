@@ -275,7 +275,7 @@ config_h.set('WITH_MBIM', enable_mbim)
 # QMI support (enabled by default)
 enable_qmi = get_option('qmi')
 if enable_qmi
-  qmi_glib_dep = dependency('qmi-glib', version: '>= 1.36.0',
+  qmi_glib_dep = dependency('qmi-glib', version: '>= 1.37.1',
                             required: not get_option('subproject-fallback'))
 
   if not qmi_glib_dep.found() and get_option('subproject-fallback')
