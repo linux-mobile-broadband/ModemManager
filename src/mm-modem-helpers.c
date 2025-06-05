@@ -5895,7 +5895,7 @@ mm_dtmf_split (const gchar *dtmf)
     const gchar *p = dtmf;
     GString     *cur = NULL;
 
-    array = g_ptr_array_new ();
+    array = g_ptr_array_new_with_free_func (g_free);
 
     while (*p) {
         if (*p == MM_CALL_DTMF_PAUSE_CHAR) {

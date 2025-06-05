@@ -766,7 +766,6 @@ static void
 send_dtmf_context_free (SendDtmfContext *ctx)
 {
     send_dtmf_context_clear_timeout (ctx);
-    g_ptr_array_foreach (ctx->dtmfs, (GFunc) g_free, NULL);
     g_ptr_array_free (ctx->dtmfs, TRUE);
     g_assert (!ctx->saved_error);
     g_slice_free (SendDtmfContext, ctx);
