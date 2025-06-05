@@ -316,3 +316,18 @@ build-release-builtin:
     - ninja -C build test
     - ninja -C build install
     - ninja -C build uninstall
+
+build-asan:
+  stage: build
+  extends:
+  - .fdo.distribution-image@ubuntu
+  - .common_variables
+  only:
+    - main
+    - merge_requests
+    - tags
+    - schedules
+  script:
+    - *prepare_deps
+    - meson setup build-asan -Db_sanitize=address  -Dwerror=true -Dgtk_doc=false -Dqmi=true -Dqrtr=true -Dmbim=true
+    - meson test -C build-asan --suite=daemon --timeout-multiplier=5 --print-errorlogs
