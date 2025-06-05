@@ -31,7 +31,7 @@ static void
 test_cbm_ca (void)
 {
     g_autoptr(GError) err = NULL;
-    MMCbmPart *part;
+    g_autoptr(MMCbmPart) part = NULL;
     guint16 serial;
 
     static const guint8 pdu[] = {
@@ -76,7 +76,7 @@ static void
 test_cbm_ucs2 (void)
 {
     g_autoptr(GError) err = NULL;
-    MMCbmPart *part;
+    g_autoptr(MMCbmPart) part = NULL;
     guint16 serial;
 
     static const guint8 pdu [] = {
@@ -120,7 +120,7 @@ static void
 test_cbm_eu (void)
 {
     g_autoptr(GError) err = NULL;
-    MMCbmPart *part;
+    g_autoptr(MMCbmPart) part = NULL;
     guint16 serial;
 
     static const guint8 pdu[] = {
@@ -238,7 +238,7 @@ static void
 test_cbm_gsm7bit_with_lang (void)
 {
     g_autoptr(GError) err = NULL;
-    MMCbmPart *part;
+    g_autoptr(MMCbmPart) part = NULL;
 
     static const guint8 pdu[] = {
         0x40, 0xC0, 0x11, 0x1F, 0x10 /* GSM 7Bit with language */, 0x13,
@@ -261,7 +261,7 @@ static void
 test_cbm_ucs2_with_7bit_lang (void)
 {
     g_autoptr(GError) err = NULL;
-    MMCbmPart *part;
+    g_autoptr(MMCbmPart) part = NULL;
 
     static const guint8 pdu [] = {
         0x63, 0x40, 0x00, 0x32, 0x11 /* UCS2 with 7Bit language */, 0x14,
