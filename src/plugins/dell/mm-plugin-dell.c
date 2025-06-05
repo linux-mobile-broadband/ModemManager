@@ -405,7 +405,9 @@ create_modem (MMPlugin *self,
                                                                        drivers,
                                                                        mm_plugin_get_name (self),
                                                                        vendor,
-                                                                       product));
+                                                                       product,
+                                                                       subsystem_vendor,
+                                                                       subsystem_device));
         }
 
         if (mm_port_probe_list_is_xmm (probes)) {
