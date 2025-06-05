@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Copyright (C) 2021 Iñigo Martinez <inigomartinez@gmail.com>
 
+test_env = environment()
+test_env.set('ASAN_OPTIONS', 'fast_unwind_on_malloc=0')
+
 test_units = {
   'at-serial-port': libport_dep,
   'cbm-part': libhelpers_dep,
@@ -47,7 +50,7 @@ foreach test_unit, test_deps: test_units
     c_args: c_args,
   )
 
-  test(test_name, exe)
+  test(test_name, exe, suite: 'daemon', env: test_env)
 endforeach
 
 # base call test
@@ -59,7 +62,7 @@ exe = executable(
   c_args: c_args,
 )
 
-test('test-base-call', exe)
+test('test-base-call', exe, suite: 'daemon', env: test_env)
 
 
 if get_option('fuzzer')
