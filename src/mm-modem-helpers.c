@@ -3162,6 +3162,7 @@ mm_3gpp_parse_cscb_response (const char *response, GError **error)
         goto out;
     }
 
+    g_free (str);
     str = g_match_info_fetch (match_info, 2);
     intervals = g_strsplit (str, ",", -1);
     for (i = 0; intervals[i]; i++) {
