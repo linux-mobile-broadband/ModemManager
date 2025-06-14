@@ -3162,6 +3162,7 @@ mm_3gpp_parse_cscb_response (const char *response, GError **error)
         goto out;
     }
 
+    g_free (str);
     str = g_match_info_fetch (match_info, 2);
     intervals = g_strsplit (str, ",", -1);
     for (i = 0; intervals[i]; i++) {
@@ -5895,7 +5896,7 @@ mm_dtmf_split (const gchar *dtmf)
     const gchar *p = dtmf;
     GString     *cur = NULL;
 
-    array = g_ptr_array_new ();
+    array = g_ptr_array_new_with_free_func (g_free);
 
     while (*p) {
         if (*p == MM_CALL_DTMF_PAUSE_CHAR) {

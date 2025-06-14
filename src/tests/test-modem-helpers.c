@@ -4491,7 +4491,7 @@ static void
 common_test_cscb_response (const gchar *response, TestCscb *expected)
 {
     GError   *error = NULL;
-    GArray   *result;
+    g_autoptr(GArray) result = NULL;
 
     g_debug ("Testing '%s'", response);
     result = mm_3gpp_parse_cscb_response (response, &error);
@@ -4726,7 +4726,7 @@ test_emergency_numbers (void)
 
     for (i = 0; i < G_N_ELEMENTS (emergency_numbers_tests); i++) {
         GStrv   numbers;
-        GError *error = NULL;
+        g_autoptr(GError) error = NULL;
         guint   j;
 
         g_debug ("  testing %s...", emergency_numbers_tests[i].raw);
@@ -5138,7 +5138,7 @@ static void
 test_dtmf_split (gpointer user_data)
 {
     DtmfTestData *td = user_data;
-    GPtrArray *split;
+    g_autoptr(GPtrArray) split = NULL;
     guint expected_len;
     guint i;
 

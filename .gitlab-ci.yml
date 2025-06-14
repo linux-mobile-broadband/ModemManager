@@ -28,7 +28,7 @@ stages:
     BUILD_QMI: true
     BUILD_QRTR: true
 
-build container:
+build_container:
   extends:
   - .fdo.container-build@ubuntu
   - .common_variables
@@ -73,6 +73,7 @@ verify-dco:
   extends:
   - .fdo.distribution-image@ubuntu
   - .common_variables
+  needs: []
   only:
     - merge_requests
   script: |
@@ -89,6 +90,8 @@ verify-dco:
 
 build-no-qmi:
   stage: build
+  needs:
+    - build_container
   extends:
   - .fdo.distribution-image@ubuntu
   - .common_variables
@@ -107,6 +110,8 @@ build-no-qmi:
 
 build-qmi-qrtr-no-mbim:
   stage: build
+  needs:
+    - build_container
   extends:
   - .fdo.distribution-image@ubuntu
   - .common_variables
@@ -124,6 +129,8 @@ build-qmi-qrtr-no-mbim:
 
 build-qmi-no-qrtr-no-mbim:
   stage: build
+  needs:
+    - build_container
   extends:
   - .fdo.distribution-image@ubuntu
   - .common_variables
@@ -142,6 +149,8 @@ build-qmi-no-qrtr-no-mbim:
 
 build-no-qmi-no-mbim:
   stage: build
+  needs:
+    - build_container
   extends:
   - .fdo.distribution-image@ubuntu
   - .common_variables
@@ -162,6 +171,8 @@ build-no-qmi-no-mbim:
 
 build-no-qmi-no-mbim-no-tests:
   stage: build
+  needs:
+    - build_container
   extends:
   - .fdo.distribution-image@ubuntu
   - .common_variables
@@ -181,6 +192,8 @@ build-no-qmi-no-mbim-no-tests:
 
 build-no-deprecated:
   stage: build
+  needs:
+    - build_container
   extends:
   - .fdo.distribution-image@ubuntu
   - .common_variables
@@ -201,6 +214,8 @@ build-no-deprecated:
 
 build-no-suspend-resume:
   stage: build
+  needs:
+    - build_container
   extends:
   - .fdo.distribution-image@ubuntu
   - .common_variables
@@ -217,6 +232,8 @@ build-no-suspend-resume:
 
 build-suspend-resume-powerd:
   stage: build
+  needs:
+    - build_container
   extends:
   - .fdo.distribution-image@ubuntu
   - .common_variables
@@ -233,6 +250,8 @@ build-suspend-resume-powerd:
 
 build-single-plugins:
   stage: build
+  needs:
+    - build_container
   extends:
   - .fdo.distribution-image@ubuntu
   - .common_variables
@@ -249,6 +268,8 @@ build-single-plugins:
 
 build-single-plugins-builtin:
   stage: build
+  needs:
+    - build_container
   extends:
   - .fdo.distribution-image@ubuntu
   - .common_variables
@@ -265,6 +286,8 @@ build-single-plugins-builtin:
 
 build-debug:
   stage: build
+  needs:
+    - build_container
   extends:
   - .fdo.distribution-image@ubuntu
   - .common_variables
@@ -283,6 +306,8 @@ build-debug:
 
 build-release:
   stage: build
+  needs:
+    - build_container
   extends:
   - .fdo.distribution-image@ubuntu
   - .common_variables
@@ -301,6 +326,8 @@ build-release:
 
 build-release-builtin:
   stage: build
+  needs:
+    - build_container
   extends:
   - .fdo.distribution-image@ubuntu
   - .common_variables
@@ -316,3 +343,20 @@ build-release-builtin:
     - ninja -C build test
     - ninja -C build install
     - ninja -C build uninstall
+
+build-asan:
+  stage: build
+  needs:
+    - build_container
+  extends:
+  - .fdo.distribution-image@ubuntu
+  - .common_variables
+  only:
+    - main
+    - merge_requests
+    - tags
+    - schedules
+  script:
+    - *prepare_deps
+    - meson setup build-asan -Db_sanitize=address  -Dwerror=true -Dgtk_doc=false -Dqmi=true -Dqrtr=true -Dmbim=true
+    - meson test -C build-asan --suite=daemon --timeout-multiplier=5 --print-errorlogs
