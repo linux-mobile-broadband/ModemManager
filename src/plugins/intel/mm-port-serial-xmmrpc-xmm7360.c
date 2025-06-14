@@ -215,7 +215,7 @@ xmm7360_byte_array_hexlify (GByteArray *buf) {
         gsize string_len;
         string_len = string->len;
         g_string_truncate (string, 48);
-        g_string_append_printf (string, "... (%ld chars)", string_len);
+        g_string_append_printf (string, "... (%" G_GSIZE_FORMAT " chars)", string_len);
     }
 
     return string;
@@ -260,7 +260,7 @@ xmm7360_rpc_args_to_string (GPtrArray *args)
             g_string_append_printf (result, "L(0x%08x)", arg_value_long);
             break;
         case XMM7360_RPC_MSG_ARG_TYPE_STRING:
-            g_string_append_printf (result, "STR(size=%ld)", arg->size);
+            g_string_append_printf (result, "STR(size=%" G_GSIZE_FORMAT ")", arg->size);
             break;
         case XMM7360_RPC_MSG_ARG_TYPE_UNKNOWN:
         default:
