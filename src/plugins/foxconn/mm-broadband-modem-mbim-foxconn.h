@@ -45,6 +45,8 @@ MMBroadbandModemMbimFoxconn *mm_broadband_modem_mbim_foxconn_new (const gchar  *
                                                                   const gchar **driver,
                                                                   const gchar  *plugin,
                                                                   guint16       vendor_id,
-                                                                  guint16       product_id);
+                                                                  guint16       product_id,
+                                                                  guint16       subsystem_vendor_id,
+                                                                  guint16       subsystem_device_id);
 
 #endif /* MM_BROADBAND_MODEM_MBIM_FOXCONN_H */

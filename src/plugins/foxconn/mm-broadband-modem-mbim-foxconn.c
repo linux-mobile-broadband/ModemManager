@@ -88,6 +88,7 @@ needs_qdu_and_mcfg_apps_version (MMIfaceModemFirmware *self)
 {
     guint vendor_id;
     guint product_id;
+    guint subsystem_vid;
 
     /* 0x105b is the T99W175 module, T99W175 supports QDU and requires MCFG+APPS version.
      * T99W265(0x0489:0xe0da ; 0x0489:0xe0db): supports QDU and requires MCFG+APPS version.
@@ -95,7 +96,8 @@ needs_qdu_and_mcfg_apps_version (MMIfaceModemFirmware *self)
      */
     vendor_id = mm_base_modem_get_vendor_id (MM_BASE_MODEM (self));
     product_id = mm_base_modem_get_product_id (MM_BASE_MODEM (self));
-    return (vendor_id == 0x105b || (vendor_id == 0x0489 && (product_id  == 0xe0da || product_id == 0xe0db)));
+    subsystem_vid = mm_base_modem_get_subsystem_vendor_id (MM_BASE_MODEM (self));
+    return (vendor_id == 0x105b || (vendor_id == 0x0489 && (product_id  == 0xe0da || product_id == 0xe0db)) || subsystem_vid == 0x105b);
 }
 
 /*****************************************************************************/
@@ -582,7 +584,9 @@ mm_broadband_modem_mbim_foxconn_new (const gchar  *device,
                                      const gchar **drivers,
                                      const gchar  *plugin,
                                      guint16       vendor_id,
-                                     guint16       product_id)
+                                     guint16       product_id,
+                                     guint16       subsystem_vendor_id,
+                                     guint16       subsystem_device_id)
 {
     const gchar *carrier_config_mapping = NULL;
 
@@ -598,6 +602,8 @@ mm_broadband_modem_mbim_foxconn_new (const gchar  *device,
                          MM_BASE_MODEM_PLUGIN,     plugin,
                          MM_BASE_MODEM_VENDOR_ID,  vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
+                         MM_BASE_MODEM_SUBSYSTEM_VENDOR_ID, subsystem_vendor_id,
+                         MM_BASE_MODEM_SUBSYSTEM_DEVICE_ID, subsystem_device_id,
                          /* MBIM bearer supports NET only */
                          MM_BASE_MODEM_DATA_NET_SUPPORTED, TRUE,
                          MM_BASE_MODEM_DATA_TTY_SUPPORTED, FALSE,
