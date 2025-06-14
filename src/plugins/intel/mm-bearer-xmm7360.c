@@ -26,6 +26,7 @@
 #include "mm-broadband-modem-xmm7360.h"
 #include "mm-broadband-modem-xmm7360-rpc.h"
 #include "mm-port-serial-xmmrpc-xmm7360.h"
+#include "mm-bind.h"
 
 G_DEFINE_TYPE (MMBearerXmm7360, mm_bearer_xmm7360, MM_TYPE_BASE_BEARER)
 
@@ -673,6 +674,7 @@ static const MMBroadbandModemXmm7360RpcCommand disconnect_sequence[] = {
         },
         3,
         FALSE,
+        FALSE,
         mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success
         /* response will be: L(0x0) L(0x0) L(0x5dffffff) L(0x0) (meaning unknown) */
     },
@@ -685,6 +687,7 @@ static const MMBroadbandModemXmm7360RpcCommand disconnect_sequence[] = {
             { XMM7360_RPC_MSG_ARG_TYPE_UNKNOWN },
         },
         3,
+        FALSE,
         FALSE,
         mm_broadband_modem_xmm7360_rpc_response_processor_final
         /* response will be: L(0x0) (meaning unknown) */
@@ -731,6 +734,7 @@ mm_bearer_xmm7360_new (MMBroadbandModemXmm7360 *modem,
      * g_object_new here */
     bearer = g_object_new (MM_TYPE_BEARER_XMM7360,
                            MM_BASE_BEARER_MODEM, modem,
+                           MM_BIND_TO, modem,
                            MM_BASE_BEARER_CONFIG, config,
                            NULL);
 

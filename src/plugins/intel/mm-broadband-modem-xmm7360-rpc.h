@@ -61,6 +61,7 @@ typedef struct {
     guint timeout;
     /* Flag to allow cached replies */
     gboolean allow_cached;
+    gboolean allow_retry_once;
     /* The response processor */
     MMBroadbandModemXmm7360RpcResponseProcessor response_processor;
     /* Time to wait before sending this command (in seconds) */

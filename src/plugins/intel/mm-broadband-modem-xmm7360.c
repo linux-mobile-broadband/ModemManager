@@ -31,29 +31,31 @@
 #include "mm-log-object.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
-#include "mm-iface-modem-location.h"
 #include "mm-broadband-modem-xmm.h"
 
 #include "mm-broadband-modem-xmm7360.h"
 #include "mm-broadband-modem-xmm7360-rpc.h"
+#include "mm-port-scheduler-rr.h"
 #include "mm-port-serial-xmmrpc-xmm7360.h"
 #include "mm-bearer-xmm7360.h"
+#include "mm-shared-xmm.h"
 #include "mm-sim-xmm7360.h"
 
 static void iface_modem_init (MMIfaceModemInterface *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface);
-static void iface_modem_location_init (MMIfaceModemLocationInterface *iface);
+static void iface_shared_xmm_init (MMSharedXmmInterface *iface);
 
 static MMIfaceModemInterface *iface_modem_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemXmm7360, mm_broadband_modem_xmm7360, MM_TYPE_BROADBAND_MODEM_XMM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_XMM, iface_shared_xmm_init)
 )
 
 struct _MMBroadbandModemXmm7360Private {
     MMUnlockRetries *unlock_retries;
+    GRegex *nmea_regex_full, *nmea_regex_trace;
 };
 
 /*****************************************************************************/
@@ -1088,14 +1090,14 @@ static const Xmm7360RpcMsgArg set_radio_signal_reporting_args[] = {
 };
 
 static const MMBroadbandModemXmm7360RpcCommand init_sequence[] = {
-    { XMM7360_RPC_CALL_UTA_MS_SMS_INIT, FALSE, NULL, 3, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
-    { XMM7360_RPC_CALL_UTA_MS_CBS_INIT, FALSE, NULL, 3, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
-    { XMM7360_RPC_CALL_UTA_MS_NET_OPEN, FALSE, NULL, 3, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
-    { XMM7360_RPC_CALL_UTA_MS_NET_SET_RADIO_SIGNAL_REPORTING, FALSE, set_radio_signal_reporting_args, 3, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success},
-    { XMM7360_RPC_CALL_UTA_MS_CALL_CS_INIT, FALSE, NULL, 3, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
-    { XMM7360_RPC_CALL_UTA_MS_CALL_PS_INITIALIZE, FALSE, NULL, 3, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
-    { XMM7360_RPC_CALL_UTA_MS_SS_INIT, FALSE, NULL, 3, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
-    { XMM7360_RPC_CALL_UTA_MS_SIM_OPEN_REQ, FALSE, NULL, 3, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_final },
+    { XMM7360_RPC_CALL_UTA_MS_SMS_INIT, FALSE, NULL, 3, FALSE, TRUE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
+    { XMM7360_RPC_CALL_UTA_MS_CBS_INIT, FALSE, NULL, 3, FALSE, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
+    { XMM7360_RPC_CALL_UTA_MS_NET_OPEN, FALSE, NULL, 3, FALSE, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
+    { XMM7360_RPC_CALL_UTA_MS_NET_SET_RADIO_SIGNAL_REPORTING, FALSE, set_radio_signal_reporting_args, 3, FALSE, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success},
+    { XMM7360_RPC_CALL_UTA_MS_CALL_CS_INIT, FALSE, NULL, 3, FALSE, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
+    { XMM7360_RPC_CALL_UTA_MS_CALL_PS_INITIALIZE, FALSE, NULL, 3, FALSE, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
+    { XMM7360_RPC_CALL_UTA_MS_SS_INIT, FALSE, NULL, 3, FALSE, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_continue_on_success },
+    { XMM7360_RPC_CALL_UTA_MS_SIM_OPEN_REQ, FALSE, NULL, 3, FALSE, FALSE, mm_broadband_modem_xmm7360_rpc_response_processor_final },
     { 0 }
 };
 
@@ -1108,6 +1110,8 @@ initialization_started (MMBroadbandModem    *modem,
     MMBroadbandModemXmm7360 *self = MM_BROADBAND_MODEM_XMM7360 (modem);
     InitializationStartedContext *ctx;
     GTask *task;
+    MMPortSerialAt *at_port;
+    g_autoptr(MMPortScheduler) sched = NULL;
 
     task = g_task_new (self,
                        NULL,
@@ -1119,6 +1123,14 @@ initialization_started (MMBroadbandModem    *modem,
     ctx->is_sim_initialized = FALSE;
     ctx->timeout_id = 0;
     g_task_set_task_data (task, ctx, (GDestroyNotify)initialization_started_context_free);
+
+    at_port = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    if (!at_port) {
+        g_task_return_new_error (task, G_IO_ERROR, G_IO_ERROR_NOT_INITIALIZED,
+                                 "no primary AT port");
+        g_object_unref (task);
+        return;
+    }
 
     /* Open XMMRPC port for initialization */
     if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->port), &error)) {
@@ -1134,6 +1146,13 @@ initialization_started (MMBroadbandModem    *modem,
         task,
         NULL);
 
+    g_object_get (G_OBJECT (ctx->port), MM_PORT_SERIAL_SCHEDULER, &sched, NULL);
+    g_object_set (sched,
+                  MM_PORT_SCHEDULER_RR_INTER_PORT_DELAY,
+                  300,
+                  NULL);
+    g_object_set (G_OBJECT (at_port), MM_PORT_SERIAL_SCHEDULER, sched, NULL);
+
     mm_obj_dbg (self, "running init sequence...");
     mm_broadband_modem_xmm7360_rpc_sequence_full (MM_BROADBAND_MODEM_XMM7360 (self),
                                                   ctx->port,
@@ -1142,6 +1161,56 @@ initialization_started (MMBroadbandModem    *modem,
                                                   (GAsyncReadyCallback)init_sequence_ready,
                                                   task);
 }
+
+/*****************************************************************************/
+
+static void
+nmea_received (MMPortSerialAt *port,
+               GMatchInfo     *info_full,
+               MMBroadbandModemXmm7360 *self)
+{
+    g_autofree gchar *trace_full = NULL;
+    g_autoptr(GMatchInfo) info = NULL;
+
+    trace_full = g_match_info_fetch (info_full, 1);
+    if (!trace_full) {
+        return;
+    }
+
+    g_regex_match (self->priv->nmea_regex_trace, trace_full, 0, &info);
+    while (g_match_info_matches (info)) {
+        g_autofree gchar *trace = NULL;
+
+        trace = g_match_info_fetch (info, 1);
+        if (!trace) {
+            mm_obj_err (self, "fetching NMEA trace failed");
+        } else {
+            mm_iface_modem_location_gps_update (MM_IFACE_MODEM_LOCATION (self), trace);
+        }
+
+        g_match_info_next (info, NULL);
+    }
+}
+
+static void
+nmea_parser_register (MMSharedXmm *self_shared_xmm, MMPortSerialAt *gps_port,
+                      gboolean is_register)
+{
+    MMBroadbandModemXmm7360 *self = MM_BROADBAND_MODEM_XMM7360 (self_shared_xmm);
+
+    if (is_register) {
+        mm_port_serial_at_add_unsolicited_msg_handler (gps_port,
+                                                       self->priv->nmea_regex_full,
+                                                       (MMPortSerialAtUnsolicitedMsgFn)nmea_received,
+                                                       self,
+                                                       NULL);
+    } else {
+        mm_port_serial_at_add_unsolicited_msg_handler (gps_port,
+                                                       self->priv->nmea_regex_full,
+                                                       NULL, NULL, NULL);
+    }
+}
+
 
 /*****************************************************************************/
 
@@ -1172,6 +1241,13 @@ mm_broadband_modem_xmm7360_init (MMBroadbandModemXmm7360 *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BROADBAND_MODEM_XMM7360,
                                               MMBroadbandModemXmm7360Private);
+
+    self->priv->nmea_regex_full = g_regex_new ("(?:\\r\\n){2}((?:\\$G.*?\\r\\n)+)(?:\\r\\n){2}OK(?:\\r\\n)",
+                                               G_REGEX_RAW | G_REGEX_OPTIMIZE, 0,
+                                               NULL);
+    self->priv->nmea_regex_trace = g_regex_new ("(\\$G.*?)\\r\\n",
+                                                G_REGEX_RAW | G_REGEX_OPTIMIZE, 0,
+                                                NULL);
 }
 
 static void
@@ -1179,6 +1255,8 @@ dispose (GObject *object)
 {
     MMBroadbandModemXmm7360 *self = MM_BROADBAND_MODEM_XMM7360 (object);
 
+    g_clear_pointer (&self->priv->nmea_regex_trace, g_regex_unref);
+    g_clear_pointer (&self->priv->nmea_regex_full, g_regex_unref);
     g_clear_object (&self->priv->unlock_retries);
 
     G_OBJECT_CLASS (mm_broadband_modem_xmm7360_parent_class)->dispose (object);
@@ -1205,13 +1283,9 @@ iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
 }
 
 static void
-iface_modem_location_init (MMIfaceModemLocationInterface *iface)
+iface_shared_xmm_init (MMSharedXmmInterface *iface)
 {
-    /* asking for location capabilities can destabilize the device */
-    iface->load_capabilities = NULL;
-    iface->load_capabilities_finish = NULL;
-    iface->enable_location_gathering = NULL;
-    iface->enable_location_gathering_finish = NULL;
+    iface->nmea_parser_register = nmea_parser_register;
 }
 
 static void

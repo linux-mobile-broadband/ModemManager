@@ -149,4 +149,8 @@ mm_broadband_modem_xmm_class_init (MMBroadbandModemXmmClass *klass)
     MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
 
     broadband_modem_class->setup_ports = mm_shared_xmm_setup_ports;
+    broadband_modem_class->initialization_started =
+        mm_shared_xmm_initialization_started;
+    broadband_modem_class->initialization_started_finish =
+        mm_shared_xmm_initialization_started_finish;
 }

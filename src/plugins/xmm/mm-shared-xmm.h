@@ -38,11 +38,20 @@ struct _MMSharedXmmInterface {
 
     /* Peek location interface of the parent class of the object */
     MMIfaceModemLocationInterface *  (* peek_parent_location_interface) (MMSharedXmm *self);
+
+    void (* nmea_parser_register) (MMSharedXmm *self, MMPortSerialAt *gps_port,
+                                   gboolean is_register);
 };
 
 /* Shared XMM device setup */
 
 void mm_shared_xmm_setup_ports (MMBroadbandModem *self);
+void mm_shared_xmm_initialization_started (MMBroadbandModem *self,
+                                           GAsyncReadyCallback callback,
+                                           gpointer user_data);
+gpointer mm_shared_xmm_initialization_started_finish (MMBroadbandModem *self,
+                                                      GAsyncResult *res,
+                                                      GError **error);
 
 /* Shared XMM device management support */
 

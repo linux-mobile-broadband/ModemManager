@@ -17,6 +17,7 @@
 #include "mm-broadband-modem-xmm7360-rpc.h"
 #include "mm-log-object.h"
 #include "mm-sim-xmm7360.h"
+#include "mm-bind.h"
 
 G_DEFINE_TYPE (MMSimXmm7360, mm_sim_xmm7360, MM_TYPE_BASE_SIM)
 
@@ -392,6 +393,7 @@ mm_sim_xmm7360_new (MMBaseModem *modem,
                                 callback,
                                 user_data,
                                 MM_BASE_SIM_MODEM, modem,
+                                MM_BIND_TO, modem,
                                 "active", TRUE, /* by default always active */
                                 NULL);
 }
@@ -413,6 +415,7 @@ mm_sim_xmm7360_new_initialized (MMBaseModem *modem,
 
     sim = MM_BASE_SIM (g_object_new (MM_TYPE_SIM_XMM7360,
                                      MM_BASE_SIM_MODEM,       modem,
+                                     MM_BIND_TO,              modem,
                                      MM_BASE_SIM_SLOT_NUMBER, slot_number,
                                      "active",                active,
                                      "sim-type",              sim_type,
