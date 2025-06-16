@@ -77,6 +77,7 @@ typedef enum {
     MM_BASE_MANAGER_CLEANUP_DISABLE   = 0x1,
     MM_BASE_MANAGER_CLEANUP_LOW_POWER = 0x2,
     MM_BASE_MANAGER_CLEANUP_REMOVE    = 0x4,
+    MM_BASE_MANAGER_CLEANUP_TERSE     = 0x8,
 } MMBaseManagerCleanupFlags;
 
 void             mm_base_manager_cleanup     (MMBaseManager             *manager,

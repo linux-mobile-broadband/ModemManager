@@ -17,6 +17,8 @@
  * Copyright (C) 2011 - 2016 Aleksander Morgado <aleksander@aleksander.es>
  */
 
+#include "gio/gio.h"
+#include "glib.h"
 #include <config.h>
 
 #include <string.h>
@@ -874,6 +876,7 @@ typedef enum {
     DEVICE_CLEANUP_STEP_DISABLE,
     DEVICE_CLEANUP_STEP_LOW_POWER,
     DEVICE_CLEANUP_STEP_REMOVE,
+    DEVICE_CLEANUP_STEP_TERSE,
     DEVICE_CLEANUP_STEP_LAST,
 } DeviceCleanupStep;
 
@@ -965,6 +968,25 @@ cleanup_disable_ready (MMBaseModem  *modem,
     device_cleanup_step (task);
 }
 
+#if defined WITH_SUSPEND_RESUME
+static void
+cleanup_terse_ready (MMBaseModem  *modem,
+                     GAsyncResult *res,
+                     GTask        *task)
+{
+    DeviceCleanupContext *ctx;
+    g_autoptr(GError)     error = NULL;
+
+    ctx = g_task_get_task_data (task);
+    if (!mm_base_modem_terse_finish (modem, res, &error))
+        mm_obj_info (modem, "setting terse failed: %s", error->message);
+
+    ctx->step++;
+
+    device_cleanup_step (task);
+}
+#endif
+
 static gboolean
 has_cleanup_flag (MMBaseManagerCleanupFlags flags,
                   MMBaseManagerCleanupFlags expected)
@@ -1025,6 +1047,24 @@ device_cleanup_step (GTask *task)
                                     task);
             return;
         }
+        ctx->step++;
+        /* fall through */
+
+    case DEVICE_CLEANUP_STEP_TERSE:
+
+#if defined WITH_SUSPEND_RESUME
+        if (ctx->modem && has_cleanup_flag (ctx->flags, MM_BASE_MANAGER_CLEANUP_TERSE)) {
+            mm_obj_dbg(device,
+                    "settting terse on modem%d",
+                    mm_base_modem_get_dbus_id (ctx->modem));
+            mm_base_modem_terse (ctx->modem,
+                                 MM_OPERATION_LOCK_REQUIRED,
+                                 (GAsyncReadyCallback)cleanup_terse_ready,
+                                 task);
+            return;
+        }
+#endif
+
         ctx->step++;
         /* fall through */
 
@@ -1126,7 +1166,7 @@ mm_base_manager_cleanup (MMBaseManager             *self,
     ManagerCleanupContext *ctx;
     GHashTableIter          iter;
     MMDevice               *device;
-    gboolean                disable, remove, low_power;
+    gboolean                disable, remove, low_power, terse;
 
     g_return_if_fail (self != NULL);
     g_return_if_fail (MM_IS_BASE_MANAGER (self));
@@ -1137,13 +1177,16 @@ mm_base_manager_cleanup (MMBaseManager             *self,
     disable = has_cleanup_flag (flags, MM_BASE_MANAGER_CLEANUP_DISABLE);
     low_power = has_cleanup_flag (flags, MM_BASE_MANAGER_CLEANUP_LOW_POWER);
     remove = has_cleanup_flag (flags, MM_BASE_MANAGER_CLEANUP_REMOVE);
+    terse = has_cleanup_flag (flags, MM_BASE_MANAGER_CLEANUP_TERSE);
     mm_obj_dbg (self,
-                "manager shutting down... (%s%s%s%s%s)",
+                "manager shutting down... (%s%s%s%s%s%s%s)",
                 disable ? "disable" : "",
-                disable && (low_power || remove) ? "," : "",
+                disable && (low_power || remove || terse) ? "," : "",
                 low_power ? "low-power" : "",
-                (low_power && remove) ? "," : "",
-                remove ? "remove" : "");
+                low_power && (remove || terse) ? "," : "",
+                remove ? "remove" : "",
+                (remove && terse) ? "," : "",
+                terse ? "terse" : "");
 
     ctx = manager_cleanup_context_new (self, sleep_ctx);
 
