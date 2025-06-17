@@ -31,7 +31,7 @@ static void iface_modem_init          (MMIfaceModemInterface         *iface);
 static void iface_modem_firmware_init (MMIfaceModemFirmwareInterface *iface);
 static void shared_fibocom_init       (MMSharedFibocomInterface      *iface);
 
-static MMIfaceModemInterface *iface_modem_parent;
+static MMIfaceModemInterface         *iface_modem_parent;
 static MMIfaceModemFirmwareInterface *iface_modem_firmware_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbimXmmFibocom, mm_broadband_modem_mbim_xmm_fibocom, MM_TYPE_BROADBAND_MODEM_MBIM_XMM, 0,
@@ -212,6 +212,7 @@ static void
 iface_modem_init (MMIfaceModemInterface *iface)
 {
     iface_modem_parent = g_type_interface_peek_parent (iface);
+
     iface->load_revision = load_revision;
     iface->load_revision_finish = load_revision_finish;
 }
@@ -223,6 +224,12 @@ iface_modem_firmware_init (MMIfaceModemFirmwareInterface *iface)
 
     iface->load_update_settings = mm_shared_fibocom_firmware_load_update_settings;
     iface->load_update_settings_finish = mm_shared_fibocom_firmware_load_update_settings_finish;
+}
+
+static MMIfaceModemInterface *
+peek_parent_modem_interface (MMSharedFibocom *self)
+{
+    return iface_modem_parent;
 }
 
 static MMIfaceModemFirmwareInterface *
@@ -240,8 +247,9 @@ peek_parent_class (MMSharedFibocom *self)
 static void
 shared_fibocom_init (MMSharedFibocomInterface *iface)
 {
-    iface->peek_parent_class = peek_parent_class;
+    iface->peek_parent_modem_interface    = peek_parent_modem_interface;
     iface->peek_parent_firmware_interface = peek_parent_firmware_interface;
+    iface->peek_parent_class              = peek_parent_class;
 }
 
 static void

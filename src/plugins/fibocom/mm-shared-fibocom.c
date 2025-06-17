@@ -42,6 +42,8 @@ static GQuark private_quark;
 typedef struct {
     /* Parent class */
     MMBaseModemClass *class_parent;
+    /* Modem interface of parent class */
+    MMIfaceModemInterface *iface_modem_parent;
     /* Firmware interface of parent class */
     MMIfaceModemFirmwareInterface *iface_modem_firmware_parent;
     /* URCs to ignore */
@@ -74,6 +76,10 @@ get_private (MMSharedFibocom *self)
         g_assert (MM_SHARED_FIBOCOM_GET_IFACE (self)->peek_parent_class);
         priv->class_parent = MM_SHARED_FIBOCOM_GET_IFACE (self)->peek_parent_class (self);
 
+        /* Setup modem interface of parent class */
+        if (MM_SHARED_FIBOCOM_GET_IFACE (self)->peek_parent_modem_interface)
+            priv->iface_modem_parent = MM_SHARED_FIBOCOM_GET_IFACE (self)->peek_parent_modem_interface (self);
+
         /* Setup firmware interface of parent class */
         if (MM_SHARED_FIBOCOM_GET_IFACE (self)->peek_parent_firmware_interface)
             priv->iface_modem_firmware_parent = MM_SHARED_FIBOCOM_GET_IFACE (self)->peek_parent_firmware_interface (self);
@@ -82,6 +88,96 @@ get_private (MMSharedFibocom *self)
     }
 
     return priv;
+}
+
+/*****************************************************************************/
+
+static void
+sim_hotswap_unsolicited_handler (MMPortSerialAt *port,
+                                 GMatchInfo     *match_info,
+                                 MMIfaceModem   *self)
+{
+    mm_obj_dbg (self, "processing +SIM URC reporting a SIM hotswap event");
+    mm_iface_modem_process_sim_event (MM_IFACE_MODEM (self));
+}
+
+/*****************************************************************************/
+/* Setup SIM hot swap context (Modem interface) */
+
+gboolean
+mm_shared_fibocom_setup_sim_hot_swap_finish (MMIfaceModem  *self,
+                                             GAsyncResult  *res,
+                                             GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+parent_setup_sim_hot_swap_ready (MMIfaceModem *self,
+                                 GAsyncResult *res,
+                                 GTask        *task)
+{
+    Private           *priv;
+    g_autoptr(GError)  error = NULL;
+
+    priv = get_private (MM_SHARED_FIBOCOM (self));
+
+    if (!priv->iface_modem_parent->setup_sim_hot_swap_finish (self, res, &error))
+        mm_obj_dbg (self, "additional SIM hot swap detection setup failed: %s", error->message);
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+void
+mm_shared_fibocom_setup_sim_hot_swap (MMIfaceModem        *self,
+                                      GAsyncReadyCallback  callback,
+                                      gpointer             user_data)
+{
+    Private           *priv;
+    MMPortSerialAt    *ports[2];
+    GTask             *task;
+    guint              i;
+    g_autoptr(GRegex)  pattern = NULL;
+    g_autoptr(GError)  error = NULL;
+
+    priv = get_private (MM_SHARED_FIBOCOM (self));
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    ports[0] = mm_base_modem_peek_port_primary   (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+
+    pattern = g_regex_new ("(\\+SIM: Inserted)|(\\+SIM: Removed)|(\\+SIM DROP)\\r\\n", G_REGEX_RAW, 0, NULL);
+    g_assert (pattern);
+
+    for (i = 0; i < G_N_ELEMENTS (ports); i++) {
+        if (ports[i])
+            mm_port_serial_at_add_unsolicited_msg_handler (
+                ports[i],
+                pattern,
+                (MMPortSerialAtUnsolicitedMsgFn)sim_hotswap_unsolicited_handler,
+                self,
+                NULL);
+    }
+
+    mm_obj_dbg (self, "+SIM based hotswap detection set up");
+
+    if (!mm_broadband_modem_sim_hot_swap_ports_context_init (MM_BROADBAND_MODEM (self), &error))
+        mm_obj_warn (self, "failed to initialize SIM hot swap ports context: %s", error->message);
+
+    /* Now, if available, setup parent logic */
+    if (priv->iface_modem_parent->setup_sim_hot_swap &&
+        priv->iface_modem_parent->setup_sim_hot_swap_finish) {
+        priv->iface_modem_parent->setup_sim_hot_swap (self,
+                                                      (GAsyncReadyCallback) parent_setup_sim_hot_swap_ready,
+                                                      task);
+        return;
+    }
+
+    /* Otherwise, we're done */
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
