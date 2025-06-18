@@ -620,4 +620,6 @@ void mm_iface_modem_modify_sim (MMIfaceModem *self,
 
 void mm_iface_modem_process_sim_event (MMIfaceModem *self);
 
+gboolean mm_iface_modem_is_primary_sim_slot_switch_ongoing (MMIfaceModem *self);
+
 #endif /* MM_IFACE_MODEM_H */

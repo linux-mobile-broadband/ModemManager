@@ -92,6 +92,10 @@ typedef struct {
     /* Timer that tracks when the last power operation request was
      * performed, so that we can throttle the requests to the modem. */
     GTimer *power_state_timer;
+
+    /* Flag indicating whether a primary SIM slot switch operation is
+     * ongoing */
+    gboolean ongoing_primary_sim_slot_switch;
 } Private;
 
 static void
@@ -350,10 +354,10 @@ after_sim_event_disable_ready (MMBaseModem  *self,
     mm_base_modem_set_valid (self, FALSE);
 }
 
-void
-mm_iface_modem_process_sim_event (MMIfaceModem *self)
+static void
+iface_modem_process_sim_event_internal (MMIfaceModem *self)
 {
-    mm_obj_info (self, "Processing SIM event");
+    mm_obj_info (self, "processing SIM event");
 
     if (MM_IFACE_MODEM_GET_IFACE (self)->cleanup_sim_hot_swap)
         MM_IFACE_MODEM_GET_IFACE (self)->cleanup_sim_hot_swap (self);
@@ -367,6 +371,19 @@ mm_iface_modem_process_sim_event (MMIfaceModem *self)
                            MM_OPERATION_PRIORITY_OVERRIDE,
                            (GAsyncReadyCallback) after_sim_event_disable_ready,
                            NULL);
+}
+
+void
+mm_iface_modem_process_sim_event (MMIfaceModem *self)
+{
+    Private *priv;
+
+    priv = get_private  (self);
+    if (priv->ongoing_primary_sim_slot_switch) {
+        mm_obj_info (self, "ignoring SIM event during a SIM slot switch");
+        return;
+    }
+    iface_modem_process_sim_event_internal (self);
 }
 
 /*****************************************************************************/
@@ -1351,6 +1368,17 @@ handle_list_bearers (MmGdbusModem          *skeleton,
 
 /*****************************************************************************/
 
+gboolean
+mm_iface_modem_is_primary_sim_slot_switch_ongoing (MMIfaceModem *self)
+{
+    Private *priv;
+
+    priv = get_private (self);
+    return priv->ongoing_primary_sim_slot_switch;
+}
+
+/*****************************************************************************/
+
 typedef struct {
     MmGdbusModem          *skeleton;
     GDBusMethodInvocation *invocation;
@@ -1372,24 +1400,34 @@ set_primary_sim_slot_ready (MMIfaceModem                   *self,
                             GAsyncResult                   *res,
                             HandleSetPrimarySimSlotContext *ctx)
 {
-    g_autoptr(GError) error = NULL;
+    g_autoptr(GError)  error = NULL;
+    Private           *priv;
+
+    priv = get_private (self);
+    g_assert (priv->ongoing_primary_sim_slot_switch);
 
     if (!MM_IFACE_MODEM_GET_IFACE (self)->set_primary_sim_slot_finish (self, res, &error)) {
         /* If the implementation returns EXISTS, we're already in the requested SIM slot,
          * so we can safely return a success on the operation and skip the reprobing */
         if (!g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_EXISTS)) {
             mm_obj_warn (self, "failed setting primary SIM slot '%u': %s", ctx->requested_sim_slot, error->message);
+            priv->ongoing_primary_sim_slot_switch = FALSE;
             mm_dbus_method_invocation_take_error (ctx->invocation, g_steal_pointer (&error));
             handle_set_primary_sim_slot_context_free (ctx);
             return;
         }
         mm_obj_dbg (self, "ignored request to set primary SIM slot '%u': already set", ctx->requested_sim_slot);
+        priv->ongoing_primary_sim_slot_switch = FALSE;
     } else {
         /* Notify about the SIM swap, which will disable and reprobe the device.
          * There is no need to update the PrimarySimSlot property, as this value will be
          * reloaded automatically during the reprobe. */
         mm_obj_info (self, "primary SIM slot '%u' set", ctx->requested_sim_slot);
-        mm_iface_modem_process_sim_event (self);
+        /* Process SIM event without checking the ongoing_primary_sim_slot_switch flag, as
+         * we are the ones who set it in this operation. This flag is kept enabled for as
+         * long as the modem object exists! Once the reprobe happens, a new modem object
+         * will be created. */
+        iface_modem_process_sim_event_internal (self);
     }
 
     mm_gdbus_modem_complete_set_primary_sim_slot (ctx->skeleton, ctx->invocation);
@@ -1401,6 +1439,7 @@ handle_set_primary_sim_slot_auth_ready (MMIfaceAuth                    *self,
                                         GAsyncResult                   *res,
                                         HandleSetPrimarySimSlotContext *ctx)
 {
+    Private            *priv;
     GError             *error = NULL;
     const gchar *const *sim_slot_paths;
 
@@ -1428,7 +1467,16 @@ handle_set_primary_sim_slot_auth_ready (MMIfaceAuth                    *self,
         return;
     }
 
+    priv = get_private (MM_IFACE_MODEM (self));
+    if (priv->ongoing_primary_sim_slot_switch) {
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                                        "SIM slot switch operation already ongoing.");
+        handle_set_primary_sim_slot_context_free (ctx);
+        return;
+    }
+
     mm_obj_info (self, "processing user request to set primary SIM slot '%u'...", ctx->requested_sim_slot);
+    priv->ongoing_primary_sim_slot_switch = TRUE;
     MM_IFACE_MODEM_GET_IFACE (self)->set_primary_sim_slot (MM_IFACE_MODEM (self),
                                                            ctx->requested_sim_slot,
                                                            (GAsyncReadyCallback)set_primary_sim_slot_ready,
