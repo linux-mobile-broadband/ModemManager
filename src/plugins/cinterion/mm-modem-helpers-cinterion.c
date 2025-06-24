@@ -343,11 +343,16 @@ mm_cinterion_parse_scfg_test (const gchar                 *response,
                 break;
             parse_bands (maxband, &bands, MM_CINTERION_RB_BLOCK_LTE_LOW, modem_family);
             if (modem_family == MM_CINTERION_MODEM_FAMILY_DEFAULT) {
-                maxband = take_and_convert_from_matched_string (mm_get_string_unquoted_from_match_info (match_info2, 6),
-                                                                charset, modem_family, &inner_error);
-                if (inner_error)
-                    break;
-                parse_bands (maxband, &bands, MM_CINTERION_RB_BLOCK_LTE_HIGH, modem_family);
+                g_autofree gchar *lte_high_bands = mm_get_string_unquoted_from_match_info (match_info2, 6);
+                // Some modems (for example ELS62-E) doesn't support LTE-TDD bands and their response
+                // doesn't contain such bands.
+                if (lte_high_bands && *lte_high_bands) {
+                    maxband = take_and_convert_from_matched_string (g_steal_pointer (&lte_high_bands),
+                                                                    charset, modem_family, &inner_error);
+                    if (inner_error)
+                        break;
+                    parse_bands (maxband, &bands, MM_CINTERION_RB_BLOCK_LTE_HIGH, modem_family);
+                }
             }
         } else {
             inner_error = g_error_new (MM_CORE_ERROR,
@@ -501,11 +506,16 @@ mm_cinterion_parse_scfg_response (const gchar                  *response,
                     break;
                 parse_bands (current, &bands, MM_CINTERION_RB_BLOCK_LTE_LOW, modem_family);
                 if (modem_family == MM_CINTERION_MODEM_FAMILY_DEFAULT) {
-                    current = take_and_convert_from_matched_string (mm_get_string_unquoted_from_match_info (match_info, 3),
-                                                                    charset, modem_family, &inner_error);
-                    if (inner_error)
-                        break;
-                    parse_bands (current, &bands, MM_CINTERION_RB_BLOCK_LTE_HIGH, modem_family);
+                    g_autofree gchar *lte_high_bands = mm_get_string_unquoted_from_match_info (match_info, 3);
+                    // Some modems (for example ELS62-E) doesn't support LTE-TDD bands and their response
+                    // doesn't contain such bands.
+                    if (lte_high_bands && *lte_high_bands) {
+                        current = take_and_convert_from_matched_string (g_steal_pointer (&lte_high_bands),
+                                                                        charset, modem_family, &inner_error);
+                        if (inner_error)
+                            break;
+                        parse_bands (current, &bands, MM_CINTERION_RB_BLOCK_LTE_HIGH, modem_family);
+                    }
                 }
             } else {
                 inner_error = g_error_new (MM_CORE_ERROR,

@@ -453,6 +453,74 @@ test_scfg_alas5 (void)
     g_array_unref (expected_bands);
 }
 
+static void
+test_scfg_els62_e (void)
+{
+    GArray *expected_bands;
+    MMModemBand single;
+    const gchar *response =
+        "^SCFG: \"Radio/Band/2G\",(\"00000001-00000003\"),,(\"0\",\"1\")\r\n"
+        "^SCFG: \"Radio/Band/4G\",(\"00000001-080800c5\")\r\n"
+        "^SCFG: \"GPRS/AutoAttach\",(\"disabled\",\"enabled\")\r\n"
+        "^SCFG: \"Ident/Manufacturer\",(25)\r\n"
+        "^SCFG: \"Ident/Product\",(25)\r\n"
+        "^SCFG: \"MEopMode/SRPOM\",(\"0\",\"1\")\r\n"
+        "^SCFG: \"MEopMode/PingRsp\",(\"0\",\"1\")\r\n"
+        "^SCFG: \"Tcp/IRT\",(\"0-60\")\r\n"
+        "^SCFG: \"Tcp/MR\",(\"1-12\")\r\n"
+        "^SCFG: \"Tcp/OT\",(\"1-6000\")\r\n"
+        "^SCFG: \"Tcp/TLS/Version\",(\"MIN\",\"1.1\",\"1.2\",\"1.3\",\"MAX\"),(\"1.2\",\"1.3\",\"MAX\")\r\n"
+        "^SCFG: \"Tcp/WithURCs\",(\"on\",\"off\")\r\n"
+        "^SCFG: \"URC/Ringline\",(\"off\",\"local\",\"asc0\")\r\n"
+        "^SCFG: \"URC/Ringline/ActiveTime\",(\"0\",\"1\",\"2\")\r\n"
+        "^SCFG: \"Audio/Loop\",(\"0\",\"1\")\r\n"
+        "^SCFG: \"Call/ECC\",(\"0\"-\"255\")\r\n"
+        "^SCFG: \"Call/Speech/Codec\",(\"0\",\"1\",\"2\")\r\n"
+        "^SCFG: \"GPIO/Mode/DAI\",(\"gpio\",\"std\",\"rsv\")\r\n"
+        "^SCFG: \"GPIO/Mode/MCLK\",(\"gpio\",\"std\",\"rsv\")\r\n"
+        "^SCFG: \"GPIO/Mode/AntTun\",(\"gpio\",\"std\")\r\n"
+        "^SCFG: \"GPIO/Mode/ASC1\",(\"gpio\",\"std\",\"rsv\")\r\n"
+        "^SCFG: \"GPIO/Mode/DCD0\",(\"gpio\",\"std\")\r\n"
+        "^SCFG: \"GPIO/Mode/DSR0\",(\"gpio\",\"std\")\r\n"
+        "^SCFG: \"GPIO/Mode/DTR0\",(\"gpio\",\"std\")\r\n"
+        "^SCFG: \"GPIO/Mode/FNS\",(\"gpio\",\"std\",\"rsv\")\r\n"
+        "^SCFG: \"GPIO/Mode/RING0\",(\"gpio\",\"std\")\r\n"
+        "^SCFG: \"GPIO/Mode/SYNC\",(\"gpio\",\"std\",\"rsv\")\r\n"
+        "^SCFG: \"GPRS/MTU/Mode\",(\"0-1\")\r\n"
+        "^SCFG: \"GPRS/MTU/Size\",(\"1280-1500\")\r\n"
+        "^SCFG: \"MEopMode/ExpectDTR\",(\"current\",\"powerup\"),(\"acm0\",\"acm1\",\"acm2\",\"asc0\")\r\n"
+        "^SCFG: \"MEopMode/IMS\",(\"0\",\"1\")\r\n"
+        "^SCFG: \"MEShutdown/sVsup/threshold\",(\"-4\"-\"4\"),(\"0\")\r\n"
+        "^SCFG: \"Radio/Mtpl\",(\"0-1\"),(\"1-8\")\r\n"
+        "^SCFG: \"Radio/Mtpl/2G\",(\"2-3\"),(\"1-8\"),(\"00000001-00000003\"),(\"18-33\"),(\"18-27\")\r\n"
+        "^SCFG: \"Radio/Mtpl/4G\",(\"2-3\"),(\"1-8\"),(\"00000001-080800c5\"),,(\"18-23\")\r\n"
+        "^SCFG: \"Radio/OutputPowerReduction\",(\"0\"-\"4\")\r\n"
+        "^SCFG: \"RemoteWakeUp/Ports\",(\"current\",\"powerup\"),(\"acm0\",\"acm1\",\"acm2\",\"ecm\")\r\n"
+        "^SCFG: \"MEopMode/RingOnData\",(\"off\",\"on\")\r\n"
+        "^SCFG: \"SAT/AR/Refresh\",(\"0\",\"2\"),(\"0000-FFFF\")\r\n"
+        "^SCFG: \"SAT/GTP\",(\"+BIP\",\"-BIP\")\r\n"
+        "^SCFG: \"SAT/URC\",(\"0\",\"1\",\"2\")\r\n"
+        "^SCFG: \"SAT/UTP\",(\"+BIP\",\"-BIP\")\r\n"
+        "^SCFG: \"Serial/USB/DDD\",(\"0-1\"),(\"0\"),(\"0001-ffff\"),(\"0001-ffff\"),(\"0001-ffff\"),(63),(63),(8)\r\n"
+        "^SCFG: \"SIM/CS\",(\"SIM1\",\"SIM3\")\r\n"
+        "^SCFG: \"SIM/DualMode\",(\"0\",\"2\")\r\n"
+        "^SCFG: \"URC/Ringline/SelWUrc\",(\"all\",\"RING\",\"+CMT\")\r\n";
+
+    expected_bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 8);
+    single = MM_MODEM_BAND_EGSM,        g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_DCS,         g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_EUTRAN_1,    g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_EUTRAN_3,    g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_EUTRAN_7,    g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_EUTRAN_8,    g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_EUTRAN_20,   g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_EUTRAN_28,   g_array_append_val (expected_bands, single);
+
+    common_test_scfg (response, expected_bands, MM_MODEM_CHARSET_GSM, MM_CINTERION_MODEM_FAMILY_DEFAULT);
+
+    g_array_unref (expected_bands);
+}
+
 /*****************************************************************************/
 /* Test ^SCFG responses */
 
@@ -771,6 +839,72 @@ test_scfg_response_alas5 (void)
     single = MM_MODEM_BAND_EUTRAN_38, g_array_append_val (expected_bands, single);
     single = MM_MODEM_BAND_EUTRAN_39, g_array_append_val (expected_bands, single);
     single = MM_MODEM_BAND_EUTRAN_40, g_array_append_val (expected_bands, single);
+
+    common_test_scfg_response (response, MM_MODEM_CHARSET_GSM, expected_bands, MM_CINTERION_MODEM_FAMILY_DEFAULT, MM_CINTERION_RADIO_BAND_FORMAT_MULTIPLE);
+
+    g_array_unref (expected_bands);
+}
+
+static void
+test_scfg_response_els62_e (void)
+{
+    GArray *expected_bands;
+    MMModemBand single;
+     const gchar *response =
+        "^SCFG: \"Radio/Band/2G\",\"00000003\"\r\n"
+        "^SCFG: \"Radio/Band/4G\",\"080800c5\"\r\n"
+        "^SCFG: \"GPRS/AutoAttach\",\"enabled\"\r\n"
+        "^SCFG: \"Ident/Manufacturer\",\"Cinterion\"\r\n"
+        "^SCFG: \"Ident/Product\",\"ELS62-E\"\r\n"
+        "^SCFG: \"MEopMode/SRPOM\",\"0\"\r\n"
+        "^SCFG: \"MEopMode/PingRsp\",\"0\"\r\n"
+        "^SCFG: \"Tcp/IRT\",\"3\"\r\n"
+        "^SCFG: \"Tcp/MR\",\"10\"\r\n"
+        "^SCFG: \"Tcp/OT\",\"6000\"\r\n"
+        "^SCFG: \"Tcp/TLS/Version\",\"1.2\",\"MAX\"\r\n"
+        "^SCFG: \"Tcp/WithURCs\",\"on\"\r\n"
+        "^SCFG: \"URC/Ringline\",\"local\"\r\n"
+        "^SCFG: \"URC/Ringline/ActiveTime\",\"2\"\r\n"
+        "^SCFG: \"Audio/Loop\",\"0\"\r\n"
+        "^SCFG: \"Call/ECC\",\"0\"\r\n"
+        "^SCFG: \"Call/Speech/Codec\",\"0\"\r\n"
+        "^SCFG: \"GPIO/Mode/DAI\",\"std\"\r\n"
+        "^SCFG: \"GPIO/Mode/MCLK\",\"gpio\"\r\n"
+        "^SCFG: \"GPIO/Mode/AntTun\",\"gpio\"\r\n"
+        "^SCFG: \"GPIO/Mode/ASC1\",\"std\"\r\n"
+        "^SCFG: \"GPIO/Mode/DCD0\",\"std\"\r\n"
+        "^SCFG: \"GPIO/Mode/DSR0\",\"std\"\r\n"
+        "^SCFG: \"GPIO/Mode/DTR0\",\"std\"\r\n"
+        "^SCFG: \"GPIO/Mode/FNS\",\"gpio\"\r\n"
+        "^SCFG: \"GPIO/Mode/RING0\",\"std\"\r\n"
+        "^SCFG: \"GPIO/Mode/SYNC\",\"std\"\r\n"
+        "^SCFG: \"GPRS/MTU/Mode\",0\r\n"
+        "^SCFG: \"GPRS/MTU/Size\",1430\r\n"
+        "^SCFG: \"MEopMode/ExpectDTR\",\"current\"\r\n"
+        "^SCFG: \"MEopMode/ExpectDTR\",\"powerup\"\r\n"
+        "^SCFG: \"MEopMode/IMS\",\"1\"\r\n"
+        "^SCFG: \"MEShutdown/sVsup/threshold\",\"0\",\"0\"\r\n"
+        "^SCFG: \"Radio/Mtpl\",\"0\"\r\n"
+        "^SCFG: \"Radio/Mtpl/2G\",\"0\"\r\n"
+        "^SCFG: \"Radio/Mtpl/4G\",\"0\"\r\n"
+        "^SCFG: \"Radio/OutputPowerReduction\",\"4\"\r\n"
+        "^SCFG: \"RemoteWakeUp/Ports\",\"current\",\"acm0\",\"acm1\",\"acm2\",\"ecm\"\r\n"
+        "^SCFG: \"RemoteWakeUp/Ports\",\"powerup\",\"acm0\",\"acm1\",\"acm2\",\"ecm\"\r\n"
+        "^SCFG: \"MEopMode/RingOnData\",\"off\"\r\n"
+        "^SCFG: \"Serial/USB/DDD\",\"0\",\"0\",\"0409\",\"1E2D\",\"00D0\",\"Cinterion Wireless Modules\",\"ELS62\",\"20080600\"\r\n"
+        "^SCFG: \"SIM/CS\",\"SIM1\"\r\n"
+        "^SCFG: \"SIM/DualMode\",\"0\"\r\n"
+        "^SCFG: \"URC/Ringline/SelWUrc\",\"all\"\r\n";
+
+    expected_bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 8);
+    single = MM_MODEM_BAND_EGSM,        g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_DCS,         g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_EUTRAN_1,    g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_EUTRAN_3,    g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_EUTRAN_7,    g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_EUTRAN_8,    g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_EUTRAN_20,   g_array_append_val (expected_bands, single);
+    single = MM_MODEM_BAND_EUTRAN_28,   g_array_append_val (expected_bands, single);
 
     common_test_scfg_response (response, MM_MODEM_CHARSET_GSM, expected_bands, MM_CINTERION_MODEM_FAMILY_DEFAULT, MM_CINTERION_RADIO_BAND_FORMAT_MULTIPLE);
 
@@ -2185,11 +2319,13 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/cinterion/scfg/pls62/gsm",          test_scfg_pls62_gsm);
     g_test_add_func ("/MM/cinterion/scfg/pls62/ucs2",         test_scfg_pls62_ucs2);
     g_test_add_func ("/MM/cinterion/scfg/alas5",              test_scfg_alas5);
+    g_test_add_func ("/MM/cinterion/scfg/els62_e",            test_scfg_els62_e);
     g_test_add_func ("/MM/cinterion/scfg/response/3g",        test_scfg_response_3g);
     g_test_add_func ("/MM/cinterion/scfg/response/2g",        test_scfg_response_2g);
     g_test_add_func ("/MM/cinterion/scfg/response/pls62/gsm", test_scfg_response_pls62_gsm);
     g_test_add_func ("/MM/cinterion/scfg/response/pls62/ucs2",test_scfg_response_pls62_ucs2);
     g_test_add_func ("/MM/cinterion/scfg/response/alas5",     test_scfg_response_alas5);
+    g_test_add_func ("/MM/cinterion/scfg/response/els62_e",   test_scfg_response_els62_e);
     g_test_add_func ("/MM/cinterion/cnmi/phs8",               test_cnmi_phs8);
     g_test_add_func ("/MM/cinterion/cnmi/other",              test_cnmi_other);
     g_test_add_func ("/MM/cinterion/swwan/pls8",              test_swwan_pls8);
