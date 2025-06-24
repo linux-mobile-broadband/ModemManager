@@ -27,12 +27,15 @@
 #include "mm-broadband-modem-mbim-fibocom.h"
 #include "mm-shared-fibocom.h"
 
-static void shared_fibocom_init       (MMSharedFibocomInterface      *iface);
+static void iface_modem_init          (MMIfaceModemInterface         *iface);
 static void iface_modem_firmware_init (MMIfaceModemFirmwareInterface *iface);
+static void shared_fibocom_init       (MMSharedFibocomInterface      *iface);
 
+static MMIfaceModemInterface         *iface_modem_parent;
 static MMIfaceModemFirmwareInterface *iface_modem_firmware_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbimFibocom, mm_broadband_modem_mbim_fibocom, MM_TYPE_BROADBAND_MODEM_MBIM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_FIBOCOM,  shared_fibocom_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init))
 
@@ -67,12 +70,27 @@ mm_broadband_modem_mbim_fibocom_init (MMBroadbandModemMbimFibocom *self)
 }
 
 static void
+iface_modem_init (MMIfaceModemInterface *iface)
+{
+    iface_modem_parent = g_type_interface_peek_parent (iface);
+
+    iface->setup_sim_hot_swap = mm_shared_fibocom_setup_sim_hot_swap;
+    iface->setup_sim_hot_swap_finish = mm_shared_fibocom_setup_sim_hot_swap_finish;
+}
+
+static void
 iface_modem_firmware_init (MMIfaceModemFirmwareInterface *iface)
 {
     iface_modem_firmware_parent = g_type_interface_peek_parent (iface);
 
     iface->load_update_settings = mm_shared_fibocom_firmware_load_update_settings;
     iface->load_update_settings_finish = mm_shared_fibocom_firmware_load_update_settings_finish;
+}
+
+static MMIfaceModemInterface *
+peek_parent_modem_interface (MMSharedFibocom *self)
+{
+    return iface_modem_parent;
 }
 
 static MMIfaceModemFirmwareInterface *
@@ -90,8 +108,9 @@ peek_parent_class (MMSharedFibocom *self)
 static void
 shared_fibocom_init (MMSharedFibocomInterface *iface)
 {
-    iface->peek_parent_class = peek_parent_class;
+    iface->peek_parent_modem_interface    = peek_parent_modem_interface;
     iface->peek_parent_firmware_interface = peek_parent_firmware_interface;
+    iface->peek_parent_class              = peek_parent_class;
 }
 
 static void

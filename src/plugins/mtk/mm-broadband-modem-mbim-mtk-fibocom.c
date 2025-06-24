@@ -426,7 +426,6 @@ iface_modem_init (MMIfaceModemInterface *iface)
     iface->create_bearer_list = create_bearer_list;
     iface->load_unlock_retries = mm_shared_mtk_load_unlock_retries;
     iface->load_unlock_retries_finish = mm_shared_mtk_load_unlock_retries_finish;
-
 }
 
 static void
@@ -444,6 +443,8 @@ peek_parent_class (MMSharedFibocom *self)
     return MM_BASE_MODEM_CLASS (mm_broadband_modem_mbim_mtk_fibocom_parent_class);
 }
 
+/* Note: shared fibocom is only used to create usbmisc/wwan ports, so there is no need
+ * to initialize the parent modem/firmware interface objects. */
 static void
 shared_fibocom_init (MMSharedFibocomInterface *iface)
 {
