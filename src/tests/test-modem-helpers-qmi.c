@@ -1969,6 +1969,44 @@ test_supported_bands_eutran_telit_fn990 (void)
 }
 
 static void
+test_supported_bands_eutran_telit_fn990_b106 (void)
+{
+    g_autoptr(GArray) mm_bands_arr = NULL;
+    g_autoptr(GArray) mm_bands_arr_expected = NULL;
+    g_autoptr(GArray) extended_qmi_lte_bands = NULL;
+    static const guint16 qmi_bands[] = {
+        1, 2, 3, 4, 5, 6, 7, 8,
+        12, 13, 14, 17, 18, 19, 20, 25,
+        26, 28, 29, 30, 32, 34, 38, 39,
+        40, 41, 42, 43, 46, 48, 66, 71,
+        106
+    };
+    static const MMModemBand mm_bands[] = {
+        MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_4,
+        MM_MODEM_BAND_EUTRAN_5, MM_MODEM_BAND_EUTRAN_6, MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_8,
+        MM_MODEM_BAND_EUTRAN_12, MM_MODEM_BAND_EUTRAN_13, MM_MODEM_BAND_EUTRAN_14, MM_MODEM_BAND_EUTRAN_17,
+        MM_MODEM_BAND_EUTRAN_18, MM_MODEM_BAND_EUTRAN_19, MM_MODEM_BAND_EUTRAN_20, MM_MODEM_BAND_EUTRAN_25,
+        MM_MODEM_BAND_EUTRAN_26, MM_MODEM_BAND_EUTRAN_28, MM_MODEM_BAND_EUTRAN_29, MM_MODEM_BAND_EUTRAN_30,
+        MM_MODEM_BAND_EUTRAN_32, MM_MODEM_BAND_EUTRAN_34, MM_MODEM_BAND_EUTRAN_38, MM_MODEM_BAND_EUTRAN_39,
+        MM_MODEM_BAND_EUTRAN_40, MM_MODEM_BAND_EUTRAN_41, MM_MODEM_BAND_EUTRAN_42, MM_MODEM_BAND_EUTRAN_43,
+        MM_MODEM_BAND_EUTRAN_46, MM_MODEM_BAND_EUTRAN_48, MM_MODEM_BAND_EUTRAN_66, MM_MODEM_BAND_EUTRAN_71,
+        MM_MODEM_BAND_EUTRAN_106
+    };
+
+    extended_qmi_lte_bands = g_array_sized_new (FALSE, FALSE, sizeof (guint16), G_N_ELEMENTS (qmi_bands));
+    mm_bands_arr_expected = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), G_N_ELEMENTS (mm_bands));
+    g_array_append_vals (mm_bands_arr_expected, &mm_bands, G_N_ELEMENTS (mm_bands));
+    g_array_append_vals (extended_qmi_lte_bands, &qmi_bands, G_N_ELEMENTS (qmi_bands));
+
+    mm_bands_arr = mm_modem_bands_from_qmi_band_capabilities (0, 0, extended_qmi_lte_bands, NULL, NULL);
+
+    g_assert_cmpmem (
+        mm_bands_arr->data, mm_bands_arr->len * sizeof (MMModemBand),
+        mm_bands_arr_expected->data, mm_bands_arr_expected->len * sizeof (MMModemBand)
+    );
+}
+
+static void
 test_supported_bands_cdma_generic (void)
 {
     g_autoptr(GArray) mm_bands_arr = NULL;
@@ -2013,6 +2051,54 @@ test_mm_bands_to_qmi_eutran_telit_fn990 (void)
     guint64 extended_qmi_lte_bands_expected[4] = {
         0b101001111110001010111011000011110011100011111111,
         0b1000010,
+        0,
+        0,
+    };
+    guint extended_qmi_lte_bands_expected_size = G_N_ELEMENTS (extended_qmi_lte_bands_expected);
+    /* The following are not needed for this test, but mm_modem_bands_to_qmi_band_preference does not check for NULL */
+    QmiNasBandPreference nas_bands_preference;
+    QmiNasLteBandPreference nas_lte_bands_preference;
+
+    mm_bands_arr = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), G_N_ELEMENTS (mm_bands));
+    g_array_append_vals (mm_bands_arr, &mm_bands, G_N_ELEMENTS (mm_bands));
+
+    mm_modem_bands_to_qmi_band_preference (
+        mm_bands_arr,
+        &nas_bands_preference,
+        &nas_lte_bands_preference,
+        extended_qmi_lte_bands,
+        extended_qmi_lte_bands_size,
+        NULL,
+        0,
+        NULL
+    );
+
+    g_assert_cmpmem (
+        extended_qmi_lte_bands, extended_qmi_lte_bands_size * sizeof (guint64),
+        extended_qmi_lte_bands_expected, extended_qmi_lte_bands_expected_size * sizeof (guint64)
+    );
+}
+
+static void
+test_mm_bands_to_qmi_eutran_telit_fn990_b106 (void)
+{
+    g_autoptr(GArray) mm_bands_arr = NULL;
+    static const MMModemBand mm_bands[] = {
+        MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_4,
+        MM_MODEM_BAND_EUTRAN_5, MM_MODEM_BAND_EUTRAN_6, MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_8,
+        MM_MODEM_BAND_EUTRAN_12, MM_MODEM_BAND_EUTRAN_13, MM_MODEM_BAND_EUTRAN_14, MM_MODEM_BAND_EUTRAN_17,
+        MM_MODEM_BAND_EUTRAN_18, MM_MODEM_BAND_EUTRAN_19, MM_MODEM_BAND_EUTRAN_20, MM_MODEM_BAND_EUTRAN_25,
+        MM_MODEM_BAND_EUTRAN_26, MM_MODEM_BAND_EUTRAN_28, MM_MODEM_BAND_EUTRAN_29, MM_MODEM_BAND_EUTRAN_30,
+        MM_MODEM_BAND_EUTRAN_32, MM_MODEM_BAND_EUTRAN_34, MM_MODEM_BAND_EUTRAN_38, MM_MODEM_BAND_EUTRAN_39,
+        MM_MODEM_BAND_EUTRAN_40, MM_MODEM_BAND_EUTRAN_41, MM_MODEM_BAND_EUTRAN_42, MM_MODEM_BAND_EUTRAN_43,
+        MM_MODEM_BAND_EUTRAN_46, MM_MODEM_BAND_EUTRAN_48, MM_MODEM_BAND_EUTRAN_66, MM_MODEM_BAND_EUTRAN_71,
+        MM_MODEM_BAND_EUTRAN_106,
+    };
+    guint64 extended_qmi_lte_bands[4];
+    guint extended_qmi_lte_bands_size = G_N_ELEMENTS (extended_qmi_lte_bands);
+    guint64 extended_qmi_lte_bands_expected[4] = {
+        0b101001111110001010111011000011110011100011111111,
+        0b100000000000000000000000000000000001000010,
         0,
         0,
     };
@@ -2155,10 +2241,12 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/qmi/registration-state-from-system-info/4g/eps-home",      test_registration_state_from_qmi_system_info_4g_eps_home);
     g_test_add_func ("/MM/qmi/registration-state-from-system-info/5g/5gs-home",      test_registration_state_from_qmi_system_info_5g_5gs_home);
 
-    g_test_add_func ("/MM/qmi/supported-bands/eutran/telit/fn990", test_supported_bands_eutran_telit_fn990);
-    g_test_add_func ("/MM/qmi/supported-bands/cdma/generic",       test_supported_bands_cdma_generic);
-    g_test_add_func ("/MM/qmi/mm-bands-to-qmi/eutran/telit/fn990", test_mm_bands_to_qmi_eutran_telit_fn990);
-    g_test_add_func ("/MM/qmi/mm-bands-to-qmi/cdma/generic",       test_mm_bands_to_qmi_cdma_generic);
+    g_test_add_func ("/MM/qmi/supported-bands/eutran/telit/fn990",      test_supported_bands_eutran_telit_fn990);
+    g_test_add_func ("/MM/qmi/supported-bands/eutran/telit/fn990-b106", test_supported_bands_eutran_telit_fn990_b106);
+    g_test_add_func ("/MM/qmi/supported-bands/cdma/generic",            test_supported_bands_cdma_generic);
+    g_test_add_func ("/MM/qmi/mm-bands-to-qmi/eutran/telit/fn990",      test_mm_bands_to_qmi_eutran_telit_fn990);
+    g_test_add_func ("/MM/qmi/mm-bands-to-qmi/eutran/telit/fn990-b106", test_mm_bands_to_qmi_eutran_telit_fn990_b106);
+    g_test_add_func ("/MM/qmi/mm-bands-to-qmi/cdma/generic",            test_mm_bands_to_qmi_cdma_generic);
 
     return g_test_run ();
 }
