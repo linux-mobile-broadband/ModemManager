@@ -12947,7 +12947,11 @@ enable (MMBaseModem         *self,
         return;
 
     case MM_MODEM_STATE_ENABLING:
-        g_assert_not_reached ();
+        /* Enabling can be ongoing when another user enable request arrives,
+         * just error out gracefully. */
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                 "Cannot enable modem (again): enabling ongoing");
+        g_object_unref (task);
         return;
 
     case MM_MODEM_STATE_ENABLED:
