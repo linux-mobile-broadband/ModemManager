@@ -95,36 +95,36 @@ process_fm350_version_features (MMBroadbandModemMbimMtkFibocom *self,
      */
     split = g_strsplit_set (revision, "._", -1);
     if (!split || g_strv_length (split) < 6) {
-        mm_obj_warn (self, "failed to process FM350 firmware version string");
+        mm_obj_warn (self, "failed to process modem firmware version string");
         return;
     }
 
     if (!mm_get_uint_from_str (split[3], &major) ||
         !mm_get_uint_from_str (split[4], &minor) ||
         !mm_get_uint_from_str (split[5], &micro)) {
-        mm_obj_warn (self, "failed to process FM350 firmware version string: %s.%s.%s",
+        mm_obj_warn (self, "failed to process modem firmware version string: %s.%s.%s",
                      split[3], split[4], split[5]);
         return;
     }
 
     /* Check if async SLAAC is supported */
     self->priv->is_async_slaac_supported = fm350_check_version (major, minor, micro, ASYNC_SLAAC_SUPPORTED_VERSION);
-    mm_obj_info (self, "FM350 async SLAAC result indications are %ssupported",
+    mm_obj_info (self, "modem async SLAAC result indications are %ssupported",
                  self->priv->is_async_slaac_supported ? "" : "not ");
 
     /* Check if multiplex is supported */
     self->priv->is_multiplex_supported = fm350_check_version (major, minor, micro, MULTIPLEX_SUPPORTED_VERSION);
-    mm_obj_info (self, "FM350 multiplexing is %ssupported",
+    mm_obj_info (self, "modem multiplexing is %ssupported",
                  self->priv->is_multiplex_supported ? "" : "not ");
 
     /* Check if we need to remove IP packet filters */
     self->priv->remove_ip_packet_filters = !fm350_check_version (major, minor, micro, IP_PACKET_FILTER_REMOVAL_UNNEEDED_VERSION);
-    mm_obj_info (self, "FM350 %s IP packet filter removal",
+    mm_obj_info (self, "modem %s IP packet filter removal",
                  self->priv->remove_ip_packet_filters ? "requires" : "does not require");
 
     /* Check if we need to normalize network errors */
     self->priv->normalize_nw_error = !fm350_check_version (major, minor, micro, NORMALIZE_NW_ERROR_UNNEEDED);
-    mm_obj_info (self, "FM350 %s network error normalization",
+    mm_obj_info (self, "modem %s network error normalization",
                  self->priv->normalize_nw_error ? "requires" : "does not require");
 }
 
@@ -191,7 +191,7 @@ create_bearer (MMIfaceModem        *_self,
     GTask                          *task;
 
     task = g_task_new (self, NULL, callback, user_data);
-    mm_obj_dbg (self, "creating MTK Fibocom MBIM bearer (async SLAAC %s)",
+    mm_obj_dbg (self, "creating MTK-based modem MBIM bearer (async SLAAC %s)",
                 self->priv->is_async_slaac_supported ? "supported" : "unsupported");
     bearer = mm_bearer_mbim_mtk_fibocom_new (MM_BROADBAND_MODEM_MBIM (self),
                                              self->priv->is_async_slaac_supported,
@@ -215,7 +215,7 @@ create_bearer_list (MMIfaceModem *self)
         g_object_set (bearer_list,
                       MM_BEARER_LIST_MAX_ACTIVE_MULTIPLEXED_BEARERS, 0,
                       NULL);
-        mm_obj_dbg (self, "FM350 firmware version doesn't support multiplexed bearers");
+        mm_obj_dbg (self, "modem firmware version doesn't support multiplexed bearers");
     }
 
     return bearer_list;
