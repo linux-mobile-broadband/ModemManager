@@ -27,6 +27,7 @@ G_DEFINE_TYPE_EXTENDED (MMSleepContext, mm_sleep_context, G_TYPE_OBJECT, 0,
 struct _MMSleepContextPrivate {
     GTask *task;
     guint  timeout_id;
+    gint64 timeout_start;
 };
 
 enum {
@@ -52,6 +53,7 @@ timeout_cleanup (MMSleepContext *self)
     if (self->priv->timeout_id)
         g_source_remove (self->priv->timeout_id);
     self->priv->timeout_id = 0;
+    self->priv->timeout_start = 0;
 }
 
 void
@@ -95,6 +97,33 @@ operation_ready (MMSleepContext *self,
     g_signal_emit (self, signals[DONE], 0, error);
 }
 
+static void
+timeout_add (MMSleepContext *self,
+             guint           interval)
+{
+    timeout_cleanup (self);
+    self->priv->timeout_start = g_get_monotonic_time ();
+    self->priv->timeout_id = g_timeout_add_seconds (interval,
+                                                    (GSourceFunc)operation_timeout,
+                                                    self);
+}
+
+void
+mm_sleep_context_timeout_backoff (MMSleepContext *self,
+                                  guint           more_seconds)
+{
+    gint64 cur_time;
+    gint64 new_interval;
+
+    new_interval = more_seconds * G_USEC_PER_SEC;
+    if (self->priv->timeout_start) {
+        cur_time = g_get_monotonic_time ();
+        new_interval += (cur_time - self->priv->timeout_start);
+    }
+
+    timeout_add (self, new_interval / G_USEC_PER_SEC);
+}
+
 /*****************************************************************************/
 
 MMSleepContext *
@@ -107,9 +136,7 @@ mm_sleep_context_new (guint timeout_seconds)
                                    NULL,
                                    (GAsyncReadyCallback)operation_ready,
                                    NULL);
-    self->priv->timeout_id = g_timeout_add_seconds (timeout_seconds,
-                                                    (GSourceFunc)operation_timeout,
-                                                    self);
+    timeout_add (self, timeout_seconds);
     mm_obj_dbg (self, "new context with %d second timeout", timeout_seconds);
 
     return self;
