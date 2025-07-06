@@ -51,6 +51,9 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMSleepContext, g_object_unref)
 
 MMSleepContext *mm_sleep_context_new      (guint           timeout_seconds);
 
+void            mm_sleep_context_timeout_backoff (MMSleepContext *self,
+                                                  guint           more_seconds);
+
 /* The MMSleepContext assumes ownership of @error */
 void            mm_sleep_context_complete (MMSleepContext *self,
                                            GError         *error);
