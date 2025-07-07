@@ -386,6 +386,7 @@ typedef enum { /*< underscore_name=mm_modem_mode >*/
  * @MM_MODEM_BAND_EUTRAN_70: E-UTRAN band 70. Since 1.8.
  * @MM_MODEM_BAND_EUTRAN_71: E-UTRAN band 71. Since 1.8.
  * @MM_MODEM_BAND_EUTRAN_85: E-UTRAN band 85. Since 1.20.
+ * @MM_MODEM_BAND_EUTRAN_106: E-UTRAN band 106. Since 1.26.
  * @MM_MODEM_BAND_CDMA_BC0: CDMA Band Class 0 (US Cellular 850MHz). Since 1.8.
  * @MM_MODEM_BAND_CDMA_BC1: CDMA Band Class 1 (US PCS 1900MHz). Since 1.8.
  * @MM_MODEM_BAND_CDMA_BC2: CDMA Band Class 2 (UK TACS 900MHz). Since 1.8.
@@ -652,7 +653,9 @@ typedef enum { /*< underscore_name=mm_modem_band >*/
     MM_MODEM_BAND_NGRAN_257 = 557,
     MM_MODEM_BAND_NGRAN_258 = 558,
     MM_MODEM_BAND_NGRAN_260 = 560,
-    MM_MODEM_BAND_NGRAN_261 = 561
+    MM_MODEM_BAND_NGRAN_261 = 561,
+    /* LTE bands > 97 follow EUTRAN numbering + 1000 as offset */
+    MM_MODEM_BAND_EUTRAN_106 = 1136
 } MMModemBand;
 
 /**
