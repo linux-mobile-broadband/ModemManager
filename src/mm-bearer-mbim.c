@@ -1458,10 +1458,11 @@ load_settings_from_bearer (MMBearerMbim        *self,
     guint                     max_multiplexed_bearers;
     const gchar              *data_port_driver;
 
-    if (!mm_broadband_modem_get_active_multiplexed_bearers (MM_BROADBAND_MODEM (ctx->modem),
-                                                            &current_multiplexed_bearers,
-                                                            &max_multiplexed_bearers,
-                                                            error))
+    if (!mm_iface_modem_count_bearers (MM_IFACE_MODEM (ctx->modem),
+                                       MM_IFACE_MODEM_COUNT_BEARERS_FLAG_MULTIPLEXED,
+                                       &current_multiplexed_bearers,
+                                       &max_multiplexed_bearers,
+                                       error))
         return FALSE;
 
     /* Check multiplex support in the kernel and the device */
