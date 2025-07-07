@@ -1167,6 +1167,7 @@ mm_base_manager_cleanup (MMBaseManager             *self,
     GHashTableIter          iter;
     MMDevice               *device;
     gboolean                disable, remove, low_power, terse;
+    guint                   active_bearers = 0;
 
     g_return_if_fail (self != NULL);
     g_return_if_fail (MM_IS_BASE_MANAGER (self));
@@ -1193,7 +1194,20 @@ mm_base_manager_cleanup (MMBaseManager             *self,
     g_hash_table_iter_init (&iter, self->priv->devices);
     while (g_hash_table_iter_next (&iter, NULL, (gpointer) &device)) {
         DeviceCleanupContext *dctx;
-        GTask                 *task;
+        GTask                *task;
+        MMBaseModem          *modem;
+
+        modem = mm_device_peek_modem (device);
+        if (modem) {
+            guint count = 0;
+
+            mm_iface_modem_count_bearers (MM_IFACE_MODEM (modem),
+                                          MM_IFACE_MODEM_COUNT_BEARERS_FLAG_ACTIVE,
+                                          &count,
+                                          NULL,
+                                          NULL);
+            active_bearers += count;
+        }
 
         task = g_task_new (device,
                            NULL,
@@ -1201,11 +1215,17 @@ mm_base_manager_cleanup (MMBaseManager             *self,
                            ctx);
         ctx->tasks = g_slist_append (ctx->tasks, task);
 
-        dctx = device_cleanup_context_new (mm_device_peek_modem (device), flags);
+        dctx = device_cleanup_context_new (modem, flags);
         g_task_set_task_data (task, dctx, (GDestroyNotify)device_cleanup_context_free);
 
         device_cleanup_step (task);
     }
+
+    /* Increase cleanup timeout for each connected bearer; disconnecting a
+     * bearer can take many seconds.
+     */
+    if (active_bearers)
+        mm_sleep_context_timeout_backoff (sleep_ctx, active_bearers * 20);
 
     /* Complete cleanup if there were no devices */
     manager_cleanup_context_maybe_complete (ctx, NULL, NULL, FALSE);
