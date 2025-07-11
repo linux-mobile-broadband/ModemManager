@@ -1314,7 +1314,9 @@ mm_common_band_is_utran (MMModemBand band)
 gboolean
 mm_common_band_is_eutran (MMModemBand band)
 {
-    return (band >= MM_MODEM_BAND_EUTRAN_1 && band <= MM_MODEM_BAND_EUTRAN_71);
+    return ((band >= MM_MODEM_BAND_EUTRAN_1 && band <= MM_MODEM_BAND_EUTRAN_71) ||
+            (band == MM_MODEM_BAND_EUTRAN_85) ||
+            (band == MM_MODEM_BAND_EUTRAN_106));
 }
 
 gboolean

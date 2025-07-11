@@ -338,18 +338,29 @@ dms_add_extended_qmi_lte_bands (GArray   *mm_bands,
 
         val = g_array_index (extended_qmi_bands, guint16, i);
 
-        /* MM_MODEM_BAND_EUTRAN_1 = 31,
+        /* Valid EUTRAN bands:
+         *
+         * MM_MODEM_BAND_EUTRAN_1 = 31,
          * ...
          * MM_MODEM_BAND_EUTRAN_71 = 101
+         * <gap>
+         * MM_MODEM_BAND_EUTRAN_85 = 115
+         *
+         * There's then an offset of 1000 for EUTRAN bands >= 98
+         *
+         * MM_MODEM_BAND_EUTRAN_106 = 1136
          */
-        if (val < 1 || val > 71)
-            mm_obj_dbg (log_object, "unexpected LTE band supported by module: EUTRAN %u", val);
-        else {
+        if ((val >= 1 && val <= 71) ||
+            (val == 85) || (val == 106)) {
             MMModemBand band;
 
-            band = (MMModemBand)(val + MM_MODEM_BAND_EUTRAN_1 - 1);
+            if (val >= 98)
+                band = (MMModemBand)(val + 1000 + MM_MODEM_BAND_EUTRAN_1 - 1);
+            else
+                band = (MMModemBand)(val + MM_MODEM_BAND_EUTRAN_1 - 1);
             g_array_append_val (mm_bands, band);
-        }
+        } else
+            mm_obj_dbg (log_object, "unexpected LTE band supported by module: EUTRAN %u", val);
     }
 }
 
@@ -584,18 +595,29 @@ nas_add_extended_qmi_lte_bands (GArray        *mm_bands,
 
             val = 1 + j + (i * 64);
 
-            /* MM_MODEM_BAND_EUTRAN_1 = 31,
+            /* Valid EUTRAN bands:
+             *
+             * MM_MODEM_BAND_EUTRAN_1 = 31,
              * ...
              * MM_MODEM_BAND_EUTRAN_71 = 101
+             * <gap>
+             * MM_MODEM_BAND_EUTRAN_85 = 115
+             *
+             * There's then an offset of 1000 for EUTRAN bands >= 98
+             *
+             * MM_MODEM_BAND_EUTRAN_106 = 1136
              */
-            if (val < 1 || val > 71)
-                mm_obj_dbg (log_object, "unexpected LTE band supported by module: EUTRAN %u", val);
-            else {
+            if ((val >= 1 && val <= 71) ||
+                (val == 85) || (val == 106)) {
                 MMModemBand band;
 
-                band = (val + MM_MODEM_BAND_EUTRAN_1 - 1);
+                if (val >= 98)
+                    band = (val + 1000 + MM_MODEM_BAND_EUTRAN_1 - 1);
+                else
+                    band = (val + MM_MODEM_BAND_EUTRAN_1 - 1);
                 g_array_append_val (mm_bands, band);
-            }
+            } else
+                mm_obj_dbg (log_object, "unexpected LTE band supported by module: EUTRAN %u", val);
         }
     }
 }
@@ -686,13 +708,18 @@ mm_modem_bands_to_qmi_band_preference (GArray                  *mm_bands,
 
         band = g_array_index (mm_bands, MMModemBand, i);
 
-        if (band >= MM_MODEM_BAND_EUTRAN_1 && band <= MM_MODEM_BAND_EUTRAN_71) {
+        if ((band >= MM_MODEM_BAND_EUTRAN_1 && band <= MM_MODEM_BAND_EUTRAN_71) ||
+            (band == MM_MODEM_BAND_EUTRAN_85) ||
+            (band == MM_MODEM_BAND_EUTRAN_106)) {
             if (extended_qmi_lte_bands && extended_qmi_lte_bands_size) {
                 /* Add extended LTE band preference */
                 guint val;
                 guint j;
                 guint k;
 
+                /* Check first if we need to subtract the offset */
+                if (band == MM_MODEM_BAND_EUTRAN_106)
+                    band -= 1000;
                 /* it's really (band - MM_MODEM_BAND_EUTRAN_1 +1 -1), because
                  * we want EUTRAN1 in index 0 */
                 val = band - MM_MODEM_BAND_EUTRAN_1;
