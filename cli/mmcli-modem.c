@@ -346,9 +346,11 @@ print_modem_info (void)
     g_free (bands);
     mm_modem_get_ports (ctx->modem, &ports, &n_ports);
     ports_string = mm_common_build_ports_string (ports, n_ports);
+    mm_modem_port_info_array_free (ports, n_ports);
     mm_modem_get_ignored_ports (ctx->modem, &ignored_ports, &n_ignored_ports);
     ignored_ports_string = mm_common_build_ports_string (ignored_ports, n_ignored_ports);
-    mm_modem_port_info_array_free (ports, n_ports);
+    if (ignored_ports)
+        mm_modem_port_info_array_free (ignored_ports, n_ignored_ports);
     if (mm_modem_get_current_modes (ctx->modem, &allowed_modes, &preferred_mode)) {
         allowed_modes_string = mm_modem_mode_build_string_from_mask (allowed_modes);
         preferred_mode_string = mm_modem_mode_build_string_from_mask (preferred_mode);
