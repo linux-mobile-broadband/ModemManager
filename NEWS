@@ -1,3 +1,31 @@
+ModemManager 1.24.2
+-------------------------------------------
+This is a new stable release of ModemManager.
+
+The most important features and changes in this release are the following:
+
+ * Core:
+   ** Wait until bearers are disconnected before allowing system to suspend
+   ** Fix checks for CDMA/EVDO access technology in some modems
+   ** Detect old Mediatek 62xx-based devices as GSM-capable
+   ** Refresh registration info after manual registration for AT-based devices
+   ** Correctly report NB-IOT access technology
+   ** Disable unsolicited 3GPP events during quick suspend/resume
+
+ * MBIM:
+   ** Fix re-assembly of multi-part unstored SMS messages
+
+ * QMI:
+   ** Fix re-assembly of multi-part unstored SMS messages
+
+ * Voice interface:
+   ** Correctly start call state polling on some modems
+
+ * Plugins:
+   ** fibocomm: don't assert when checking for firmware interface
+   ** cinterion: allow spaces in ^SXRAT response
+
+
 ModemManager 1.24.0
 -------------------------------------------
 This is a new stable release of ModemManager.
