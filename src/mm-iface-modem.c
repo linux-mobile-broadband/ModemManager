@@ -6784,6 +6784,74 @@ mm_iface_modem_get_current_modes (MMIfaceModem *self,
 
 /*****************************************************************************/
 
+typedef struct {
+    const MMIfaceModemCountBearersFlags flags;
+    guint                               count;
+} CountBearersContext;
+
+static void
+bearer_count (MMBaseBearer        *bearer,
+              CountBearersContext *ctx)
+{
+    MMBearerStatus status;
+
+    status = mm_base_bearer_get_status (MM_BASE_BEARER (bearer));
+
+    if (ctx->flags & MM_IFACE_MODEM_COUNT_BEARERS_FLAG_MULTIPLEXED) {
+        /* The Multiplexed property is only set if connected, so it's enough to check
+         * that one to see if we're connected and multiplexed */
+        if (mm_gdbus_bearer_get_multiplexed (MM_GDBUS_BEARER (bearer)))
+            ctx->count++;
+    } else if (ctx->flags & MM_IFACE_MODEM_COUNT_BEARERS_FLAG_CONNECTED) {
+        if (status == MM_BEARER_STATUS_CONNECTED)
+            ctx->count++;
+    } else if (ctx->flags & MM_IFACE_MODEM_COUNT_BEARERS_FLAG_ACTIVE) {
+        if (status >= MM_BEARER_STATUS_CONNECTING)
+            ctx->count++;
+    } else
+        ctx->count++;
+}
+
+gboolean
+mm_iface_modem_count_bearers (MMIfaceModem                   *self,
+                              MMIfaceModemCountBearersFlags   flags,
+                              guint                          *out_current,
+                              guint                          *out_max,
+                              GError                        **error)
+{
+    g_autoptr(MMBearerList) list = NULL;
+    guint                   max = 0;
+    CountBearersContext     ctx = {
+        .flags = flags,
+        .count = 0,
+    };
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_BEARER_LIST, &list,
+                  NULL);
+    if (!list) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Bearer list unavailable");
+        return FALSE;
+    }
+
+    if (flags & MM_IFACE_MODEM_COUNT_BEARERS_FLAG_MULTIPLEXED)
+        max = mm_bearer_list_get_max_active_multiplexed (list);
+    else
+        max = mm_bearer_list_get_max_active (list);
+
+    mm_bearer_list_foreach (list, (MMBearerListForeachFunc)bearer_count, &ctx);
+    g_assert (max >= ctx.count);
+
+    if (out_max)
+        *out_max = max;
+    if (out_current)
+        *out_current = ctx.count;
+
+    return TRUE;
+}
+
+/*****************************************************************************/
+
 static void
 mm_iface_modem_default_init (MMIfaceModemInterface *iface)
 {
