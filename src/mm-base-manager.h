@@ -72,11 +72,17 @@ MMBaseManager   *mm_base_manager_new         (GDBusConnection  *bus,
 void             mm_base_manager_start       (MMBaseManager *manager,
                                               gboolean manual_scan);
 
-void             mm_base_manager_shutdown    (MMBaseManager  *manager,
-                                              gboolean        disable,
-                                              gboolean        power_low,
-                                              gboolean        remove,
-                                              MMSleepContext *ctx);
+typedef enum {
+    MM_BASE_MANAGER_CLEANUP_NONE      = 0x0,
+    MM_BASE_MANAGER_CLEANUP_DISABLE   = 0x1,
+    MM_BASE_MANAGER_CLEANUP_LOW_POWER = 0x2,
+    MM_BASE_MANAGER_CLEANUP_REMOVE    = 0x4,
+    MM_BASE_MANAGER_CLEANUP_TERSE     = 0x8,
+} MMBaseManagerCleanupFlags;
+
+void             mm_base_manager_cleanup     (MMBaseManager             *manager,
+                                              MMBaseManagerCleanupFlags  flags,
+                                              MMSleepContext            *ctx);
 
 #if defined WITH_SUSPEND_RESUME
 void             mm_base_manager_sync        (MMBaseManager *manager);

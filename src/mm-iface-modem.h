@@ -620,4 +620,19 @@ void mm_iface_modem_modify_sim (MMIfaceModem *self,
 
 void mm_iface_modem_process_sim_event (MMIfaceModem *self);
 
+typedef enum {
+    /* Connecting or connected bearers */
+    MM_IFACE_MODEM_COUNT_BEARERS_FLAG_ACTIVE      = 0x1,
+    /* Fully connected bearers */
+    MM_IFACE_MODEM_COUNT_BEARERS_FLAG_CONNECTED   = 0x2,
+    /* Multiplexed implies connected */
+    MM_IFACE_MODEM_COUNT_BEARERS_FLAG_MULTIPLEXED = 0x4,
+} MMIfaceModemCountBearersFlags;
+
+gboolean mm_iface_modem_count_bearers (MMIfaceModem                   *self,
+                                       MMIfaceModemCountBearersFlags   flags,
+                                       guint                          *out_current,
+                                       guint                          *out_max,
+                                       GError                        **error);
+
 #endif /* MM_IFACE_MODEM_H */

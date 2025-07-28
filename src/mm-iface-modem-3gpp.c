@@ -3232,6 +3232,8 @@ static void interface_syncing_step (GTask *task);
 
 typedef enum {
     SYNCING_STEP_FIRST,
+    SYNCING_STEP_ENABLE_UNSOLICITED_EVENTS,
+    SYNCING_STEP_ENABLE_UNSOLICITED_REGISTRATION_EVENTS,
     SYNCING_STEP_REFRESH_3GPP_REGISTRATION,
     SYNCING_STEP_REFRESH_EPS_BEARER,
     SYNCING_STEP_LAST
@@ -3248,6 +3250,31 @@ mm_iface_modem_3gpp_sync_finish (MMIfaceModem3gpp  *self,
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
+
+#undef VOID_SYNC_REPLY_READY_FN
+#define VOID_SYNC_REPLY_READY_FN(NAME,DISPLAY)                          \
+    static void                                                         \
+    sync_##NAME##_ready (MMIfaceModem3gpp *self,                        \
+                         GAsyncResult     *res,                         \
+                         GTask            *task)                        \
+    {                                                                   \
+        DisablingContext  *ctx;                                         \
+        g_autoptr(GError)  error = NULL;                                \
+                                                                        \
+        MM_IFACE_MODEM_3GPP_GET_IFACE (self)->NAME##_finish (self, res, &error); \
+        if (error)                                                      \
+            mm_obj_dbg (self, "couldn't %s: %s", DISPLAY, error->message);      \
+                                                                        \
+        /* Go on to next step */                                        \
+        ctx = g_task_get_task_data (task);                              \
+        ctx->step++;                                                    \
+        interface_syncing_step (task);                                  \
+    }
+
+VOID_SYNC_REPLY_READY_FN (enable_unsolicited_events,
+                     "enable unsolicited events")
+VOID_SYNC_REPLY_READY_FN (enable_unsolicited_registration_events,
+                     "enable unsolicited registration events")
 
 static void
 sync_eps_bearer_ready (MMIfaceModem3gpp *self,
@@ -3327,6 +3354,33 @@ interface_syncing_step (GTask *task)
         ctx->step++;
         /* fall through */
 
+    case SYNCING_STEP_ENABLE_UNSOLICITED_EVENTS:
+        if (MM_IFACE_MODEM_3GPP_GET_IFACE (self)->enable_unsolicited_events &&
+            MM_IFACE_MODEM_3GPP_GET_IFACE (self)->enable_unsolicited_events_finish) {
+            MM_IFACE_MODEM_3GPP_GET_IFACE (self)->enable_unsolicited_events (
+                self,
+                (GAsyncReadyCallback)sync_enable_unsolicited_events_ready,
+                task);
+            return;
+        }
+        ctx->step++;
+        /* fall through */
+
+    case SYNCING_STEP_ENABLE_UNSOLICITED_REGISTRATION_EVENTS:
+        if (MM_IFACE_MODEM_3GPP_GET_IFACE (self)->enable_unsolicited_registration_events &&
+            MM_IFACE_MODEM_3GPP_GET_IFACE (self)->enable_unsolicited_registration_events_finish) {
+            MM_IFACE_MODEM_3GPP_GET_IFACE (self)->enable_unsolicited_registration_events (
+                self,
+                get_cs_network_supported (self),
+                get_ps_network_supported (self),
+                get_eps_network_supported (self),
+                (GAsyncReadyCallback)sync_enable_unsolicited_registration_events_ready,
+                task);
+            return;
+        }
+        ctx->step++;
+        /* fall through */
+
     case SYNCING_STEP_REFRESH_3GPP_REGISTRATION:
         /*
          * Refresh registration info to verify that the modem is still registered.
@@ -3379,6 +3433,129 @@ mm_iface_modem_3gpp_sync (MMIfaceModem3gpp    *self,
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)g_free);
     interface_syncing_step (task);
+}
+
+typedef struct _TerseContext TerseContext;
+static void interface_terse_step (GTask *task);
+
+typedef enum {
+    TERSE_STEP_FIRST,
+    TERSE_STEP_DISABLE_UNSOLICITED_REGISTRATION_EVENTS,
+    TERSE_STEP_DISABLE_UNSOLICITED_EVENTS,
+    TERSE_STEP_LAST
+} TerseStep;
+
+struct _TerseContext {
+    TerseStep step;
+};
+
+gboolean
+mm_iface_modem_3gpp_terse_finish (MMIfaceModem3gpp  *self,
+                                  GAsyncResult      *res,
+                                  GError           **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+#undef VOID_TERSE_REPLY_READY_FN
+#define VOID_TERSE_REPLY_READY_FN(NAME,DISPLAY)                         \
+    static void                                                         \
+    terse_##NAME##_ready (MMIfaceModem3gpp *self,                       \
+                  GAsyncResult     *res,                                \
+                  GTask            *task)                               \
+    {                                                                   \
+        TerseContext  *ctx;                                             \
+        g_autoptr(GError)  error = NULL;                                \
+                                                                        \
+        MM_IFACE_MODEM_3GPP_GET_IFACE (self)->NAME##_finish (self, res, &error); \
+        if (error)                                                      \
+            mm_obj_dbg (self, "couldn't %s: %s", DISPLAY, error->message);      \
+                                                                        \
+        /* Go on to next step */                                        \
+        ctx = g_task_get_task_data (task);                              \
+        ctx->step++;                                                    \
+        interface_terse_step (task);                                    \
+    }
+
+VOID_TERSE_REPLY_READY_FN (disable_unsolicited_events,
+                     "disable unsolicited events")
+VOID_TERSE_REPLY_READY_FN (disable_unsolicited_registration_events,
+                     "disable unsolicited registration events")
+
+static void
+interface_terse_step (GTask *task)
+{
+    MMIfaceModem3gpp *self;
+    TerseContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    switch (ctx->step) {
+    case TERSE_STEP_FIRST:
+        ctx->step++;
+        /* fall through */
+
+    case TERSE_STEP_DISABLE_UNSOLICITED_REGISTRATION_EVENTS:
+        if (MM_IFACE_MODEM_3GPP_GET_IFACE (self)->disable_unsolicited_registration_events &&
+            MM_IFACE_MODEM_3GPP_GET_IFACE (self)->disable_unsolicited_registration_events_finish) {
+            MM_IFACE_MODEM_3GPP_GET_IFACE (self)->disable_unsolicited_registration_events (
+                self,
+                get_cs_network_supported (self),
+                get_ps_network_supported (self),
+                get_eps_network_supported (self),
+                (GAsyncReadyCallback)terse_disable_unsolicited_registration_events_ready,
+                task);
+            mm_obj_msg (self, "terse state 3GPP (%d/%d): disable unsolicited registration events done",
+                        ctx->step, TERSE_STEP_LAST);
+            return;
+        }
+        ctx->step++;
+        /* fall through */
+
+    case TERSE_STEP_DISABLE_UNSOLICITED_EVENTS:
+        if (MM_IFACE_MODEM_3GPP_GET_IFACE (self)->disable_unsolicited_events &&
+            MM_IFACE_MODEM_3GPP_GET_IFACE (self)->disable_unsolicited_events_finish) {
+            MM_IFACE_MODEM_3GPP_GET_IFACE (self)->disable_unsolicited_events (
+                self,
+                (GAsyncReadyCallback)terse_disable_unsolicited_events_ready,
+                task);
+            mm_obj_msg (self, "terse state 3GPP (%d/%d): disable unsolicited events done",
+                        ctx->step, TERSE_STEP_LAST);
+            return;
+        }
+        ctx->step++;
+        /* fall through */
+
+    case TERSE_STEP_LAST:
+        /* We are done without errors! */
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+
+    default:
+        g_assert_not_reached ();
+    }
+
+    g_assert_not_reached ();
+}
+
+void
+mm_iface_modem_3gpp_terse (MMIfaceModem3gpp    *self,
+                           GAsyncReadyCallback  callback,
+                           gpointer             user_data)
+{
+    TerseContext *ctx;
+    GTask          *task;
+
+    /* Create SyncingContext */
+    ctx = g_new0 (TerseContext, 1);
+    ctx->step = TERSE_STEP_FIRST;
+
+    /* Create sync steps task and execute it */
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)g_free);
+    interface_terse_step (task);
 }
 
 #endif

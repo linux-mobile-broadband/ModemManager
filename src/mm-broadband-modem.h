@@ -143,12 +143,6 @@ gboolean mm_broadband_modem_sim_hot_swap_ports_context_init  (MMBroadbandModem  
                                                               GError           **error);
 void     mm_broadband_modem_sim_hot_swap_ports_context_reset (MMBroadbandModem  *self);
 
-/* Helper to manage multiplexed bearers */
-gboolean mm_broadband_modem_get_active_multiplexed_bearers (MMBroadbandModem  *self,
-                                                            guint             *out_current,
-                                                            guint             *out_max,
-                                                            GError           **error);
-
 /* Helper to manage initial EPS bearer */
 gint mm_broadband_modem_get_initial_eps_bearer_cid (MMBroadbandModem *self);
 
