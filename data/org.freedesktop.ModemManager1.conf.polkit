@@ -351,6 +351,10 @@
            send_interface="org.freedesktop.ModemManager1.Modem.Signal"
            send_member="Setup"/>
 
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Signal"
+           send_member="SetupThresholds"/>
+
     <!-- org.freedesktop.ModemManager1.Modem.Time.xml -->
 
     <!-- Protected by the Time policy rule -->
