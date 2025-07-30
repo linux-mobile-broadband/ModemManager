@@ -94,7 +94,7 @@ mm_cell_info_gsm_set_operator_id (MMCellInfoGsm *self,
  * Encoded in upper-case hexadecimal format without leading zeros,
  * as specified in 3GPP TS 27.007.
  *
- * Returns: (transfer none): the MCCMNC, or %NULL if not available.
+ * Returns: (transfer none): the Location Area Code, or %NULL if not available.
  *
  * Since: 1.20
  */
@@ -126,7 +126,7 @@ mm_cell_info_gsm_set_lac (MMCellInfoGsm *self,
  * Encoded in upper-case hexadecimal format without leading zeros,
  * as specified in 3GPP TS 27.007.
  *
- * Returns: (transfer none): the MCCMNC, or %NULL if not available.
+ * Returns: (transfer none): the Cell Identifier, or %NULL if not available.
  *
  * Since: 1.20
  */

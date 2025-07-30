@@ -103,7 +103,7 @@ mm_cell_info_nr5g_set_operator_id (MMCellInfoNr5g *self,
  * Encoded in upper-case hexadecimal format without leading zeros,
  * as specified in 3GPP TS 27.007.
  *
- * Returns: (transfer none): the MCCMNC, or %NULL if not available.
+ * Returns: (transfer none): the Tracking Area Code, or %NULL if not available.
  *
  * Since: 1.20
  */
@@ -135,7 +135,7 @@ mm_cell_info_nr5g_set_tac (MMCellInfoNr5g *self,
  * Encoded in upper-case hexadecimal format without leading zeros,
  * as specified in 3GPP TS 27.007.
  *
- * Returns: (transfer none): the MCCMNC, or %NULL if not available.
+ * Returns: (transfer none): the Cell Identifier, or %NULL if not available.
  *
  * Since: 1.20
  */
@@ -167,7 +167,7 @@ mm_cell_info_nr5g_set_ci (MMCellInfoNr5g *self,
  * Encoded in upper-case hexadecimal format without leading zeros,
  * as specified in 3GPP TS 27.007.
  *
- * Returns: (transfer none): the MCCMNC, or %NULL if not available.
+ * Returns: (transfer none): the physical cell identifier, or %NULL if not available.
  *
  * Since: 1.20
  */
