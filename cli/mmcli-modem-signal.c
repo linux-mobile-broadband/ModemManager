@@ -458,7 +458,7 @@ mmcli_modem_signal_run_synchronous (GDBusConnection *connection)
             exit (EXIT_FAILURE);
         }
 
-        g_debug ("Asynchronously setting up threshold values...");
+        g_debug ("Synchronously setting up threshold values...");
         result = mm_modem_signal_setup_thresholds_sync (ctx->modem_signal,
                                                         properties,
                                                         NULL,
