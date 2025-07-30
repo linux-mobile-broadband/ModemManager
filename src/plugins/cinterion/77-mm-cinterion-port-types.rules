@@ -68,4 +68,22 @@ ATTRS{idVendor}=="1e2d", ATTRS{idProduct}=="006F", ENV{.MM_USBIFNUM}=="02", SUBS
 ATTRS{idVendor}=="1e2d", ATTRS{idProduct}=="006F", ENV{.MM_USBIFNUM}=="04", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="1e2d", ATTRS{idProduct}=="006F", ENV{.MM_USBIFNUM}=="06", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_QCDM}="1"
 
+# MV32 port types
+#  ttyUSB0 (if #2): AT port
+#  ttyUSB1 (if #4): GPS data port
+#  ttyUSB2 (if #5): unknown
+ATTRS{idVendor}=="1e2d", ATTRS{idProduct}=="00f1", ENV{ID_MM_TTY_AT_PROBE_TRIES}="10"
+ATTRS{idVendor}=="1e2d", ATTRS{idProduct}=="00f1", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="1e2d", ATTRS{idProduct}=="00f1", ENV{.MM_USBIFNUM}=="04", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="1e2d", ATTRS{idProduct}=="00f1", ENV{.MM_USBIFNUM}=="05", ENV{ID_MM_PORT_IGNORE}="1"
+
+# MV31 port types
+#  ttyUSB0 (if #2): AT port
+#  ttyUSB1 (if #4): GPS data port
+#  ttyUSB2 (if #5): unknown
+ATTRS{idVendor}=="1e2d", ATTRS{idProduct}=="00b3", ENV{ID_MM_TTY_AT_PROBE_TRIES}="10"
+ATTRS{idVendor}=="1e2d", ATTRS{idProduct}=="00b3", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="1e2d", ATTRS{idProduct}=="00b3", ENV{.MM_USBIFNUM}=="04", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="1e2d", ATTRS{idProduct}=="00b3", ENV{.MM_USBIFNUM}=="05", ENV{ID_MM_PORT_IGNORE}="1"
+
 LABEL="mm_cinterion_port_types_end"
