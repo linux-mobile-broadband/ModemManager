@@ -78,7 +78,7 @@ mm_cbm_part_coding_group_to_language (guint8 group)
     case 0b0110:
         return g_strdup ("sv");
     case 0b0111:
-        return g_strdup ("dk");
+        return g_strdup ("da");
     case 0b1000:
         return g_strdup ("pt");
     case 0b1001:
@@ -193,7 +193,7 @@ mm_cbm_part_new_from_binary_pdu (const guint8  *pdu,
         switch (group) {
         case CBS_DATA_CODING_OTHER_CZECH:
             cbm_part->encoding = MM_SMS_ENCODING_GSM7;
-            cbm_part->language = g_strdup ("cz");
+            cbm_part->language = g_strdup ("cs");
             break;
         case CBS_DATA_CODING_OTHER_HEBREW:
             cbm_part->encoding = MM_SMS_ENCODING_UCS2;
