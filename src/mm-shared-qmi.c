@@ -4541,7 +4541,7 @@ pds_set_supl_server (GTask *task)
         qmi_message_pds_set_agps_config_input_set_network_mode (input, QMI_PDS_NETWORK_MODE_CDMA, NULL);
 
     if (mm_parse_supl_address (ctx->supl, NULL, &ip, &port, NULL))
-        qmi_message_pds_set_agps_config_input_set_location_server_address (input, ip, port, NULL);
+        qmi_message_pds_set_agps_config_input_set_location_server_address (input, GUINT32_FROM_BE (ip), port, NULL);
     else {
         url = parse_as_utf16_url (ctx->supl);
         qmi_message_pds_set_agps_config_input_set_location_server_url (input, url, NULL);
@@ -4655,7 +4655,7 @@ loc_set_supl_server (GTask *task)
         qmi_message_loc_set_server_input_set_server_type (input, QMI_LOC_SERVER_TYPE_CDMA_PDE, NULL);
 
     if (mm_parse_supl_address (ctx->supl, NULL, &ip, &port, NULL))
-        qmi_message_loc_set_server_input_set_ipv4 (input, ip, (guint32) port, NULL);
+        qmi_message_loc_set_server_input_set_ipv4 (input, GUINT32_FROM_BE (ip), (guint32) port, NULL);
     else
         qmi_message_loc_set_server_input_set_url (input, ctx->supl, NULL);
 
@@ -4771,7 +4771,7 @@ pds_get_agps_config_ready (QmiClientPds *client,
             NULL) &&
         ip != 0 &&
         port != 0) {
-        struct in_addr a = { .s_addr = ip };
+        struct in_addr a = { .s_addr = GUINT32_FROM_BE (ip) };
         gchar buf[INET_ADDRSTRLEN + 1];
 
         memset (buf, 0, sizeof (buf));
@@ -4882,7 +4882,7 @@ loc_location_get_server_indication_cb (QmiClientLoc                    *client,
             &ipv4_port,
             NULL) &&
         ipv4_address != 0 && ipv4_port != 0) {
-        struct in_addr a = { .s_addr = ipv4_address };
+        struct in_addr a = { .s_addr = GUINT32_FROM_BE (ipv4_address) };
         gchar buf[INET_ADDRSTRLEN + 1];
 
         memset (buf, 0, sizeof (buf));
