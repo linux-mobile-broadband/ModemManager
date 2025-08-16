@@ -5093,14 +5093,58 @@ pds_gps_service_state_stop_ready (QmiClientPds *client,
 }
 
 static void
+loc_lock_engine_ready (QmiClientLoc *client,
+                       GAsyncResult *res,
+                       GTask        *task)
+{
+    MMSharedQmi                      *self;
+    Private                          *priv;
+    QmiMessageLocSetEngineLockOutput *output;
+    GError                           *error = NULL;
+
+    output = qmi_client_loc_set_engine_lock_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!qmi_message_loc_set_engine_lock_output_get_result (output, &error)
+     && !g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NO_PERMISSION)) {
+        g_prefix_error (&error, "Couldn't lock GPS engine: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        qmi_message_loc_set_engine_lock_output_unref (output);
+        return;
+    }
+
+    g_clear_error (&error);
+    qmi_message_loc_set_engine_lock_output_unref (output);
+
+    self = g_task_get_source_object (task);
+    priv = get_private (self);
+
+    if (priv->loc_client) {
+        if (priv->loc_location_nmea_indication_id != 0) {
+            g_signal_handler_disconnect (priv->loc_client, priv->loc_location_nmea_indication_id);
+            priv->loc_location_nmea_indication_id = 0;
+        }
+        g_clear_object (&priv->loc_client);
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
 loc_stop_ready (QmiClientLoc *client,
                 GAsyncResult *res,
                 GTask        *task)
 {
-    MMSharedQmi             *self;
-    Private                 *priv;
-    QmiMessageLocStopOutput *output;
-    GError                  *error = NULL;
+    QmiMessageLocStopOutput         *output;
+    QmiMessageLocSetEngineLockInput *input;
+    GError                          *error = NULL;
 
     output = qmi_client_loc_stop_finish (client, res, &error);
     if (!output) {
@@ -5120,19 +5164,16 @@ loc_stop_ready (QmiClientLoc *client,
 
     qmi_message_loc_stop_output_unref (output);
 
-    self = g_task_get_source_object (task);
-    priv = get_private (self);
+    input = qmi_message_loc_set_engine_lock_input_new ();
+    qmi_message_loc_set_engine_lock_input_set_lock_type (input, QMI_LOC_LOCK_TYPE_ALL, NULL);
+    qmi_client_loc_set_engine_lock (QMI_CLIENT_LOC (client),
+                                    input,
+                                    10,
+                                    NULL,
+                                    (GAsyncReadyCallback) loc_lock_engine_ready,
+                                    task);
+    qmi_message_loc_set_engine_lock_input_unref (input);
 
-    if (priv->loc_client) {
-        if (priv->loc_location_nmea_indication_id != 0) {
-            g_signal_handler_disconnect (priv->loc_client, priv->loc_location_nmea_indication_id);
-            priv->loc_location_nmea_indication_id = 0;
-        }
-        g_clear_object (&priv->loc_client);
-    }
-
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
 }
 
 static void
@@ -5231,6 +5272,7 @@ loc_location_nmea_indication_cb (QmiClientLoc               *client,
 
 typedef struct {
     QmiClientLoc *client;
+    GCancellable *req_cancel;
     guint         timeout_id;
     gulong        indication_id;
 } SetupRequiredNmeaTracesContext;
@@ -5245,6 +5287,10 @@ setup_required_nmea_traces_cleanup_action (SetupRequiredNmeaTracesContext *ctx)
     if (ctx->timeout_id) {
         g_source_remove (ctx->timeout_id);
         ctx->timeout_id = 0;
+    }
+    if (ctx->req_cancel) {
+        g_cancellable_cancel (ctx->req_cancel);
+        g_object_unref (g_steal_pointer (&ctx->req_cancel));
     }
 }
 
@@ -5311,23 +5357,15 @@ loc_set_nmea_types_ready (QmiClientLoc *client,
 
     output = qmi_client_loc_set_nmea_types_finish (client, res, &error);
     if (!output || !qmi_message_loc_set_nmea_types_output_get_result (output, &error)) {
+        if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+            return;
+
+        ctx = g_task_get_task_data (task);
+        setup_required_nmea_traces_cleanup_action (ctx);
+
         g_task_return_error (task, error);
         g_object_unref (task);
-        return;
     }
-
-    /* The task ownership is shared between signal and timeout; the one which is
-     * scheduled first will cancel the other. */
-    ctx = g_task_get_task_data (task);
-    g_assert (!ctx->indication_id);
-    ctx->indication_id = g_signal_connect (ctx->client,
-                                           "set-nmea-types",
-                                           G_CALLBACK (loc_set_nmea_types_indication_cb),
-                                           task);
-    g_assert (!ctx->timeout_id);
-    ctx->timeout_id = g_timeout_add_seconds (10,
-                                             (GSourceFunc)setup_required_nmea_traces_timeout,
-                                             task);
 }
 
 static void
@@ -5355,22 +5393,29 @@ loc_get_nmea_types_indication_cb (QmiClientLoc                       *client,
 
     qmi_indication_loc_get_nmea_types_output_get_nmea_types (output, &nmea_types_mask, NULL);
 
-    /* If the configured NMEA types already include GGA, GSV and GSA, we're fine. For raw
-     * GPS sources GGA is the only required one, the other two are given for completeness */
-    if ((nmea_types_mask & desired_nmea_types_mask) == desired_nmea_types_mask) {
-        g_task_return_boolean (task, TRUE);
-        g_object_unref (task);
-        return;
-    }
-
+    /* The task ownership is shared by the request, the signal, and the
+     * timeout; the one which is scheduled first will cancel the others.
+     */
+    g_assert (!ctx->req_cancel);
+    ctx->req_cancel = g_cancellable_new ();
     input = qmi_message_loc_set_nmea_types_input_new ();
     qmi_message_loc_set_nmea_types_input_set_nmea_types (input, (nmea_types_mask | desired_nmea_types_mask), NULL);
     qmi_client_loc_set_nmea_types (ctx->client,
                                    input,
                                    10,
-                                   NULL,
+                                   ctx->req_cancel,
                                    (GAsyncReadyCallback)loc_set_nmea_types_ready,
                                    task);
+
+    g_assert (!ctx->indication_id);
+    ctx->indication_id = g_signal_connect (ctx->client,
+                                           "set-nmea-types",
+                                           G_CALLBACK (loc_set_nmea_types_indication_cb),
+                                           task);
+    g_assert (!ctx->timeout_id);
+    ctx->timeout_id = g_timeout_add_seconds (10,
+                                             (GSourceFunc)setup_required_nmea_traces_timeout,
+                                             task);
 }
 
 static void
@@ -5384,23 +5429,15 @@ loc_get_nmea_types_ready (QmiClientLoc *client,
 
     output = qmi_client_loc_get_nmea_types_finish (client, res, &error);
     if (!output || !qmi_message_loc_get_nmea_types_output_get_result (output, &error)) {
+        if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+            return;
+
+        ctx = g_task_get_task_data (task);
+        setup_required_nmea_traces_cleanup_action (ctx);
+
         g_task_return_error (task, error);
         g_object_unref (task);
-        return;
     }
-
-    /* The task ownership is shared between signal and timeout; the one which is
-     * scheduled first will cancel the other. */
-    ctx = g_task_get_task_data (task);
-    g_assert (!ctx->indication_id);
-    ctx->indication_id = g_signal_connect (ctx->client,
-                                           "get-nmea-types",
-                                           G_CALLBACK (loc_get_nmea_types_indication_cb),
-                                           task);
-    g_assert (!ctx->timeout_id);
-    ctx->timeout_id = g_timeout_add_seconds (10,
-                                             (GSourceFunc)setup_required_nmea_traces_timeout,
-                                             task);
 }
 
 static void
@@ -5436,12 +5473,28 @@ setup_required_nmea_traces (MMSharedQmi         *self,
         ctx->client = QMI_CLIENT_LOC (g_object_ref (client));
         g_task_set_task_data (task, ctx, (GDestroyNotify)setup_required_nmea_traces_context_free);
 
+        /* The task ownership is shared by the request, the signal, and the
+         * timeout; the one which is scheduled first will cancel the others.
+         */
+        g_assert (!ctx->req_cancel);
+        ctx->req_cancel = g_cancellable_new ();
         qmi_client_loc_get_nmea_types (ctx->client,
                                        NULL,
                                        10,
-                                       NULL,
+                                       ctx->req_cancel,
                                        (GAsyncReadyCallback)loc_get_nmea_types_ready,
                                        task);
+
+        g_assert (!ctx->indication_id);
+        ctx->indication_id = g_signal_connect (ctx->client,
+                                               "get-nmea-types",
+                                               G_CALLBACK (loc_get_nmea_types_indication_cb),
+                                               task);
+        g_assert (!ctx->timeout_id);
+        ctx->timeout_id = g_timeout_add_seconds (10,
+                                                 (GSourceFunc)setup_required_nmea_traces_timeout,
+                                                 task);
+
         return;
     }
 
@@ -5675,6 +5728,49 @@ loc_start_ready (QmiClientLoc *client,
 }
 
 static void
+loc_unlock_engine_ready (QmiClientLoc *client,
+                         GAsyncResult *res,
+                         GTask        *task)
+{
+    QmiMessageLocStartInput          *input;
+    QmiMessageLocSetEngineLockOutput *output;
+    GError                           *error = NULL;
+
+    output = qmi_client_loc_set_engine_lock_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!qmi_message_loc_set_engine_lock_output_get_result (output, &error)
+     && !g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NO_PERMISSION)) {
+        g_prefix_error (&error, "Couldn't unlock GPS engine: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        qmi_message_loc_set_engine_lock_output_unref (output);
+        return;
+    }
+
+    g_clear_error (&error);
+    qmi_message_loc_set_engine_lock_output_unref (output);
+
+    input = qmi_message_loc_start_input_new ();
+    qmi_message_loc_start_input_set_session_id (input, DEFAULT_LOC_SESSION_ID, NULL);
+    qmi_message_loc_start_input_set_intermediate_report_state (input, QMI_LOC_INTERMEDIATE_REPORT_STATE_DISABLE, NULL);
+    qmi_message_loc_start_input_set_minimum_interval_between_position_reports (input, 1000, NULL);
+    qmi_message_loc_start_input_set_fix_recurrence_type (input, QMI_LOC_FIX_RECURRENCE_TYPE_REQUEST_PERIODIC_FIXES, NULL);
+    qmi_client_loc_start (QMI_CLIENT_LOC (client),
+                          input,
+                          10,
+                          NULL,
+                          (GAsyncReadyCallback) loc_start_ready,
+                          task);
+    qmi_message_loc_start_input_unref (input);
+}
+
+static void
 start_gps_engine (MMSharedQmi         *self,
                   GAsyncReadyCallback  callback,
                   gpointer             user_data)
@@ -5711,20 +5807,17 @@ start_gps_engine (MMSharedQmi         *self,
                                         MM_PORT_QMI_FLAG_DEFAULT,
                                         NULL);
     if (client) {
-        QmiMessageLocStartInput *input;
+        QmiMessageLocSetEngineLockInput *input;
 
-        input = qmi_message_loc_start_input_new ();
-        qmi_message_loc_start_input_set_session_id (input, DEFAULT_LOC_SESSION_ID, NULL);
-        qmi_message_loc_start_input_set_intermediate_report_state (input, QMI_LOC_INTERMEDIATE_REPORT_STATE_DISABLE, NULL);
-        qmi_message_loc_start_input_set_minimum_interval_between_position_reports (input, 1000, NULL);
-        qmi_message_loc_start_input_set_fix_recurrence_type (input, QMI_LOC_FIX_RECURRENCE_TYPE_REQUEST_PERIODIC_FIXES, NULL);
-        qmi_client_loc_start (QMI_CLIENT_LOC (client),
-                              input,
-                              10,
-                              NULL,
-                              (GAsyncReadyCallback) loc_start_ready,
-                              task);
-        qmi_message_loc_start_input_unref (input);
+        input = qmi_message_loc_set_engine_lock_input_new ();
+        qmi_message_loc_set_engine_lock_input_set_lock_type (input, QMI_LOC_LOCK_TYPE_MT, NULL);
+        qmi_client_loc_set_engine_lock (QMI_CLIENT_LOC (client),
+                                        input,
+                                        10,
+                                        NULL,
+                                        (GAsyncReadyCallback) loc_unlock_engine_ready,
+                                        task);
+        qmi_message_loc_set_engine_lock_input_unref (input);
         return;
     }
 
