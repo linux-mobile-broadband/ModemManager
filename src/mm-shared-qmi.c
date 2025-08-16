@@ -4525,12 +4525,19 @@ pds_set_supl_server (GTask *task)
     MMSharedQmi                     *self;
     SetSuplServerContext            *ctx;
     QmiMessagePdsSetAgpsConfigInput *input;
-    guint32                          ip;
+    guint32                          ip = 0;
     guint16                          port;
     GArray                          *url;
+    GError                          *error = NULL;
 
     self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
+
+    if (!mm_parse_supl_address (ctx->supl, NULL, &ip, &port, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
 
     input = qmi_message_pds_set_agps_config_input_new ();
 
@@ -4540,7 +4547,7 @@ pds_set_supl_server (GTask *task)
     else if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (self)))
         qmi_message_pds_set_agps_config_input_set_network_mode (input, QMI_PDS_NETWORK_MODE_CDMA, NULL);
 
-    if (mm_parse_supl_address (ctx->supl, NULL, &ip, &port, NULL))
+    if (ip)
         qmi_message_pds_set_agps_config_input_set_location_server_address (input, GUINT32_FROM_BE (ip), port, NULL);
     else {
         url = parse_as_utf16_url (ctx->supl);
@@ -4640,11 +4647,18 @@ loc_set_supl_server (GTask *task)
     MMSharedQmi                 *self;
     SetSuplServerContext        *ctx;
     QmiMessageLocSetServerInput *input;
-    guint32                      ip;
+    guint32                      ip = 0;
     guint16                      port;
+    GError                      *error = NULL;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
+
+    if (!mm_parse_supl_address (ctx->supl, NULL, &ip, &port, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
 
     input = qmi_message_loc_set_server_input_new ();
 
@@ -4654,7 +4668,7 @@ loc_set_supl_server (GTask *task)
     else if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (self)))
         qmi_message_loc_set_server_input_set_server_type (input, QMI_LOC_SERVER_TYPE_CDMA_PDE, NULL);
 
-    if (mm_parse_supl_address (ctx->supl, NULL, &ip, &port, NULL))
+    if (ip)
         qmi_message_loc_set_server_input_set_ipv4 (input, GUINT32_FROM_BE (ip), (guint32) port, NULL);
     else
         qmi_message_loc_set_server_input_set_url (input, ctx->supl, NULL);
