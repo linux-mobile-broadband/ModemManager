@@ -5502,6 +5502,20 @@ out:
 
 /*****************************************************************************/
 
+/**
+ * mm_parse_supl_address:
+ * @supl: SUPL server address in string form.
+ * @out_fqdn: Return location for SUPL server hostname/FQDN if @supl contains one.
+ * @out_ip: Return location for the SUPL server IP address (in network byte
+ *  order) if @supl contains an IP address instead of a hostname/FQDN.
+ * @out_port: Return location for the port number from @supl, if any.
+ * @error: Return location for an error, or %NULL.
+ *
+ * Parses @supl into either a hostname/FQDN and port, or IP address and port, or
+ * returns an error if @supl is malformed.
+ *
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
+ */
 gboolean
 mm_parse_supl_address (const gchar  *supl,
                        gchar       **out_fqdn,
