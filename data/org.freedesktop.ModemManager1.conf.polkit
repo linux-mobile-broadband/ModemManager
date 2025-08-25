@@ -73,6 +73,10 @@
 
     <allow send_destination="org.freedesktop.ModemManager1"
            send_interface="org.freedesktop.ModemManager1.Modem"
+           send_member="SetPrimarySimSlot"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem"
            send_member="SetCurrentBands"/>
 
     <allow send_destination="org.freedesktop.ModemManager1"
