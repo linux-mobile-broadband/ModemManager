@@ -9,8 +9,8 @@ msgstr ""
 "Project-Id-Version: ModemManager main\n"
 "Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
 "ModemManager/issues\n"
-"POT-Creation-Date: 2025-01-23 03:26+0000\n"
-"PO-Revision-Date: 2025-04-23 22:39+0200\n"
+"POT-Creation-Date: 2025-05-25 15:28+0000\n"
+"PO-Revision-Date: 2025-09-01 18:20+0200\n"
 "Last-Translator: Anders Jonsson <anders.jonsson@norsjovallen.se>\n"
 "Language-Team: Swedish <tp-sv@listor.tp-sv.se>\n"
 "Language: sv\n"
@@ -18,7 +18,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Generator: Poedit 3.5\n"
+"X-Generator: Poedit 3.7\n"
 
 # https://it-ord.computersweden.se/ord/cell-broadcast/
 #: data/org.freedesktop.ModemManager1.policy.in.in:13
@@ -26,10 +26,12 @@ msgid "Enable and view Cell Broadcast messages"
 msgstr "Aktivera och visa Cell Broadcast-meddelanden"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:14
-msgid "System policy prevents enabling or viewing this device's text messages."
+msgid ""
+"System policy prevents enabling or viewing this device's cell broadcast "
+"messages."
 msgstr ""
-"En systempolicy förhindrar att aktivera eller visa denna enhets "
-"textmeddelanden."
+"En systempolicy förhindrar att aktivera eller visa denna enhets Cell "
+"Broadcast-meddelanden."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:22
 msgid "Control the Modem Manager daemon"
@@ -121,6 +123,6 @@ msgstr ""
 "En systempolicy förhindrar att fråga och hantera denna enhets fasta "
 "programvara."
 
-#: src/mm-sleep-monitor-systemd.c:130
+#: src/mm-sleep-monitor-systemd.c:133
 msgid "ModemManager needs to reset devices"
 msgstr "ModemManager behöver starta om enheter"
