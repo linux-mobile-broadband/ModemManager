@@ -9,8 +9,8 @@ msgstr ""
 "Project-Id-Version: ModemManager\n"
 "Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
 "ModemManager/issues\n"
-"POT-Creation-Date: 2024-12-02 03:24+0000\n"
-"PO-Revision-Date: 2025-02-09 15:02+0100\n"
+"POT-Creation-Date: 2025-08-27 03:30+0000\n"
+"PO-Revision-Date: 2025-08-27 14:08+0200\n"
 "Last-Translator: Piotr Drąg <piotrdrag@gmail.com>\n"
 "Language-Team: Polish <community-poland@mozilla.org>\n"
 "Language: pl\n"
@@ -22,13 +22,15 @@ msgstr ""
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:13
 msgid "Enable and view Cell Broadcast messages"
-msgstr "Włączenie i wyświetlanie wiadomości SMS"
+msgstr "Włączenie i wyświetlanie wiadomości nadawania komórkowego"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:14
-msgid "System policy prevents enabling or viewing this device's text messages."
+msgid ""
+"System policy prevents enabling or viewing this device's cell broadcast "
+"messages."
 msgstr ""
-"Ustawienia systemu uniemożliwiają włączanie lub wyświetlanie wiadomości SMS "
-"tego urządzenia."
+"Ustawienia systemu uniemożliwiają włączanie lub wyświetlanie wiadomości "
+"nadawania komórkowego tego urządzenia."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:22
 msgid "Control the Modem Manager daemon"
@@ -124,6 +126,6 @@ msgstr ""
 "Ustawienia systemu uniemożliwiają odpytywanie lub zarządzanie "
 "oprogramowaniem sprzętowym tego urządzenia."
 
-#: src/mm-sleep-monitor-systemd.c:125
+#: src/mm-sleep-monitor-systemd.c:133
 msgid "ModemManager needs to reset devices"
 msgstr "Usługa ModemManager musi ponownie uruchomić urządzenia"
