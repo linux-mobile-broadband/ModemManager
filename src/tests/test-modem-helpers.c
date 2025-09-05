@@ -4171,6 +4171,13 @@ static const CesqResponseTest cesq_response_tests[] = {
         .gsm_info  = TRUE,  .rxlev = 10, .rssi = -101.0, .ber = 6,
         .umts_info = FALSE, .rscp_level = 255, .ecn0_level = 255,
         .lte_info  = FALSE, .rsrq_level = 255, .rsrp_level = 255,
+    },
+    {
+        /* No space after ':' */
+        .str       = "+CESQ:10,6,255,255,255,255",
+        .gsm_info  = TRUE,  .rxlev = 10, .rssi = -101.0, .ber = 6,
+        .umts_info = FALSE, .rscp_level = 255, .ecn0_level = 255,
+        .lte_info  = FALSE, .rsrq_level = 255, .rsrp_level = 255,
     }
 };
 
