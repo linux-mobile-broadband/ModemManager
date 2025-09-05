@@ -27,6 +27,15 @@
     </defaults>
   </action>
 
+  <action id="org.freedesktop.ModemManager1.Modem.SetPrimarySimSlot">
+    <description>Set the primary sim slot of a modem</description>
+    <message>System policy prevents configuring modem properties.</message>
+    <defaults>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>@MM_DEFAULT_USER_POLICY@</allow_active>
+    </defaults>
+  </action>
+
   <action id="org.freedesktop.ModemManager1.Device.Control">
     <description>Unlock and control a mobile broadband device</description>
     <message>System policy prevents unlocking or controlling the mobile broadband device.</message>
