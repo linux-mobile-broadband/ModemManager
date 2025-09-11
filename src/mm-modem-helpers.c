@@ -2755,7 +2755,7 @@ mm_3gpp_parse_cesq_response (const gchar  *response,
     /* Response may be e.g.:
      * +CESQ: 99,99,255,255,20,80
      */
-    r = g_regex_new ("\\+CESQ: (\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+)(?:\\r\\n)?", 0, 0, NULL);
+    r = g_regex_new ("\\+CESQ:\\s*(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+)(?:\\r\\n)?", 0, 0, NULL);
     g_assert (r != NULL);
 
     g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
