@@ -3,6 +3,7 @@ ACTION!="add|change|move|bind", GOTO="mm_fibocom_port_types_end"
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="2cb7", GOTO="mm_fibocom_port_types"
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="1782", GOTO="mm_fibocom_port_types"
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="1508", GOTO="mm_fibocom_port_types"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="8087", GOTO="mm_fibocom_port_types"
 GOTO="mm_fibocom_port_types_end"
 
 LABEL="mm_fibocom_port_types"
@@ -133,5 +134,15 @@ ATTRS{idVendor}=="1782", ATTRS{idProduct}=="4d11", ENV{.MM_USBIFNUM}=="05", ENV{
 ATTRS{idVendor}=="1782", ATTRS{idProduct}=="4d11", ENV{.MM_USBIFNUM}=="06", ENV{ID_MM_PORT_IGNORE}="1"
 ATTRS{idVendor}=="1782", ATTRS{idProduct}=="4d11", ENV{.MM_USBIFNUM}=="07", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 ATTRS{idVendor}=="1782", ATTRS{idProduct}=="4d11", ENV{.MM_USBIFNUM}=="08", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+
+# Intel-branded Fibocom L850-GL (MODEM + 2 CDC-ACM + 3 CDC-NCM + SS)
+#  ttyACM0 (if #0): AT port, bInterfaceSubClass=2 (modem), bInterfaceProtocol=1 (AT-commands)
+#  ttyACM1 (if #2): No response to AT, bInterfaceSubClass=2 (modem), bInterfaceProtocol=0
+#  ttyACM2 (if #4): AT port, bInterfaceSubClass=2 (modem), bInterfaceProtocol=0
+#  if #6, if #8 and if #10: CDC NCM network interfaces
+#  if #12: bInterfaceClass=255 (Vendor Specific)
+ATTRS{idVendor}=="8087", ATTRS{idProduct}=="095a", ENV{.MM_USBIFNUM}=="00", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="8087", ATTRS{idProduct}=="095a", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="8087", ATTRS{idProduct}=="095a", ENV{.MM_USBIFNUM}=="04", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 
 LABEL="mm_fibocom_port_types_end"
