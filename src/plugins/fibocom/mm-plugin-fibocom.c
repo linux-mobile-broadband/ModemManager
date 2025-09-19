@@ -111,7 +111,7 @@ MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
 mm_plugin_create_fibocom (void)
 {
     static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
-    static const guint16 vendor_ids[] = { 0x2cb7, 0x1782, 0x1508, 0 };
+    static const guint16 vendor_ids[] = { 0x2cb7, 0x1782, 0x1508, 0x8087, 0 };
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_FIBOCOM,
