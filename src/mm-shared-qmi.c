@@ -2090,28 +2090,28 @@ mm_shared_qmi_set_current_bands (MMIfaceModem        *self,
         else
             qmi_message_nas_set_system_selection_preference_input_set_lte_band_preference (input, qmi_lte_bands, NULL);
     }
-	qmi_message_nas_set_system_selection_preference_input_set_nr5g_sa_band_preference (
-		input,
-		qmi_nr5g_bands[0],
-		qmi_nr5g_bands[1],
-		qmi_nr5g_bands[2],
-		qmi_nr5g_bands[3],
-		qmi_nr5g_bands[4],
-		qmi_nr5g_bands[5],
-		qmi_nr5g_bands[6],
-		qmi_nr5g_bands[7],
-		NULL);
-	qmi_message_nas_set_system_selection_preference_input_set_nr5g_nsa_band_preference (
-		input,
-		qmi_nr5g_bands[0],
-		qmi_nr5g_bands[1],
-		qmi_nr5g_bands[2],
-		qmi_nr5g_bands[3],
-		qmi_nr5g_bands[4],
-		qmi_nr5g_bands[5],
-		qmi_nr5g_bands[6],
-		qmi_nr5g_bands[7],
-		NULL);
+    qmi_message_nas_set_system_selection_preference_input_set_nr5g_sa_band_preference (
+        input,
+        qmi_nr5g_bands[0],
+        qmi_nr5g_bands[1],
+        qmi_nr5g_bands[2],
+        qmi_nr5g_bands[3],
+        qmi_nr5g_bands[4],
+        qmi_nr5g_bands[5],
+        qmi_nr5g_bands[6],
+        qmi_nr5g_bands[7],
+        NULL);
+    qmi_message_nas_set_system_selection_preference_input_set_nr5g_nsa_band_preference (
+        input,
+        qmi_nr5g_bands[0],
+        qmi_nr5g_bands[1],
+        qmi_nr5g_bands[2],
+        qmi_nr5g_bands[3],
+        qmi_nr5g_bands[4],
+        qmi_nr5g_bands[5],
+        qmi_nr5g_bands[6],
+        qmi_nr5g_bands[7],
+        NULL);
     qmi_message_nas_set_system_selection_preference_input_set_change_duration (input, QMI_NAS_CHANGE_DURATION_PERMANENT, NULL);
 
     qmi_client_nas_set_system_selection_preference (
