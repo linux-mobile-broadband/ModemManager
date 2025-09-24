@@ -263,6 +263,7 @@ subscriber_ready_status_ready (MbimDevice   *device,
     g_autoptr(MbimMessage)  response = NULL;
     g_autofree gchar       *raw_iccid = NULL;
     g_autoptr(GError)       error = NULL;
+    MbimSubscriberReadyState ready_state = MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED;
 
     self = g_task_get_source_object (task);
 
@@ -283,7 +284,6 @@ subscriber_ready_status_ready (MbimDevice   *device,
     if (response && mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &self->priv->preload_error)) {
         if (mbim_device_check_ms_mbimex_version (device, 3, 0)) {
             MbimSubscriberReadyStatusFlag flags = MBIM_SUBSCRIBER_READY_STATUS_FLAG_NONE;
-            MbimSubscriberReadyState ready_state = MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED;
 
             if (!mbim_message_ms_basic_connect_v3_subscriber_ready_status_response_parse (
                     response,
@@ -323,7 +323,7 @@ subscriber_ready_status_ready (MbimDevice   *device,
         } else {
             if (!mbim_message_subscriber_ready_status_response_parse (
                     response,
-                    NULL, /* ready_state */
+                    &ready_state,
                     &self->priv->imsi,
                     &raw_iccid,
                     NULL, /* ready_info */
@@ -339,6 +339,17 @@ subscriber_ready_status_ready (MbimDevice   *device,
             self->priv->iccid = mm_3gpp_parse_iccid (raw_iccid, &self->priv->iccid_error);
     }
 
+    if (self->priv->preload_error || ready_state == MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED) {
+        self->priv->preload = FALSE;
+        if (self->priv->preload_error)
+            g_task_return_error (task, g_steal_pointer (&self->priv->preload_error));
+        else
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_SIM_STATE,
+                                   "SIM is not ready: NotInitialized");
+
+        g_object_unref (task);
+        return;
+    }
     /* Go on to preload next contents */
     uicc_application_list (task, device);
 }
@@ -373,8 +384,9 @@ preload_subscriber_info (MMSimMbim           *self,
     cancellable = g_cancellable_new ();
     task = g_task_new (self, cancellable, callback, user_data);
 
-    /* only preload one single time; the info of the SIM should not
-     * change during runtime, unless we're handling hotplug events */
+    /* when preloading is successful, only preload one single time;
+     * the info of the SIM should not change during runtime, unless
+     * we're handling hotplug events */
     if (self->priv->preload) {
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
