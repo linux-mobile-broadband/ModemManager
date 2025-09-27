@@ -344,7 +344,7 @@ set_supl_server_process_reply (gboolean result,
                                const GError *error)
 {
     if (!result) {
-        g_printerr ("error: couldn't set SUPL servert address: '%s'\n",
+        g_printerr ("error: couldn't set SUPL server address: '%s'\n",
                     error ? error->message : "unknown error");
         exit (EXIT_FAILURE);
     }
