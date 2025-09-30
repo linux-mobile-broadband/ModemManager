@@ -46,6 +46,30 @@ ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="01a4", ENV{.MM_USBIFNUM}=="06", SUBS
 # Firmware interface implementation comes from the Fibocom shared utils.
 ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="01a4", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_FIBOCOM_FASTBOOT}="1"
 
+# Rolling RW101R-GL (MBIM in iface #0)
+# ttyUSB0 (if #2): GNSS data
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0301", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0302", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+
+# Rolling RW101R-GL (MBIM in iface #0, ADB in iface #4)
+#  ttyUSB0 (if #2): QCDM port
+#  ttyUSB1 (if #3): AT port
+#  ttyUSB2 (if #5): GNSS data
+#  ttyUSB3 (if #6): GNSS data
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="01a8", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_QCDM}="1"
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="01a8", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="01a8", ENV{.MM_USBIFNUM}=="05", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="01a8", ENV{.MM_USBIFNUM}=="06", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+# Firmware interface implementation comes from the Fibocom shared utils.
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="01a8", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_FIBOCOM_FASTBOOT}="1"
+
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="01a9", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_QCDM}="1"
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="01a9", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="01a9", ENV{.MM_USBIFNUM}=="05", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="01a9", ENV{.MM_USBIFNUM}=="06", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+# Firmware interface implementation comes from the Fibocom shared utils.
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="01a9", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_FIBOCOM_FASTBOOT}="1"
+
 # Rolling RW135 (MBIM in iface #0, ADB in iface #5)
 #  ttyUSB0 (if #2): GNSS data
 #  ttyUSB1 (if #3): QCDM port
