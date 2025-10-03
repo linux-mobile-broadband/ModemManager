@@ -6834,10 +6834,13 @@ mm_iface_modem_count_bearers (MMIfaceModem                   *self,
         return FALSE;
     }
 
-    if (flags & MM_IFACE_MODEM_COUNT_BEARERS_FLAG_MULTIPLEXED)
-        max = mm_bearer_list_get_max_active_multiplexed (list);
-    else
+    /* If only MULTIPLEXED is requested, only return max multiplexed bearers */
+    if (flags & ~MM_IFACE_MODEM_COUNT_BEARERS_FLAG_MULTIPLEXED)
         max = mm_bearer_list_get_max_active (list);
+    /* multiplexed is a subset of ACTIVE/CONNECTED */
+    if (flags & (MM_IFACE_MODEM_COUNT_BEARERS_FLAG_ACTIVE | MM_IFACE_MODEM_COUNT_BEARERS_FLAG_CONNECTED |
+                 MM_IFACE_MODEM_COUNT_BEARERS_FLAG_MULTIPLEXED))
+        max += mm_bearer_list_get_max_active_multiplexed (list);
 
     mm_bearer_list_foreach (list, (MMBearerListForeachFunc)bearer_count, &ctx);
     g_assert (max >= ctx.count);
