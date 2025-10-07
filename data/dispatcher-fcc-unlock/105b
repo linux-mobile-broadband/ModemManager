@@ -4,6 +4,7 @@
 # 2021 Aleksander Morgado <aleksander@aleksander.es>
 # 2022 Thilo-Alexander Ginkel <thilo@ginkel.com>
 # 2022 Bjørn Mork <bjorn@mork.no>
+# 2025 Kajetan Krykwiński <gitlab@kitor.pl>
 #
 # Foxconn SDX55 (Lenovo T99W175) FCC unlock operation
 #
@@ -22,7 +23,8 @@ for PORT in "$@"; do
   # match port type in Linux 5.14 and newer
   grep -q MBIM "/sys/class/wwan/$PORT/type" 2>/dev/null ||
   # match port name in Linux 5.13
-  echo "$PORT" | grep -qi MBIM && {
+  echo "$PORT" | grep -qi MBIM ||
+  echo "$PORT" | grep -q cdc-wdm && {
     MBIM_PORT="$PORT"
     break
   }
