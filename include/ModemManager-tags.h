@@ -323,6 +323,20 @@
  */
 #define ID_MM_TTY_AT_PROBE_TRIES "ID_MM_TTY_AT_PROBE_TRIES"
 
+/**
+ * ID_MM_INITIAL_QMAP_MUX_ID:
+ *
+ * This is a device-specific tag that allows users to specify the initial value
+ * of the QMAP multiplexed id to be used.
+ *
+ * An integer value greater or equal than 1 and smaller than 255.
+ *
+ * This setting does nothing if the modem doesn't support multiplexing.
+ *
+ * Since: 1.26
+ */
+#define ID_MM_INITIAL_QMAP_MUX_ID "ID_MM_INITIAL_QMAP_MUX_ID"
+
 /*
  * The following symbols are deprecated. We don't add them to -compat
  * because this -tags file is not really part of the installed API.

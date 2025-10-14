@@ -60,6 +60,7 @@ struct _MMPortQmiPrivate {
     gchar     *net_driver;
     gchar     *net_sysfs_path;
     guint      net_preallocated_links_requested;
+    guint      net_initial_mux_id;
 #if defined WITH_QRTR
     QrtrNode  *node;
 #endif
@@ -563,14 +564,24 @@ initialize_preallocated_links_next (GTask *task)
         return;
     }
 
-    qmi_device_add_link_with_flags (self->priv->qmi_device,
-                                    ctx->preallocated_links->len + 1,
-                                    mm_kernel_device_get_name (mm_port_peek_kernel_device (ctx->data)),
-                                    ctx->link_prefix_hint,
-                                    ctx->flags,
-                                    NULL,
-                                    (GAsyncReadyCallback) device_add_link_preallocated_ready,
-                                    task);
+    if (self->priv->net_initial_mux_id)
+        qmi_device_add_link_with_flags_and_initial_mux_id (self->priv->qmi_device,
+                                                           self->priv->net_initial_mux_id + ctx->preallocated_links->len,
+                                                           mm_kernel_device_get_name (mm_port_peek_kernel_device (ctx->data)),
+                                                           ctx->link_prefix_hint,
+                                                           ctx->flags,
+                                                           NULL,
+                                                           (GAsyncReadyCallback) device_add_link_preallocated_ready,
+                                                           task);
+    else
+        qmi_device_add_link_with_flags (self->priv->qmi_device,
+                                        ctx->preallocated_links->len + 1,
+                                        mm_kernel_device_get_name (mm_port_peek_kernel_device (ctx->data)),
+                                        ctx->link_prefix_hint,
+                                        ctx->flags,
+                                        NULL,
+                                        (GAsyncReadyCallback) device_add_link_preallocated_ready,
+                                        task);
 }
 
 static void
@@ -635,12 +646,17 @@ device_add_link_ready (QmiDevice    *device,
                        GAsyncResult *res,
                        GTask        *task)
 {
+    MMPortQmi        *self;
     SetupLinkContext *ctx;
     GError           *error = NULL;
 
+    self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
-    ctx->link_name = qmi_device_add_link_with_flags_finish (device, res, &ctx->mux_id, &error);
+    if (self->priv->net_initial_mux_id)
+        ctx->link_name = qmi_device_add_link_with_flags_and_initial_mux_id_finish (device, res, &ctx->mux_id, &error);
+    else
+        ctx->link_name = qmi_device_add_link_with_flags_finish (device, res, &ctx->mux_id, &error);
     if (!ctx->link_name) {
         g_prefix_error (&error, "failed to add link for device: ");
         g_task_return_error (task, error);
@@ -810,14 +826,24 @@ mm_port_qmi_setup_link (MMPortQmi           *self,
 
     /* No preallocated links required and using rmnet, just try to add link in the QmiDevice */
     if (self->priv->kernel_data_modes & MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET) {
-        qmi_device_add_link_with_flags (self->priv->qmi_device,
-                                        QMI_DEVICE_MUX_ID_AUTOMATIC,
-                                        mm_kernel_device_get_name (mm_port_peek_kernel_device (data)),
-                                        link_prefix_hint,
-                                        get_rmnet_device_add_link_flags (self),
-                                        NULL,
-                                        (GAsyncReadyCallback) device_add_link_ready,
-                                        task);
+        if (self->priv->net_initial_mux_id)
+            qmi_device_add_link_with_flags_and_initial_mux_id (self->priv->qmi_device,
+                                                               self->priv->net_initial_mux_id,
+                                                               mm_kernel_device_get_name (mm_port_peek_kernel_device (data)),
+                                                               link_prefix_hint,
+                                                               get_rmnet_device_add_link_flags (self),
+                                                               NULL,
+                                                               (GAsyncReadyCallback) device_add_link_ready,
+                                                               task);
+        else
+            qmi_device_add_link_with_flags (self->priv->qmi_device,
+                                            QMI_DEVICE_MUX_ID_AUTOMATIC,
+                                            mm_kernel_device_get_name (mm_port_peek_kernel_device (data)),
+                                            link_prefix_hint,
+                                            get_rmnet_device_add_link_flags (self),
+                                            NULL,
+                                            (GAsyncReadyCallback) device_add_link_ready,
+                                            task);
         return;
     }
 
@@ -2722,6 +2748,9 @@ mm_port_qmi_set_net_details (MMPortQmi *self,
 
     g_assert (!self->priv->net_preallocated_links_requested);
     self->priv->net_preallocated_links_requested = mm_kernel_device_get_global_property_as_int (first_net_dev, "ID_MM_QMI_PREALLOCATED_LINKS");
+
+    g_assert (!self->priv->net_initial_mux_id);
+    self->priv->net_initial_mux_id = mm_kernel_device_get_global_property_as_int (first_net_dev, "ID_MM_INITIAL_QMAP_MUX_ID");
 
     initialize_endpoint_info (self);
 }
