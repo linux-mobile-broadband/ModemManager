@@ -341,6 +341,7 @@ subscriber_ready_status_ready (MbimDevice   *device,
 
     if (self->priv->preload_error || ready_state == MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED) {
         self->priv->preload = FALSE;
+        g_clear_object (&self->priv->preload_cancellable);
         if (self->priv->preload_error)
             g_task_return_error (task, g_steal_pointer (&self->priv->preload_error));
         else
