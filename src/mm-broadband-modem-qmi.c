@@ -3332,6 +3332,54 @@ modem_3gpp_disable_facility_lock (MMIfaceModem3gpp *self,
 /*****************************************************************************/
 /* Scan networks (3GPP interface) */
 
+typedef enum {
+    SCAN_STEP_FIRST,
+    SCAN_STEP_SCAN,
+    SCAN_STEP_5GNR,
+    SCAN_STEP_LAST,
+} ScanStep;
+
+typedef struct {
+    ScanStep      step;
+    GError       *error;
+    QmiClientNas *client;
+    guint         scan_indication_id;
+    guint         scan_timeout_id;
+    GList        *scan_result;
+} ScanContext;
+
+static void
+scan_context_timeout_cleanup (ScanContext *ctx)
+{
+    if (ctx->scan_timeout_id) {
+        g_source_remove (ctx->scan_timeout_id);
+        ctx->scan_timeout_id = 0;
+    }
+}
+
+static void
+scan_context_cleanup (ScanContext *ctx)
+{
+    scan_context_timeout_cleanup (ctx);
+    if (ctx->scan_indication_id) {
+        if (ctx->client)
+            g_signal_handler_disconnect (ctx->client, ctx->scan_indication_id);
+        ctx->scan_indication_id = 0;
+    }
+}
+
+static void
+scan_context_free (ScanContext *ctx)
+{
+    scan_context_cleanup (ctx);
+    g_clear_error (&ctx->error);
+    g_clear_object (&ctx->client);
+    g_clear_pointer (&ctx->scan_result, (GDestroyNotify)mm_3gpp_network_info_list_free);
+    g_free (ctx);
+}
+
+static void scan_context_step (GTask *task);
+
 static GList *
 modem_3gpp_scan_networks_finish (MMIfaceModem3gpp *self,
                                  GAsyncResult *res,
@@ -3411,23 +3459,24 @@ nas_network_scan_ready (QmiClientNas *client,
                         GAsyncResult *res,
                         GTask *task)
 {
-    QmiMessageNasNetworkScanOutput *output = NULL;
-    GError *error = NULL;
+    g_autoptr(QmiMessageNasNetworkScanOutput)  output = NULL;
+    ScanContext                               *ctx;
 
-    output = qmi_client_nas_network_scan_finish (client, res, &error);
+    ctx = g_task_get_task_data (task);
+
+    output = qmi_client_nas_network_scan_finish (client, res, &ctx->error);
     if (!output) {
-        g_prefix_error (&error, "QMI operation failed: ");
-        g_task_return_error (task, error);
-    } else if (!qmi_message_nas_network_scan_output_get_result (output, &error)) {
-        g_prefix_error (&error, "Couldn't scan networks: ");
-        g_task_return_error (task, error);
+        g_prefix_error (&ctx->error, "QMI operation failed: ");
+        ctx->step = SCAN_STEP_LAST;
+    } else if (!qmi_message_nas_network_scan_output_get_result (output, &ctx->error)) {
+        g_prefix_error (&ctx->error, "Couldn't scan networks: ");
+        ctx->step = SCAN_STEP_LAST;
     } else {
-        GList *scan_result = NULL;
         GArray *info_array = NULL;
 
         if (qmi_message_nas_network_scan_output_get_network_information (output, &info_array, NULL)) {
             GArray *rat_array = NULL;
-            gboolean *rat_array_used_flags = NULL;
+            g_autofree gboolean *rat_array_used_flags = NULL;
             guint i;
 
             /* Get optional RAT array */
@@ -3448,19 +3497,227 @@ nas_network_scan_ready (QmiClientNas *client,
                                                                     info_element->mcc,
                                                                     info_element->mnc);
 
-                scan_result = g_list_append (scan_result, info);
+                ctx->scan_result = g_list_append (ctx->scan_result, info);
             }
-
-            g_free (rat_array_used_flags);
         }
-
-        g_task_return_pointer (task, scan_result, (GDestroyNotify)mm_3gpp_network_info_list_free);
+        ctx->step++;
     }
 
-    if (output)
-        qmi_message_nas_network_scan_output_unref (output);
+    scan_context_step (task);
+}
 
-    g_object_unref (task);
+static gboolean
+nr5g_scan_timeout (GTask *task)
+{
+    MMBroadbandModemQmi *self;
+    ScanContext         *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+    scan_context_timeout_cleanup (ctx);
+
+    mm_obj_warn (self, "timed out incrementally scanning for 5GNR networks");
+
+    /* Not a hard error; just return results we already have */
+    ctx->step = SCAN_STEP_LAST;
+    scan_context_step (task);
+
+    return G_SOURCE_REMOVE;
+}
+
+static MM3gppNetworkInfo *
+get_3gpp_network_info_incremental (QmiIndicationNasIncrementalNetworkScanOutputNetworkInformationElement *element)
+{
+    GString *aux;
+    MM3gppNetworkInfo *info;
+
+    info = g_new (MM3gppNetworkInfo, 1);
+    info->status = network_availability_from_qmi_nas_network_status (element->network_status);
+
+    aux = g_string_new ("");
+    /* MCC always 3 digits */
+    g_string_append_printf (aux, "%.3"G_GUINT16_FORMAT, element->mcc);
+    if (element->includes_pcs_digit)
+        g_string_append_printf (aux, "%.3"G_GUINT16_FORMAT, element->mnc);
+    else
+        g_string_append_printf (aux, "%.2"G_GUINT16_FORMAT, element->mnc);
+
+    info->operator_code = g_string_free (aux, FALSE);
+    info->operator_short = NULL;
+    info->operator_long = g_strdup (element->description);
+    info->access_tech = mm_modem_access_technology_from_qmi_radio_interface (element->radio_interface);
+
+    return info;
+}
+
+static void
+nr5g_scan_received (QmiClientNas                                 *client,
+                    QmiIndicationNasIncrementalNetworkScanOutput *output,
+                    GTask                                        *task)
+{
+    g_autoptr(GError)                   error = NULL;
+    QmiNasIncrementalNetworkScanStatus  status = 0;
+    MMBroadbandModemQmi                *self;
+    ScanContext                        *ctx;
+    GArray                             *array = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    if (!qmi_indication_nas_incremental_network_scan_output_get_status (
+          output, &status, &error)) {
+        mm_obj_warn (self, "could not parse incremental scan status: %s", error->message);
+        /* Not a hard error */
+    } else {
+        if (qmi_indication_nas_incremental_network_scan_output_get_network_information (output, &array, NULL)) {
+            guint i;
+
+            for (i = 0; i < array->len; i++) {
+                QmiIndicationNasIncrementalNetworkScanOutputNetworkInformationElement *element;
+                MM3gppNetworkInfo *info;
+
+                element = &g_array_index (array, QmiIndicationNasIncrementalNetworkScanOutputNetworkInformationElement, i);
+                if (element->radio_interface == QMI_NAS_RADIO_INTERFACE_5GNR) {
+                    info = get_3gpp_network_info_incremental (element);
+                    ctx->scan_result = g_list_append (ctx->scan_result, info);
+                }
+            }
+        }
+
+        switch (status) {
+        case QMI_NAS_INCREMENTAL_NETWORK_SCAN_STATUS_PARTIAL:
+            /* Continue waiting for more results */
+            return;
+        case QMI_NAS_INCREMENTAL_NETWORK_SCAN_STATUS_COMPLETE:
+            break;
+        case QMI_NAS_INCREMENTAL_NETWORK_SCAN_STATUS_ABORTED:
+            mm_obj_warn (self, "incremental network scan aborted");
+            break;
+        default:
+            mm_obj_warn (self, "unknown incremental network scan status: %d", status);
+            break;
+        }
+    }
+
+    scan_context_cleanup (ctx);
+    ctx->step++;
+    scan_context_step (task);
+}
+
+static void
+nas_5g_network_scan_ready (QmiClientNas *client,
+                           GAsyncResult *res,
+                           GTask        *task)
+{
+    g_autoptr(QmiMessageNasIncrementalNetworkScanOutput)  output = NULL;
+    MMBroadbandModemQmi                                  *self;
+    ScanContext                                          *ctx;
+    g_autoptr(GError)                                     error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    output = qmi_client_nas_incremental_network_scan_finish (client, res, &error);
+    if (!output) {
+        mm_obj_warn (self, "incremental scan operation failed: %s", error->message);
+        /* Not a hard error; fall through to LAST */
+        ctx->step = SCAN_STEP_LAST;
+    } else if (!qmi_message_nas_incremental_network_scan_output_get_result (output, &error)) {
+        mm_obj_warn (self, "couldn't incrementally scan networks: %s", error->message);
+        /* Not a hard error; fall through to LAST */
+        ctx->step = SCAN_STEP_LAST;
+    } else {
+        /* Wait for scan results via indications */
+        return;
+    }
+
+    scan_context_step (task);
+}
+
+static void
+scan_context_step (GTask *task)
+{
+    MMBroadbandModemQmi *self;
+    ScanContext         *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    if (g_task_return_error_if_cancelled (task)) {
+        scan_context_cleanup (ctx);
+        g_object_unref (task);
+        return;
+    }
+
+    switch (ctx->step) {
+    case SCAN_STEP_FIRST:
+        mm_obj_msg (self, "scan step [%d/%d]: start",
+                    ctx->step, SCAN_STEP_LAST);
+        ctx->step++;
+        /* Fall through */
+
+    case SCAN_STEP_SCAN:
+        /* Normal blocking NAS scan does not return 5GNR results */
+        mm_obj_msg (self, "scan step [%d/%d]: non-5GNR scan",
+                    ctx->step, SCAN_STEP_LAST);
+        qmi_client_nas_network_scan (ctx->client,
+                                     NULL,
+                                     300,
+                                     NULL,
+                                     (GAsyncReadyCallback)nas_network_scan_ready,
+                                     task);
+        return;
+
+    case SCAN_STEP_5GNR:
+        /* If the modem is 5GNR capable, run an incremental scan for 5G results */
+        if (mm_iface_modem_get_current_capabilities (MM_IFACE_MODEM (self)) & MM_MODEM_CAPABILITY_5GNR) {
+            g_autoptr(QmiMessageNasIncrementalNetworkScanInput) input = NULL;
+
+            mm_obj_msg (self, "scan step [%d/%d]: 5GNR scan", ctx->step, SCAN_STEP_LAST);
+
+            input = qmi_message_nas_incremental_network_scan_input_new ();
+            if (qmi_message_nas_incremental_network_scan_input_set_network_type (
+                    input,
+                    QMI_NAS_NETWORK_SCAN_TYPE_5GNR,
+                    &ctx->error)) {
+                qmi_client_nas_incremental_network_scan (ctx->client,
+                                                         input,
+                                                         10,
+                                                         NULL,
+                                                         (GAsyncReadyCallback)nas_5g_network_scan_ready,
+                                                         task);
+
+                ctx->scan_indication_id =
+                    g_signal_connect (ctx->client,
+                                      "incremental-network-scan",
+                                      G_CALLBACK (nr5g_scan_received),
+                                      task);
+                ctx->scan_timeout_id = g_timeout_add_seconds (100,
+                                                              (GSourceFunc)nr5g_scan_timeout,
+                                                              task);
+                return;
+            }
+            /* Fall through */
+        }
+        ctx->step++;
+        /* Fall through */
+
+    case SCAN_STEP_LAST:
+        mm_obj_msg (self, "scan step [%d/%d]: done", ctx->step, SCAN_STEP_LAST);
+        scan_context_cleanup (ctx);
+        if (ctx->error) {
+            g_task_return_error (task, g_steal_pointer (&ctx->error));
+        } else {
+            g_task_return_pointer (task,
+                                   g_steal_pointer (&ctx->scan_result),
+                                   (GDestroyNotify)mm_3gpp_network_info_list_free);
+        }
+        g_object_unref (task);
+        return;
+
+    default:
+        g_assert_not_reached ();
+    }
 }
 
 static void
@@ -3468,7 +3725,9 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
-    QmiClient *client = NULL;
+    ScanContext *ctx;
+    GTask       *task;
+    QmiClient   *client = NULL;
 
     /* We will pass the GList in the GSimpleAsyncResult, so we must
      * ensure that there is a callback so that we get it properly
@@ -3480,13 +3739,14 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
                                       callback, user_data))
         return;
 
-    mm_obj_dbg (self, "scanning networks...");
-    qmi_client_nas_network_scan (QMI_CLIENT_NAS (client),
-                                 NULL,
-                                 300,
-                                 NULL,
-                                 (GAsyncReadyCallback)nas_network_scan_ready,
-                                 g_task_new (self, NULL, callback, user_data));
+    ctx = g_new0 (ScanContext, 1);
+    ctx->step = SCAN_STEP_FIRST;
+    ctx->client = QMI_CLIENT_NAS (g_object_ref (client));
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)scan_context_free);
+
+    scan_context_step (task);
 }
 
 /*****************************************************************************/
