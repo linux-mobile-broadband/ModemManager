@@ -931,6 +931,7 @@ mm_modem_access_technology_from_qmi_radio_interface (QmiNasRadioInterface interf
     case QMI_NAS_RADIO_INTERFACE_TD_SCDMA:
     case QMI_NAS_RADIO_INTERFACE_AMPS:
     case QMI_NAS_RADIO_INTERFACE_NONE:
+    case QMI_NAS_RADIO_INTERFACE_NO_CHANGE:
     default:
         return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     }
@@ -1029,6 +1030,7 @@ mm_modem_mode_from_qmi_nas_radio_interface (QmiNasRadioInterface iface)
         case QMI_NAS_RADIO_INTERFACE_AMPS:
         case QMI_NAS_RADIO_INTERFACE_TD_SCDMA:
         case QMI_NAS_RADIO_INTERFACE_UNKNOWN:
+        case QMI_NAS_RADIO_INTERFACE_NO_CHANGE:
         default:
             return MM_MODEM_MODE_NONE;
     }
