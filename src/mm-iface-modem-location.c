@@ -1184,7 +1184,7 @@ handle_inject_assistance_data_auth_ready (MMIfaceAuth                       *_se
     /* If the type is NOT supported, set error */
     if (mm_gdbus_modem_location_get_supported_assistance_data (ctx->skeleton) == MM_MODEM_LOCATION_ASSISTANCE_DATA_TYPE_NONE) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                                        "Cannot inject assistance data: ununsupported");
+                                                        "Cannot inject assistance data: unsupported");
         handle_inject_assistance_data_context_free (ctx);
         return;
     }
