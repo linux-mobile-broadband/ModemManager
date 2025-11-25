@@ -1400,6 +1400,7 @@ qmi_dbm_valid (gint8 dbm, QmiNasRadioInterface radio_interface)
         return (dbm > -125 && dbm < -30);
     case QMI_NAS_RADIO_INTERFACE_UMTS:
         return (dbm > -125 && dbm < -30);
+    case QMI_NAS_RADIO_INTERFACE_NO_CHANGE:
     case QMI_NAS_RADIO_INTERFACE_UNKNOWN:
     case QMI_NAS_RADIO_INTERFACE_NONE:
     case QMI_NAS_RADIO_INTERFACE_AMPS:
@@ -14050,6 +14051,7 @@ signal_load_values_get_signal_strength_ready (QmiClientNas *client,
                     ctx->values_result->lte = mm_signal_new ();
                 mm_signal_set_rssi (ctx->values_result->lte, (gdouble)element->rssi);
                 break;
+            case QMI_NAS_RADIO_INTERFACE_NO_CHANGE:
             case QMI_NAS_RADIO_INTERFACE_UNKNOWN:
             case QMI_NAS_RADIO_INTERFACE_NONE:
             case QMI_NAS_RADIO_INTERFACE_AMPS:
@@ -14087,6 +14089,7 @@ signal_load_values_get_signal_strength_ready (QmiClientNas *client,
             case QMI_NAS_RADIO_INTERFACE_GSM:
             case QMI_NAS_RADIO_INTERFACE_LTE:
             case QMI_NAS_RADIO_INTERFACE_UNKNOWN:
+            case QMI_NAS_RADIO_INTERFACE_NO_CHANGE:
             case QMI_NAS_RADIO_INTERFACE_NONE:
             case QMI_NAS_RADIO_INTERFACE_AMPS:
             case QMI_NAS_RADIO_INTERFACE_TD_SCDMA:
