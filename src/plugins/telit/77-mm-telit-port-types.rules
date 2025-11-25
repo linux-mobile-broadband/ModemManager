@@ -38,6 +38,7 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1011", ENV{.MM_USBIFNUM}=="01", SUBS
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1031", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_TYPE_QCDM}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1031", ENV{.MM_USBIFNUM}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1031", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1031", ENV{ID_MM_INITIAL_QMAP_MUX_ID}="129"
 
 # LE910C1-EUX (ECM composition)
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1033", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_TYPE_QCDM}="1"
