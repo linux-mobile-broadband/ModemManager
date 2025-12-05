@@ -73,6 +73,17 @@ iccid_read_ready (MMBaseModem *modem,
         return;
     }
 
+    p = mm_strip_tag (response, "ICCID:");
+    if (!p) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Failed to parse ICCID response: '%s'",
+                                 response);
+        g_object_unref (task);
+        return;
+    }
+
     parsed = mm_3gpp_parse_iccid (p, &local);
     if (parsed)
         g_task_return_pointer (task, parsed, g_free);
