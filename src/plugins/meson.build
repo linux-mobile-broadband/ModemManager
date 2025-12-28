@@ -857,6 +857,8 @@ if plugins_options['pantech']
     'plugin': true,
     'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': '-DMM_MODULE_NAME="pantech"'},
   }}
+
+  plugins_udev_rules += files('pantech/77-mm-pantech.rules')
 endif
 
 # plugin: qcom-soc
