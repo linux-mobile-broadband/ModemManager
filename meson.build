@@ -10,7 +10,7 @@ project(
     'c_std=gnu89',
     'warning_level=2',
   ],
-  meson_version: '>= 0.53.0',
+  meson_version: '>= 0.60.0',
 )
 
 meson_version = meson.version()
@@ -31,11 +31,13 @@ mm_includedir = get_option('includedir')
 mm_libdir = get_option('libdir')
 mm_sbindir = get_option('sbindir')
 mm_sysconfdir = get_option('sysconfdir')
+mm_sharedstatedir = get_option('sharedstatedir')
 
 mm_pkgdatadir = mm_datadir / mm_name
 mm_pkgincludedir = mm_includedir / mm_name
 mm_pkglibdir = mm_libdir / mm_name
 mm_pkgsysconfdir = mm_sysconfdir / mm_name
+mm_pkgsharedstatedir = mm_sharedstatedir / mm_name
 
 mm_glib_name = 'libmm-glib'
 mm_glib_pkgincludedir = mm_includedir / mm_glib_name
