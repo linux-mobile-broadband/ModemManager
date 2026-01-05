@@ -10,6 +10,7 @@ test_units = {
   'charsets': libhelpers_dep,
   'error-helpers': libhelpers_dep,
   'kernel-device-helpers': libkerneldevice_dep,
+  'location-cache': libhelpers_dep,
   'modem-helpers': libhelpers_dep,
   'port-scheduler': libport_dep,
   'sms-part-3gpp': libhelpers_dep,
