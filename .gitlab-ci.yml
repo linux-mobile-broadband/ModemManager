@@ -12,8 +12,8 @@ stages:
 .common_variables:
   variables:
     FDO_UPSTREAM_REPO: mobile-broadband/ModemManager
-    FDO_DISTRIBUTION_VERSION: '20.04'
-    FDO_DISTRIBUTION_TAG: '2023-01-03.1'
+    FDO_DISTRIBUTION_VERSION: '22.04'
+    FDO_DISTRIBUTION_TAG: '2026-01-05.1'
     FDO_DISTRIBUTION_PACKAGES: ca-certificates git gcc meson ninja-build gawk
                                libgettextpo-dev libgirepository1.0-dev libglib2.0-dev
                                libgudev-1.0-dev python3-dbus python3-gi autopoint
