@@ -487,15 +487,13 @@ xmm7360_rpc_msg_body_unpack (GByteArray *buf, GPtrArray *args, GError **error)
 }
 
 static Xmm7360RpcResponse *
-parse_response_xmm7360 (GByteArray *buf)
+parse_response_xmm7360 (GByteArray *buf, GError **error)
 {
-    g_autoptr(GError)   error = NULL;
-    Xmm7360RpcResponse *response = NULL;
-    gsize               offset;
-    Xmm7360RpcMsgArg   *arg;
-    gint                consumed;
-    gint                asn_msg_len = 0;
-    gint                unsol_id = 0;
+    g_autoptr(Xmm7360RpcResponse) response = NULL;
+    gsize                         offset;
+    gint                          consumed;
+    gint                          asn_msg_len = 0;
+    gint                          unsol_id = 0;
 
     /* first 20 bytes are format header:
      * message size           (  int32, 4)
@@ -504,30 +502,26 @@ parse_response_xmm7360 (GByteArray *buf)
      * transmission id        (  int32, 4)
      */
     if (buf->len <= 20) {
-        mm_obj_dbg (NULL, "error parsing RPC message: message size %u too short", buf->len);
-        goto err;
+        PARSE_ERROR ("error parsing RPC message: message size %u too short", buf->len);
+        return NULL;
     }
 
+    /* Read and validate the ASN message size */
     offset = 4;
-    consumed = xmm7360_byte_array_read_asn_int (buf, offset, &asn_msg_len, NULL, &error);
-    if (consumed < 0) {
-        mm_obj_dbg (NULL, "error parsing RPC message: error reading ASN message size: %s",
-                    error->message);
-        goto err;
-    }
+    consumed = xmm7360_byte_array_read_asn_int (buf, offset, &asn_msg_len, NULL, error);
+    if (consumed < 0)
+        return NULL;
     offset += consumed;
+    /* Make sure the ASN message size and message size agree */
     if (*(gint32 *) buf->data != asn_msg_len) {
-        mm_obj_dbg (NULL, "error parsing RPC message: length mismatch (buf %d != asn %d)",
-                    *(gint32 *) buf->data, asn_msg_len);
-        goto err;
+        PARSE_ERROR ("error parsing RPC message: length mismatch (buf %d != asn %d)",
+                     *(gint32 *) buf->data, asn_msg_len);
+        return NULL;
     }
 
-    consumed = xmm7360_byte_array_read_asn_int (buf, offset, &unsol_id, NULL, &error);
-    if (consumed < 0) {
-        mm_obj_dbg (NULL, "error parsing RPC message: error reading unsolicited message id: %s",
-                    error->message);
-        goto err;
-    }
+    consumed = xmm7360_byte_array_read_asn_int (buf, offset, &unsol_id, NULL, error);
+    if (consumed < 0)
+        return NULL;
     offset += consumed;
 
     /* initialize all fields of the response */
@@ -539,10 +533,8 @@ parse_response_xmm7360 (GByteArray *buf)
     response->content = g_ptr_array_new_with_free_func ((GDestroyNotify)xmm7360_rpc_msg_arg_free);
 
     g_byte_array_append (response->body, &buf->data[20], buf->len - 20);
-    if (!xmm7360_rpc_msg_body_unpack (response->body, response->content, &error)) {
-        mm_obj_dbg (NULL, "error parsing RPC message: unpacking failed: %s", error->message);
-        goto err;
-    }
+    if (!xmm7360_rpc_msg_body_unpack (response->body, response->content, error))
+        return NULL;
 
     if (response->id == 0x11000100) {
         response->type = XMM7360_RPC_RESPONSE_TYPE_RESPONSE;
@@ -550,14 +542,17 @@ parse_response_xmm7360 (GByteArray *buf)
         if (response->unsol_id >= 0x7d0) {
             response->type = XMM7360_RPC_RESPONSE_TYPE_ASYNC_ACK;
         } else {
+            Xmm7360RpcMsgArg *arg;
+
             response->type = XMM7360_RPC_RESPONSE_TYPE_RESPONSE;
 
             /* discard first element in content (equals transmission id) */
             arg = (Xmm7360RpcMsgArg *) g_ptr_array_index (response->content, 0);
             if (arg->type != XMM7360_RPC_MSG_ARG_TYPE_LONG
                 || (guint32) XMM7360_RPC_MSG_ARG_GET_INT (arg) != response->id) {
-                mm_obj_dbg (NULL, "error parsing RPC message: invalid start of async response body");
-                goto err;
+                PARSE_ERROR ("error parsing RPC message: invalid start of async response body (type %u not LONG or ID mismatch)",
+                             arg->type);
+                return NULL;
             }
             g_ptr_array_remove_index (response->content, 0);
             g_byte_array_remove_range (response->body, 0, 6);
@@ -566,12 +561,7 @@ parse_response_xmm7360 (GByteArray *buf)
         response->type = XMM7360_RPC_RESPONSE_TYPE_UNSOLICITED;
     }
 
-    return response;
-
-err:
-    if (response)
-        xmm7360_rpc_response_free (response);
-    return NULL;
+    return g_steal_pointer (&response);
 }
 
 static MMPortSerialResponseType
@@ -609,7 +599,11 @@ serial_command_ready (MMPortSerial *port,
         return;
     }
 
-    response = parse_response_xmm7360 (response_buffer);
+    response = parse_response_xmm7360 (response_buffer, &error);
+    if (!response) {
+        mm_obj_dbg (port, "%s", error->message);
+        g_clear_error (&error);
+    }
     if (response_buffer->len > 0)
         g_byte_array_remove_range (response_buffer, 0, response_buffer->len);
     g_byte_array_unref (response_buffer);
@@ -728,13 +722,14 @@ mm_port_serial_xmmrpc_xmm7360_enable_unsolicited_msg_handler (MMPortSerialXmmrpc
 static void
 parse_unsolicited (MMPortSerial *port, GByteArray *response_buffer)
 {
-    MMPortSerialXmmrpcXmm7360 *self = MM_PORT_SERIAL_XMMRPC_XMM7360 (port);
-    g_autoptr(Xmm7360RpcResponse) response = NULL;
+    MMPortSerialXmmrpcXmm7360     *self = MM_PORT_SERIAL_XMMRPC_XMM7360 (port);
+    g_autoptr(Xmm7360RpcResponse)  response = NULL;
+    g_autoptr(GError)              error = NULL;
     GSList *iter;
 
-    response = parse_response_xmm7360 (response_buffer);
-
+    response = parse_response_xmm7360 (response_buffer, &error);
     if (!response) {
+        mm_obj_dbg (port, "%s", error->message);
         return;
     }
 
