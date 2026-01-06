@@ -600,6 +600,7 @@ if plugins_options['intel']
     'intel/mm-broadband-modem-xmm7360.c',
     'intel/mm-broadband-modem-xmm7360-rpc.c',
     'intel/mm-port-serial-xmmrpc-xmm7360.c',
+    'intel/mm-xmmrpc-xmm7360-protocol.c',
     'intel/mm-bearer-xmm7360.c',
     'intel/mm-sim-xmm7360.c',
   )
@@ -610,7 +611,7 @@ if plugins_options['intel']
 
   common_c_args = '-DMM_MODULE_NAME="intel"'
 
-  headers = files('intel/mm-port-serial-xmmrpc-xmm7360.h')
+  headers = files('intel/mm-xmmrpc-xmm7360-protocol.h')
 
   enums_types = 'mm-intel-enums-types'
 
