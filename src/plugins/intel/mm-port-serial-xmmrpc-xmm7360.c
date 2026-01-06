@@ -42,6 +42,8 @@ xmm7360_rpc_msg_arg_free (Xmm7360RpcMsgArg *arg)
     g_free (arg);
 }
 
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (Xmm7360RpcMsgArg, xmm7360_rpc_msg_arg_free)
+
 void
 xmm7360_rpc_response_free (Xmm7360RpcResponse *response)
 {
@@ -52,98 +54,157 @@ xmm7360_rpc_response_free (Xmm7360RpcResponse *response)
     }
 }
 
-static gint
-xmm7360_byte_array_read_asn_int (GByteArray *buf, gsize *offset, Xmm7360RpcMsgArg *arg)
-{
-    gint size;
-    gint bytes_read;
-    gint val;
+#define PARSE_ERROR(fmt, ...) { \
+    g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, fmt, __VA_ARGS__); \
+}
 
-    g_assert (buf->len > *offset + 2);
+static gint
+xmm7360_byte_array_read_asn_int (GByteArray        *buf,
+                                 gsize              offset,
+                                 gint              *out_val,
+                                 Xmm7360RpcMsgArg  *out_arg,
+                                 GError           **error)
+{
+    const gsize orig_offset = offset;
+    gint        size;
+    gint        bytes_read;
+    gint        val;
+
+    if (buf->len <= offset + 2) {
+        PARSE_ERROR ("initial buffer size %u too small (need %zu)",
+                     buf->len, offset + 2);
+        return -1;
+    }
 
     /* check ASN start byte and read int size */
-    g_assert (buf->data[(*offset)++] == 0x02);
-    size = buf->data[(*offset)++];
+    if (buf->data[offset] != 0x02) {
+        PARSE_ERROR ("unexpected ASN start byte 0x%02X (expected 0x02)", buf->data[offset]);
+        return -1;
+    }
+    offset++;
+    size = buf->data[offset++];
 
     /* read actual value byte by byte */
-    g_assert (buf->len >= *offset + size);
+    if (buf->len < offset + size) {
+        PARSE_ERROR ("buffer size %u too small (need %zu)", buf->len, offset + size);
+        return -1;
+    }
     val = 0;
     for (bytes_read = 0; bytes_read < size; bytes_read++) {
         val <<= 8;
-        val |= buf->data[(*offset)++];
+        val |= buf->data[offset++];
     }
 
-    if (arg != NULL) {
+    if (out_arg) {
         if (size == 0x01) {
-            arg->type = XMM7360_RPC_MSG_ARG_TYPE_BYTE;
-            arg->value.b = (gint8) val;
+            out_arg->type = XMM7360_RPC_MSG_ARG_TYPE_BYTE;
+            out_arg->value.b = (gint8) val;
         } else if (size == 0x02) {
-            arg->type = XMM7360_RPC_MSG_ARG_TYPE_SHORT;
-            arg->value.s = (gint16) val;
+            out_arg->type = XMM7360_RPC_MSG_ARG_TYPE_SHORT;
+            out_arg->value.s = (gint16) val;
         } else {
-            arg->type = XMM7360_RPC_MSG_ARG_TYPE_LONG;
-            arg->value.l = (gint32) val;
+            out_arg->type = XMM7360_RPC_MSG_ARG_TYPE_LONG;
+            out_arg->value.l = (gint32) val;
         }
     }
 
-    return val;
+    if (out_val)
+        *out_val = val;
+
+    /* return bytes consumed by this function */
+    return offset - orig_offset;
 }
 
-static gchar *
-xmm7360_byte_array_read_string (GByteArray *buf, gsize *offset, gsize *string_len)
+static gint
+xmm7360_byte_array_read_string (GByteArray        *buf,
+                                gsize              offset,
+                                Xmm7360RpcMsgArg  *out_arg,
+                                GError           **error)
 {
-    guchar        string_type;
-    gsize         string_len_padded;
-    gsize         pad_len;
-    gchar        *result;
+    const gsize  orig_offset = offset;
+    guchar       string_type;
+    gint         string_len_padded;
+    gint         pad_len;
+    gint         string_len;
+    gint         consumed;
 
-    g_assert (buf->len > *offset + 2);
+    if (buf->len < offset + 2) {
+        PARSE_ERROR ("initial buffer size %u too small (need %zu)",
+                     buf->len, offset + 2);
+        return -1;
+    }
 
-    string_type = buf->data[(*offset)++];
-    g_assert (string_type == 0x55 || string_type == 0x56 || string_type == 0x57);
+    string_type = buf->data[offset++];
+    if (string_type != 0x55 && string_type != 0x56 && string_type != 0x57) {
+        PARSE_ERROR ("unhandled string type 0x%02X", string_type);
+        return -1;
+    }
 
-    *string_len = buf->data[(*offset)++];
-    if (*string_len & 0x80) {
+    string_len = buf->data[offset++];
+    if (string_len & 0x80) {
         guchar bytelen;
-        guchar i;
+        guint8 i;
 
-        bytelen = *string_len & 0x0f;
-        *string_len = 0;
-        g_assert (bytelen <= 4);
-        g_assert (buf->len > *offset + bytelen);
-        for (i = 0; i < bytelen; i++) {
-            *string_len |= buf->data[(*offset)++] << (i * 8);
+        bytelen = string_len & 0x0f;
+        if (bytelen > 4) {
+            PARSE_ERROR ("unhandled string length size 0x%02X", bytelen);
+            return -1;
+        } else if (buf->len <= offset + bytelen) {
+            PARSE_ERROR ("string len buffer size %u too small (need %zu)",
+                         buf->len, offset + bytelen);
+            return -1;
         }
+
+        string_len = 0;
+        for (i = 0; i < bytelen; i++)
+            string_len |= buf->data[offset++] << (i * 8);
     }
 
     if (string_type == 0x56) {
         /* 0x56 contains 2-byte chars */
-        *string_len <<= 1;
+        string_len <<= 1;
     } else if (string_type == 0x57) {
         /* 0x57 contains 4-byte chars */
-        *string_len <<= 2;
+        string_len <<= 2;
     }
 
-    string_len_padded = (gsize) xmm7360_byte_array_read_asn_int (buf, offset, NULL);
-    pad_len = (gsize) xmm7360_byte_array_read_asn_int (buf, offset, NULL);
+    consumed = xmm7360_byte_array_read_asn_int (buf, offset, &string_len_padded, NULL, error);
+    if (consumed < 0)
+        return -1;
+    offset += consumed;
+
+    consumed = xmm7360_byte_array_read_asn_int (buf, offset, &pad_len, NULL, error);
+    if (consumed < 0)
+        return -1;
+    offset += consumed;
 
     if (string_len_padded > 0) {
-        g_assert (string_len_padded == *string_len + pad_len);
+        if (string_len_padded != string_len + pad_len) {
+            PARSE_ERROR ("padded string len %u mismatch (expected %u)",
+                         string_len_padded, string_len + pad_len);
+            return -1;
+        }
     } else {
-        string_len_padded = *string_len + pad_len;
+        string_len_padded = string_len + pad_len;
     }
 
     /* make sure the buffer is large enough */
-    g_assert (buf->len >= *offset + string_len_padded);
+    if (buf->len < offset + string_len_padded) {
+        PARSE_ERROR ("padded string len buffer size %u too small (need %zu)",
+                     buf->len, offset + string_len_padded);
+        return -1;
+    }
 
     /* copy the result */
-    result = g_malloc (*string_len);
-    memcpy (result, &(buf->data[*offset]), *string_len);
+    if (out_arg) {
+        out_arg->type = XMM7360_RPC_MSG_ARG_TYPE_STRING;
+        /* Copy the bare string without padding */
+        out_arg->value.string = g_memdup (buf->data + offset, string_len);
+        out_arg->size = string_len;
+    }
 
-    /* move pointer to the end of the string data */
-    *offset += (*string_len + pad_len);
-
-    return result;
+    /* return bytes consumed by this function */
+    return offset + string_len_padded - orig_offset;
 }
 
 
@@ -377,64 +438,64 @@ xmm7360_command_to_byte_array (Xmm7360RpcCallId  callid,
     return buf;
 }
 
-static int
+static gboolean
 xmm7360_rpc_msg_body_unpack (GByteArray *buf, GPtrArray *args, GError **error)
 {
-    GError           *inner_error = NULL;
-    gsize             offset;
-    gchar            *str_value;
-    Xmm7360RpcMsgArg *arg;
+    gsize   offset;
+    gint    consumed;
 
     g_assert (buf != NULL && args != NULL);
 
     offset = 0;
     while (offset < buf->len) {
+        g_autoptr(Xmm7360RpcMsgArg) arg = NULL;
+
         arg = g_new0 (Xmm7360RpcMsgArg, 1);
         arg->size = 0;
         switch (buf->data[offset]) {
             case 0x02:
-                xmm7360_byte_array_read_asn_int (buf, &offset, arg);
+                consumed = xmm7360_byte_array_read_asn_int (buf,
+                                                            offset,
+                                                            NULL,
+                                                            arg,
+                                                            error);
+                if (consumed < 0)
+                    return FALSE;
+                offset += consumed;
                 break;
             case 0x55:
             case 0x56:
             case 0x57:
                 arg->type = XMM7360_RPC_MSG_ARG_TYPE_STRING;
-                str_value = xmm7360_byte_array_read_string (buf, &offset, &arg->size);
-                if (str_value == NULL) {
-                    inner_error = g_error_new (MM_CORE_ERROR,
-                                               MM_CORE_ERROR_FAILED,
-                                               "Parsing a string failed");
-                    goto out;
-                }
-                arg->value.string = str_value;
+                consumed = xmm7360_byte_array_read_string (buf,
+                                                           offset,
+                                                           arg,
+                                                           error);
+                if (consumed < 0)
+                    return FALSE;
+                offset += consumed;
                 break;
             default:
                 arg->type = XMM7360_RPC_MSG_ARG_TYPE_UNKNOWN;
-                inner_error = g_error_new (MM_CORE_ERROR,
-                                           MM_CORE_ERROR_FAILED,
-                                           "Unknown type 0x%x",
-                                           buf->data[offset]);
-                goto out;
+                PARSE_ERROR ("Unknown type 0x%x", buf->data[offset]);
+                return FALSE;
         }
-        g_ptr_array_add (args, arg);
+        g_ptr_array_add (args, g_steal_pointer (&arg));
     }
 
-out:
-    if (inner_error) {
-        g_propagate_error (error, inner_error);
-        return -1;
-    }
-
-    return 0;
+    return TRUE;
 }
 
 static Xmm7360RpcResponse *
 parse_response_xmm7360 (GByteArray *buf)
 {
-    GError             *error = NULL;
+    g_autoptr(GError)   error = NULL;
     Xmm7360RpcResponse *response = NULL;
     gsize               offset;
     Xmm7360RpcMsgArg   *arg;
+    gint                consumed;
+    gint                asn_msg_len = 0;
+    gint                unsol_id = 0;
 
     /* first 20 bytes are format header:
      * message size           (  int32, 4)
@@ -442,26 +503,44 @@ parse_response_xmm7360 (GByteArray *buf)
      * unsolicited message id (asn int, 6)
      * transmission id        (  int32, 4)
      */
-    g_assert (buf->len > 20);
-
-    offset = 4;
-    if (*(gint32 *) buf->data != xmm7360_byte_array_read_asn_int (buf, &offset, NULL)) {
-        mm_obj_dbg (NULL, "error parsing RPC message: length mismatch");
+    if (buf->len <= 20) {
+        mm_obj_dbg (NULL, "error parsing RPC message: message size %u too short", buf->len);
         goto err;
     }
+
+    offset = 4;
+    consumed = xmm7360_byte_array_read_asn_int (buf, offset, &asn_msg_len, NULL, &error);
+    if (consumed < 0) {
+        mm_obj_dbg (NULL, "error parsing RPC message: error reading ASN message size: %s",
+                    error->message);
+        goto err;
+    }
+    offset += consumed;
+    if (*(gint32 *) buf->data != asn_msg_len) {
+        mm_obj_dbg (NULL, "error parsing RPC message: length mismatch (buf %d != asn %d)",
+                    *(gint32 *) buf->data, asn_msg_len);
+        goto err;
+    }
+
+    consumed = xmm7360_byte_array_read_asn_int (buf, offset, &unsol_id, NULL, &error);
+    if (consumed < 0) {
+        mm_obj_dbg (NULL, "error parsing RPC message: error reading unsolicited message id: %s",
+                    error->message);
+        goto err;
+    }
+    offset += consumed;
 
     /* initialize all fields of the response */
     response = g_new0 (Xmm7360RpcResponse, 1);
     response->id = GINT32_FROM_BE (*(gint32 *) (buf->data + 16));
     response->type = XMM7360_RPC_RESPONSE_TYPE_UNKNOWN;
-    response->unsol_id = xmm7360_byte_array_read_asn_int (buf, &offset, NULL);
+    response->unsol_id = unsol_id;
     response->body = g_byte_array_new ();
     response->content = g_ptr_array_new_with_free_func ((GDestroyNotify)xmm7360_rpc_msg_arg_free);
 
     g_byte_array_append (response->body, &buf->data[20], buf->len - 20);
-    if (xmm7360_rpc_msg_body_unpack (response->body, response->content, &error) != 0) {
+    if (!xmm7360_rpc_msg_body_unpack (response->body, response->content, &error)) {
         mm_obj_dbg (NULL, "error parsing RPC message: unpacking failed: %s", error->message);
-        g_error_free (error);
         goto err;
     }
 
