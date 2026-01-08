@@ -75,6 +75,10 @@ xmm7360_byte_array_read_asn_int (GByteArray        *buf,
     }
     offset++;
     size = buf->data[offset++];
+    if (size > 4 || size == 3) {
+        PARSE_ERROR ("unhandled int size %d", size);
+        return -1;
+    }
 
     /* read actual value byte by byte */
     if (buf->len < offset + size) {
@@ -88,15 +92,20 @@ xmm7360_byte_array_read_asn_int (GByteArray        *buf,
     }
 
     if (out_arg) {
-        if (size == 0x01) {
+        if (size == 0x00) {
+            out_arg->type = XMM7360_RPC_MSG_ARG_TYPE_UNKNOWN;
+        } else if (size == 0x01) {
             out_arg->type = XMM7360_RPC_MSG_ARG_TYPE_BYTE;
             out_arg->value.b = (gint8) val;
         } else if (size == 0x02) {
             out_arg->type = XMM7360_RPC_MSG_ARG_TYPE_SHORT;
             out_arg->value.s = (gint16) val;
-        } else {
+        } else if (size == 0x04) {
             out_arg->type = XMM7360_RPC_MSG_ARG_TYPE_LONG;
             out_arg->value.l = (gint32) val;
+        } else {
+            /* size is validated above */
+            g_assert_not_reached ();
         }
     }
 
