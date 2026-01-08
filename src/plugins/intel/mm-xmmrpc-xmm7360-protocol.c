@@ -21,6 +21,9 @@
 #include <unistd.h>
 #include <string.h>
 
+#include <ModemManager.h>
+#define _LIBMM_INSIDE_MM
+#include <libmm-glib.h>
 
 #include "mm-xmmrpc-xmm7360-protocol.h"
 #include "mm-intel-enums-types.h"
@@ -50,7 +53,7 @@ xmm7360_rpc_response_free (Xmm7360RpcResponse *response)
     g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, fmt, __VA_ARGS__); \
 }
 
-static gint
+gint
 xmm7360_byte_array_read_asn_int (GByteArray        *buf,
                                  gsize              offset,
                                  gint              *out_val,
@@ -64,7 +67,7 @@ xmm7360_byte_array_read_asn_int (GByteArray        *buf,
 
     if (buf->len <= offset + 2) {
         PARSE_ERROR ("initial buffer size %u too small (need %zu)",
-                     buf->len, offset + 2);
+                     buf->len, offset + 2 + 1);
         return -1;
     }
 
@@ -116,7 +119,7 @@ xmm7360_byte_array_read_asn_int (GByteArray        *buf,
     return offset - orig_offset;
 }
 
-static gint
+gint
 xmm7360_byte_array_read_string (GByteArray        *buf,
                                 gsize              offset,
                                 Xmm7360RpcMsgArg  *out_arg,
@@ -217,14 +220,14 @@ xmm7360_byte_array_append_asn_int4 (GByteArray *buf, gint32 value)
     g_byte_array_append (buf, (const guint8 *) &value_be, 4);
 }
 
-static void
+void
 xmm7360_byte_array_append_uint8 (GByteArray *buf, gulong val)
 {
     guint8 _val = (guint8) val;
     g_byte_array_append (buf, &_val, 1);
 }
 
-static void
+void
 xmm7360_byte_array_append_string (GByteArray   *buf,
                                   const guint8 *data,
                                   gsize         data_len,
@@ -413,7 +416,7 @@ xmm7360_command_to_byte_array (Xmm7360RpcCallId  callid,
     return buf;
 }
 
-static gboolean
+gboolean
 xmm7360_rpc_msg_body_unpack (GByteArray *buf, GPtrArray *args, GError **error)
 {
     gsize   offset;

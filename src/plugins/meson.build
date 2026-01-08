@@ -635,16 +635,22 @@ if plugins_options['intel']
     command: [
       python,
       mm_mkenums,
-      '--fhead', '#include "mm-port-serial-xmmrpc-xmm7360.h"\n#ifndef __MM_XMM7360_ENUMS_TYPES_H__\n#define __MM_XMM7360_ENUMS_TYPES_H__\n',
+      '--fhead', '#include "mm-xmmrpc-xmm7360-protocol.h"\n#ifndef __MM_XMM7360_ENUMS_TYPES_H__\n#define __MM_XMM7360_ENUMS_TYPES_H__\n',
       '--template', files(templates_dir / enums_types + '.h.template'),
       '--ftail', '#endif /* __MM_XMM7360_ENUMS_TYPES_H__ */\n',
       '@INPUT@'],
     capture: true,
   )
 
+  test_sources = files(
+    'intel/mm-xmmrpc-xmm7360-protocol.c',
+    'intel/tests/test-xmmrpc-xmm7360-protocol.c',
+  )
+
   plugins += {'plugin-intel': {
     'plugin': true,
     'module': {'sources': sources, 'include_directories': plugins_incs + [xmm_inc, intel_inc], 'c_args': common_c_args},
+    'test': {'sources': test_sources, 'include_directories': intel_inc, 'dependencies': libhelpers_dep},
   }}
 endif
 

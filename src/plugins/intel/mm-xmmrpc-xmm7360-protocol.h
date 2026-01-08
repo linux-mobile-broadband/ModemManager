@@ -526,8 +526,27 @@ typedef struct {
 
 /*****************************************************************************/
 
+gint                xmm7360_byte_array_read_asn_int    (GByteArray              *buf,
+                                                        gsize                    offset,
+                                                        gint                    *out_val,
+                                                        Xmm7360RpcMsgArg        *out_arg,
+                                                        GError                 **error);
+
+gint                xmm7360_byte_array_read_string     (GByteArray              *buf,
+                                                        gsize                    offset,
+                                                        Xmm7360RpcMsgArg        *out_arg,
+                                                        GError                 **error);
+
 void                xmm7360_byte_array_append_asn_int4 (GByteArray              *array,
                                                         gint32                   value);
+
+void                xmm7360_byte_array_append_uint8    (GByteArray              *buf,
+                                                        gulong                   val);
+
+void                xmm7360_byte_array_append_string   (GByteArray              *buf,
+                                                        const guint8            *data,
+                                                        gsize                    data_len,
+                                                        guint                    data_len_padded);
 
 void                xmm7360_rpc_response_free          (Xmm7360RpcResponse      *msg);
 
@@ -543,6 +562,10 @@ GByteArray *        xmm7360_command_to_byte_array      (Xmm7360RpcCallId        
 GString *           xmm7360_rpc_args_to_string         (GPtrArray               *args);
 
 GString *           xmm7360_byte_array_hexlify         (GByteArray              *buf);
+
+gboolean            xmm7360_rpc_msg_body_unpack        (GByteArray              *buf,
+                                                        GPtrArray               *args,
+                                                        GError                 **error);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (Xmm7360RpcResponse, xmm7360_rpc_response_free);
 
