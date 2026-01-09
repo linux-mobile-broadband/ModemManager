@@ -337,6 +337,19 @@
  */
 #define ID_MM_INITIAL_QMAP_MUX_ID "ID_MM_INITIAL_QMAP_MUX_ID"
 
+/**
+ * ID_MM_AT_NETWORK_TIME_BROKEN:
+ *
+ * This is a device-specific tag that allows users to prevent ModemManager from
+ * attempting to read network time using AT commands, even if the device
+ * supports them.
+ *
+ * An integer value of 1 prevents reading network time with AT commands.
+ *
+ * Since: 1.26
+ */
+#define ID_MM_AT_NETWORK_TIME_BROKEN "ID_MM_AT_NETWORK_TIME_BROKEN"
+
 /*
  * The following symbols are deprecated. We don't add them to -compat
  * because this -tags file is not really part of the installed API.

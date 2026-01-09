@@ -28,6 +28,7 @@
 #include <ModemManager.h>
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
+#include <ModemManager-tags.h>
 
 #include "mm-base-modem-at.h"
 #include "mm-broadband-modem.h"
@@ -10968,6 +10969,27 @@ modem_time_check_support (MMIfaceModemTime *self,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
+    MMIfacePortAt *port;
+    GError        *error = NULL;
+
+    port = mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), &error);
+    if (!port) {
+        g_task_report_error (self, callback, user_data, modem_time_check_support, error);
+        return;
+    }
+
+    if (mm_kernel_device_get_global_property_as_boolean (mm_port_peek_kernel_device (MM_PORT (port)),
+                                                         ID_MM_AT_NETWORK_TIME_BROKEN)) {
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 modem_time_check_support,
+                                 MM_MOBILE_EQUIPMENT_ERROR,
+                                 MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED,
+                                 "AT network time tagged as broken");
+        return;
+    }
+
     mm_base_modem_at_sequence (MM_BASE_MODEM (self),
                                time_check_sequence,
                                NULL, /* response_processor_context */
