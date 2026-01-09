@@ -262,6 +262,66 @@ static const ReadAsnIntTest read_asn_int_tests[] = {
         .expected_error_string = "unhandled int size 6",
         XMM_BUFFER( 0x02, 0x06, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06 )
     },
+    {
+        .detail = "u8_negative_max",
+        .expected_consumed = 3,
+        .expected_val = -128,
+        XMM_BUFFER( 0x02, 0x01, 0x80 )
+        .expected_arg = {
+            .type = XMM7360_RPC_MSG_ARG_TYPE_BYTE,
+            .value.b = -128,
+        },
+    },
+    {
+        .detail = "u16_negative_max",
+        .expected_consumed = 4,
+        .expected_val = -32768,
+        XMM_BUFFER( 0x02, 0x02, 0x80, 0x00 )
+        .expected_arg = {
+            .type = XMM7360_RPC_MSG_ARG_TYPE_SHORT,
+            .value.s = -32768,
+        },
+    },
+    {
+        .detail = "u32_negative_max",
+        .expected_consumed = 6,
+        .expected_val = -2147483648,
+        XMM_BUFFER( 0x02, 0x04, 0x80, 0x00, 0x00, 0x00 )
+        .expected_arg = {
+            .type = XMM7360_RPC_MSG_ARG_TYPE_LONG,
+            .value.l = -2147483648,
+        },
+    },
+    {
+        .detail = "u8_negative_min",
+        .expected_consumed = 3,
+        .expected_val = -1,
+        XMM_BUFFER( 0x02, 0x01, 0xFF )
+        .expected_arg = {
+            .type = XMM7360_RPC_MSG_ARG_TYPE_BYTE,
+            .value.b = -1,
+        },
+    },
+    {
+        .detail = "u16_negative_min",
+        .expected_consumed = 4,
+        .expected_val = -1,
+        XMM_BUFFER( 0x02, 0x02, 0xFF, 0xFF )
+        .expected_arg = {
+            .type = XMM7360_RPC_MSG_ARG_TYPE_SHORT,
+            .value.s = -1,
+        },
+    },
+    {
+        .detail = "u32_negative_min",
+        .expected_consumed = 6,
+        .expected_val = -1,
+        XMM_BUFFER( 0x02, 0x04, 0xFF, 0xFF, 0xFF, 0xFF )
+        .expected_arg = {
+            .type = XMM7360_RPC_MSG_ARG_TYPE_LONG,
+            .value.l = -1,
+        },
+    },
 };
 
 static void
@@ -289,6 +349,7 @@ test_read_asn_int (gconstpointer data)
         g_assert_cmpint (test->expected_error, ==, 0);
         g_assert_false (!!test->expected_error_string);
         g_assert_cmpint (consumed, ==, test->expected_consumed);
+g_message ("v = %d 0x%x\n", val, val);
         g_assert_cmpint (val, ==, test->expected_val);
         if (test->expected_arg.type != XMM7360_RPC_MSG_ARG_TYPE_UNKNOWN) {
             g_assert_cmpint (arg.type, ==, test->expected_arg.type);

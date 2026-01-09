@@ -61,9 +61,10 @@ xmm7360_byte_array_read_asn_int (GByteArray        *buf,
                                  GError           **error)
 {
     const gsize orig_offset = offset;
-    gint        size;
-    gint        bytes_read;
-    gint        val;
+    gint                      size;
+    gint                      bytes_read;
+    gint                      val;
+    Xmm7360RpcMsgArg          arg = { 0 };
 
     if (buf->len <= offset + 2) {
         PARSE_ERROR ("initial buffer size %u too small (need %zu)",
@@ -94,26 +95,37 @@ xmm7360_byte_array_read_asn_int (GByteArray        *buf,
         val |= buf->data[offset++];
     }
 
-    if (out_arg) {
-        if (size == 0x00) {
-            out_arg->type = XMM7360_RPC_MSG_ARG_TYPE_UNKNOWN;
-        } else if (size == 0x01) {
-            out_arg->type = XMM7360_RPC_MSG_ARG_TYPE_BYTE;
-            out_arg->value.b = (gint8) val;
-        } else if (size == 0x02) {
-            out_arg->type = XMM7360_RPC_MSG_ARG_TYPE_SHORT;
-            out_arg->value.s = (gint16) val;
-        } else if (size == 0x04) {
-            out_arg->type = XMM7360_RPC_MSG_ARG_TYPE_LONG;
-            out_arg->value.l = (gint32) val;
-        } else {
-            /* size is validated above */
-            g_assert_not_reached ();
-        }
+    if (size == 0x00) {
+        arg.type = XMM7360_RPC_MSG_ARG_TYPE_UNKNOWN;
+    } else if (size == 0x01) {
+        arg.type = XMM7360_RPC_MSG_ARG_TYPE_BYTE;
+        arg.value.b = (gint8) val;
+    } else if (size == 0x02) {
+        arg.type = XMM7360_RPC_MSG_ARG_TYPE_SHORT;
+        arg.value.s = (gint16) val;
+    } else if (size == 0x04) {
+        arg.type = XMM7360_RPC_MSG_ARG_TYPE_LONG;
+        arg.value.l = (gint32) val;
+    } else {
+        /* size is validated above */
+        g_assert_not_reached ();
     }
 
-    if (out_val)
-        *out_val = val;
+    if (out_arg)
+        *out_arg = arg;
+
+    if (out_val) {
+        /* If the ASN int is negative, we must convert a int8/int16
+         * value to the appropriate u32 value to avoid returning a
+         * positive 32-bit gint.
+         */
+        if ((arg.type == XMM7360_RPC_MSG_ARG_TYPE_BYTE) && (arg.value.b < 0))
+            *out_val = (arg.value.b << 24) >> 24;
+        else if ((arg.type == XMM7360_RPC_MSG_ARG_TYPE_SHORT) && (arg.value.s < 0))
+            *out_val = (arg.value.s << 16) >> 16;
+        else
+            *out_val = arg.value.l;
+    }
 
     /* return bytes consumed by this function */
     return offset - orig_offset;
@@ -175,11 +187,19 @@ xmm7360_byte_array_read_string (GByteArray        *buf,
     consumed = xmm7360_byte_array_read_asn_int (buf, offset, &string_len_padded, NULL, error);
     if (consumed < 0)
         return -1;
+    else if (string_len_padded < 0) {
+        PARSE_ERROR ("string length padded should be >= 0 (got %d)", string_len_padded);
+        return -1;
+    }
     offset += consumed;
 
     consumed = xmm7360_byte_array_read_asn_int (buf, offset, &pad_len, NULL, error);
     if (consumed < 0)
         return -1;
+    else if (pad_len < 0) {
+        PARSE_ERROR ("pad length should be >= 0 (got %d)", pad_len);
+        return -1;
+    }
     offset += consumed;
 
     if (string_len_padded > 0) {
@@ -490,6 +510,9 @@ xmm7360_parse_response (GByteArray *buf, GError **error)
     if (consumed < 0) {
         g_prefix_error (error, "error parsing RPC message: error reading ASN message size: ");
         return NULL;
+    } else if (asn_msg_len < 0) {
+        PARSE_ERROR ("ASN message size should be >= 0 (got %d)", asn_msg_len);
+        return NULL;
     }
     offset += consumed;
     /* Make sure the ASN message size and message size agree */
@@ -502,6 +525,9 @@ xmm7360_parse_response (GByteArray *buf, GError **error)
     consumed = xmm7360_byte_array_read_asn_int (buf, offset, &unsol_id, NULL, error);
     if (consumed < 0) {
         g_prefix_error (error, "error parsing RPC message: error reading unsolicited message id: ");
+        return NULL;
+    } else if (unsol_id < 0) {
+        PARSE_ERROR ("Unsolicited message ID should be >= 0 (got %d)", unsol_id);
         return NULL;
     }
     offset += consumed;
