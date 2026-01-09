@@ -30,6 +30,7 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-location.h"
+#include "mm-location-cache.h"
 #include "mm-sim-qmi.h"
 #include "mm-shared-qmi.h"
 #include "mm-modem-helpers-qmi.h"
@@ -91,6 +92,9 @@ typedef struct {
     guint32                         loc_assistance_data_max_file_size;
     guint32                         loc_assistance_data_max_part_size;
 
+    gulong                          loc_assistance_inject_time_req_indication_id;
+    gulong                          loc_assistance_inject_position_req_indication_id;
+
     /* Carrier config helpers */
     gboolean  config_active_default;
     GArray   *config_list;
@@ -102,6 +106,9 @@ typedef struct {
     gulong     uim_slot_status_indication_id;
     gulong     uim_refresh_indication_id;
     guint      uim_refresh_start_timeout_id;
+
+    /* Cached last location from nmea */
+    MMLocationCache *location_cache;
 } Private;
 
 static void
@@ -119,6 +126,10 @@ private_free (Private *priv)
         g_object_unref (priv->pds_client);
     if (priv->loc_location_nmea_indication_id)
         g_signal_handler_disconnect (priv->loc_client, priv->loc_location_nmea_indication_id);
+    if (priv->loc_assistance_inject_time_req_indication_id)
+        g_signal_handler_disconnect (priv->loc_client, priv->loc_assistance_inject_time_req_indication_id);
+    if (priv->loc_assistance_inject_position_req_indication_id)
+        g_signal_handler_disconnect (priv->loc_client, priv->loc_assistance_inject_position_req_indication_id);
     if (priv->loc_client)
         g_object_unref (priv->loc_client);
     if (priv->uim_slot_status_indication_id)
@@ -131,6 +142,7 @@ private_free (Private *priv)
         g_object_unref (priv->uim_client);
     if (priv->uim_refresh_start_timeout_id)
         g_source_remove (priv->uim_refresh_start_timeout_id);
+    g_clear_object (&priv->location_cache);
     if (priv->feature_nas_ssp_acquisition_order_preference_array)
         g_array_unref (priv->feature_nas_ssp_acquisition_order_preference_array);
     g_strfreev (priv->loc_assistance_data_servers);
@@ -140,7 +152,8 @@ private_free (Private *priv)
 static Private *
 get_private (MMSharedQmi *self)
 {
-    Private *priv;
+    g_autoptr(GError)  error = NULL;
+    Private           *priv;
 
     if (G_UNLIKELY (!private_quark))
         private_quark = g_quark_from_static_string (PRIVATE_TAG);
@@ -154,6 +167,10 @@ get_private (MMSharedQmi *self)
         priv->feature_nas_ssp_extended_lte_band_preference = FEATURE_UNKNOWN;
         priv->feature_nas_ssp_acquisition_order_preference = FEATURE_UNKNOWN;
         priv->config_active_i = -1;
+
+        priv->location_cache = mm_location_cache_new ();
+        if (!mm_location_cache_load (priv->location_cache, &error))
+            mm_obj_warn (priv->location_cache, "%s", error->message);
 
         /* Setup parent class' MMIfaceModemLocation */
         g_assert (MM_SHARED_QMI_GET_INTERFACE (self)->peek_parent_location_interface);
@@ -5156,12 +5173,16 @@ stop_gps_engine (MMSharedQmi         *self,
                  GAsyncReadyCallback  callback,
                  gpointer             user_data)
 {
-    GTask   *task;
-    Private *priv;
+    GTask             *task;
+    Private           *priv;
+    g_autoptr(GError)  error = NULL;
 
     priv = get_private (self);
 
     task = g_task_new (self, NULL, callback, user_data);
+
+    if (!mm_location_cache_save (priv->location_cache, &error))
+        mm_obj_warn (self, "%s", error->message);
 
     if (priv->pds_client) {
         QmiMessagePdsSetGpsServiceStateInput *input;
@@ -5209,7 +5230,9 @@ pds_location_event_report_indication_cb (QmiClientPds                      *clie
 {
     QmiPdsPositionSessionStatus  session_status;
     const gchar                 *nmea;
+    Private                     *priv;
 
+    priv = get_private (MM_SHARED_QMI (self));
     if (qmi_indication_pds_event_report_output_get_position_session_status (
             output,
             &session_status,
@@ -5224,6 +5247,7 @@ pds_location_event_report_indication_cb (QmiClientPds                      *clie
             NULL)) {
         mm_obj_dbg (self, "[NMEA] %s", nmea);
         mm_iface_modem_location_gps_update (MM_IFACE_MODEM_LOCATION (self), nmea);
+        mm_location_cache_update_from_nmea (priv->location_cache, nmea);
     }
 }
 
@@ -5233,13 +5257,16 @@ loc_location_nmea_indication_cb (QmiClientLoc               *client,
                                  MMSharedQmi                *self)
 {
     const gchar *nmea = NULL;
+    Private     *priv;
 
+    priv = get_private (MM_SHARED_QMI (self));
     qmi_indication_loc_nmea_output_get_nmea_string (output, &nmea, NULL);
     if (!nmea)
         return;
 
     mm_obj_dbg (self, "[NMEA] %s", nmea);
     mm_iface_modem_location_gps_update (MM_IFACE_MODEM_LOCATION (self), nmea);
+    mm_location_cache_update_from_nmea (priv->location_cache, nmea);
 }
 
 /*****************************************************************************/
@@ -5670,6 +5697,7 @@ loc_start_ready (QmiClientLoc *client,
 {
     QmiMessageLocRegisterEventsInput *input;
     QmiMessageLocStartOutput         *output;
+    guint64                           event_mask;
     GError                           *error = NULL;
 
     output = qmi_client_loc_start_finish (client, res, &error);
@@ -5691,8 +5719,11 @@ loc_start_ready (QmiClientLoc *client,
     qmi_message_loc_start_output_unref (output);
 
     input = qmi_message_loc_register_events_input_new ();
+    event_mask = QMI_LOC_EVENT_REGISTRATION_FLAG_NMEA |
+                 QMI_LOC_EVENT_REGISTRATION_FLAG_INJECT_TIME_REQUEST |
+                 QMI_LOC_EVENT_REGISTRATION_FLAG_INJECT_POSITION_REQUEST;
     qmi_message_loc_register_events_input_set_event_registration_mask (
-        input, QMI_LOC_EVENT_REGISTRATION_FLAG_NMEA, NULL);
+        input, event_mask, NULL);
     qmi_client_loc_register_events (client,
                                     input,
                                     10,
@@ -6714,6 +6745,338 @@ loc_location_get_predicted_orbits_data_source_indication_timed_out (GTask *task)
     return G_SOURCE_REMOVE;
 }
 
+/*****************************************************************************/
+/* Location: Inject UTC time */
+
+typedef struct {
+    guint         timeout_id;
+    gulong        indication_id;
+    QmiClientLoc *client;
+} InjectTimeContext;
+
+static void
+inject_time_context_cleanup_action (InjectTimeContext *ctx)
+{
+    if (ctx->timeout_id) {
+        g_source_remove  (ctx->timeout_id);
+        ctx->timeout_id = 0;
+    }
+    if (ctx->indication_id) {
+        if (ctx->client)
+            g_signal_handler_disconnect (ctx->client, ctx->indication_id);
+        ctx->indication_id = 0;
+    }
+}
+
+static void
+inject_time_context_free (InjectTimeContext *ctx)
+{
+    inject_time_context_cleanup_action (ctx);
+    g_clear_object (&ctx->client);
+    g_slice_free (InjectTimeContext, ctx);
+}
+
+static void
+inject_time_finish_task (GTask  *_task,
+                         GError *error)
+{
+    InjectTimeContext *ctx;
+    g_autoptr(GTask)   task = _task;
+
+    ctx = g_task_get_task_data (task);
+    inject_time_context_cleanup_action (ctx);
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+}
+
+static gboolean
+loc_location_inject_time_indication_timed_out (GTask *task)
+{
+    inject_time_finish_task (task, g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_ABORTED,
+                                                "Operation timed out"));
+    return G_SOURCE_REMOVE;
+}
+
+static void
+loc_location_inject_time_indication_cb (QmiClientLoc                        *client,
+                                        QmiIndicationLocInjectUtcTimeOutput *output,
+                                        GTask                               *task)
+{
+    QmiLocIndicationStatus  status;
+    GError                 *error = NULL;
+
+    if (!qmi_indication_loc_inject_utc_time_output_get_indication_status (output, &status, &error))
+        g_prefix_error (&error, "QMI operation failed: ");
+    else
+        mm_error_from_qmi_loc_indication_status (status, &error);
+    inject_time_finish_task (task, error);
+}
+
+static void
+loc_location_inject_time_ready (QmiClientLoc *client,
+                                GAsyncResult *res,
+                                GTask        *task)
+{
+    g_autoptr(QmiMessageLocInjectUtcTimeOutput)  output = NULL;
+    GError                                      *error = NULL;
+
+    output = qmi_client_loc_inject_utc_time_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        inject_time_finish_task (task, error);
+        return;
+    }
+
+    if (!qmi_message_loc_inject_utc_time_output_get_result (output, &error)) {
+        inject_time_finish_task (task, error);
+        return;
+    }
+}
+
+static void
+loc_location_inject_time_req_indication_cb (QmiClientLoc                            *client,
+                                            QmiIndicationLocInjectTimeRequestOutput *output,
+                                            MMSharedQmi                             *self)
+{
+    g_autoptr(QmiMessageLocInjectUtcTimeInput)  input = NULL;
+    guint64                                     utc_ms = 0;
+    GTask                                      *task;
+    InjectTimeContext                          *ctx;
+
+    task = g_task_new (self, NULL, NULL, NULL);
+    ctx = g_slice_new0 (InjectTimeContext);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)inject_time_context_free);
+
+    ctx->client = g_object_ref (client);
+
+    input = qmi_message_loc_inject_utc_time_input_new ();
+
+    utc_ms = g_get_real_time () / 1000;
+    qmi_message_loc_inject_utc_time_input_set_utc_time (input, utc_ms, NULL);
+    qmi_message_loc_inject_utc_time_input_set_time_uncertainty (input, 1000, NULL);
+    qmi_message_loc_inject_utc_time_input_set_time_source (input, QMI_LOC_INJECTED_TIME_SOURCE_UNKNOWN, NULL);
+
+    ctx->timeout_id = g_timeout_add_seconds (10,
+                                             (GSourceFunc) loc_location_inject_time_indication_timed_out,
+                                             task);
+
+    ctx->indication_id = g_signal_connect (client,
+                                           "inject-utc-time",
+                                           G_CALLBACK (loc_location_inject_time_indication_cb),
+                                           task);
+
+    qmi_client_loc_inject_utc_time (
+        QMI_CLIENT_LOC (ctx->client),
+        input,
+        10,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)loc_location_inject_time_ready,
+        task);
+}
+
+/*****************************************************************************/
+/* Location: Inject position */
+
+typedef struct {
+    guint         timeout_id;
+    gulong        indication_id;
+    QmiClientLoc *client;
+} InjectPositionContext;
+
+static void
+inject_position_context_cleanup_action (InjectPositionContext *ctx)
+{
+    if (ctx->timeout_id) {
+        g_source_remove  (ctx->timeout_id);
+        ctx->timeout_id = 0;
+    }
+    if (ctx->indication_id) {
+        if (ctx->client)
+            g_signal_handler_disconnect (ctx->client, ctx->indication_id);
+        ctx->indication_id = 0;
+    }
+}
+
+static void
+inject_position_context_free (InjectPositionContext *ctx)
+{
+    inject_position_context_cleanup_action (ctx);
+    g_clear_object (&ctx->client);
+    g_slice_free (InjectPositionContext, ctx);
+}
+
+static void
+inject_position_finish_task (GTask  *_task,
+                             GError *error)
+{
+    InjectPositionContext *ctx;
+    g_autoptr(GTask)       task = _task;
+
+    ctx = g_task_get_task_data (task);
+    inject_position_context_cleanup_action (ctx);
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+}
+
+static gboolean
+loc_location_inject_position_indication_timed_out (GTask *task)
+{
+    inject_position_finish_task (task, g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_ABORTED,
+                                                    "Operation timed out"));
+    return G_SOURCE_REMOVE;
+}
+
+static void
+loc_location_inject_position_indication_cb (QmiClientLoc                         *client,
+                                            QmiIndicationLocInjectPositionOutput *output,
+                                            GTask                                *task)
+{
+    QmiLocIndicationStatus  status;
+    GError                 *error = NULL;
+
+    if (!qmi_indication_loc_inject_position_output_get_indication_status (output, &status, &error))
+        g_prefix_error (&error, "QMI operation failed: ");
+    else
+        mm_error_from_qmi_loc_indication_status (status, &error);
+    inject_position_finish_task (task, error);
+}
+
+static void
+loc_location_inject_position_ready (QmiClientLoc *client,
+                                    GAsyncResult *res,
+                                    GTask        *task)
+{
+    g_autoptr(QmiMessageLocInjectPositionOutput)  output = NULL;
+    GError                                       *error = NULL;
+
+    output = qmi_client_loc_inject_position_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        inject_position_finish_task (task, error);
+        return;
+    }
+
+    if (!qmi_message_loc_inject_position_output_get_result (output, &error)) {
+        inject_position_finish_task (task, error);
+        return;
+    }
+}
+
+static void
+loc_location_inject_position_req_indication_cb (QmiClientLoc                                *client,
+                                                QmiIndicationLocInjectPositionRequestOutput *output,
+                                                MMSharedQmi                                 *self)
+{
+    g_autoptr(QmiMessageLocInjectPositionInput) input = NULL;
+    InjectPositionContext                      *ctx;
+    Private                                    *priv;
+    GTask                                      *task;
+    gdouble                                     lat;
+    gdouble                                     lon;
+    guint64                                     utc_ms = 0;
+    gdouble                                     last_lat;
+    gdouble                                     last_lon;
+    guint64                                     timestamp;
+
+    qmi_indication_loc_inject_position_request_output_get_latitude (output, &lat, NULL);
+    qmi_indication_loc_inject_position_request_output_get_longitude (output, &lon, NULL);
+    qmi_indication_loc_inject_position_request_output_get_utc_timestamp (output, &timestamp, NULL);
+
+    /* check whether modem already has position */
+    if ((lat != 0.0) && (lon != 0.0) && (timestamp != 0))
+        return;
+
+    priv = get_private (MM_SHARED_QMI (self));
+    mm_location_cache_get_lat_lon (priv->location_cache, &last_lat, &last_lon);
+    if ((last_lat == MM_LOCATION_LATITUDE_UNKNOWN) ||
+        (last_lon == MM_LOCATION_LONGITUDE_UNKNOWN))
+        return;
+
+    task = g_task_new (self, NULL, NULL, NULL);
+    ctx = g_slice_new0 (InjectPositionContext);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)inject_position_context_free);
+
+    ctx->client = g_object_ref (client);
+
+    input = qmi_message_loc_inject_position_input_new ();
+
+    qmi_message_loc_inject_position_input_set_latitude (input, last_lat, NULL);
+    qmi_message_loc_inject_position_input_set_longitude (input, last_lon, NULL);
+    qmi_message_loc_inject_position_input_set_position_source (input, QMI_LOC_POSITION_SOURCE_OTHER, NULL);
+
+    // it's not recommended to advertise accuracy better than 1000 meters to the modem
+    qmi_message_loc_inject_position_input_set_horizontal_uncertainty_circular (input, 1000, NULL);
+    qmi_message_loc_inject_position_input_set_horizontal_confidence (input, 68, NULL);
+
+    utc_ms = g_get_real_time () / 1000;
+    qmi_message_loc_inject_position_input_set_utc_timestamp (input, utc_ms, NULL);
+
+    ctx->timeout_id = g_timeout_add_seconds (10,
+                                             (GSourceFunc) loc_location_inject_position_indication_timed_out,
+                                             task);
+
+    ctx->indication_id = g_signal_connect (client,
+                                           "inject-position",
+                                           G_CALLBACK (loc_location_inject_position_indication_cb),
+                                           task);
+
+    qmi_client_loc_inject_position (
+        QMI_CLIENT_LOC (ctx->client),
+        input,
+        10,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)loc_location_inject_position_ready,
+        task);
+}
+
+
+static void
+loc_register_event_inject_req_ready (QmiClientLoc *client,
+                                     GAsyncResult *res,
+                                     GTask        *task)
+{
+    g_autoptr(QmiMessageLocRegisterEventsOutput)  output = NULL;
+    g_autoptr(GError)                             error = NULL;
+    MMSharedQmi                                  *self;
+    Private                                      *priv;
+
+    output = qmi_client_loc_register_events_finish (client, res, &error);
+    if (!output) {
+        mm_obj_warn (client, "QMI operation failed: %s", error->message);
+        goto out;
+    }
+
+    if (!qmi_message_loc_register_events_output_get_result (output, &error)) {
+        mm_obj_warn (client, "Couldn't not register tracking events: %s", error->message);
+        goto out;
+    }
+
+    self = g_task_get_source_object (task);
+    priv = get_private (self);
+
+    g_assert (!priv->loc_assistance_inject_time_req_indication_id);
+    priv->loc_assistance_inject_time_req_indication_id =
+        g_signal_connect (client,
+                          "inject-time-request",
+                          G_CALLBACK (loc_location_inject_time_req_indication_cb),
+                          self);
+
+    g_assert (!priv->loc_assistance_inject_position_req_indication_id);
+    priv->loc_assistance_inject_position_req_indication_id =
+        g_signal_connect (client,
+                          "inject-position-request",
+                          G_CALLBACK (loc_location_inject_position_req_indication_cb),
+                          self);
+
+out:
+    g_task_return_int (task, MM_MODEM_LOCATION_ASSISTANCE_DATA_TYPE_XTRA);
+    g_object_unref (task);
+}
+
 static void
 loc_location_get_predicted_orbits_data_source_indication_cb (QmiClientLoc                                       *client,
                                                              QmiIndicationLocGetPredictedOrbitsDataSourceOutput *output,
@@ -6772,13 +7135,28 @@ loc_location_get_predicted_orbits_data_source_indication_cb (QmiClientLoc       
     }
 
 out:
-    if (error)
+    if (error) {
         g_task_return_error (task, error);
-    else if (!supported)
+        g_object_unref (task);
+    } else if (!supported) {
         g_task_return_int (task, MM_MODEM_LOCATION_ASSISTANCE_DATA_TYPE_NONE);
-    else
-        g_task_return_int (task, MM_MODEM_LOCATION_ASSISTANCE_DATA_TYPE_XTRA);
-    g_object_unref (task);
+        g_object_unref (task);
+    } else {
+        g_autoptr(QmiMessageLocRegisterEventsInput) input = NULL;
+        guint64                                     event_mask;
+
+        event_mask = QMI_LOC_EVENT_REGISTRATION_FLAG_INJECT_TIME_REQUEST |
+            QMI_LOC_EVENT_REGISTRATION_FLAG_INJECT_POSITION_REQUEST;
+        input = qmi_message_loc_register_events_input_new ();
+        qmi_message_loc_register_events_input_set_event_registration_mask (
+            input, event_mask, NULL);
+        qmi_client_loc_register_events (client,
+                                        input,
+                                        10,
+                                        NULL,
+                                        (GAsyncReadyCallback) loc_register_event_inject_req_ready,
+                                        task);
+    }
 }
 
 static void

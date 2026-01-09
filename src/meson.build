@@ -46,6 +46,7 @@ sources = files(
   'mm-cbm-part.c',
   'mm-charsets.c',
   'mm-error-helpers.c',
+  'mm-location-cache.c',
   'mm-log.c',
   'mm-log-object.c',
   'mm-modem-helpers.c',
@@ -80,11 +81,16 @@ if enable_systemd_journal
   private_deps += libsystemd_dep
 endif
 
+c_args = [
+  '-DPKGSTATEDIR="@0@"'.format(mm_pkgsharedstatedir),
+]
+
 libhelpers = static_library(
   'helpers',
   sources: sources + enums_sources,
   include_directories: incs,
   dependencies: deps + private_deps,
+  c_args: c_args,
 )
 
 libhelpers_dep = declare_dependency(
@@ -504,6 +510,11 @@ pkg.generate(
 install_data(
   '80-mm-candidate.rules',
   install_dir: udev_rulesdir,
+)
+
+# empty directory for cached position
+install_emptydir(
+  mm_pkgsharedstatedir,
 )
 
 if enable_tests

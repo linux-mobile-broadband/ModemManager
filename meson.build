@@ -10,7 +10,7 @@ project(
     'c_std=gnu89',
     'warning_level=2',
   ],
-  meson_version: '>= 0.53.0',
+  meson_version: '>= 0.60.0',
 )
 
 meson_version = meson.version()
@@ -31,11 +31,13 @@ mm_includedir = get_option('includedir')
 mm_libdir = get_option('libdir')
 mm_sbindir = get_option('sbindir')
 mm_sysconfdir = get_option('sysconfdir')
+mm_sharedstatedir = get_option('sharedstatedir')
 
 mm_pkgdatadir = mm_datadir / mm_name
 mm_pkgincludedir = mm_includedir / mm_name
 mm_pkglibdir = mm_libdir / mm_name
 mm_pkgsysconfdir = mm_sysconfdir / mm_name
+mm_pkgsharedstatedir = mm_sharedstatedir / mm_name
 
 mm_glib_name = 'libmm-glib'
 mm_glib_pkgincludedir = mm_includedir / mm_glib_name
@@ -168,21 +170,21 @@ glib_deps = declare_dependency(
 
 # DBus system directory
 dbus_dep = dependency('dbus-1')
-dbus_interfaces_dir = dbus_dep.get_pkgconfig_variable('interfaces_dir', define_variable: ['datadir', mm_datadir])
-dbus_system_bus_services_dir = dbus_dep.get_pkgconfig_variable('system_bus_services_dir', define_variable: ['datadir', mm_datadir])
+dbus_interfaces_dir = dbus_dep.get_variable(pkgconfig: 'interfaces_dir', pkgconfig_define: ['datadir', mm_datadir])
+dbus_system_bus_services_dir = dbus_dep.get_variable(pkgconfig: 'system_bus_services_dir', pkgconfig_define: ['datadir', mm_datadir])
 
 dbus_policy_dir = get_option('dbus_policy_dir')
 if dbus_policy_dir == ''
-  dbus_policy_dir = dbus_dep.get_pkgconfig_variable('sysconfdir', define_variable: ['sysconfdir', mm_sysconfdir]) / 'dbus-1/system.d'
+  dbus_policy_dir = dbus_dep.get_variable(pkgconfig: 'sysconfdir', pkgconfig_define: ['sysconfdir', mm_sysconfdir]) / 'dbus-1/system.d'
 endif
 
 enable_bash_completion = get_option('bash_completion')
 if enable_bash_completion
   bash_completion_dep = dependency('bash-completion')
-  bash_completion_completionsdir = bash_completion_dep.get_pkgconfig_variable(
-    'completionsdir',
+  bash_completion_completionsdir = bash_completion_dep.get_variable(
+    pkgconfig: 'completionsdir',
     # bash-completion 2.10 changed the substitutions
-    define_variable: bash_completion_dep.version().version_compare('>= 2.10') ? ['datadir', mm_datadir] : ['prefix', mm_prefix],
+    pkgconfig_define: bash_completion_dep.version().version_compare('>= 2.10') ? ['datadir', mm_datadir] : ['prefix', mm_prefix],
   )
 endif
 
@@ -197,7 +199,7 @@ config_h.set('WITH_UDEV', enable_udev)
 udev_udevdir = get_option('udevdir')
 if udev_udevdir == ''
   assert(enable_udev, 'udevdir must be explicitly given if udev support is disabled')
-  udev_udevdir = dependency('udev').get_pkgconfig_variable('udevdir')
+  udev_udevdir = dependency('udev').get_variable(pkgconfig: 'udevdir')
 endif
 udev_rulesdir = udev_udevdir / 'rules.d'
 
@@ -207,7 +209,7 @@ install_systemdunitdir = (systemd_systemdsystemunitdir != 'no')
 
 if install_systemdunitdir and systemd_systemdsystemunitdir == ''
   systemd_dep = dependency('systemd', not_found_message: 'systemd required but not found, please provide a valid systemd user unit dir or disable it')
-  systemd_systemdsystemunitdir = systemd_dep.get_pkgconfig_variable('systemdsystemunitdir', define_variable: ['root_prefix', mm_prefix])
+  systemd_systemdsystemunitdir = systemd_dep.get_variable(pkgconfig: 'systemdsystemunitdir', pkgconfig_define: ['root_prefix', mm_prefix])
 endif
 
 # Suspend/resume support
@@ -240,7 +242,7 @@ enable_polkit = (polkit_opt != 'no')
 if enable_polkit
   polkit_gobject_dep = dependency('polkit-gobject-1', version: '>= 0.97', not_found_message: 'PolicyKit development headers are required')
 
-  polkit_gobject_policydir = polkit_gobject_dep.get_pkgconfig_variable('policydir', define_variable: ['prefix', mm_prefix])
+  polkit_gobject_policydir = polkit_gobject_dep.get_variable(pkgconfig: 'policydir', pkgconfig_define: ['prefix', mm_prefix])
 
   policy_conf = {'MM_DEFAULT_USER_POLICY': (polkit_opt == 'permissive' ? 'yes' : 'auth_self_keep')}
 endif
@@ -297,7 +299,7 @@ if enable_qrtr
   if qmi_glib_dep.type_name() == 'internal'
     qmi_qrtr_supported = qmi_glib_proj.get_variable('enable_qrtr')
   else
-    qmi_qrtr_supported = qmi_glib_dep.get_pkgconfig_variable('qmi_qrtr_supported')
+    qmi_qrtr_supported = qmi_glib_dep.get_variable(pkgconfig: 'qmi_qrtr_supported')
   endif
   assert(qmi_qrtr_supported.to_int().is_odd(), 'Couldn\'t find QRTR support in qmi-glib.')
   qrtr_glib_dep = dependency('qrtr-glib', version: '>= 1.0.0')
