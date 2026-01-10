@@ -45,16 +45,20 @@ G_DEFINE_TYPE (MMLocationGpsNmea, mm_location_gps_nmea, G_TYPE_OBJECT)
 
 struct _MMLocationGpsNmeaPrivate {
     GHashTable *traces;
-    GRegex *sequence_regex;
+    gchar      *sequence_last_trace;
+    gchar      *sequence_last_trace_type;
+    GRegex     *sequence_regex;
 };
 
 /*****************************************************************************/
 
 static gboolean
-check_append_or_replace (MMLocationGpsNmea *self,
-                         const gchar *trace)
+is_sequence_trace_type (MMLocationGpsNmea *self,
+                        const gchar       *trace,
+                        gboolean          *first)
 {
     g_autoptr(GMatchInfo) match_info = NULL;
+    guint                 index;
 
     if (G_UNLIKELY (!self->priv->sequence_regex))
         self->priv->sequence_regex = g_regex_new ("\\$..(?:ALM|GSV|RTE|SFI),(\\d),(\\d).*",
@@ -62,15 +66,13 @@ check_append_or_replace (MMLocationGpsNmea *self,
                                                   0,
                                                   NULL);
 
+    *first = FALSE;
     if (g_regex_match (self->priv->sequence_regex, trace, 0, &match_info)) {
-        guint index;
-
-        /* If we don't have the first element of a sequence, append */
-        if (mm_get_uint_from_match_info (match_info, 2, &index) && index != 1)
+        if (mm_get_uint_from_match_info (match_info, 2, &index)) {
+            *first = (index == 1);
             return TRUE;
+        }
     }
-
-    /* By default, replace */
     return FALSE;
 }
 
@@ -81,6 +83,10 @@ location_gps_nmea_take_trace (MMLocationGpsNmea *self,
     gchar            *i;
     g_autofree gchar *trace_type = NULL;
     g_autofree gchar *trace = _trace;
+    g_autofree gchar *sequence = NULL;
+    gboolean          first;
+    gboolean          sequence_trace;
+
 
     i = strchr (trace, ',');
     if (!i || i == trace)
@@ -93,14 +99,38 @@ location_gps_nmea_take_trace (MMLocationGpsNmea *self,
     /* Some traces are part of a SEQUENCE; so we need to decide whether we
      * completely replace the previous trace, or we append the new one to
      * the already existing list */
-    if (check_append_or_replace (self, trace)) {
+    sequence_trace = is_sequence_trace_type (self, trace, &first);
+
+    /* Save previous sequence trace, if
+     * new trace type is different or this is the first sequence trace */
+    if (self->priv->sequence_last_trace_type &&
+        self->priv->sequence_last_trace &&
+        (g_strcmp0 (self->priv->sequence_last_trace_type, trace_type) ||
+         (sequence_trace && first))) {
+        g_hash_table_replace (self->priv->traces,
+                              g_steal_pointer (&self->priv->sequence_last_trace_type),
+                              g_steal_pointer (&self->priv->sequence_last_trace));
+    }
+
+    if (!sequence_trace) {
+        g_hash_table_replace (self->priv->traces,
+                              g_steal_pointer (&trace_type),
+                              g_steal_pointer (&trace));
+        return TRUE;
+    }
+
+    /* Process the trace as part of a sequence. */
+    if (first) {
+        /* Record first record in the sequence */
+        sequence = g_steal_pointer (&trace);
+    } else {
         /* Append */
-        const gchar *previous;
+        const gchar *previous = self->priv->sequence_last_trace;
 
-        previous = g_hash_table_lookup (self->priv->traces, trace_type);
+        if (!previous)
+            previous = g_hash_table_lookup (self->priv->traces, trace_type);
+
         if (previous) {
-            g_autofree gchar *sequence = NULL;
-
             /* Skip the trace if we already have it there */
             if (strstr (previous, trace))
                 return TRUE;
@@ -109,14 +139,18 @@ location_gps_nmea_take_trace (MMLocationGpsNmea *self,
                                         previous,
                                         g_str_has_suffix (previous, "\r\n") ? "" : "\r\n",
                                         trace);
-            g_free (trace);
-            trace = g_steal_pointer (&sequence);
+        } else {
+            /* No previous records, record first record in the sequence */
+            sequence = g_steal_pointer (&trace);
         }
     }
 
-    g_hash_table_replace (self->priv->traces,
-                          g_steal_pointer (&trace_type),
-                          g_steal_pointer (&trace));
+    g_clear_pointer (&self->priv->sequence_last_trace, g_free);
+    self->priv->sequence_last_trace = g_steal_pointer (&sequence);
+
+    g_clear_pointer (&self->priv->sequence_last_trace_type, g_free);
+    self->priv->sequence_last_trace_type = g_steal_pointer (&trace_type);
+
     return TRUE;
 }
 
@@ -287,6 +321,8 @@ finalize (GObject *object)
     g_hash_table_destroy (self->priv->traces);
     if (self->priv->sequence_regex)
         g_regex_unref (self->priv->sequence_regex);
+    g_free (self->priv->sequence_last_trace);
+    g_free (self->priv->sequence_last_trace_type);
 
     G_OBJECT_CLASS (mm_location_gps_nmea_parent_class)->finalize (object);
 }
