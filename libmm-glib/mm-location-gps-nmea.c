@@ -76,16 +76,15 @@ check_append_or_replace (MMLocationGpsNmea *self,
 
 static gboolean
 location_gps_nmea_take_trace (MMLocationGpsNmea *self,
-                              gchar *trace)
+                              gchar             *_trace)
 {
-    gchar *i;
-    gchar *trace_type;
+    gchar            *i;
+    g_autofree gchar *trace_type = NULL;
+    g_autofree gchar *trace = _trace;
 
     i = strchr (trace, ',');
-    if (!i || i == trace) {
-        g_free (trace);
+    if (!i || i == trace)
         return FALSE;
-    }
 
     trace_type = g_malloc (i - trace + 1);
     memcpy (trace_type, trace, i - trace);
@@ -100,27 +99,24 @@ location_gps_nmea_take_trace (MMLocationGpsNmea *self,
 
         previous = g_hash_table_lookup (self->priv->traces, trace_type);
         if (previous) {
-            gchar *sequence;
+            g_autofree gchar *sequence = NULL;
 
             /* Skip the trace if we already have it there */
-            if (strstr (previous, trace)) {
-                g_free (trace_type);
-                g_free (trace);
+            if (strstr (previous, trace))
                 return TRUE;
-            }
 
             sequence = g_strdup_printf ("%s%s%s",
                                         previous,
                                         g_str_has_suffix (previous, "\r\n") ? "" : "\r\n",
                                         trace);
             g_free (trace);
-            trace = sequence;
+            trace = g_steal_pointer (&sequence);
         }
     }
 
     g_hash_table_replace (self->priv->traces,
-                          trace_type,
-                          trace);
+                          g_steal_pointer (&trace_type),
+                          g_steal_pointer (&trace));
     return TRUE;
 }
 
