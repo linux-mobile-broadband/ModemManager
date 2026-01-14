@@ -4585,8 +4585,8 @@ mm_3gpp_parse_iccid (const char *raw_iccid, GError **error)
         goto error;
     }
 
-    /* ICCIDs are 19 or 20 digits long */
-    if (len < 19 || len > 20) {
+    /* ICCIDs are 18 to 22 digits long */
+    if (len < 18 || len > 22) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "Invalid ICCID response size (was %zd, expected 19 or 20)",
                      len);
