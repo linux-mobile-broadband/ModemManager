@@ -446,6 +446,17 @@ base_modem_internal_grab_port (MMBaseModem         *self,
 #endif
     }
 
+    /* Check if a custom max timeouts value is set via udev */
+    if (mm_kernel_device_has_global_property (kernel_device, ID_MM_MAX_TIMEOUTS)) {
+        guint max_timeouts;
+
+        max_timeouts = mm_kernel_device_get_global_property_as_int (kernel_device, ID_MM_MAX_TIMEOUTS);
+        if (max_timeouts != self->priv->max_timeouts) {
+            mm_obj_dbg (self, "max timeouts overridden via udev: %u", max_timeouts);
+            self->priv->max_timeouts = max_timeouts;
+        }
+    }
+
     if (port_monitoring) {
         if (self->priv->max_timeouts > 0)
             g_signal_connect (port,
