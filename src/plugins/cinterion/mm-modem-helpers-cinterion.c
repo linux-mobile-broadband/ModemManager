@@ -2062,6 +2062,18 @@ mm_cinterion_parse_ws46_response (const gchar  *response,
             /* E-UTRAN only */
             *result = MM_MODEM_MODE_4G;
             break;
+        case 29:
+            /* GERAN and UTRAN */
+            *result = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G;
+            break;
+        case 30:
+            /* GERAN and E-UTRAN */
+            *result = MM_MODEM_MODE_2G | MM_MODEM_MODE_4G;
+            break;
+        case 31:
+            /* UTRAN and E-UTRAN */
+            *result = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G;
+            break;
         default:
             g_set_error (error,
                          MM_CORE_ERROR,
