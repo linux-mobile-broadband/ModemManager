@@ -60,6 +60,10 @@ static const UsbInterfaceConfig usb_interface_configs[] = {
         .swwan_index   = 1,
         .usb_iface_num = 0x08,
     },
+    {
+        .swwan_index = 1,
+        .usb_iface_num = 0x05,
+    }
 };
 
 static gint
