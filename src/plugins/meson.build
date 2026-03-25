@@ -136,6 +136,8 @@ endif
 if plugins_shared['mtk']
   mtk_inc = include_directories('mtk')
 
+  incs = plugins_incs
+
   c_args = '-DMM_MODULE_NAME="shared-mtk"'
 
   sources = files(
@@ -143,9 +145,18 @@ if plugins_shared['mtk']
     'mtk/mm-shared-mtk.c',
   )
 
+  if enable_mbim
+    incs += [fibocom_inc]
+    sources += files(
+      'mtk/mm-bearer-mbim-mtk-fibocom.c',
+      'mtk/mm-broadband-modem-mbim-mtk-fibocom.c',
+      'mtk/mm-broadband-modem-mbim-mtk.c',
+    )
+  endif
+
   plugins += {'shared-mtk': {
     'plugin': false,
-    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': c_args},
+    'module': {'sources': sources, 'include_directories': incs, 'c_args': c_args},
   }}
 endif
 
