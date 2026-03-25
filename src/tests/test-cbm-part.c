@@ -279,6 +279,31 @@ test_cbm_ucs2_with_7bit_lang (void)
 }
 
 
+static void
+test_cbm_ucs2_pad (void)
+{
+    MMCbmPart *part;
+    guint16 serial;
+
+    /* The `00` at the end is additional padding tripping up the parser */
+    parse_cbm ("\r\n+CBM: 87\r\n5540111259FF0430043B044C043D0435043904480438044500200443043A043004370430043D04380439002E000D000D000D000D000D000D000D000D000D000D000D000D000D000D000D000D000D000D000D000D000D00\r\n", &part);
+
+    serial = mm_cbm_part_get_serial (part);
+    g_assert_cmpuint (CBM_SERIAL_GEO_SCOPE (serial), ==, MM_CBM_GEO_SCOPE_PLMN);
+    g_assert_false (CBM_SERIAL_MESSAGE_CODE_ALERT (serial));
+    g_assert_true (CBM_SERIAL_MESSAGE_CODE_POPUP (serial));
+    g_assert_cmpuint (CBM_SERIAL_MESSAGE_CODE (serial), ==, 84);
+    g_assert_cmpuint (CBM_SERIAL_MESSAGE_CODE_UPDATE (serial), ==, 0);
+    g_assert_cmpuint (mm_cbm_part_get_channel (part), ==, 4370);
+    g_assert_cmpuint (mm_cbm_part_get_num_parts (part), ==, 15);
+    g_assert_cmpuint (mm_cbm_part_get_part_num (part), ==, 15);
+
+    //g_warning ("'%s'", mm_cbm_part_get_text (part));
+    g_assert_cmpstr (mm_cbm_part_get_text (part), ==, "альнейших указаний.\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r");
+    mm_cbm_part_free (part);
+}
+
+
 int main (int argc, char **argv)
 {
     setlocale (LC_ALL, "");
@@ -301,6 +326,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/CBM/PDU-Parser/has-lang", test_cbm_gsm7bit_with_lang);
     /* UCS2 encoding with 7bit language in first 2 bytes of the message */
     g_test_add_func ("/MM/CBM/PDU-Parser/has-7bit-lang", test_cbm_ucs2_with_7bit_lang);
+    /* UCS2 message with additional padding: https://gitlab.freedesktop.org/mobile-broadband/ModemManager/-/issues/253#note_3355339 */
+    g_test_add_func ("/MM/CBM/PDU-Parser/UCS2/pad", test_cbm_ucs2_pad);
 
     return g_test_run ();
 }
