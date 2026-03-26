@@ -916,7 +916,7 @@ if plugins_options['rolling']
   test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_ROLLING="@0@"'.format(plugins_dir / 'rolling')]
   plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
 
-  incs = plugins_incs + [fibocom_inc]
+  incs = plugins_incs + [fibocom_inc] + [mtk_inc]
 
   sources = files(
     'rolling/mm-plugin-rolling.c',
