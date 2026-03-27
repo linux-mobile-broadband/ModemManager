@@ -97,7 +97,7 @@ cpin_query_ready (MMIfaceModem *self,
 {
     MMModemLock  lock = MM_MODEM_LOCK_UNKNOWN;
     const gchar *result;
-    GError      *error = NULL;
+    g_autoptr (GError) error = NULL;
 
     result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
@@ -118,7 +118,7 @@ cpin_query_ready (MMIfaceModem *self,
         }
 
         /* Otherwise just return the error */
-        g_task_return_error (task, error);
+        g_task_return_error (task, g_steal_pointer (&error));
     } else {
         if (result)
             lock = mm_parse_cpin_response (result, TRUE);
