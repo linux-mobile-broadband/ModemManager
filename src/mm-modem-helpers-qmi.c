@@ -2373,6 +2373,7 @@ mm_bearer_ip_family_from_qmi_pdp_type (QmiWdsPdpType pdp_type)
     case QMI_WDS_PDP_TYPE_IPV4_OR_IPV6:
         return MM_BEARER_IP_FAMILY_IPV4V6;
     case QMI_WDS_PDP_TYPE_PPP:
+    case QMI_WDS_PDP_TYPE_NON_IP:
     default:
         return MM_BEARER_IP_FAMILY_NONE;
     }
