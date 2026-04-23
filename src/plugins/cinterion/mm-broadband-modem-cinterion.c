@@ -1723,14 +1723,14 @@ ws46_query_ready (MMBaseModem  *self,
 
     response = mm_base_modem_at_command_finish (self, res, &error);
     if (!response) {
-        g_task_return_error (task, error);
+        g_task_return_error(task, g_steal_pointer(&error));
         g_object_unref (task);
         return;
     }
     if (!mm_cinterion_parse_ws46_response (response,
                                            &(result->allowed),
                                            &error)) {
-        g_task_return_error (task, error);
+        g_task_return_error(task, g_steal_pointer(&error));
         g_object_unref (task);
         return;
     }
