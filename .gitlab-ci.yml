@@ -73,7 +73,8 @@ verify-dco:
   extends:
   - .fdo.distribution-image@ubuntu
   - .common_variables
-  needs: []
+  needs:
+    - build_container
   only:
     - merge_requests
   script: |
