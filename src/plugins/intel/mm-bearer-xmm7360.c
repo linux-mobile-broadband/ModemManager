@@ -274,12 +274,22 @@ get_dns_ready (MMBroadbandModemXmm7360 *modem,
         arg = (Xmm7360RpcMsgArg *) g_ptr_array_index (response->content, i + 1);
         if (XMM7360_RPC_MSG_ARG_GET_INT (arg) == 1) {
             arg = (Xmm7360RpcMsgArg *) g_ptr_array_index (response->content, i);
-            g_assert (arg->size >= 4);
+            if (arg->size < 4) {
+                g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                         "Unexpected DNSv4 address format");
+                g_object_unref (task);
+                return;
+            }
             g_ptr_array_add (ctx->dns, g_inet_address_new_from_bytes ((const guint8 *)arg->value.string,
                                                                       G_SOCKET_FAMILY_IPV4));
         } else if (XMM7360_RPC_MSG_ARG_GET_INT (arg) == 2) {
             arg = (Xmm7360RpcMsgArg *) g_ptr_array_index (response->content, i);
-            g_assert (arg->size >= 16);
+            if (arg->size < 16) {
+                g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                         "Unexpected DNSv6 address format");
+                g_object_unref (task);
+                return;
+            }
             g_ptr_array_add (ctx->dns, g_inet_address_new_from_bytes ((const guint8 *)arg->value.string,
                                                                       G_SOCKET_FAMILY_IPV6));
         }
@@ -458,7 +468,12 @@ net_attach_command_ready (MMBroadbandModemXmm7360 *modem,
 
     /* status code */
     arg = (Xmm7360RpcMsgArg *) g_ptr_array_index (response->content, 1);
-    g_assert (arg->type == XMM7360_RPC_MSG_ARG_TYPE_LONG);
+    if (arg->type != XMM7360_RPC_MSG_ARG_TYPE_LONG) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Unexpected net attach command response");
+        g_object_unref (task);
+        return;
+    }
     status = XMM7360_RPC_MSG_ARG_GET_INT (arg);
 
     if (status != (gint32)0xffffffff) {
