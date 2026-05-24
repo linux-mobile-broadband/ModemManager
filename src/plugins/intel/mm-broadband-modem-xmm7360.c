@@ -472,8 +472,7 @@ fcc_unlock_ready (MMBroadbandModem *self,
         return;
     }
     arg = (Xmm7360RpcMsgArg *) g_ptr_array_index (response->content, 0);
-    g_assert (arg->type == XMM7360_RPC_MSG_ARG_TYPE_LONG);
-    if (XMM7360_RPC_MSG_ARG_GET_INT (arg) != 1) {
+    if ((arg->type != XMM7360_RPC_MSG_ARG_TYPE_LONG) || (XMM7360_RPC_MSG_ARG_GET_INT (arg) != 1)) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                  "Our answer to the FCC unlock challenge was not accepted");
         g_object_unref (task);
@@ -496,7 +495,7 @@ fcc_unlock_challenge_ready (MMBroadbandModem *self,
     Xmm7360RpcMsgArg *arg;
     gint32 fcc_challenge;
     GChecksum *checksum;
-    guchar salt[] = { 0x3d, 0xf8, 0xc7, 0x19 };
+    const guchar salt[] = { 0x3d, 0xf8, 0xc7, 0x19 };
     guint8 digest[32] = { 0 };
     gsize digest_len = 32;
     g_autoptr(GByteArray) digest_response = NULL;
@@ -512,7 +511,12 @@ fcc_unlock_challenge_ready (MMBroadbandModem *self,
     }
 
     arg = (Xmm7360RpcMsgArg *) g_ptr_array_index (response->content, 1);
-    g_assert (arg->type == XMM7360_RPC_MSG_ARG_TYPE_LONG);
+    if (arg->type != XMM7360_RPC_MSG_ARG_TYPE_LONG) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Unexpected response to FCC unlock challenge request");
+        g_object_unref (task);
+        return;
+    }
     fcc_challenge = XMM7360_RPC_MSG_ARG_GET_INT (arg);
 
     checksum = g_checksum_new (G_CHECKSUM_SHA256);
@@ -566,7 +570,12 @@ fcc_lock_query_ready (MMBroadbandModem *self,
 
     /* second argument is fcc_state */
     arg = (Xmm7360RpcMsgArg *) g_ptr_array_index (response->content, 1);
-    g_assert (arg->type == XMM7360_RPC_MSG_ARG_TYPE_LONG);
+    if (arg->type != XMM7360_RPC_MSG_ARG_TYPE_LONG) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Unexpected FCC check fcc_state type");
+        g_object_unref (task);
+        return;
+    }
     if (XMM7360_RPC_MSG_ARG_GET_INT (arg)) {
         /* no FCC unlock required: FCC state is != 0 */
         g_task_return_boolean (task, FALSE);
@@ -576,7 +585,12 @@ fcc_lock_query_ready (MMBroadbandModem *self,
 
     /* third argument is fcc_mode */
     arg = (Xmm7360RpcMsgArg *) g_ptr_array_index (response->content, 2);
-    g_assert (arg->type == XMM7360_RPC_MSG_ARG_TYPE_LONG);
+    if (arg->type != XMM7360_RPC_MSG_ARG_TYPE_LONG) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Unexpected FCC check fcc_mode type");
+        g_object_unref (task);
+        return;
+    }
     if (!XMM7360_RPC_MSG_ARG_GET_INT (arg)) {
         /* no FCC unlock required: FCC mode is == 0 */
         g_task_return_boolean (task, FALSE);
