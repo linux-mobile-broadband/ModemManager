@@ -1,0 +1,137 @@
+# Kazakh translation for ModemManager.
+# Copyright (C) 2026 ModemManager's COPYRIGHT HOLDER
+# This file is distributed under the same license as the ModemManager package.
+# Baurzhan Muftakhidinov <baurthefirst@gmail.com>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: ModemManager main\n"
+"Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
+"ModemManager/issues\n"
+"POT-Creation-Date: 2025-09-05 16:31+0000\n"
+"PO-Revision-Date: 2026-03-01 12:56+0500\n"
+"Last-Translator: Baurzhan Muftakhidinov <baurthefirst@gmail.com>\n"
+"Language-Team: Kazakh <kk_KZ@googlegroups.com>\n"
+"Language: kk\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Generator: Poedit 3.8\n"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:13
+msgid "Enable and view Cell Broadcast messages"
+msgstr "Ұялы хабар тарату хабарламаларын іске қосу және көру"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:14
+msgid ""
+"System policy prevents enabling or viewing this device's cell broadcast "
+"messages."
+msgstr ""
+"Жүйелік саясат бұл құрылғының ұялы хабар тарату хабарламаларын іске қосуға "
+"немесе көруге рұқсат бермейді."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:22
+msgid "Control the Modem Manager daemon"
+msgstr "Modem Manager қызметін басқару"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:23
+msgid "System policy prevents controlling the Modem Manager."
+msgstr "Жүйелік саясат Modem Manager қызметін басқаруға рұқсат бермейді."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:31
+msgid "Set the primary sim slot of a modem"
+msgstr "Модемнің негізгі SIM-слотын орнату"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
+msgid "System policy prevents configuring modem properties."
+msgstr "Жүйелік саясат модем қасиеттерін баптауға рұқсат бермейді."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
+msgid "Unlock and control a mobile broadband device"
+msgstr "Мобильді кең жолақты құрылғының құлпын ашу және оны басқару"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
+msgid ""
+"System policy prevents unlocking or controlling the mobile broadband device."
+msgstr ""
+"Жүйелік саясат мобильді кең жолақты құрылғының құлпын ашуға немесе оны "
+"басқаруға рұқсат бермейді."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
+msgid "Add, modify, and delete mobile broadband contacts"
+msgstr "Мобильді кең жолақты контактілерді қосу, өзгерту және өшіру"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
+msgid ""
+"System policy prevents adding, modifying, or deleting this device's "
+"contacts."
+msgstr ""
+"Жүйелік саясат бұл құрылғының контактілерін қосуға, өзгертуге немесе "
+"өшіруге рұқсат бермейді."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Send, save, modify, and delete text messages"
+msgstr "Мәтіндік хабарламаларды жіберу, сақтау, өзгерту және өшіру"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+msgid ""
+"System policy prevents sending or manipulating this device's text messages."
+msgstr ""
+"Жүйелік саясат бұл құрылғының мәтіндік хабарламаларын жіберуге немесе "
+"өңдеуге рұқсат бермейді."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
+msgid "Accept incoming voice calls or start outgoing voice calls."
+msgstr ""
+"Кіріс дауыстық қоңырауларды қабылдау немесе шығыс дауыстық қоңырауларды "
+"бастау."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
+msgid "System policy prevents voice calls."
+msgstr "Жүйелік саясат дауыстық қоңырауларға рұқсат бермейді."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
+msgid "Query network time and timezone information"
+msgstr "Желі уақыты мен уақыт белдеуі туралы ақпаратты сұрау"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
+msgid "System policy prevents querying network time information."
+msgstr "Жүйелік саясат желі уақыты туралы ақпаратты сұрауға рұқсат бермейді."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:85
+msgid "Enable and view geographic location and positioning information"
+msgstr "Географиялық орналасу мен позициялау ақпаратын іске қосу және көру"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:86
+msgid ""
+"System policy prevents enabling or viewing geographic location information."
+msgstr ""
+"Жүйелік саясат географиялық орналасу ақпаратын іске қосуға немесе көруге "
+"рұқсат бермейді."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:94
+msgid "Query and utilize network information and services"
+msgstr "Желі ақпаратын және қызметтерін сұрау және пайдалану"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:95
+msgid ""
+"System policy prevents querying or utilizing network information and "
+"services."
+msgstr ""
+"Жүйелік саясат желі ақпаратын және қызметтерін сұрауға немесе пайдалануға "
+"рұқсат бермейді."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:103
+msgid "Query and manage firmware on a mobile broadband device"
+msgstr "Мобильді кең жолақты құрылғының микробағдарламасын сұрау және басқару"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:104
+msgid "System policy prevents querying or managing this device's firmware."
+msgstr ""
+"Жүйелік саясат бұл құрылғының микробағдарламасын сұрауға немесе басқаруға "
+"рұқсат бермейді."
+
+#: src/mm-sleep-monitor-systemd.c:133
+msgid "ModemManager needs to reset devices"
+msgstr "ModemManager-ге құрылғыларды қайта іске қосу қажет"
