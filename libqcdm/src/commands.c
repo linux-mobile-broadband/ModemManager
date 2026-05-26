@@ -1741,6 +1741,8 @@ qcdm_cmd_log_config_new (char *buf,
     qcdm_return_val_if_fail (len >= cmdsize, 0);
 
     cmd = calloc (1, cmdbufsize);
+    qcdm_return_val_if_fail (cmd != NULL, 0);
+
     cmd->code = DIAG_CMD_LOG_CONFIG;
     cmd->op = htole32 (op);
     cmd->equipid = htole32 (equip_id);
@@ -1877,6 +1879,12 @@ log_config_get_set_result (const char *buf, size_t len, uint32_t op, int *out_er
 
         if (num_result_items) {
             items = malloc (sizeof (*items) * num_result_items);
+            if (!items) {
+                if (out_error)
+                    *out_error = -QCDM_ERROR_RESPONSE_FAILED;
+                qcdm_result_unref (result);
+                return NULL;
+            }
             for (i = 0; i < num_items; i++) {
                 if (LOG_CODE_SET (rsp->u.get_set_items.mask, i))
                     items[count++] = (equipid << 12) | (i & 0x0FFF);
