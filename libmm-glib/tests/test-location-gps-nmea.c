@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2026 Dan Williams <dan@ioncontrol.co>
+ * Copyright (C) 2026 Andrey Skvortsov <andrej.skvortzov@gmail.com>
  */
 
 #include <glib.h>
@@ -177,12 +178,199 @@ test_append_sequence (void)
 
 /**************************************************************/
 
+static void
+test_append_sequence_interleaved (void)
+{
+    MMLocationGpsNmea *nmea;
+    GError *error = NULL;
+    g_autofree gchar *combined_start = NULL;
+    g_autofree gchar *combined_full = NULL;
+
+    #define TRACE0 "$GNGGA,001626.000,,,,,0,00,25.5,,,,,,*79"
+    #define TRACE1 "$GPGSV,3,1,12,01,35,282,,02,68,264,,03,02,243,,08,35,206,,1*68"
+    #define TRACE2 "$GPGSV,3,2,12,10,46,074,,14,16,312,,17,,,,22,16,327,,1*53"
+    #define TRACE3 "$BDGSV,1,1,00,0*74"
+    #define TRACE4 "$GPGSV,3,3,12,23,07,068,,24,15,030,,27,14,181,,32,51,120,,1*60"
+    #define TRACE5 "$GNGGA,001626.000,,,,,0,00,25.6,,,,,,*79"
+
+    #define GPGSV_TYPE "$GPGSV"
+    #define BDGSV_TYPE "$BDGSV"
+    #define GNGGA_TYPE "$GNGGA"
+
+    static const gchar *gpgsvs_start[] = { TRACE1, TRACE2 };
+    static const gchar *gpgsvs_full[] = { TRACE1, TRACE2, TRACE4 };
+
+    nmea = mm_location_gps_nmea_new_from_string_variant (g_variant_new_string (TRACE0), &error);
+    g_assert_no_error (error);
+
+    /* No part of the GPGSV sequence should be found in traces until a new
+     * trace type is added.
+     */
+    g_assert (mm_location_gps_nmea_add_trace (nmea, TRACE1));
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, GPGSV_TYPE), ==, NULL);
+    g_assert (mm_location_gps_nmea_add_trace (nmea, TRACE2));
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, GPGSV_TYPE), ==, NULL);
+
+    /* Add a new type, but it's also a sequence so it won't be found yet */
+    g_assert (mm_location_gps_nmea_add_trace (nmea, TRACE3));
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, BDGSV_TYPE), ==, NULL);
+
+    /* New type was just added, now first part of $GPGSV should be available */
+    combined_start = combine_traces (gpgsvs_start, G_N_ELEMENTS (gpgsvs_start), FALSE);
+    g_assert (combined_start);
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, GPGSV_TYPE), ==, combined_start);
+
+    /* Add third GPGSV, but it won't be found yet, only previous GPGSV records
+     * But $BDGSV should be found now.
+     */
+    g_assert (mm_location_gps_nmea_add_trace (nmea, TRACE4));
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, GPGSV_TYPE), ==, combined_start);
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, BDGSV_TYPE), ==, TRACE3);
+
+    /* Add a non-sequence trace */
+    g_assert (mm_location_gps_nmea_add_trace (nmea, TRACE5));
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, GNGGA_TYPE), ==, TRACE5);
+
+    /* New type was just added, now we should find full $GPGSV sequence */
+    combined_full = combine_traces (gpgsvs_full, G_N_ELEMENTS (gpgsvs_full), FALSE);
+    g_assert (combined_full);
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, GPGSV_TYPE), ==, combined_full);
+
+}
+
+#undef TRACE0
+#undef TRACE1
+#undef TRACE2
+#undef TRACE3
+#undef TRACE4
+#undef TRACE5
+
+/**************************************************************/
+
+static void
+test_append_multiple_sequences (void)
+{
+    MMLocationGpsNmea *nmea;
+    GError *error = NULL;
+    g_autofree gchar *combined1 = NULL;
+    g_autofree gchar *combined2 = NULL;
+
+    #define TRACE0 "$GPGSV,3,1,12,01,35,282,,02,68,264,,03,02,243,,08,35,206,,1*68"
+    #define TRACE1 "$GPGSV,3,2,12,10,46,074,,14,16,312,,17,,,,22,16,327,,1*53"
+    #define TRACE2 "$GPGSV,3,3,12,23,07,068,,24,15,030,,27,14,181,,32,51,120,,1*60"
+    #define TRACE3 "$GPGSV,3,1,12,01,35,282,23,02,68,264,,03,02,243,,08,35,206,,1*69"
+    #define TRACE4 "$GPGSV,3,2,12,10,46,074,28,14,16,312,,17,,,,22,16,327,,1*59"
+    #define TRACE5 "$GPGSV,3,3,12,23,07,068,18,24,15,030,,27,14,181,,32,51,120,,1*69"
+    #define TRACE6 "$GPGSV,3,1,12,01,35,282,25,02,68,264,,03,02,243,,08,35,206,,1*6F"
+
+    #define GPGSV_TYPE "$GPGSV"
+
+    static const gchar *gpgsvs1[] = { TRACE0, TRACE1, TRACE2 };
+    static const gchar *gpgsvs2[] = { TRACE3, TRACE4, TRACE5 };
+
+    /* No part of the GPGSV sequence should be found in traces until a new
+     * trace sequence is added.
+     */
+    nmea = mm_location_gps_nmea_new_from_string_variant (g_variant_new_string (TRACE0), &error);
+    g_assert_no_error (error);
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, GPGSV_TYPE), ==, NULL);
+    g_assert (mm_location_gps_nmea_add_trace (nmea, TRACE1));
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, GPGSV_TYPE), ==, NULL);
+    g_assert (mm_location_gps_nmea_add_trace (nmea, TRACE2));
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, GPGSV_TYPE), ==, NULL);
+
+    /* Add first record for next sequence, old sequence should be available */
+    g_assert (mm_location_gps_nmea_add_trace (nmea, TRACE3));
+    combined1 = combine_traces (gpgsvs1, G_N_ELEMENTS (gpgsvs1), FALSE);
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, GPGSV_TYPE), ==, combined1);
+
+    /* No part of new the GPGSV sequence should be found in traces until a new
+     * trace sequence is added.
+     */
+    g_assert (mm_location_gps_nmea_add_trace (nmea, TRACE4));
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, GPGSV_TYPE), ==, combined1);
+    g_assert (mm_location_gps_nmea_add_trace (nmea, TRACE5));
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, GPGSV_TYPE), ==, combined1);
+
+    /* Add first record for next sequence, updated sequence should be available */
+    g_assert (mm_location_gps_nmea_add_trace (nmea, TRACE6));
+    combined2 = combine_traces (gpgsvs2, G_N_ELEMENTS (gpgsvs2), FALSE);
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, GPGSV_TYPE), ==, combined2);
+}
+
+#undef TRACE0
+#undef TRACE1
+#undef TRACE2
+#undef TRACE3
+#undef TRACE4
+#undef TRACE5
+#undef TRACE6
+
+/**************************************************************/
+
+static void
+test_start_from_incomplete_sequence (void)
+{
+    MMLocationGpsNmea *nmea;
+    GError *error = NULL;
+    g_autofree gchar *combined = NULL;
+
+    #define TRACE0 "$GPGSV,3,3,12,23,07,068,,24,15,030,,27,14,181,,32,51,120,,1*60"
+    #define TRACE1 "$GNGGA,001626.000,,,,,0,00,25.5,,,,,,*79"
+    #define TRACE2 "$GPGSV,3,1,12,01,35,282,,02,68,264,,03,02,243,,08,35,206,,1*68"
+    #define TRACE3 "$GPGSV,3,2,12,10,46,074,,14,16,312,,17,,,,22,16,327,,1*53"
+    #define TRACE4 "$GPGSV,3,3,12,23,07,068,,24,15,030,,27,14,181,,32,51,120,,1*60"
+    #define TRACE5 "$GNGGA,001626.000,,,,,0,00,25.6,,,,,,*7A"
+
+    #define GPGSV_TYPE "$GPGSV"
+    #define GNGGA_TYPE "$GNGGA"
+
+    static const gchar *gpgsvs[] = { TRACE2, TRACE3, TRACE4 };
+
+    /* Start sequence not from the first record */
+    nmea = mm_location_gps_nmea_new_from_string_variant (g_variant_new_string (TRACE0), &error);
+    g_assert_no_error (error);
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, GPGSV_TYPE), ==, NULL);
+
+    /* New type was just added, now we should find $GPGSV sequence */
+    g_assert (mm_location_gps_nmea_add_trace (nmea, TRACE1));
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, GNGGA_TYPE), ==, TRACE1);
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, GPGSV_TYPE), ==, TRACE0);
+
+    /* Add first record for next sequence, old sequence should be available */
+    g_assert (mm_location_gps_nmea_add_trace (nmea, TRACE2));
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, GPGSV_TYPE), ==, TRACE0);
+    g_assert (mm_location_gps_nmea_add_trace (nmea, TRACE3));
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, GPGSV_TYPE), ==, TRACE0);
+    g_assert (mm_location_gps_nmea_add_trace (nmea, TRACE4));
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, GPGSV_TYPE), ==, TRACE0);
+
+    /* New type was just added, now we should find new full $GPGSV sequence */
+    g_assert (mm_location_gps_nmea_add_trace (nmea, TRACE5));
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, GNGGA_TYPE), ==, TRACE5);
+
+    combined = combine_traces (gpgsvs, G_N_ELEMENTS (gpgsvs), FALSE);
+    g_assert_cmpstr (mm_location_gps_nmea_get_trace (nmea, GPGSV_TYPE), ==, combined);
+}
+
+#undef TRACE0
+#undef TRACE1
+#undef TRACE2
+#undef TRACE3
+#undef TRACE4
+#undef TRACE5
+
+/**************************************************************/
+
 int main (int argc, char **argv)
 {
     g_test_init (&argc, &argv, NULL);
 
     g_test_add_func ("/MM/Location/GPS/NMEA/round-trip", test_round_trip);
     g_test_add_func ("/MM/Location/GPS/NMEA/append-sequence", test_append_sequence);
+    g_test_add_func ("/MM/Location/GPS/NMEA/append-sequence-interleaved", test_append_sequence_interleaved);
+    g_test_add_func ("/MM/Location/GPS/NMEA/append-multiple-sequences", test_append_multiple_sequences);
+    g_test_add_func ("/MM/Location/GPS/NMEA/start-from-incomplete-sequence", test_start_from_incomplete_sequence);
 
     return g_test_run ();
 }
