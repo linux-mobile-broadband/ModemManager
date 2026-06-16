@@ -285,6 +285,9 @@ cmp_sms_by_number_reference (MMBaseSms *sms,
     if (mm_base_sms_get_max_parts (sms) != mm_sms_part_get_concat_max (part))
         return -1;
 
+    if (mm_gdbus_sms_get_pdu_type (MM_GDBUS_SMS (sms)) != mm_sms_part_get_pdu_type (part))
+        return -1;
+
     return 0;
 }
 
