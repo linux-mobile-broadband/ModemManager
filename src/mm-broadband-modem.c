@@ -7504,6 +7504,8 @@ modem_messaging_setup_cleanup_unsolicited_events_finish (MMIfaceModemMessaging *
 }
 
 typedef struct {
+    MMBroadbandModem *self;
+    MMSmsStorage storage;
     guint idx;
 } SmsPartContext;
 
@@ -7568,6 +7570,38 @@ sms_part_ready (MMBroadbandModem *self,
 
 static void
 indication_lock_storages_ready (MMIfaceModemMessaging *messaging,
+                                GAsyncResult *res,
+                                GTask *task);
+
+gboolean
+indication_lock_storages_retry(GTask *task)
+{
+    MMBroadbandModem *self;
+    SmsPartContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+    self = ctx->self;
+
+    /* Don't signal multiple times if there are multiple CMTI notifications for a message */
+    if (mm_sms_list_has_part (self->priv->modem_messaging_sms_list,
+                              ctx->storage,
+                              ctx->idx)) {
+        mm_obj_dbg (self, "skipping CMTI indication, part already processed");
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return G_SOURCE_REMOVE;
+    }
+
+    mm_iface_modem_messaging_lock_storages (MM_IFACE_MODEM_MESSAGING (self),
+                                            ctx->storage,
+                                            MM_SMS_STORAGE_UNKNOWN,
+                                            (GAsyncReadyCallback)indication_lock_storages_ready,
+                                            task);
+    return G_SOURCE_REMOVE;
+}
+
+static void
+indication_lock_storages_ready (MMIfaceModemMessaging *messaging,
                                 GAsyncResult          *res,
                                 GTask                 *task)
 {
@@ -7576,10 +7610,7 @@ indication_lock_storages_ready (MMIfaceModemMessaging *messaging,
     GError *error = NULL;
 
     if (!mm_iface_modem_messaging_lock_storages_finish (messaging, res, &error)) {
-        /* TODO: we should either make this lock() never fail, by automatically
-         * retrying after some time, or otherwise retry here. */
-        g_task_return_error (task, error);
-        g_object_unref (task);
+        g_timeout_add(100, (GSourceFunc)indication_lock_storages_retry, task);
         return;
     }
 
@@ -7630,6 +7661,8 @@ cmti_received (MMPortSerialAt *port,
     }
 
     ctx = g_new (SmsPartContext, 1);
+    ctx->self = self;
+    ctx->storage = storage;
     ctx->idx = idx;
 
     task = g_task_new (self, NULL, NULL, NULL);
@@ -7912,6 +7945,7 @@ modem_messaging_enable_unsolicited_events (MMIfaceModemMessaging *self,
 /* Load initial list of SMS parts (Messaging interface) */
 
 typedef struct {
+    MMIfaceModemMessaging *self;
     MMSmsStorage list_storage;
 } ListPartsContext;
 
@@ -8159,16 +8193,33 @@ sms_pdu_part_list_ready (MMBroadbandModem *self,
 
 static void
 list_parts_lock_storages_ready (MMIfaceModemMessaging *self,
+                                GAsyncResult *res,
+                                GTask *task);
+
+gboolean
+list_parts_lock_storages_retry(GTask *task)
+{
+    ListPartsContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    mm_iface_modem_messaging_lock_storages (ctx->self,
+                                            ctx->list_storage,
+                                            MM_SMS_STORAGE_UNKNOWN,
+                                            (GAsyncReadyCallback)list_parts_lock_storages_ready,
+                                            task);
+    return G_SOURCE_REMOVE;
+}
+
+static void
+list_parts_lock_storages_ready (MMIfaceModemMessaging *self,
                                 GAsyncResult          *res,
                                 GTask                 *task)
 {
     GError *error = NULL;
 
     if (!mm_iface_modem_messaging_lock_storages_finish (self, res, &error)) {
-        /* TODO: we should either make this lock() never fail, by automatically
-         * retrying after some time, or otherwise retry here. */
-        g_task_return_error (task, error);
-        g_object_unref (task);
+        g_timeout_add(100, (GSourceFunc)list_parts_lock_storages_retry, task);
         return;
     }
 
@@ -8198,6 +8249,7 @@ modem_messaging_load_initial_sms_parts (MMIfaceModemMessaging *self,
     GTask *task;
 
     ctx = g_new (ListPartsContext, 1);
+    ctx->self = self;
     ctx->list_storage = storage;
 
     task = g_task_new (self, NULL, callback, user_data);
