@@ -7283,7 +7283,7 @@ loc_location_inject_data_indication_timed_out (GTask *task)
     ctx->timeout_id = 0;
 
     g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED,
-                             "Failed to receive indication with the server update result");
+                             "Failed to receive indication with the injection data result");
     g_object_unref (task);
     return G_SOURCE_REMOVE;
 }
