@@ -28,6 +28,7 @@
 #include "mm-broadband-modem-fibocom.h"
 #if defined WITH_MBIM
 #include "mm-broadband-modem-mbim-fibocom.h"
+#include "mm-broadband-modem-mbim-mtk-fibocom.h"
 #endif
 
 #if defined WITH_QMI
@@ -53,6 +54,16 @@ create_modem (MMPlugin     *self,
 {
 #if defined WITH_MBIM
     if (mm_port_probe_list_has_mbim_port (probes)) {
+        /* rw350r-usb support with rolling-specific changes */
+        if (product == 0x0802) {
+            mm_obj_dbg (self, "MBIM-powered MTK-based Rolling modem found...");
+            return MM_BASE_MODEM (mm_broadband_modem_mbim_mtk_fibocom_new (uid,
+                                                                           physdev,
+                                                                           drivers,
+                                                                           mm_plugin_get_name (self),
+                                                                           vendor,
+                                                                           product));
+        }
         /* For the MBIM-based modem we fully rely on the Fibocom implementation */
         mm_obj_dbg (self, "MBIM-powered Rolling modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_mbim_fibocom_new (uid,

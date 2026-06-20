@@ -47,9 +47,12 @@ ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="01a4", ENV{.MM_USBIFNUM}=="06", SUBS
 ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="01a4", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_FIBOCOM_FASTBOOT}="1"
 
 # Rolling RW101R-GL (MBIM in iface #0)
-# ttyUSB0 (if #2): GNSS data
-ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0301", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
-ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0302", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+# ttyUSB0 (if #2): AT port
+# Firmware interface implementation comes from the Fibocom shared utils.
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0301", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0301", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_FIBOCOM_FASTBOOT}="1"
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0302", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0302", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_FIBOCOM_FASTBOOT}="1"
 
 # Rolling RW101R-GL (MBIM in iface #0, ADB in iface #4)
 #  ttyUSB0 (if #2): QCDM port
@@ -77,5 +80,29 @@ ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="01a9", ENV{.MM_USBIFNUM}=="03", SUBS
 ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0115", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0115", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_QCDM}="1"
 ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0115", ENV{.MM_USBIFNUM}=="04", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+
+# Rolling RW350-USB (MBIM in iface #0, ADB in iface #5)
+#  ttyUSB0 (if #2): AP AT port
+#  ttyUSB1 (if #3): AP LOG port
+#  ttyUSB2 (if #4): AP META port
+#  ttyUSB3 (if #6): MD AT port
+#  ttyUSB4 (if #7): MD META port
+#  ttyUSB5 (if #8): NPT port
+#  ttyUSB6 (if #9): DEBUG port
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0802", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0802", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0802", ENV{.MM_USBIFNUM}=="04", SUBSYSTEM=="tty", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0802", ENV{.MM_USBIFNUM}=="06", SUBSYSTEM=="tty", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0802", ENV{.MM_USBIFNUM}=="07", SUBSYSTEM=="tty", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0802", ENV{.MM_USBIFNUM}=="08", SUBSYSTEM=="tty", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="0802", ENV{.MM_USBIFNUM}=="09", SUBSYSTEM=="tty", ENV{ID_MM_PORT_IGNORE}="1"
+
+# Rolling RW135R (MBIM in iface #0, ADB in iface #5)
+#  ttyUSB0 (if #2): GNSS data
+#  ttyUSB1 (if #3): QCDM port
+#  ttyUSB2 (if #4): AT port
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="1003", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="1003", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_QCDM}="1"
+ATTRS{idVendor}=="33f8", ATTRS{idProduct}=="1003", ENV{.MM_USBIFNUM}=="04", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
 
 LABEL="mm_rolling_port_types_end"

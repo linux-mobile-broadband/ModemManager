@@ -111,8 +111,8 @@ MM_PLUGIN_NAMED_CREATOR_SCOPE MMPlugin *
 mm_plugin_create_sierra (void)
 {
     static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
-    static const guint16 vendor_ids[] = { 0x1199, 0 };
-    static const gchar *drivers[] = { "qmi_wwan", "cdc_mbim", NULL };
+    static const guint16 vendor_ids[] = { 0x1199, 0x1519, 0 };
+    static const gchar *drivers[] = { "qmi_wwan", "cdc_mbim", "cdc_acm", "cdc_ncm", NULL };
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_SIERRA,

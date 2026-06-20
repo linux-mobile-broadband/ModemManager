@@ -143,9 +143,19 @@ if plugins_shared['mtk']
     'mtk/mm-shared-mtk.c',
   )
 
+  incs = plugins_incs
+  if enable_mbim
+    incs += [fibocom_inc]
+    sources += files(
+      'mtk/mm-bearer-mbim-mtk-fibocom.c',
+      'mtk/mm-broadband-modem-mbim-mtk.c',
+      'mtk/mm-broadband-modem-mbim-mtk-fibocom.c',
+    )
+  endif
+
   plugins += {'shared-mtk': {
     'plugin': false,
-    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': c_args},
+    'module': {'sources': sources, 'include_directories': incs, 'c_args': c_args},
   }}
 endif
 
@@ -590,6 +600,7 @@ if plugins_options['intel']
     'intel/mm-broadband-modem-xmm7360.c',
     'intel/mm-broadband-modem-xmm7360-rpc.c',
     'intel/mm-port-serial-xmmrpc-xmm7360.c',
+    'intel/mm-xmmrpc-xmm7360-protocol.c',
     'intel/mm-bearer-xmm7360.c',
     'intel/mm-sim-xmm7360.c',
   )
@@ -600,7 +611,7 @@ if plugins_options['intel']
 
   common_c_args = '-DMM_MODULE_NAME="intel"'
 
-  headers = files('intel/mm-port-serial-xmmrpc-xmm7360.h')
+  headers = files('intel/mm-xmmrpc-xmm7360-protocol.h')
 
   enums_types = 'mm-intel-enums-types'
 
@@ -624,16 +635,22 @@ if plugins_options['intel']
     command: [
       python,
       mm_mkenums,
-      '--fhead', '#include "mm-port-serial-xmmrpc-xmm7360.h"\n#ifndef __MM_XMM7360_ENUMS_TYPES_H__\n#define __MM_XMM7360_ENUMS_TYPES_H__\n',
+      '--fhead', '#include "mm-xmmrpc-xmm7360-protocol.h"\n#ifndef __MM_XMM7360_ENUMS_TYPES_H__\n#define __MM_XMM7360_ENUMS_TYPES_H__\n',
       '--template', files(templates_dir / enums_types + '.h.template'),
       '--ftail', '#endif /* __MM_XMM7360_ENUMS_TYPES_H__ */\n',
       '@INPUT@'],
     capture: true,
   )
 
+  test_sources = files(
+    'intel/mm-xmmrpc-xmm7360-protocol.c',
+    'intel/tests/test-xmmrpc-xmm7360-protocol.c',
+  )
+
   plugins += {'plugin-intel': {
     'plugin': true,
     'module': {'sources': sources, 'include_directories': plugins_incs + [xmm_inc, intel_inc], 'c_args': common_c_args},
+    'test': {'sources': test_sources, 'include_directories': intel_inc, 'dependencies': libhelpers_dep},
   }}
 endif
 
@@ -757,15 +774,6 @@ if plugins_options['mtk']
   sources = files(
     'mtk/mm-plugin-mtk.c',
   )
-
-  if enable_mbim
-    incs += [fibocom_inc]
-    sources += files(
-      'mtk/mm-bearer-mbim-mtk-fibocom.c',
-      'mtk/mm-broadband-modem-mbim-mtk.c',
-      'mtk/mm-broadband-modem-mbim-mtk-fibocom.c',
-    )
-  endif
 
   plugins += {'plugin-mtk': {
     'plugin': true,
@@ -905,7 +913,7 @@ if plugins_options['rolling']
   test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_ROLLING="@0@"'.format(plugins_dir / 'rolling')]
   plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
 
-  incs = plugins_incs + [fibocom_inc]
+  incs = plugins_incs + [fibocom_inc] + [mtk_inc]
 
   sources = files(
     'rolling/mm-plugin-rolling.c',

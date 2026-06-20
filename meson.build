@@ -383,7 +383,7 @@ plugins_options_reqs = {
   'pantech': {'available': true, 'shared': []},
   'qcom-soc': {'available': enable_qmi, 'shared': []},
   'quectel': {'available': true, 'shared': ['quectel']},
-  'rolling': {'available': true, 'shared': ['fibocom']},
+  'rolling': {'available': true, 'shared': ['fibocom', 'mtk']},
   'samsung': {'available': true, 'shared': ['icera']},
   'sierra-legacy': {'available': true, 'shared': ['icera', 'sierra']},
   'sierra': {'available': true, 'shared': ['xmm']},

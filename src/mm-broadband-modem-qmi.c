@@ -2666,9 +2666,9 @@ dms_get_operating_mode_ready (QmiClientDms *client,
             g_task_return_int (task, MM_MODEM_POWER_STATE_LOW);
             break;
         case QMI_DMS_OPERATING_MODE_OFFLINE:
+        case QMI_DMS_OPERATING_MODE_SHUTTING_DOWN:
             g_task_return_int (task, MM_MODEM_POWER_STATE_OFF);
             break;
-        case QMI_DMS_OPERATING_MODE_SHUTTING_DOWN:
         case QMI_DMS_OPERATING_MODE_FACTORY_TEST:
         case QMI_DMS_OPERATING_MODE_RESET:
         case QMI_DMS_OPERATING_MODE_UNKNOWN:

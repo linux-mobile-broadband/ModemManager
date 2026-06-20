@@ -160,6 +160,7 @@ initialize_endpoint_info (MMPortQmi *self)
         case QMI_DATA_ENDPOINT_TYPE_UNDEFINED:
         case QMI_DATA_ENDPOINT_TYPE_HSIC:
         case QMI_DATA_ENDPOINT_TYPE_BAM_DMUX:
+        case QMI_DATA_ENDPOINT_TYPE_ETHERNET:
         case QMI_DATA_ENDPOINT_TYPE_UNKNOWN:
         default:
             self->priv->endpoint_interface_number = 0;

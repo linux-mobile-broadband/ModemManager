@@ -275,6 +275,10 @@ mm_cbm_part_new_from_binary_pdu (const guint8  *pdu,
         break;
     case MM_SMS_ENCODING_UCS2:
         len = pdu_len - offset;
+        /* UCS2 must be even number of bytes but some messages
+         * eg from 'il' have trailing 00 */
+        if (len % 2)
+            len--;
         break;
     case MM_SMS_ENCODING_8BIT:
     case MM_SMS_ENCODING_UNKNOWN:

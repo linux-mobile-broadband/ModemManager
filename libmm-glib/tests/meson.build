@@ -4,6 +4,7 @@
 test_units = [
   'common-helpers',
   'pco',
+  'location-gps-nmea',
 ]
 
 foreach test_unit: test_units

@@ -9,8 +9,8 @@ msgstr ""
 "Project-Id-Version: ModemManager main\n"
 "Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
 "ModemManager/issues\n"
-"POT-Creation-Date: 2025-05-25 15:28+0000\n"
-"PO-Revision-Date: 2025-09-01 18:20+0200\n"
+"POT-Creation-Date: 2025-09-07 15:30+0000\n"
+"PO-Revision-Date: 2025-09-07 22:14+0200\n"
 "Last-Translator: Anders Jonsson <anders.jonsson@norsjovallen.se>\n"
 "Language-Team: Swedish <tp-sv@listor.tp-sv.se>\n"
 "Language: sv\n"
@@ -42,70 +42,78 @@ msgid "System policy prevents controlling the Modem Manager."
 msgstr "En systempolicy förhindrar kontroll av Modem Manager."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:31
+msgid "Set the primary sim slot of a modem"
+msgstr "Ställ in primärt SIM-fack för ett modem"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
+msgid "System policy prevents configuring modem properties."
+msgstr "En systempolicy förhindrar konfiguration av modemegenskaper."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
 msgid "Unlock and control a mobile broadband device"
 msgstr "Lås upp och kontrollera en mobil bredbandsenhet"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:32
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
 msgid ""
 "System policy prevents unlocking or controlling the mobile broadband device."
 msgstr ""
 "En systempolicy hindrar upplåsning eller kontroll över den mobila "
 "bredbandsenheten."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:40
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
 msgid "Add, modify, and delete mobile broadband contacts"
 msgstr "Lägg till, ändra och ta bort mobila bredbandskontakter"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:41
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
 msgid ""
 "System policy prevents adding, modifying, or deleting this device's contacts."
 msgstr ""
 "En systempolicy förhindrar att lägga till, ändra och ta bort denna enhets "
 "kontakter."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:49
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
 msgid "Send, save, modify, and delete text messages"
 msgstr "Skicka, spara, ändra och ta bort meddelanden"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:50
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
 msgid ""
 "System policy prevents sending or manipulating this device's text messages."
 msgstr ""
 "En systempolicy förhindrar att skicka eller ändra denna enhets "
 "textmeddelanden."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:58
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
 msgid "Accept incoming voice calls or start outgoing voice calls."
 msgstr "Acceptera inkommande röstsamtal eller påbörja utgående röstsamtal."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:59
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
 msgid "System policy prevents voice calls."
 msgstr "En systempolicy förhindrar röstsamtal."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:67
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
 msgid "Query network time and timezone information"
 msgstr "Fråga efter nätverkstid och tidzonsinformation"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:68
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
 msgid "System policy prevents querying network time information."
 msgstr "En systempolicy förhindrar frågande av nätverkstidsinformation."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:76
+#: data/org.freedesktop.ModemManager1.policy.in.in:85
 msgid "Enable and view geographic location and positioning information"
 msgstr "Aktivera och visa geografisk plats samt positioneringsinformation"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:77
+#: data/org.freedesktop.ModemManager1.policy.in.in:86
 msgid ""
 "System policy prevents enabling or viewing geographic location information."
 msgstr ""
 "En systempolicy förhindrar aktivering eller visning av geografisk "
 "platsinformation."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:85
+#: data/org.freedesktop.ModemManager1.policy.in.in:94
 msgid "Query and utilize network information and services"
 msgstr "Fråga efter och nyttja nätverksinformation och tjänster"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:86
+#: data/org.freedesktop.ModemManager1.policy.in.in:95
 msgid ""
 "System policy prevents querying or utilizing network information and "
 "services."
@@ -113,11 +121,11 @@ msgstr ""
 "En systempolicy förhindrar frågande och nyttjande av nätverksinformation och "
 "tjänster."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:94
+#: data/org.freedesktop.ModemManager1.policy.in.in:103
 msgid "Query and manage firmware on a mobile broadband device"
 msgstr "Fråga efter och hantera fast programvara för en mobil bredbandsenhet"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:95
+#: data/org.freedesktop.ModemManager1.policy.in.in:104
 msgid "System policy prevents querying or managing this device's firmware."
 msgstr ""
 "En systempolicy förhindrar att fråga och hantera denna enhets fasta "
