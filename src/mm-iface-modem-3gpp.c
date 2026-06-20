@@ -1612,16 +1612,18 @@ disable_facility_lock_auth_ready (MMIfaceAuth                      *auth,
 
     g_variant_get (ctx->dictionary, "(us)", &ctx->facility, &ctx->control_key);
 
-    /* Only four facility locks can be disabled:
+    /* Only five facility locks can be disabled:
      * - MM_MODEM_3GPP_FACILITY_NET_PERS (network personalization)
      * - MM_MODEM_3GPP_FACILITY_NET_SUB_PERS (network subset personalization)
      * - MM_MODEM_3GPP_FACILITY_PROVIDER_PERS (service provider personalization)
      * - MM_MODEM_3GPP_FACILITY_CORP_PERS (corporate personalization)
+     * - MM_MODEM_3GPP_FACILITY_FIXED_DIALING (fixed dialing)
      */
     if (ctx->facility != (ctx->facility & (MM_MODEM_3GPP_FACILITY_NET_PERS |
                                            MM_MODEM_3GPP_FACILITY_NET_SUB_PERS |
                                            MM_MODEM_3GPP_FACILITY_PROVIDER_PERS |
-                                           MM_MODEM_3GPP_FACILITY_CORP_PERS))) {
+                                           MM_MODEM_3GPP_FACILITY_CORP_PERS |
+                                           MM_MODEM_3GPP_FACILITY_FIXED_DIALING))) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
                                                         "Invalid type of facility lock to disable or empty key");
         handle_disable_facility_lock_context_free (ctx);
