@@ -176,8 +176,10 @@ in use, like \fIBearer\fR. For example:
 .RE
 
 .TP
-.B \-m, \-\-modem=[PATH|INDEX]
-Specify a modem.
+.B \-m, \-\-modem=[PATH|INDEX|any]
+Specify a modem via full D-Bus object path, modem index, or 'any'. 'any' selects
+the first available modem regardless of index or path, which can simplify
+operation for single-modem systems.
 .TP
 .B \-b, \-\-bearer=[PATH|INDEX]
 Specify a bearer.
