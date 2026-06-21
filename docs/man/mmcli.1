@@ -498,6 +498,10 @@ This DBus property signal updates are by default disabled.
 .B \-\-location\-set\-disable\-signal
 Disable reporting location updates via DBus property signals.
 
+.TP
+.B \-\-location\-monitor
+Continuously monitor all available location information.
+
 .SH MESSAGING OPTIONS
 All messaging options must be used with \fB\-\-modem\fR or \fB\-m\fR.
 
@@ -939,6 +943,33 @@ be omitted from the output.
                       | $GPGSV,4,3,16,03,,,,12,,,,30,,,,13,,,*78
                       | $GPGSV,4,4,16,23,,,,15,,,,27,,,,07,,,*79
                       | $GPVTG,,T,,M,,N,,K,N*2C
+.Ed
+
+Location information may be continuously monitored using
+\fB\-\-location\-monitor\fR, which watches 'Location' property updates. Note
+that these updates must first be enabled with
+\fB\-\-location\-set\-enable\-signal\fR.
+
+.Bd -literal -compact
+    $ sudo mmcli -m 0 --location-set-gps-refresh-rate=10
+    successfully set GPS refresh rate
+
+    $ sudo mmcli -m 0 --location-enable-gps-nmea --location-set-enable-signal
+    successfully setup location gathering
+
+    $ sudo mmcli -m 0 --location-monitor
+      -----------
+      GPS | nmea: $GPGSA,A,2,03,04,06,07,09,,,,,,,,1.7,1.4,1.0*3E
+          |       $GPGSV,3,1,11,03,38,123,37,04,56,037,18,06,41,277,21,07,52,209,32*75
+          |       $GPGSV,3,2,11,09,61,320,23,11,17,313,19,30,12,217,24,01,02,168,*77
+          |       $GPGSV,3,3,11,16,21,077,,26,13,047,,40,,,36*79
+          |       $GPGGA,152454.00,3651.420706,N,03101.297031,E,1,05,1.4,128.4,M,32.0,M,,*6A
+      -----------
+      GPS | nmea: $GPGSA,A,2,03,04,06,07,09,,,,,,,,1.7,1.4,1.0*3E
+          |       $GPGSV,3,1,11,03,38,123,37,04,56,037,24,06,41,277,20,07,52,209,33*7A
+          |       $GPGSV,3,2,11,09,61,320,23,11,17,313,18,30,12,217,23,01,02,168,*71
+          |       $GPGSV,3,3,11,16,21,077,,26,13,047,,40,,,36*79
+          |       $GPGGA,152504.00,3651.420036,N,03101.297176,E,1,05,1.4,60.7,M,32.0,M,,*56
 .Ed
 
 .SS A-GPS support
