@@ -292,8 +292,6 @@ mm_telit_build_bnd_request (GArray                 *bands_array,
     /* Get 4G-specific telit band bitmask */
     flag4g = (mask4g != 0) ? ((gint64)mask4g) : -1;
 
-    /* If the modem supports a given access tech, we must always give band settings
-     * for the specific tech */
     if (modem_is_2g && flag2g == -1) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
                      "None or invalid 2G bands combination in the provided list");
@@ -304,11 +302,16 @@ mm_telit_build_bnd_request (GArray                 *bands_array,
                      "None or invalid 3G bands combination in the provided list");
         return NULL;
     }
-    if (modem_is_4g && mask4g == 0 && mask4gext == 0) {
+    /* At least one technology must have valid bands */
+    if (flag2g == -1 && flag3g == -1 && flag4g == -1) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
-                     "None or invalid 4G bands combination in the provided list");
+                     "No valid bands combination in the provided list");
         return NULL;
     }
+
+    /* 4g bands could be disabled */
+    if (modem_is_4g && flag4g == -1)
+        flag4g = 0;
 
     if (modem_is_2g && !modem_is_3g && !modem_is_4g)
         cmd = g_strdup_printf ("#BND=%d", flag2g);

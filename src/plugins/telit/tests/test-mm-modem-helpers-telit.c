@@ -579,6 +579,78 @@ test_telit_get_4g_bnd_flag (void)
     g_array_unref (bands_array);
 }
 
+static void test_telit_bnd_cmd_multitech(void)
+{
+    GArray *bands_array;
+    gchar *cmd;
+    GError *error = NULL;
+    MMTelitBNDParseConfig config = { TRUE, TRUE, TRUE, FALSE, FALSE, FALSE };
+    MMModemBand egsm = MM_MODEM_BAND_EGSM;
+    MMModemBand dcs = MM_MODEM_BAND_DCS;
+    MMModemBand u2100 = MM_MODEM_BAND_UTRAN_1;
+    MMModemBand eutran1 = MM_MODEM_BAND_EUTRAN_1;
+    MMModemBand pcs = MM_MODEM_BAND_PCS;
+
+    /* No bands specified */
+    bands_array = g_array_new(FALSE, FALSE, sizeof(MMModemBand));
+    cmd = mm_telit_build_bnd_request(bands_array, &config, &error);
+    g_assert_error(error, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND);
+    g_assert(cmd == NULL);
+    g_clear_error(&error);
+    g_array_unref(bands_array);
+
+    /* Only 2G bands for a 2G, 3G, 4G modem */
+    bands_array = g_array_new(FALSE, FALSE, sizeof(MMModemBand));
+    g_array_append_val(bands_array, egsm);
+    g_array_append_val(bands_array, dcs);
+    cmd = mm_telit_build_bnd_request(bands_array, &config, &error);
+    g_assert_error(error, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND);
+    g_assert(cmd == NULL);
+    g_clear_error(&error);
+    g_array_unref(bands_array);
+
+    /* Only 3G bands for a 2G, 3G, 4G modem */
+    bands_array = g_array_new(FALSE, FALSE, sizeof(MMModemBand));
+    g_array_append_val(bands_array, u2100);
+    cmd = mm_telit_build_bnd_request(bands_array, &config, &error);
+    g_assert_error(error, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND);
+    g_assert(cmd == NULL);
+    g_clear_error(&error);
+    g_array_unref(bands_array);
+
+    /* Only 4G bands for a 2G, 3G, 4G modem */
+    bands_array = g_array_new(FALSE, FALSE, sizeof(MMModemBand));
+    g_array_append_val(bands_array, eutran1);
+    cmd = mm_telit_build_bnd_request(bands_array, &config, &error);
+    g_assert_error(error, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND);
+    g_assert(cmd == NULL);
+    g_clear_error(&error);
+    g_array_unref(bands_array);
+
+    /* 2G+3G+4G bands for a 2G, 3G, 4G modem */
+    bands_array = g_array_new(FALSE, FALSE, sizeof(MMModemBand));
+    g_array_append_val(bands_array, egsm);
+    g_array_append_val(bands_array, dcs);
+    g_array_append_val(bands_array, u2100);
+    g_array_append_val(bands_array, eutran1);
+    cmd = mm_telit_build_bnd_request(bands_array, &config, &error);
+    g_assert_no_error(error);
+    g_assert_cmpstr(cmd, ==, "#BND=0,0,1");
+    g_free(cmd);
+    g_array_unref(bands_array);
+
+    /* 2G+3G bands for a 2G, 3G, 4G modem */
+    bands_array = g_array_new(FALSE, FALSE, sizeof(MMModemBand));
+    g_array_append_val(bands_array, egsm);
+    g_array_append_val(bands_array, pcs);
+    g_array_append_val(bands_array, u2100);
+    cmd = mm_telit_build_bnd_request(bands_array, &config, &error);
+    g_assert_no_error(error);
+    g_assert_cmpstr(cmd, ==, "#BND=1,0,0");
+    g_free(cmd);
+    g_array_unref(bands_array);
+}
+
 /******************************************************************************/
 
 typedef struct {
@@ -678,8 +750,7 @@ test_telit_compare_software_revision_string (void)
 
 /******************************************************************************/
 
-int main (int argc, char **argv)
-{
+int main (int argc, char **argv){
     setlocale (LC_ALL, "");
 
     g_test_init (&argc, &argv, NULL);
@@ -689,6 +760,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/telit/bands/current/set_bands/2g", test_telit_get_2g_bnd_flag);
     g_test_add_func ("/MM/telit/bands/current/set_bands/3g", test_telit_get_3g_bnd_flag);
     g_test_add_func ("/MM/telit/bands/current/set_bands/4g", test_telit_get_4g_bnd_flag);
+    g_test_add_func ("/MM/telit/bands/current/set_bands/multitech", test_telit_bnd_cmd_multitech);
     g_test_add_func ("/MM/telit/qss/query", test_telit_parse_qss_query);
     g_test_add_func ("/MM/telit/swpkv/parse_response", test_telit_parse_swpkgv_response);
     g_test_add_func ("/MM/telit/revision/compare", test_telit_compare_software_revision_string);
