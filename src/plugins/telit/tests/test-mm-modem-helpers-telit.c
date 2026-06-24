@@ -292,7 +292,7 @@ static BndResponseTest current_band_mapping_tests [] = {
     },
     /* 4G ext band settings: devices such as LN920 */
     {
-        "#BND: 0,0,1003100185A,42", {FALSE, TRUE, TRUE, FALSE, FALSE, TRUE}, 13,
+        "#BND: 0,0,1003100185A,42", {FALSE, TRUE, TRUE, FALSE, TRUE, TRUE}, 13,
         { MM_MODEM_BAND_UTRAN_1,
           MM_MODEM_BAND_EUTRAN_2,
           MM_MODEM_BAND_EUTRAN_4,
