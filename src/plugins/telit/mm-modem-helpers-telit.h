@@ -28,6 +28,7 @@ typedef enum {
     MM_TELIT_MODEL_LN920,
     MM_TELIT_MODEL_FN990,
     MM_TELIT_MODEL_ME910G1,
+    MM_TELIT_MODEL_ME310M1,
 } MMTelitModel;
 
 typedef struct {

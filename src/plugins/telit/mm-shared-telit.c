@@ -102,7 +102,8 @@ has_extended_4g_bands (const gchar *revision)
             model == MM_TELIT_MODEL_FN990 ||
             model == MM_TELIT_MODEL_LM960 ||
             model == MM_TELIT_MODEL_LN920 ||
-            model == MM_TELIT_MODEL_ME910G1);
+            model == MM_TELIT_MODEL_ME910G1 ||
+            model == MM_TELIT_MODEL_ME310M1);
 }
 
 static gboolean
@@ -112,7 +113,8 @@ has_tdscdma_bands (const gchar *revision)
 
     model = mm_telit_model_from_revision (revision);
 
-    return (model == MM_TELIT_MODEL_ME910G1);
+    return (model == MM_TELIT_MODEL_ME910G1 ||
+            model == MM_TELIT_MODEL_ME310M1);
 }
 
 static Private *

@@ -31,7 +31,7 @@
 
 /******************************************************************************/
 
-#define MAX_BANDS_LIST_LEN 17
+#define MAX_BANDS_LIST_LEN 18
 
 typedef struct {
     const gchar *response;
@@ -204,7 +204,29 @@ static BndResponseTest supported_band_mapping_tests [] = {
           MM_MODEM_BAND_EUTRAN_28,
           MM_MODEM_BAND_EUTRAN_66,
           MM_MODEM_BAND_EUTRAN_85 }
-    }
+    },
+    /* ME310M1, decimal 4G ext band settings with TDSCDMA field */
+    {
+        "#BND: (0),(0),(0,1-252590239),(0),(0,2-1048578)", {FALSE, FALSE, TRUE, FALSE, FALSE, TRUE, TRUE}, 18,
+        { MM_MODEM_BAND_EUTRAN_1,
+          MM_MODEM_BAND_EUTRAN_2,
+          MM_MODEM_BAND_EUTRAN_3,
+          MM_MODEM_BAND_EUTRAN_4,
+          MM_MODEM_BAND_EUTRAN_5,
+          MM_MODEM_BAND_EUTRAN_8,
+          MM_MODEM_BAND_EUTRAN_12,
+          MM_MODEM_BAND_EUTRAN_13,
+          MM_MODEM_BAND_EUTRAN_14,
+          MM_MODEM_BAND_EUTRAN_18,
+          MM_MODEM_BAND_EUTRAN_19,
+          MM_MODEM_BAND_EUTRAN_20,
+          MM_MODEM_BAND_EUTRAN_25,
+          MM_MODEM_BAND_EUTRAN_26,
+          MM_MODEM_BAND_EUTRAN_27,
+          MM_MODEM_BAND_EUTRAN_28,
+          MM_MODEM_BAND_EUTRAN_66,
+          MM_MODEM_BAND_EUTRAN_85 }
+    },
 };
 
 static void
@@ -348,7 +370,34 @@ static BndResponseTest current_band_mapping_tests [] = {
           MM_MODEM_BAND_EUTRAN_28,
           MM_MODEM_BAND_EUTRAN_66,
           MM_MODEM_BAND_EUTRAN_85 }
-    }
+    },
+    /* ME310M1, decimal 4G ext band settings with TDSCDMA field */
+    {
+        "#BND: 0,0,252590239,0,1048578", {FALSE, FALSE, TRUE, FALSE, FALSE, TRUE, TRUE}, 18,
+        { MM_MODEM_BAND_EUTRAN_1,
+          MM_MODEM_BAND_EUTRAN_2,
+          MM_MODEM_BAND_EUTRAN_3,
+          MM_MODEM_BAND_EUTRAN_4,
+          MM_MODEM_BAND_EUTRAN_5,
+          MM_MODEM_BAND_EUTRAN_8,
+          MM_MODEM_BAND_EUTRAN_12,
+          MM_MODEM_BAND_EUTRAN_13,
+          MM_MODEM_BAND_EUTRAN_14,
+          MM_MODEM_BAND_EUTRAN_18,
+          MM_MODEM_BAND_EUTRAN_19,
+          MM_MODEM_BAND_EUTRAN_20,
+          MM_MODEM_BAND_EUTRAN_25,
+          MM_MODEM_BAND_EUTRAN_26,
+          MM_MODEM_BAND_EUTRAN_27,
+          MM_MODEM_BAND_EUTRAN_28,
+          MM_MODEM_BAND_EUTRAN_66,
+          MM_MODEM_BAND_EUTRAN_85 }
+    },
+    /* ME310M1, only extended 4g bands */
+    {
+        "#BND: 0,0,0,0,2", {FALSE, FALSE, TRUE, FALSE, FALSE, TRUE, TRUE}, 1,
+        { MM_MODEM_BAND_EUTRAN_66 }
+    },
 };
 
 static void
@@ -712,6 +761,7 @@ test_telit_bnd_cmd_me910g1_2g_4gext(void)
     MMModemBand g850 = MM_MODEM_BAND_G850;
     MMModemBand eutran_66 = MM_MODEM_BAND_EUTRAN_66;
     MMModemBand eutran_85 = MM_MODEM_BAND_EUTRAN_85;
+    MMModemBand eutran1 = MM_MODEM_BAND_EUTRAN_1;
     g_array_append_val(bands_array, dcs);
     g_array_append_val(bands_array, g850);
     g_array_append_val(bands_array, eutran_66);
@@ -731,6 +781,48 @@ test_telit_bnd_cmd_me910g1_2g_4gext(void)
     g_free(cmd);
     g_array_unref(bands_array);
 
+    bands_array = g_array_new(FALSE, FALSE, sizeof(MMModemBand));
+    g_array_append_val(bands_array, dcs);
+    g_array_append_val(bands_array, g850);
+    g_array_append_val(bands_array, eutran1);
+    cmd = mm_telit_build_bnd_request(bands_array, &config, &error);
+    g_assert_no_error(error);
+    g_assert_cmpstr(cmd, ==, "#BND=2,0,1,0,0");
+    g_free(cmd);
+    g_array_unref(bands_array);
+}
+
+static void
+test_telit_bnd_cmd_4g_only(void)
+{
+    GArray *bands_array = g_array_new(FALSE, FALSE, sizeof(MMModemBand));
+    GError *error = NULL;
+    gchar *cmd;
+    MMTelitBNDParseConfig config = {
+        .modem_is_2g = FALSE,
+        .modem_is_3g = FALSE,
+        .modem_is_4g = TRUE,
+        .modem_alternate_3g_bands = FALSE,
+        .modem_ext_4g_bands = TRUE,
+        .modem_has_tdscdma_bands = TRUE
+    };
+    MMModemBand eutran1 = MM_MODEM_BAND_EUTRAN_1;
+    MMModemBand eutran_85 = MM_MODEM_BAND_EUTRAN_85;
+
+    g_array_append_val(bands_array, eutran_85);
+    cmd = mm_telit_build_bnd_request(bands_array, &config, &error);
+    g_assert_no_error(error);
+    g_assert_cmpstr(cmd, ==, "#BND=0,0,0,0,1048576");
+    g_free(cmd);
+    g_array_unref(bands_array);
+
+    bands_array = g_array_new(FALSE, FALSE, sizeof(MMModemBand));
+    g_array_append_val(bands_array, eutran1);
+    cmd = mm_telit_build_bnd_request(bands_array, &config, &error);
+    g_assert_no_error(error);
+    g_assert_cmpstr(cmd, ==, "#BND=0,0,1,0,0");
+    g_free(cmd);
+    g_array_unref(bands_array);
 }
 
 /******************************************************************************/
@@ -843,6 +935,7 @@ int main (int argc, char **argv){
     g_test_add_func ("/MM/telit/bands/current/set_bands/3g", test_telit_get_3g_bnd_flag);
     g_test_add_func ("/MM/telit/bands/current/set_bands/4g", test_telit_get_4g_bnd_flag);
     g_test_add_func ("/MM/telit/bands/current/set_bands/multitech", test_telit_bnd_cmd_multitech);
+    g_test_add_func ("/MM/telit/bands/current/set_bands/4g_only", test_telit_bnd_cmd_4g_only);
     g_test_add_func ("/MM/telit/bands/current/set_bands/me910g1_2g_4gext", test_telit_bnd_cmd_me910g1_2g_4gext);
     g_test_add_func ("/MM/telit/qss/query", test_telit_parse_qss_query);
     g_test_add_func ("/MM/telit/swpkv/parse_response", test_telit_parse_swpkgv_response);
