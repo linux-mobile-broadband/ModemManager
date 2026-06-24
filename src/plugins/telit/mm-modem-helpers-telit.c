@@ -614,7 +614,7 @@ telit_get_ext_4g_mm_bands (GMatchInfo  *match_info,
     GError       *inner_error = NULL;
     MMModemBand   band;
     gchar        *match_str = NULL;
-    gchar        *match_str_ext = NULL;
+    gchar        *match_str_ext_hex = NULL;
     guint64       value;
 
     match_str = g_match_info_fetch_named (match_info, "Bands4GHex");
@@ -636,12 +636,12 @@ telit_get_ext_4g_mm_bands (GMatchInfo  *match_info,
     }
 
     /* extended bands */
-    match_str_ext = g_match_info_fetch_named (match_info, "Bands4GExt");
-    if (match_str_ext) {
+    match_str_ext_hex = g_match_info_fetch_named (match_info, "Bands4GExtHex");
+    if (match_str_ext_hex) {
 
-        if (!mm_get_u64_from_hex_str (match_str_ext, &value)) {
+        if (!mm_get_u64_from_hex_str (match_str_ext_hex, &value)) {
             g_set_error (&inner_error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                         "Could not parse 4G ext band mask from string: '%s'", match_str_ext);
+                         "Could not parse 4G ext band mask from string: '%s'", match_str_ext_hex);
             goto out;
         }
 
@@ -653,7 +653,7 @@ telit_get_ext_4g_mm_bands (GMatchInfo  *match_info,
 
 out:
     g_free (match_str);
-    g_free (match_str_ext);
+    g_free (match_str_ext_hex);
 
     if (inner_error) {
         g_propagate_error (error, inner_error);
@@ -668,16 +668,16 @@ typedef enum {
 } LoadBandsType;
 
 /* Regex tokens for #BND parsing */
-#define MM_SUPPORTED_BANDS_2G       "\\s*\\((?P<Bands2G>[0-9\\-,]*)\\)"
-#define MM_SUPPORTED_BANDS_3G       "(,\\s*\\((?P<Bands3G>[0-9\\-,]*)\\))?"
-#define MM_SUPPORTED_BANDS_4G_HEX   "(,\\s*\\((?P<Bands4GHex>[0-9A-F\\-,]*)\\))?"
-#define MM_SUPPORTED_BANDS_4G_DEC   "(,\\s*\\((?P<Bands4GDec>[0-9\\-,]*)\\))?"
-#define MM_SUPPORTED_BANDS_4G_EXT   "(,\\s*\\((?P<Bands4GHex>[0-9A-F]+)\\))?(,\\s*\\((?P<Bands4GExt>[0-9A-F]+)\\))?"
-#define MM_CURRENT_BANDS_2G         "\\s*(?P<Bands2G>\\d+)"
-#define MM_CURRENT_BANDS_3G         "(,\\s*(?P<Bands3G>\\d+))?"
-#define MM_CURRENT_BANDS_4G_HEX     "(,\\s*(?P<Bands4GHex>[0-9A-F]+))?"
-#define MM_CURRENT_BANDS_4G_DEC     "(,\\s*(?P<Bands4GDec>\\d+))?"
-#define MM_CURRENT_BANDS_4G_EXT     "(,\\s*(?P<Bands4GHex>[0-9A-F]+))?(,\\s*(?P<Bands4GExt>[0-9A-F]+))?"
+#define MM_SUPPORTED_BANDS_2G         "\\s*\\((?P<Bands2G>[0-9\\-,]*)\\)"
+#define MM_SUPPORTED_BANDS_3G         "(,\\s*\\((?P<Bands3G>[0-9\\-,]*)\\))?"
+#define MM_SUPPORTED_BANDS_4G_HEX     "(,\\s*\\((?P<Bands4GHex>[0-9A-F\\-,]*)\\))?"
+#define MM_SUPPORTED_BANDS_4G_DEC     "(,\\s*\\((?P<Bands4GDec>[0-9\\-,]*)\\))?"
+#define MM_SUPPORTED_BANDS_4G_EXT_HEX "(,\\s*\\((?P<Bands4GHex>[0-9A-F]+)\\))?(,\\s*\\((?P<Bands4GExtHex>[0-9A-F]+)\\))?"
+#define MM_CURRENT_BANDS_2G           "\\s*(?P<Bands2G>\\d+)"
+#define MM_CURRENT_BANDS_3G           "(,\\s*(?P<Bands3G>\\d+))?"
+#define MM_CURRENT_BANDS_4G_HEX       "(,\\s*(?P<Bands4GHex>[0-9A-F]+))?"
+#define MM_CURRENT_BANDS_4G_DEC       "(,\\s*(?P<Bands4GDec>\\d+))?"
+#define MM_CURRENT_BANDS_4G_EXT_HEX   "(,\\s*(?P<Bands4GHex>[0-9A-F]+))?(,\\s*(?P<Bands4GExtHex>[0-9A-F]+))?"
 
 static GArray *
 common_parse_bnd_response (const gchar            *response,
@@ -701,13 +701,13 @@ common_parse_bnd_response (const gchar            *response,
         [LOAD_BANDS_TYPE_SUPPORTED] = "#BND:"MM_SUPPORTED_BANDS_2G MM_SUPPORTED_BANDS_3G MM_SUPPORTED_BANDS_4G_DEC,
         [LOAD_BANDS_TYPE_CURRENT]   = "#BND:"MM_CURRENT_BANDS_2G MM_CURRENT_BANDS_3G MM_CURRENT_BANDS_4G_DEC,
     };
-    static const gchar *load_bands_regex_4g_ext[] = {
-        [LOAD_BANDS_TYPE_SUPPORTED] = "#BND:"MM_SUPPORTED_BANDS_2G MM_SUPPORTED_BANDS_3G MM_SUPPORTED_BANDS_4G_EXT,
-        [LOAD_BANDS_TYPE_CURRENT]   = "#BND:"MM_CURRENT_BANDS_2G MM_CURRENT_BANDS_3G MM_CURRENT_BANDS_4G_EXT,
+    static const gchar *load_bands_regex_4g_ext_hex[] = {
+        [LOAD_BANDS_TYPE_SUPPORTED] = "#BND:"MM_SUPPORTED_BANDS_2G MM_SUPPORTED_BANDS_3G MM_SUPPORTED_BANDS_4G_EXT_HEX,
+        [LOAD_BANDS_TYPE_CURRENT]   = "#BND:"MM_CURRENT_BANDS_2G MM_CURRENT_BANDS_3G MM_CURRENT_BANDS_4G_EXT_HEX,
     };
 
     if (config->modem_ext_4g_bands)
-        load_bands_regex = load_bands_regex_4g_ext[load_type];
+        load_bands_regex = load_bands_regex_4g_ext_hex[load_type];
     else if (config->modem_has_hex_format_4g_bands)
         load_bands_regex = load_bands_regex_4g_hex[load_type];
     else
