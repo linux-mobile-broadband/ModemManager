@@ -571,6 +571,8 @@ gboolean mm_parse_supl_address (const gchar  *supl,
                                 guint16      *out_port,
                                 GError      **error);
 
+void mm_utils_remove_control_characters (gchar *str);
+
 gboolean mm_validate_cbs_channels (GArray   *channels,
                                    GError  **error);
 

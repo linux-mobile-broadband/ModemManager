@@ -5936,3 +5936,24 @@ mm_dtmf_split (const gchar *dtmf)
 
     return array;
 }
+
+/*****************************************************************************/
+
+void
+mm_utils_remove_control_characters (gchar *str)
+{
+    gchar *src = str;
+    gchar *dst = str;
+
+    if (!str)
+        return;
+
+    while (*src) {
+        if (((guint8)*src) >= 0x20) {
+            *dst = *src;
+            dst++;
+        }
+        src++;
+    }
+    *dst = '\0';
+}

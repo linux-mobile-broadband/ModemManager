@@ -4872,6 +4872,25 @@ test_at_quote_string (void *f, gpointer d)
     }
 }
 
+static void
+test_remove_control_characters (void *f, gpointer d)
+{
+    gchar str1[] = "hello\r\nworld";
+    gchar str2[] = "no_controls";
+    gchar str3[] = "\r\n\t";
+
+    mm_utils_remove_control_characters (str1);
+    g_assert_cmpstr (str1, ==, "helloworld");
+
+    mm_utils_remove_control_characters (str2);
+    g_assert_cmpstr (str2, ==, "no_controls");
+
+    mm_utils_remove_control_characters (str3);
+    g_assert_cmpstr (str3, ==, "");
+
+    mm_utils_remove_control_characters (NULL);
+}
+
 /*****************************************************************************/
 
 typedef struct {
@@ -5418,6 +5437,7 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_bcd_to_string, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_at_quote_string, NULL));
+    g_test_suite_add (suite, TESTCASE (test_remove_control_characters, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cpol_response, NULL));
 
