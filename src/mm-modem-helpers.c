@@ -5992,3 +5992,25 @@ mm_utils_is_numeric (const gchar *str)
     }
     return TRUE;
 }
+
+gboolean
+mm_utils_is_valid_dial_number (const gchar  *str,
+                               GError      **error)
+{
+    const gchar *c;
+
+    if (!str || !str[0]) {
+        g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                             "missing number");
+        return FALSE;
+    }
+
+    for (c = str; *c; c++) {
+        if (((guint8)*c) < 0x20 || *c == ';') {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                         "invalid character '0x%02x' in number", (guint8)*c);
+            return FALSE;
+        }
+    }
+    return TRUE;
+}

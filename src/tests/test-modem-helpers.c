@@ -4923,6 +4923,63 @@ test_is_numeric (void *f, gpointer d)
     g_assert (!mm_utils_is_numeric ("+123"));
 }
 
+static void
+test_is_valid_dial_number (void *f, gpointer d)
+{
+    GError   *error = NULL;
+    gboolean  r;
+
+    r = mm_utils_is_valid_dial_number ("123456", &error);
+    g_assert (r);
+    g_assert_no_error (error);
+
+    r = mm_utils_is_valid_dial_number ("+123456", &error);
+    g_assert (r);
+    g_assert_no_error (error);
+
+    r = mm_utils_is_valid_dial_number ("*123#", &error);
+    g_assert (r);
+    g_assert_no_error (error);
+
+    r = mm_utils_is_valid_dial_number ("123,456", &error);
+    g_assert (r);
+    g_assert_no_error (error);
+
+    r = mm_utils_is_valid_dial_number ("123W456", &error);
+    g_assert (r);
+    g_assert_no_error (error);
+
+    r = mm_utils_is_valid_dial_number (NULL, &error);
+    g_assert (!r);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_clear_error (&error);
+
+    r = mm_utils_is_valid_dial_number ("", &error);
+    g_assert (!r);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_clear_error (&error);
+
+    r = mm_utils_is_valid_dial_number ("123;456", &error);
+    g_assert (!r);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_clear_error (&error);
+
+    r = mm_utils_is_valid_dial_number ("123\r456", &error);
+    g_assert (!r);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_clear_error (&error);
+
+    r = mm_utils_is_valid_dial_number ("123\n456", &error);
+    g_assert (!r);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_clear_error (&error);
+
+    r = mm_utils_is_valid_dial_number ("123\x01" "456", &error);
+    g_assert (!r);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_clear_error (&error);
+}
+
 /*****************************************************************************/
 
 typedef struct {
@@ -5472,6 +5529,7 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_remove_control_characters, NULL));
     g_test_suite_add (suite, TESTCASE (test_is_valid_fqdn, NULL));
     g_test_suite_add (suite, TESTCASE (test_is_numeric, NULL));
+    g_test_suite_add (suite, TESTCASE (test_is_valid_dial_number, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cpol_response, NULL));
 

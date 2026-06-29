@@ -574,6 +574,8 @@ gboolean mm_parse_supl_address (const gchar  *supl,
 void mm_utils_remove_control_characters (gchar *str);
 gboolean mm_utils_is_valid_fqdn (const gchar *fqdn);
 gboolean mm_utils_is_numeric (const gchar *str);
+gboolean mm_utils_is_valid_dial_number (const gchar  *str,
+                                        GError      **error);
 
 gboolean mm_validate_cbs_channels (GArray   *channels,
                                    GError  **error);
