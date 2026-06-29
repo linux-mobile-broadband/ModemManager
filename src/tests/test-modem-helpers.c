@@ -4891,6 +4891,23 @@ test_remove_control_characters (void *f, gpointer d)
     mm_utils_remove_control_characters (NULL);
 }
 
+static void
+test_is_valid_fqdn (void *f, gpointer d)
+{
+    g_assert (mm_utils_is_valid_fqdn ("google.com"));
+    g_assert (mm_utils_is_valid_fqdn ("a.b.c.d"));
+    g_assert (mm_utils_is_valid_fqdn ("valid-host.com"));
+    g_assert (mm_utils_is_valid_fqdn ("123.com"));
+    g_assert (mm_utils_is_valid_fqdn ("a"));
+
+    g_assert (!mm_utils_is_valid_fqdn (NULL));
+    g_assert (!mm_utils_is_valid_fqdn (""));
+    g_assert (!mm_utils_is_valid_fqdn ("invalid host.com"));
+    g_assert (!mm_utils_is_valid_fqdn ("host;com"));
+    g_assert (!mm_utils_is_valid_fqdn ("host\rcom"));
+    g_assert (!mm_utils_is_valid_fqdn ("host/com"));
+}
+
 /*****************************************************************************/
 
 typedef struct {
@@ -5438,6 +5455,7 @@ int main (int argc, char **argv)
 
     g_test_suite_add (suite, TESTCASE (test_at_quote_string, NULL));
     g_test_suite_add (suite, TESTCASE (test_remove_control_characters, NULL));
+    g_test_suite_add (suite, TESTCASE (test_is_valid_fqdn, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cpol_response, NULL));
 

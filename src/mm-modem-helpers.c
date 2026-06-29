@@ -5554,6 +5554,11 @@ mm_parse_supl_address (const gchar  *supl,
     /* Try to parse first item as IP */
     if (inet_pton (AF_INET, split[0], &ip) <= 0) {
         /* Otherwise, assume it's a domain name */
+        if (!mm_utils_is_valid_fqdn (split[0])) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                         "Invalid SUPL host: not a valid FQDN or IP: %s", split[0]);
+            goto out;
+        }
         if (out_fqdn)
             *out_fqdn = g_strdup (split[0]);
         if (out_ip)
@@ -5956,4 +5961,19 @@ mm_utils_remove_control_characters (gchar *str)
         src++;
     }
     *dst = '\0';
+}
+
+gboolean
+mm_utils_is_valid_fqdn (const gchar *fqdn)
+{
+    const gchar *c;
+
+    if (!fqdn || !fqdn[0])
+        return FALSE;
+
+    for (c = fqdn; *c; c++) {
+        if (!g_ascii_isalnum (*c) && *c != '-' && *c != '.')
+            return FALSE;
+    }
+    return TRUE;
 }
