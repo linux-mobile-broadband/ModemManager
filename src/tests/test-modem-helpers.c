@@ -4908,6 +4908,21 @@ test_is_valid_fqdn (void *f, gpointer d)
     g_assert (!mm_utils_is_valid_fqdn ("host/com"));
 }
 
+static void
+test_is_numeric (void *f, gpointer d)
+{
+    g_assert (mm_utils_is_numeric ("123456"));
+    g_assert (mm_utils_is_numeric ("0"));
+    g_assert (mm_utils_is_numeric ("0123456789"));
+
+    g_assert (!mm_utils_is_numeric (NULL));
+    g_assert (!mm_utils_is_numeric (""));
+    g_assert (!mm_utils_is_numeric ("123a45"));
+    g_assert (!mm_utils_is_numeric ("123 45"));
+    g_assert (!mm_utils_is_numeric ("123\r45"));
+    g_assert (!mm_utils_is_numeric ("+123"));
+}
+
 /*****************************************************************************/
 
 typedef struct {
@@ -5456,6 +5471,7 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_at_quote_string, NULL));
     g_test_suite_add (suite, TESTCASE (test_remove_control_characters, NULL));
     g_test_suite_add (suite, TESTCASE (test_is_valid_fqdn, NULL));
+    g_test_suite_add (suite, TESTCASE (test_is_numeric, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cpol_response, NULL));
 

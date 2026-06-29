@@ -5977,3 +5977,18 @@ mm_utils_is_valid_fqdn (const gchar *fqdn)
     }
     return TRUE;
 }
+
+gboolean
+mm_utils_is_numeric (const gchar *str)
+{
+    const gchar *c;
+
+    if (!str || !str[0])
+        return FALSE;
+
+    for (c = str; *c; c++) {
+        if (!g_ascii_isdigit (*c))
+            return FALSE;
+    }
+    return TRUE;
+}
