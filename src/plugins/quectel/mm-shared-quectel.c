@@ -152,6 +152,14 @@ mm_shared_quectel_create_wwan_port (MMBaseModem *self,
 /*****************************************************************************/
 /* RDY unsolicited event handler */
 
+static gboolean
+rdy_handler_idle (MMBroadbandModem *self)
+{
+    mm_base_modem_set_reprobe (MM_BASE_MODEM (self), TRUE);
+    mm_base_modem_set_valid (MM_BASE_MODEM (self), FALSE);
+    return G_SOURCE_REMOVE;
+}
+
 static void
 rdy_handler (MMPortSerialAt *port,
              GMatchInfo *match_info,
@@ -162,8 +170,10 @@ rdy_handler (MMPortSerialAt *port,
      * re-synchronize modem and ModemManager states by re-probing.
      */
     mm_obj_warn (self, "modem reset detected, triggering reprobe");
-    mm_base_modem_set_reprobe (MM_BASE_MODEM (self), TRUE);
-    mm_base_modem_set_valid (MM_BASE_MODEM (self), FALSE);
+    g_idle_add_full (G_PRIORITY_DEFAULT_IDLE,
+                     (GSourceFunc) rdy_handler_idle,
+                     g_object_ref (self),
+                     g_object_unref);
 }
 
 /*****************************************************************************/
