@@ -3713,10 +3713,11 @@ load_enabled_facility_locks_ready (MMIfaceModem3gpp *self,
         g_object_get (self, MM_IFACE_MODEM_SIM, &sim, NULL);
 
         if (sim)
-            g_signal_connect (sim,
-                              MM_BASE_SIM_PIN_LOCK_ENABLED,
-                              G_CALLBACK (sim_pin_lock_enabled_cb),
-                              ctx->skeleton);
+            g_signal_connect_object (sim,
+                                     MM_BASE_SIM_PIN_LOCK_ENABLED,
+                                     G_CALLBACK (sim_pin_lock_enabled_cb),
+                                     ctx->skeleton,
+                                     0);
     }
 
     /* Go on to next step */

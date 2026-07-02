@@ -3019,14 +3019,16 @@ interface_initialization_step (GTask *task)
                           NULL);
 
             /* Connect to list's signals */
-            g_signal_connect (list,
-                              MM_CALL_ADDED,
-                              G_CALLBACK (call_added),
-                              ctx->skeleton);
-            g_signal_connect (list,
-                              MM_CALL_DELETED,
-                              G_CALLBACK (call_deleted),
-                              ctx->skeleton);
+            g_signal_connect_object (list,
+                                     MM_CALL_ADDED,
+                                     G_CALLBACK (call_added),
+                                     ctx->skeleton,
+                                     0);
+            g_signal_connect_object (list,
+                                     MM_CALL_DELETED,
+                                     G_CALLBACK (call_deleted),
+                                     ctx->skeleton,
+                                     0);
 
             /* Setup monitoring for in-call event handling */
             g_signal_connect (list,

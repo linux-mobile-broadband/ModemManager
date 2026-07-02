@@ -1026,14 +1026,16 @@ interface_enabling_step (GTask *task)
                       NULL);
 
         /* Connect to list's signals */
-        g_signal_connect (list,
-                          MM_SMS_ADDED,
-                          G_CALLBACK (sms_added),
-                          ctx->skeleton);
-        g_signal_connect (list,
-                          MM_SMS_DELETED,
-                          G_CALLBACK (sms_deleted),
-                          ctx->skeleton);
+        g_signal_connect_object (list,
+                                 MM_SMS_ADDED,
+                                 G_CALLBACK (sms_added),
+                                 ctx->skeleton,
+                                 0);
+        g_signal_connect_object (list,
+                                 MM_SMS_DELETED,
+                                 G_CALLBACK (sms_deleted),
+                                 ctx->skeleton,
+                                 0);
 
         g_object_unref (list);
 

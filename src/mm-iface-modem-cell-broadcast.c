@@ -636,14 +636,16 @@ interface_enabling_step (GTask *task)
                       NULL);
 
         /* Connect to list's signals */
-        g_signal_connect (list,
-                          MM_CBM_ADDED,
-                          G_CALLBACK (cbm_added),
-                          ctx->skeleton);
-        g_signal_connect (list,
-                          MM_CBM_DELETED,
-                          G_CALLBACK (cbm_deleted),
-                          ctx->skeleton);
+        g_signal_connect_object (list,
+                                 MM_CBM_ADDED,
+                                 G_CALLBACK (cbm_added),
+                                 ctx->skeleton,
+                                 0);
+        g_signal_connect_object (list,
+                                 MM_CBM_DELETED,
+                                 G_CALLBACK (cbm_deleted),
+                                 ctx->skeleton,
+                                 0);
         ctx->step++;
     } /* fall through */
 
