@@ -212,7 +212,7 @@ power_off_ready (MMBroadbandModemQuectel *self,
      */
 
     if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error)) {
-        g_task_return_error (task, error);
+        g_task_return_error (task, g_steal_pointer (&error));
         g_object_unref (task);
         return;
     }
