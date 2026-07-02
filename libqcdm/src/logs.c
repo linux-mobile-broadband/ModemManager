@@ -88,6 +88,7 @@ qcdm_log_item_evdo_pilot_sets_v2_new (const char *buf, size_t len, int *out_erro
     QcdmResult *result = NULL;
     DMLogItemEvdoPilotSetsV2 *pilot_sets;
     DMCmdLog *log_cmd = (DMCmdLog *) buf;
+    size_t avail;
     size_t sets_len;
 
     qcdm_return_val_if_fail (buf != NULL, NULL);
@@ -96,6 +97,21 @@ qcdm_log_item_evdo_pilot_sets_v2_new (const char *buf, size_t len, int *out_erro
         return NULL;
 
     pilot_sets = (DMLogItemEvdoPilotSetsV2 *) log_cmd->data;
+
+    /* check_log_item() guarantees len >= sizeof (DMCmdLog) + sizeof (DMLogItemEvdoPilotSetsV2),
+     * so 'avail' cannot underflow. */
+    /* Ensure the flexible sets[] array actually contains as many entries as
+     * the header claims; the modem fully controls these counts. */
+    avail = len - sizeof (DMCmdLog) - sizeof (DMLogItemEvdoPilotSetsV2);
+    sets_len = ((size_t) pilot_sets->active_count
+                + (size_t) pilot_sets->candidate_count
+                + (size_t) pilot_sets->remaining_count)
+               * sizeof (DMLogItemEvdoPilotSetsV2Pilot);
+    if (sets_len > avail) {
+        if (out_error)
+            *out_error = -QCDM_ERROR_RESPONSE_BAD_LENGTH;
+        return NULL;
+    }
 
     result = qcdm_result_new ();
 
