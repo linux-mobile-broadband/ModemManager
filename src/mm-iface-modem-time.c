@@ -153,6 +153,7 @@ typedef struct {
     MMModemState state;
     guint network_timezone_poll_id;
     guint network_timezone_poll_retries;
+    guint session_id;
 } NetworkTimezoneContext;
 
 static void
@@ -191,22 +192,33 @@ update_network_timezone_dictionary (MMIfaceModemTime *self,
 
 static void
 load_network_timezone_ready (MMIfaceModemTime *self,
-                             GAsyncResult *res)
+                             GAsyncResult     *res,
+                             gpointer          user_data)
 {
-    g_autoptr(GError)  error = NULL;
-    MMNetworkTimezone *tz;
+    g_autoptr(GError)            error = NULL;
+    g_autoptr(MMNetworkTimezone) tz = NULL;
+    NetworkTimezoneContext      *ctx;
+    guint                        session_id;
 
-    /* Finish the async operation */
+    session_id = GPOINTER_TO_UINT (user_data);
+
+    /* Finish the async operation first to avoid resource leaks */
     tz = MM_IFACE_MODEM_TIME_GET_IFACE (self)->load_network_timezone_finish (self, res, &error);
+
+    /* Note: may be NULL if the polling has been removed while processing the async operation */
+    ctx = (NetworkTimezoneContext *) g_object_get_qdata (G_OBJECT (self), network_timezone_context_quark);
+    if (!ctx)
+        return;
+
+    /* Check if this is the result of the current poll session */
+    if (ctx->session_id != session_id) {
+        mm_obj_dbg (self, "discarding network timezone load result from old session (session ID %u, current %u)",
+                    session_id, ctx->session_id);
+        return;
+    }
+
     if (!tz) {
-        NetworkTimezoneContext *ctx;
-
         mm_obj_dbg (self, "couldn't load network timezone: %s", error->message);
-
-        /* Note: may be NULL if the polling has been removed while processing the async operation */
-        ctx = (NetworkTimezoneContext *) g_object_get_qdata (G_OBJECT (self), network_timezone_context_quark);
-        if (!ctx)
-            return;
 
         /* Retry? */
         ctx->network_timezone_poll_retries--;
@@ -227,7 +239,6 @@ load_network_timezone_ready (MMIfaceModemTime *self,
 
     /* Got final result properly, update the property in the skeleton */
     update_network_timezone_dictionary (self, tz);
-    g_object_unref (tz);
 }
 
 static gboolean
@@ -241,7 +252,7 @@ network_timezone_poll_cb (MMIfaceModemTime *self)
     MM_IFACE_MODEM_TIME_GET_IFACE (self)->load_network_timezone (
         self,
         (GAsyncReadyCallback)load_network_timezone_ready,
-        NULL);
+        GUINT_TO_POINTER (ctx->session_id));
 
     return G_SOURCE_REMOVE;
 }
@@ -253,7 +264,13 @@ start_network_timezone_poll (MMIfaceModemTime *self)
 
     ctx = (NetworkTimezoneContext *) g_object_get_qdata (G_OBJECT (self), network_timezone_context_quark);
 
-    mm_obj_dbg (self, "network timezone polling started");
+    if (ctx->network_timezone_poll_id) {
+        g_source_remove (ctx->network_timezone_poll_id);
+        ctx->network_timezone_poll_id = 0;
+    }
+    ctx->session_id++;
+
+    mm_obj_dbg (self, "network timezone polling started (session ID %u)", ctx->session_id);
     ctx->network_timezone_poll_retries = NETWORK_TIMEZONE_POLL_RETRIES;
     ctx->network_timezone_poll_id = g_timeout_add_seconds (NETWORK_TIMEZONE_POLL_INTERVAL_SEC, (GSourceFunc)network_timezone_poll_cb, self);
 }
@@ -270,6 +287,7 @@ stop_network_timezone_poll (MMIfaceModemTime *self)
         g_source_remove (ctx->network_timezone_poll_id);
         ctx->network_timezone_poll_id = 0;
     }
+    ctx->session_id++;
 }
 
 static void
