@@ -45,6 +45,7 @@ typedef struct {
     MMIfaceModemInterface *iface_modem_parent;
     gboolean               alternate_3g_bands;
     gboolean               ext_4g_bands;
+    gboolean               tdscdma_bands;
     GArray                *supported_bands;
     GArray                *supported_modes;
     gchar                 *software_package_version;
@@ -100,7 +101,20 @@ has_extended_4g_bands (const gchar *revision)
     return (model == MM_TELIT_MODEL_FN980 ||
             model == MM_TELIT_MODEL_FN990 ||
             model == MM_TELIT_MODEL_LM960 ||
-            model == MM_TELIT_MODEL_LN920);
+            model == MM_TELIT_MODEL_LN920 ||
+            model == MM_TELIT_MODEL_ME910G1 ||
+            model == MM_TELIT_MODEL_ME310M1);
+}
+
+static gboolean
+has_tdscdma_bands (const gchar *revision)
+{
+    MMTelitModel model;
+
+    model = mm_telit_model_from_revision (revision);
+
+    return (model == MM_TELIT_MODEL_ME910G1 ||
+            model == MM_TELIT_MODEL_ME310M1);
 }
 
 static Private *
@@ -145,6 +159,7 @@ mm_shared_telit_store_revision (MMSharedTelit *self,
     priv->software_package_version = g_strdup (revision);
     priv->alternate_3g_bands = has_alternate_3g_bands (revision);
     priv->ext_4g_bands = has_extended_4g_bands (revision);
+    priv->tdscdma_bands = has_tdscdma_bands (revision);
 }
 
 void
@@ -160,6 +175,7 @@ mm_shared_telit_get_bnd_parse_config (MMIfaceModem *self, MMTelitBNDParseConfig 
     config->modem_alternate_3g_bands = priv->alternate_3g_bands;
     config->modem_has_hex_format_4g_bands = is_bnd_4g_format_hex (priv->software_package_version);
     config->modem_ext_4g_bands = priv->ext_4g_bands;
+    config->modem_has_tdscdma_bands = priv->tdscdma_bands;
 }
 
 /*****************************************************************************/

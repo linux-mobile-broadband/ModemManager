@@ -27,6 +27,8 @@ typedef enum {
     MM_TELIT_MODEL_LM960,
     MM_TELIT_MODEL_LN920,
     MM_TELIT_MODEL_FN990,
+    MM_TELIT_MODEL_ME910G1,
+    MM_TELIT_MODEL_ME310M1,
 } MMTelitModel;
 
 typedef struct {
@@ -36,6 +38,7 @@ typedef struct {
     gboolean      modem_alternate_3g_bands;
     gboolean      modem_has_hex_format_4g_bands;
     gboolean      modem_ext_4g_bands;
+    gboolean      modem_has_tdscdma_bands;
 } MMTelitBNDParseConfig;
 
 typedef enum {
