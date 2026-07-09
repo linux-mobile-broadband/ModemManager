@@ -1,0 +1,134 @@
+# Serbian translation for ModemManager.
+# Copyright (C) 2026 ModemManager's COPYRIGHT HOLDER
+# This file is distributed under the same license as the ModemManager package.
+# Марко Костић <marko.m.kostic@gmail.com>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: ModemManager main\n"
+"Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
+"ModemManager/issues\n"
+"POT-Creation-Date: 2025-09-05 16:31+0000\n"
+"PO-Revision-Date: 2026-04-11 14:54+0200\n"
+"Last-Translator: Марко Костић <marko.m.kostic@gmail.com>\n"
+"Language-Team: Serbian <Serbian>\n"
+"Language: sr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=4; plural=n==1? 3 : n%10==1 && n%100!=11 ? 0 : "
+"n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2;\n"
+"X-Generator: Poedit 3.9\n"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:13
+msgid "Enable and view Cell Broadcast messages"
+msgstr "Омогућите и прегледајте поруке емитовања ћелије"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:14
+msgid ""
+"System policy prevents enabling or viewing this device's cell broadcast "
+"messages."
+msgstr ""
+"Системска правила спречавају омогућавање или преглед порука емитовања у "
+"ћелији овог уређаја."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:22
+msgid "Control the Modem Manager daemon"
+msgstr "Управљајте демоном управника модема"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:23
+msgid "System policy prevents controlling the Modem Manager."
+msgstr "Системска правила спречавају управљање управником модема."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:31
+msgid "Set the primary sim slot of a modem"
+msgstr "Поставите примарни СИМ слот модема"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
+msgid "System policy prevents configuring modem properties."
+msgstr "Системска правила спречавају подешавање својстава модема."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
+msgid "Unlock and control a mobile broadband device"
+msgstr "Откључајте и управљајте мобилним широкопојасним уређајем"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
+msgid ""
+"System policy prevents unlocking or controlling the mobile broadband device."
+msgstr ""
+"Системска правила спречавају откључавање или управљање мобилним "
+"широкопојасним уређајем."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
+msgid "Add, modify, and delete mobile broadband contacts"
+msgstr "Додајте, мењајте и бришите контакте мобилне широкопојасне мреже"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
+msgid ""
+"System policy prevents adding, modifying, or deleting this device's contacts."
+msgstr ""
+"Системска правила спречавају додавање, мењање или брисање контаката овог "
+"уређаја."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Send, save, modify, and delete text messages"
+msgstr "Шаљите, чувајте, мењајте и бришите текстуалне поруке"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+msgid ""
+"System policy prevents sending or manipulating this device's text messages."
+msgstr ""
+"Системска правила спречавају слање или управљање текстуалним порукама овог "
+"уређаја."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
+msgid "Accept incoming voice calls or start outgoing voice calls."
+msgstr ""
+"Прихватите долазне говорне позиве или започните одлазне говорне позиве."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
+msgid "System policy prevents voice calls."
+msgstr "Системска правила спречавају говорне позиве."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
+msgid "Query network time and timezone information"
+msgstr "Упитајте време мреже и податке о временској зони"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
+msgid "System policy prevents querying network time information."
+msgstr "Системска правила спречавају упитивање података о времену мреже."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:85
+msgid "Enable and view geographic location and positioning information"
+msgstr "Омогућите и прегледајте податке о географском положају и позиционирању"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:86
+msgid ""
+"System policy prevents enabling or viewing geographic location information."
+msgstr ""
+"Системска правила спречавају омогућавање или преглед података о географском "
+"положају."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:94
+msgid "Query and utilize network information and services"
+msgstr "Упитајте и користите мрежне податке и услуге"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:95
+msgid ""
+"System policy prevents querying or utilizing network information and "
+"services."
+msgstr ""
+"Системска правила спречавају упитивање или коришћење мрежних података и "
+"услуга."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:103
+msgid "Query and manage firmware on a mobile broadband device"
+msgstr "Упит и управљање фирмвером на мобилном широкопојасном уређају"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:104
+msgid "System policy prevents querying or managing this device's firmware."
+msgstr "Системска политика спречава упит или управљање фирмвером овог уређаја."
+
+#: src/mm-sleep-monitor-systemd.c:133
+msgid "ModemManager needs to reset devices"
+msgstr "Управник модема мора да поново покрене уређаје"
