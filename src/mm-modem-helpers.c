@@ -5554,6 +5554,11 @@ mm_parse_supl_address (const gchar  *supl,
     /* Try to parse first item as IP */
     if (inet_pton (AF_INET, split[0], &ip) <= 0) {
         /* Otherwise, assume it's a domain name */
+        if (!mm_utils_is_valid_fqdn (split[0])) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                         "Invalid SUPL host: not a valid FQDN or IP: %s", split[0]);
+            goto out;
+        }
         if (out_fqdn)
             *out_fqdn = g_strdup (split[0]);
         if (out_ip)
@@ -5935,4 +5940,77 @@ mm_dtmf_split (const gchar *dtmf)
     }
 
     return array;
+}
+
+/*****************************************************************************/
+
+void
+mm_utils_remove_control_characters (gchar *str)
+{
+    gchar *src = str;
+    gchar *dst = str;
+
+    if (!str)
+        return;
+
+    while (*src) {
+        if (((guint8)*src) >= 0x20) {
+            *dst = *src;
+            dst++;
+        }
+        src++;
+    }
+    *dst = '\0';
+}
+
+gboolean
+mm_utils_is_valid_fqdn (const gchar *fqdn)
+{
+    const gchar *c;
+
+    if (!fqdn || !fqdn[0])
+        return FALSE;
+
+    for (c = fqdn; *c; c++) {
+        if (!g_ascii_isalnum (*c) && *c != '-' && *c != '.')
+            return FALSE;
+    }
+    return TRUE;
+}
+
+gboolean
+mm_utils_is_numeric (const gchar *str)
+{
+    const gchar *c;
+
+    if (!str || !str[0])
+        return FALSE;
+
+    for (c = str; *c; c++) {
+        if (!g_ascii_isdigit (*c))
+            return FALSE;
+    }
+    return TRUE;
+}
+
+gboolean
+mm_utils_is_valid_dial_number (const gchar  *str,
+                               GError      **error)
+{
+    const gchar *c;
+
+    if (!str || !str[0]) {
+        g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                             "missing number");
+        return FALSE;
+    }
+
+    for (c = str; *c; c++) {
+        if (((guint8)*c) < 0x20 || *c == ';') {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                         "invalid character '0x%02x' in number", (guint8)*c);
+            return FALSE;
+        }
+    }
+    return TRUE;
 }

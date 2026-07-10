@@ -4872,6 +4872,114 @@ test_at_quote_string (void *f, gpointer d)
     }
 }
 
+static void
+test_remove_control_characters (void *f, gpointer d)
+{
+    gchar str1[] = "hello\r\nworld";
+    gchar str2[] = "no_controls";
+    gchar str3[] = "\r\n\t";
+
+    mm_utils_remove_control_characters (str1);
+    g_assert_cmpstr (str1, ==, "helloworld");
+
+    mm_utils_remove_control_characters (str2);
+    g_assert_cmpstr (str2, ==, "no_controls");
+
+    mm_utils_remove_control_characters (str3);
+    g_assert_cmpstr (str3, ==, "");
+
+    mm_utils_remove_control_characters (NULL);
+}
+
+static void
+test_is_valid_fqdn (void *f, gpointer d)
+{
+    g_assert (mm_utils_is_valid_fqdn ("google.com"));
+    g_assert (mm_utils_is_valid_fqdn ("a.b.c.d"));
+    g_assert (mm_utils_is_valid_fqdn ("valid-host.com"));
+    g_assert (mm_utils_is_valid_fqdn ("123.com"));
+    g_assert (mm_utils_is_valid_fqdn ("a"));
+
+    g_assert (!mm_utils_is_valid_fqdn (NULL));
+    g_assert (!mm_utils_is_valid_fqdn (""));
+    g_assert (!mm_utils_is_valid_fqdn ("invalid host.com"));
+    g_assert (!mm_utils_is_valid_fqdn ("host;com"));
+    g_assert (!mm_utils_is_valid_fqdn ("host\rcom"));
+    g_assert (!mm_utils_is_valid_fqdn ("host/com"));
+}
+
+static void
+test_is_numeric (void *f, gpointer d)
+{
+    g_assert (mm_utils_is_numeric ("123456"));
+    g_assert (mm_utils_is_numeric ("0"));
+    g_assert (mm_utils_is_numeric ("0123456789"));
+
+    g_assert (!mm_utils_is_numeric (NULL));
+    g_assert (!mm_utils_is_numeric (""));
+    g_assert (!mm_utils_is_numeric ("123a45"));
+    g_assert (!mm_utils_is_numeric ("123 45"));
+    g_assert (!mm_utils_is_numeric ("123\r45"));
+    g_assert (!mm_utils_is_numeric ("+123"));
+}
+
+static void
+test_is_valid_dial_number (void *f, gpointer d)
+{
+    GError   *error = NULL;
+    gboolean  r;
+
+    r = mm_utils_is_valid_dial_number ("123456", &error);
+    g_assert (r);
+    g_assert_no_error (error);
+
+    r = mm_utils_is_valid_dial_number ("+123456", &error);
+    g_assert (r);
+    g_assert_no_error (error);
+
+    r = mm_utils_is_valid_dial_number ("*123#", &error);
+    g_assert (r);
+    g_assert_no_error (error);
+
+    r = mm_utils_is_valid_dial_number ("123,456", &error);
+    g_assert (r);
+    g_assert_no_error (error);
+
+    r = mm_utils_is_valid_dial_number ("123W456", &error);
+    g_assert (r);
+    g_assert_no_error (error);
+
+    r = mm_utils_is_valid_dial_number (NULL, &error);
+    g_assert (!r);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_clear_error (&error);
+
+    r = mm_utils_is_valid_dial_number ("", &error);
+    g_assert (!r);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_clear_error (&error);
+
+    r = mm_utils_is_valid_dial_number ("123;456", &error);
+    g_assert (!r);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_clear_error (&error);
+
+    r = mm_utils_is_valid_dial_number ("123\r456", &error);
+    g_assert (!r);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_clear_error (&error);
+
+    r = mm_utils_is_valid_dial_number ("123\n456", &error);
+    g_assert (!r);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_clear_error (&error);
+
+    r = mm_utils_is_valid_dial_number ("123\x01" "456", &error);
+    g_assert (!r);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS);
+    g_clear_error (&error);
+}
+
 /*****************************************************************************/
 
 typedef struct {
@@ -5418,6 +5526,10 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_bcd_to_string, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_at_quote_string, NULL));
+    g_test_suite_add (suite, TESTCASE (test_remove_control_characters, NULL));
+    g_test_suite_add (suite, TESTCASE (test_is_valid_fqdn, NULL));
+    g_test_suite_add (suite, TESTCASE (test_is_numeric, NULL));
+    g_test_suite_add (suite, TESTCASE (test_is_valid_dial_number, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cpol_response, NULL));
 

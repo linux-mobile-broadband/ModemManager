@@ -6419,6 +6419,7 @@ modem_3gpp_ussd_context_send_unencoded (MMBroadbandModem *self)
 {
     Modem3gppUssdSendContext *ctx;
     gchar                    *at_command = NULL;
+    gchar                    *quoted_command;
 
     g_assert (self->priv->pending_ussd_action);
     ctx = g_task_get_task_data (self->priv->pending_ussd_action);
@@ -6426,9 +6427,11 @@ modem_3gpp_ussd_context_send_unencoded (MMBroadbandModem *self)
     /* Build AT command with action unencoded */
     ctx->unencoded_used = TRUE;
     ctx->current_is_unencoded = TRUE;
-    at_command = g_strdup_printf ("+CUSD=1,\"%s\",%d",
-                                  ctx->command,
-                                  MM_MODEM_GSM_USSD_SCHEME_7BIT);
+    quoted_command = mm_at_quote_string (ctx->command);
+    at_command = g_strdup_printf ("+CUSD=1,%s,%d",
+                                   quoted_command,
+                                   MM_MODEM_GSM_USSD_SCHEME_7BIT);
+    g_free (quoted_command);
 
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               at_command,

@@ -261,6 +261,13 @@ handle_change_pin_auth_ready (MMAuthProvider *authp,
         return;
     }
 
+    if (!mm_utils_is_numeric (ctx->old_pin) || !mm_utils_is_numeric (ctx->new_pin)) {
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                       "PIN must be numeric");
+        handle_change_pin_context_free (ctx);
+        return;
+    }
+
     /* If changing PIN is not implemented, report an error */
     if (!MM_BASE_SIM_GET_CLASS (ctx->self)->change_pin ||
         !MM_BASE_SIM_GET_CLASS (ctx->self)->change_pin_finish) {
@@ -441,6 +448,13 @@ handle_enable_pin_auth_ready (MMAuthProvider *authp,
 
     if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_enable_pin_context_free (ctx);
+        return;
+    }
+
+    if (!mm_utils_is_numeric (ctx->pin)) {
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                       "PIN must be numeric");
         handle_enable_pin_context_free (ctx);
         return;
     }
@@ -869,6 +883,13 @@ handle_send_pin_auth_ready (MMAuthProvider *authp,
         return;
     }
 
+    if (!mm_utils_is_numeric (ctx->pin)) {
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                       "PIN must be numeric");
+        handle_send_pin_context_free (ctx);
+        return;
+    }
+
     if (!mm_gdbus_sim_get_active (MM_GDBUS_SIM (ctx->self))) {
         mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                                         "Cannot send PIN: SIM not currently active");
@@ -970,6 +991,13 @@ handle_send_puk_auth_ready (MMAuthProvider *authp,
 
     if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_send_puk_context_free (ctx);
+        return;
+    }
+
+    if (!mm_utils_is_numeric (ctx->puk) || !mm_utils_is_numeric (ctx->new_pin)) {
+        mm_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                       "PIN/PUK must be numeric");
         handle_send_puk_context_free (ctx);
         return;
     }
@@ -1518,12 +1546,34 @@ handle_set_preferred_networks_ready (MMBaseSim *self,
     handle_set_preferred_networks_context_free (ctx);
 }
 
+static gboolean
+validate_networks_list (GList   *networks_list,
+                        GError **error)
+{
+    GList *l;
+
+    for (l = networks_list; l; l = g_list_next (l)) {
+        MMSimPreferredNetwork *network = (MMSimPreferredNetwork *)l->data;
+        const gchar *operator_code;
+
+        operator_code = mm_sim_preferred_network_get_operator_code (network);
+        if (!mm_utils_is_numeric (operator_code)) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                         "Invalid operator code: '%s'", operator_code);
+            return FALSE;
+        }
+    }
+
+    return TRUE;
+}
+
 static void
 handle_set_preferred_networks_auth_ready (MMAuthProvider *authp,
                                           GAsyncResult *res,
                                           HandleSetPreferredNetworksContext *ctx)
 {
     GError *error = NULL;
+    GList  *networks_list = NULL;
 
     if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
         mm_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -1553,12 +1603,22 @@ handle_set_preferred_networks_auth_ready (MMAuthProvider *authp,
         return;
     }
 
+    networks_list = mm_sim_preferred_network_list_new_from_variant (ctx->networks);
+    if (!validate_networks_list (networks_list, &error)) {
+        g_list_free_full (networks_list, g_object_unref);
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_set_preferred_networks_context_free (ctx);
+        return;
+    }
+
     mm_obj_info (ctx->self, "processing user request to set preferred networks...");
     MM_BASE_SIM_GET_CLASS (ctx->self)->set_preferred_networks (
             ctx->self,
-            mm_sim_preferred_network_list_new_from_variant (ctx->networks),
+            networks_list,
             (GAsyncReadyCallback)handle_set_preferred_networks_ready,
             ctx);
+
+    g_list_free_full (networks_list, g_object_unref);
 }
 
 static gboolean

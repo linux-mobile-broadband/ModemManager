@@ -440,6 +440,13 @@ handle_deflect_auth_ready (MMAuthProvider       *authp,
         return;
     }
 
+    /* Validate input number */
+    if (!mm_utils_is_valid_dial_number (ctx->number, &error)) {
+        mm_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_deflect_context_free (ctx);
+        return;
+    }
+
     state = mm_gdbus_call_get_state (MM_GDBUS_CALL (ctx->self));
 
     /* We can only deflect incoming call in ringing or waiting state */

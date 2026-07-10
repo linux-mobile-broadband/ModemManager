@@ -28,6 +28,7 @@
 #include "mm-sms-part-3gpp.h"
 #include "mm-charsets.h"
 #include "mm-log.h"
+#include "mm-modem-helpers.h"
 
 #define PDU_SIZE 200
 
@@ -141,6 +142,8 @@ sms_decode_address (const guint8  *address,
         unpacked = mm_charset_gsm_unpack (address, (len_digits * 4) / 7, 0, &unpacked_len);
         unpacked_array = g_byte_array_new_take (unpacked, unpacked_len);
         utf8 = mm_modem_charset_bytearray_to_utf8 (unpacked_array, MM_MODEM_CHARSET_GSM, FALSE, error);
+        if (utf8)
+            mm_utils_remove_control_characters (utf8);
     } else if (addrtype == SMS_NUMBER_TYPE_INTL &&
                addrplan == SMS_NUMBER_PLAN_TELEPHONE) {
         /* International telphone number, format as "+1234567890" */
