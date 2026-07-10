@@ -343,7 +343,7 @@ parent_load_update_settings_ready (MMIfaceModemFirmware *self,
     priv = get_private (MM_SHARED_FIBOCOM (self));
     update_settings = priv->iface_modem_firmware_parent->load_update_settings_finish (self, res, &error);
     if (error) {
-        g_task_return_error (task, error);
+        g_task_return_error (task, g_steal_pointer (&error));
         g_object_unref (task);
         return;
     }

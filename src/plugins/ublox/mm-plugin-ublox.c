@@ -113,6 +113,9 @@ ready_received (MMPortSerialAt   *port,
     g_source_remove (ctx->timeout_id);
     ctx->timeout_id = 0;
 
+    mm_port_serial_at_add_unsolicited_msg_handler (port, ctx->ready_regex,
+                                                   NULL, NULL, NULL);
+
     mm_obj_dbg (probe, "received READY: port is AT");
 
     /* Flag as an AT port right away */

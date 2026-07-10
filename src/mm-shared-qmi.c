@@ -3111,6 +3111,12 @@ list_configs_indication (QmiClientPdc                      *client,
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
 
+    /* Disconnect list-configs indication right away to avoid re-entry */
+    if (ctx->list_configs_indication_id) {
+        g_signal_handler_disconnect (ctx->client, ctx->list_configs_indication_id);
+        ctx->list_configs_indication_id = 0;
+    }
+
     if (!qmi_indication_pdc_list_configs_output_get_indication_result (output, &error_code, &error)) {
         load_carrier_config_abort (task, error);
         return;

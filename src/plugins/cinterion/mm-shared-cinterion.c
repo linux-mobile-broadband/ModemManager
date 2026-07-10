@@ -266,7 +266,7 @@ parent_load_update_settings_ready (MMIfaceModemFirmware *self,
     priv = get_private (MM_SHARED_CINTERION (self));
     update_settings = priv->iface_modem_firmware_parent->load_update_settings_finish (self, res, &error);
     if (error) {
-        g_task_return_error (task, error);
+        g_task_return_error (task, g_steal_pointer (&error));
         g_object_unref (task);
         return;
     }
@@ -276,7 +276,7 @@ parent_load_update_settings_ready (MMIfaceModemFirmware *self,
     ids = mm_iface_firmware_build_generic_device_ids (MM_IFACE_MODEM_FIRMWARE (self), &error);
     if (error) {
         mm_obj_warn (self, "failed to build generic device ids: %s", error->message);
-        g_task_return_error (task, error);
+        g_task_return_error (task, g_steal_pointer (&error));
         g_object_unref (task);
         return;
     }

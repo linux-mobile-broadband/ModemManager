@@ -241,7 +241,7 @@ parse_unsolicited (MMPortSerial *port, GByteArray *response)
                                       response->len,
                                       0, 0, &match_info, NULL);
         if (handler->callback) {
-            while (g_match_info_matches (match_info)) {
+            while (g_match_info_matches (match_info) && handler->callback) {
                 handler->callback (self, match_info, handler->user_data);
                 g_match_info_next (match_info, NULL);
             }
