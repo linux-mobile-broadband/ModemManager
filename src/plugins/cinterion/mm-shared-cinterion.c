@@ -650,11 +650,9 @@ disable_location_gathering_context_gps_step (GTask *task)
         }
 
         if (ctx->sgpss_error) {
-            g_task_return_error (task, ctx->sgpss_error);
-            g_clear_error (&ctx->sgpss_error);
+            g_task_return_error (task, g_steal_pointer (&ctx->sgpss_error));
         } else if (ctx->sgpsc_error) {
-            g_task_return_error (task, ctx->sgpsc_error);
-            g_clear_error (&ctx->sgpsc_error);
+            g_task_return_error (task, g_steal_pointer (&ctx->sgpsc_error));
         } else {
             priv->enabled_sources &= ~ctx->source;
             g_task_return_boolean (task, TRUE);
