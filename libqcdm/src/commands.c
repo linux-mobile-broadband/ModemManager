@@ -672,11 +672,23 @@ qcdm_cmd_pilot_sets_result (const char *buf, size_t len, int *out_error)
     QcdmResult *result = NULL;
     DMCmdPilotSetsRsp *rsp = (DMCmdPilotSetsRsp *) buf;
     size_t sets_len;
+    size_t total_count;
 
     qcdm_return_val_if_fail (buf != NULL, NULL);
 
     if (!check_command (buf, len, DIAG_CMD_PILOT_SETS, sizeof (DMCmdPilotSetsRsp), out_error))
         return NULL;
+
+    /* Validate that the modem-supplied counts fit in the fixed sets[] array
+     * and in the actually-received response. */
+    total_count = (size_t) rsp->active_count + rsp->candidate_count + rsp->neighbor_count;
+    if (total_count > (sizeof (rsp->sets) / sizeof (rsp->sets[0])) ||
+        ((sizeof (*rsp) - sizeof (rsp->sets)) + total_count * sizeof (DMCmdPilotSetsSet)) > len) {
+        qcdm_err (0, "DM Pilot Sets response counts out of range");
+        if (out_error)
+            *out_error = -QCDM_ERROR_RESPONSE_BAD_LENGTH;
+        return NULL;
+    }
 
     result = qcdm_result_new ();
 
