@@ -98,10 +98,10 @@ qcdm_log_item_evdo_pilot_sets_v2_new (const char *buf, size_t len, int *out_erro
 
     pilot_sets = (DMLogItemEvdoPilotSetsV2 *) log_cmd->data;
 
-    /* check_log_item() guarantees len >= sizeof (DMCmdLog) + sizeof (DMLogItemEvdoPilotSetsV2),
-     * so 'avail' cannot underflow. */
     /* Ensure the flexible sets[] array actually contains as many entries as
-     * the header claims; the modem fully controls these counts. */
+     * the header claims; the modem fully controls these counts. check_log_item()
+     * guarantees len >= sizeof (DMCmdLog) + sizeof (DMLogItemEvdoPilotSetsV2),
+     * so 'avail' cannot underflow.*/
     avail = len - sizeof (DMCmdLog) - sizeof (DMLogItemEvdoPilotSetsV2);
     sets_len = ((size_t) pilot_sets->active_count
                 + (size_t) pilot_sets->candidate_count
