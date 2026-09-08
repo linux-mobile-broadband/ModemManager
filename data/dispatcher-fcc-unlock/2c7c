@@ -13,6 +13,13 @@
 #  EM120,                   1eac:1001
 #  RM520N (HP shipped),     1eac:1004
 #  RM520N (Lenovo shipped), 1eac:1007
+#  EM160R-GL,               1eac:100d
+#  EM061K,                  2c7c:6008
+#
+# Lenovo's own unlock for these modules is an MBIM set on the Quectel service:
+# setFccUnlock_cs24() calls mbim_radio_state_set() in libmbimtools.so, which
+# composes a SET on uuid 11223344-5566-7788-99aa-bbccddeeff11, cid 1, which is
+# exactly what --quectel-set-radio-state=on sends.
 #
 
 # require program name and at least 2 arguments
