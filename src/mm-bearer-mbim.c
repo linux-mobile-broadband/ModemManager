@@ -667,7 +667,8 @@ ip_configuration_async_timeout (GTask *task)
 }
 
 static void
-ip_configuration_async_cancelled (GTask *task)
+ip_configuration_async_cancelled (GCancellable *cancellable,
+                                  GTask *task)
 {
     ip_configuration_async_cleanup (task);
     g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED,
