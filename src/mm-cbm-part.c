@@ -225,7 +225,9 @@ mm_cbm_part_new_from_binary_pdu (const guint8  *pdu,
             cbm_part->encoding = MM_SMS_ENCODING_GSM7;
         else if (charset == CBS_DATA_CODING_GENERAL_UCS2)
             cbm_part->encoding = MM_SMS_ENCODING_UCS2;
-    } else {
+    }
+
+    if (cbm_part->encoding == MM_SMS_ENCODING_UNKNOWN) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
