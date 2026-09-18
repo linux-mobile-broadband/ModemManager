@@ -1,0 +1,164 @@
+#!/bin/sh
+
+# SPDX-License-Identifier: CC0-1.0
+# 2026 Wayne Hendricks <twh@waynehendricks.com>
+#
+# Dell DW5933e (14c0:4d75) FCC unlock
+#
+# Dell ships this module as the DW5933e. It presents PCI 14c0:4d75, a vendor id
+# registered to COMPAL, with Dell subsystems 1028:5933 and 1028:5966, and Linux
+# binds it through drivers/net/wwan/t7xx, whose id table carries
+# { PCI_DEVICE(0x14c0, 0x4d75) }. The dispatcher looks the script up by vendor
+# and product alone, so one file covers both subsystems.
+#
+# Dell's WWANModemAuthenticator.exe drives this module over the Intel Mutual
+# Authentication FCC Lock MBIM service, uuid
+# f85d46ef-ab26-4081-9868-4d183c0a3aec, which libmbim implements and mbimcli
+# exposes as --intel-query-fcc-lock and --intel-set-fcc-lock. Both operations
+# are CID 1 of that service, and both replies carry the same two fields,
+# ChallengePresent and Challenge.
+#
+# Transcribed from DoFccUnlock in that binary, which runs:
+#
+#   query, empty payload        proceed only while ChallengePresent is set
+#   set, ResponsePresent = 0    the reply to this is what carries the challenge
+#   sha256(model id)            first 4 bytes kept
+#   sha256(challenge, id)       the challenge's 4 wire bytes then those 4 bytes
+#   set, ResponsePresent = 1    Response = first 4 bytes of that digest
+#   unlocked when the reply to the second set clears ChallengePresent
+#
+# The challenge is taken from the reply to the first set, not from the query.
+# The vendor gates on the query's own Challenge field being empty before it
+# asks, so the query does not hand out a usable value on this hardware.
+#
+# Every byte copy in the vendor's code is ascending: the digest of the model id
+# is copied forward into the hash input, the challenge's four bytes are copied
+# forward ahead of it, and the four response bytes are copied forward into the
+# outgoing payload. Nothing is reversed while hashing.
+#
+# The swapping below exists only at the mbimcli boundary. Challenge and Response
+# are u32 fields, so mbimcli prints and parses them as numbers while the modem
+# hashes their little endian wire bytes. The vendor id hash is not swapped,
+# because it is a byte string on both sides.
+#
+# mbimcli accepts only decimal for the response: mbimcli_read_uint_from_string
+# rejects any non-digit and calls strtoul(str, NULL, 10).
+
+[ "$FCC_UNLOCK_DEBUG_LOG" = '1' ] && {
+    exec 3>&1 4>&2
+    trap 'exec 2>&4 1>&3' 0 1 2 3
+    exec 1>>'/var/log/mm-dw5933e-fcc.log' 2>&1
+}
+
+# require program name and at least 2 arguments
+[ $# -lt 2 ] && exit 1
+
+# first argument is DBus path, not needed here
+shift
+
+# second and next arguments are control port names
+for PORT in "$@"; do
+  # match port type in Linux 5.14 and newer
+  grep -q MBIM "/sys/class/wwan/$PORT/type" 2>/dev/null ||
+  # match port name in Linux 5.13
+  echo "$PORT" | grep -qi MBIM ||
+  echo "$PORT" | grep -q cdc-wdm && {
+    MBIM_PORT="$PORT"
+    break
+  }
+done
+
+# fail if no MBIM port exposed
+[ -n "$MBIM_PORT" ] || exit 2
+
+DEVICE="/dev/$MBIM_PORT"
+
+log() {
+    echo "$1"
+}
+
+error() {
+    echo "$1" >&2
+}
+
+mbim_command() {
+    mbimcli --device-open-proxy --device="$DEVICE" "$1" 2>&1
+}
+
+# Hex string to raw bytes. xxd would do this, but it comes from vim on most
+# distributions and is not a dependency of ModemManager, and when it is missing
+# the hash is computed over an empty input, which looks exactly like a wrong
+# vendor ID hash. printf understands \0ooo octal escapes in POSIX, so no
+# external tool is needed.
+hex_to_bin() {
+    _h="$1"
+    while [ -n "$_h" ]; do
+        _b="${_h%"${_h#??}"}"
+        _h="${_h#??}"
+        printf '%b' "\\0$(printf '%o' "$((0x$_b))")"
+    done
+}
+
+swap32() {
+    printf '%s' "$1" | sed 's/\(..\)\(..\)\(..\)\(..\)/\4\3\2\1/'
+}
+
+challenge_of() {
+    echo "$1" | sed -n 's/.*Challenge: *\([0-9][0-9]*\).*/\1/p'
+}
+
+# 93555146 is SHA-256("DW5933EFCCLOCK"), the model id the vendor copies into its
+# key buffer once its machine checks pass. Those checks read the Windows
+# registry, and its only other source is a 5 byte SMBIOS type 133 record that
+# Dell firmware does not ship, so this is the value in use on this hardware.
+VENDOR_ID_HASH='93555146'
+
+i=1
+while [ "$i" -le 3 ]; do
+    log "Querying FCC lock state (attempt #$i)"
+    STATUS="$(mbim_command '--intel-query-fcc-lock')"
+
+    case "$STATUS" in
+        *'FCC lock status: unlocked'*)
+            log 'FCC lock is not engaged, nothing to do.'
+            exit 0 ;;
+        *'FCC lock status: locked'*) ;;
+        *)
+            error "Could not read FCC lock state. Got: $STATUS"
+            sleep 0.5
+            i="$((i + 1))"
+            continue ;;
+    esac
+
+    # The vendor asks for the challenge with a set carrying no response. The
+    # reply to that is what contains it.
+    CHALLENGE="$(challenge_of "$(mbim_command '--intel-set-fcc-lock=0,0')")"
+    [ -n "$CHALLENGE" ] && [ "$CHALLENGE" != '0' ] || {
+        error "Modem did not return a challenge."
+        sleep 0.5
+        i="$((i + 1))"
+        continue
+    }
+
+    log "Got challenge from modem: $CHALLENGE"
+    WIRE_CHALLENGE="$(swap32 "$(printf '%08x' "$CHALLENGE")")"
+    COMBINED_CHALLENGE="$WIRE_CHALLENGE$VENDOR_ID_HASH"
+    RESPONSE_HASH="$(hex_to_bin "$COMBINED_CHALLENGE" | sha256sum | cut -d ' ' -f 1)"
+    RESPONSE="$(printf '%u' "0x$(swap32 "$(printf '%.8s' "$RESPONSE_HASH")")")"
+
+    log "Sending response to WWAN modem: $RESPONSE"
+    RESULT="$(mbim_command "--intel-set-fcc-lock=1,$RESPONSE")"
+
+    case "$RESULT" in
+        *'FCC lock status: unlocked'*)
+            log 'FCC unlock succeeded.'
+            exit 0 ;;
+        *)
+            error "FCC unlock failed. Got: $RESULT" ;;
+    esac
+
+    sleep 0.5
+    i="$((i + 1))"
+done
+
+exit 2
