@@ -350,6 +350,22 @@
  */
 #define ID_MM_AT_NETWORK_TIME_BROKEN "ID_MM_AT_NETWORK_TIME_BROKEN"
 
+/**
+ * ID_MM_MAX_TIMEOUTS:
+ *
+ * This is a device-specific tag that allows users to specify the maximum number
+ * of consecutive command timeouts allowed before the modem is marked as invalid
+ * and re-probed.
+ *
+ * An integer value greater or equal than 0 must be given. The value 0 in this
+ * tag completely disables the timeout monitoring feature.
+ *
+ * If not given, the default value of 10 consecutive timeouts is used.
+ *
+ * Since: 1.26
+ */
+#define ID_MM_MAX_TIMEOUTS "ID_MM_MAX_TIMEOUTS"
+
 /*
  * The following symbols are deprecated. We don't add them to -compat
  * because this -tags file is not really part of the installed API.
