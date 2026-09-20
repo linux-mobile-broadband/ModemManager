@@ -641,9 +641,10 @@ ip_configuration_async_cleanup (GTask *task)
 
     ctx  = g_task_get_task_data (task);
 
-    g_assert (ctx->async_slaac_cancellation_id);
-    g_cancellable_disconnect (g_task_get_cancellable (task), ctx->async_slaac_cancellation_id);
-    ctx->async_slaac_cancellation_id = 0;
+    if (ctx->async_slaac_cancellation_id) {
+        g_cancellable_disconnect (g_task_get_cancellable (task), ctx->async_slaac_cancellation_id);
+        ctx->async_slaac_cancellation_id = 0;
+    }
 
     g_assert (ctx->async_slaac_notification_id);
     if (g_signal_handler_is_connected (ctx->mbim, ctx->async_slaac_notification_id))
@@ -667,8 +668,15 @@ ip_configuration_async_timeout (GTask *task)
 }
 
 static void
-ip_configuration_async_cancelled (GTask *task)
+ip_configuration_async_cancelled (GCancellable *cancellable,
+                                  GTask *task)
 {
+    ConnectContext *ctx;
+
+    /* Avoid the explicit g_cancellable_disconnect(), which would deadlock */
+    ctx = g_task_get_task_data (task);
+    ctx->async_slaac_cancellation_id = 0;
+
     ip_configuration_async_cleanup (task);
     g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED,
                              "Cancelled waiting for SLAAC notification");
