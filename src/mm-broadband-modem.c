@@ -1475,7 +1475,7 @@ modem_load_own_numbers (MMIfaceModem *self,
                         gpointer user_data)
 {
     OwnNumbersContext *ctx;
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
     GTask *task;
 
     ctx = g_new0 (OwnNumbersContext, 1);
@@ -9307,7 +9307,6 @@ modem_cdma_setup_cleanup_unsolicited_events (MMBroadbandModem *self,
     GTask *task;
     GByteArray *logcmd;
     uint16_t log_items[] = { DM_LOG_ITEM_EVDO_PILOT_SETS_V2, 0 };
-    GError *error = NULL;
 
     ctx = g_new0 (CdmaUnsolicitedEventsContext, 1);
     ctx->setup = TRUE;
@@ -9327,7 +9326,7 @@ modem_cdma_setup_cleanup_unsolicited_events (MMBroadbandModem *self,
      * if not we still want to open it and try to disable log messages.
      */
     if (setup || !mm_port_serial_is_open (MM_PORT_SERIAL (ctx->qcdm))) {
-        if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->qcdm), &error)) {
+        if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->qcdm), NULL)) {
             g_task_return_boolean (task, TRUE);
             g_object_unref (task);
             return;

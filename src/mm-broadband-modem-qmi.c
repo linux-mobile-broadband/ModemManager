@@ -4888,7 +4888,6 @@ activate_manual_get_msisdn_ready (QmiClientDms *client,
     MMBroadbandModemQmi *self;
     CdmaActivationContext *ctx;
     QmiMessageDmsGetMsisdnOutput *output = NULL;
-    GError *error = NULL;
     const gchar *current_mdn = NULL;
     const gchar *expected_mdn = NULL;
 
@@ -4902,7 +4901,7 @@ activate_manual_get_msisdn_ready (QmiClientDms *client,
                                                     NULL, /* min */
                                                     NULL);
 
-    output = qmi_client_dms_get_msisdn_finish (client, res, &error);
+    output = qmi_client_dms_get_msisdn_finish (client, res, NULL);
     if (output &&
         qmi_message_dms_get_msisdn_output_get_result (output, NULL) &&
         qmi_message_dms_get_msisdn_output_get_msisdn (output, &current_mdn, NULL) &&

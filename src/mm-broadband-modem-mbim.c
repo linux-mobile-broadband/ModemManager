@@ -4971,11 +4971,11 @@ atds_location_query_ready (MbimDevice           *device,
                            GAsyncResult         *res,
                            MMBroadbandModemMbim *self)
 {
-    g_autoptr(MbimMessage)  response = NULL;
-    GError                 *error = NULL;
-    guint32                 lac;
-    guint32                 tac;
-    guint32                 cid;
+    g_autoptr(MbimMessage) response = NULL;
+    g_autoptr(GError)      error = NULL;
+    guint32                lac;
+    guint32                tac;
+    guint32                cid;
 
     response = mbim_device_command_finish (device, res, &error);
     if (!response ||

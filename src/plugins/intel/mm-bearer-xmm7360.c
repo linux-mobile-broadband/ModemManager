@@ -659,7 +659,7 @@ disconnect_sequence_ready (MMBroadbandModem *modem,
                            GAsyncResult *res,
                            GTask *task)
 {
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
     g_autoptr(Xmm7360RpcResponse) response = NULL;
 
     response = mm_broadband_modem_xmm7360_rpc_sequence_finish (MM_BROADBAND_MODEM_XMM7360 (modem),
@@ -667,8 +667,8 @@ disconnect_sequence_ready (MMBroadbandModem *modem,
                                                                &error);
 
     if (error) {
-        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                 "Failed to complete disconnect sequence: %s", error->message);
+        g_prefix_error (&error, "Failed to complete disconnect sequence: ");
+        g_task_return_error (task, g_steal_pointer (&error));
         g_object_unref (task);
         return;
     }

@@ -1059,7 +1059,7 @@ init_sequence_ready (MMBroadbandModem *self,
                      GAsyncResult *res,
                      GTask *task)
 {
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
     g_autoptr(Xmm7360RpcResponse) response = NULL;
     InitializationStartedContext *ctx;
 
@@ -1068,8 +1068,8 @@ init_sequence_ready (MMBroadbandModem *self,
                                                                &error);
 
     if (error) {
-        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                 "Failed to complete init sequence: %s", error->message);
+        g_prefix_error (&error, "Failed to complete init sequence: ");
+        g_task_return_error (task, g_steal_pointer (&error));
         g_object_unref (task);
         return;
     }
