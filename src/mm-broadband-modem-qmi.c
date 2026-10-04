@@ -11642,6 +11642,7 @@ all_call_status_indication_cb (QmiClientVoice                        *client,
                 case QMI_VOICE_CALL_STATE_CC_IN_PROGRESS:
                     call_info->state = MM_CALL_STATE_DIALING;
                     break;
+                case QMI_VOICE_CALL_STATE_PRE_ALERTING:
                 case QMI_VOICE_CALL_STATE_ALERTING:
                     call_info->state = MM_CALL_STATE_RINGING_OUT;
                     break;
@@ -12085,6 +12086,7 @@ process_get_all_call_info (QmiClientVoice                       *client,
                 case QMI_VOICE_CALL_STATE_CC_IN_PROGRESS:
                     call_info->state = MM_CALL_STATE_DIALING;
                     break;
+                case QMI_VOICE_CALL_STATE_PRE_ALERTING:
                 case QMI_VOICE_CALL_STATE_ALERTING:
                     call_info->state = MM_CALL_STATE_RINGING_OUT;
                     break;
