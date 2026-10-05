@@ -227,11 +227,14 @@ transaction_complete (Transaction     *tr,
                       struct nlmsghdr *hdr,
                       gint             saved_errno)
 {
-    GTask *task;
-    guint32 sequence_id;
+    GTask   *task;
+    guint32  sequence_id;
+    MsgFunc  completion_fn;
 
+    /* tr is freed by hashtable remove; cache values we need after */
     task = g_steal_pointer (&tr->completion_task);
     sequence_id = tr->sequence_id;
+    completion_fn = tr->completion_fn;
 
     g_hash_table_remove (tr->self->transactions,
                          GUINT_TO_POINTER (tr->sequence_id));
@@ -239,7 +242,7 @@ transaction_complete (Transaction     *tr,
     if (!saved_errno) {
         GError *error = NULL;
 
-        if (!tr->completion_fn (task, hdr, &error))
+        if (!completion_fn (task, hdr, &error))
             g_task_return_error (task, error);
     } else {
         g_task_return_new_error (task, G_IO_ERROR, g_io_error_from_errno (saved_errno),
