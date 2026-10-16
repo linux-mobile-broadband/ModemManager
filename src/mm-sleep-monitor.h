@@ -35,7 +35,7 @@ G_BEGIN_DECLS
 typedef struct _MMSleepMonitor         MMSleepMonitor;
 typedef struct _MMSleepMonitorClass    MMSleepMonitorClass;
 
-GType           mm_sleep_monitor_get_type     (void) G_GNUC_CONST;
+GType           mm_sleep_monitor_get_type     (void);
 MMSleepMonitor *mm_sleep_monitor_get          (void);
 
 G_END_DECLS
