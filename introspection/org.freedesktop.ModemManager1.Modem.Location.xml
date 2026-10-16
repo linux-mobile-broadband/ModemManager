@@ -20,10 +20,8 @@
       if they do, they may not be able to provide it while a data session is
       active.
 
-      This interface will only be available once the modem is ready to be
-      registered in the cellular network. 3GPP devices will require a valid
-      unlocked SIM card before any of the features in the interface can be
-      used (including GNSS module management).
+      Since 1.24 interface is enabled even with the modem in failed state, e.g.
+      when there is no SIM card inserted.
   -->
   <interface name="org.freedesktop.ModemManager1.Modem.Location">
 
