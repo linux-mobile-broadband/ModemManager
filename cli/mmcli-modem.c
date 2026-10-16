@@ -249,7 +249,7 @@ static void
 inhibition_cancelled (GCancellable *cancellable,
                       const gchar  *uid)
 {
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
 
     if (!mm_manager_uninhibit_device_sync (ctx->manager, uid, NULL, &error)) {
         g_printerr ("error: couldn't uninhibit device: '%s'\n",

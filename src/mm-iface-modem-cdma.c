@@ -785,7 +785,7 @@ get_detailed_registration_state_ready (MMIfaceModemCdma *self,
                                        GTask *task)
 {
     RunRegistrationChecksContext *ctx;
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
     MMModemCdmaRegistrationState detailed_cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     MMModemCdmaRegistrationState detailed_evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
 
