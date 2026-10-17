@@ -35,7 +35,7 @@ G_BEGIN_DECLS
 typedef struct _MMNetlink         MMNetlink;
 typedef struct _MMNetlinkClass    MMNetlinkClass;
 
-GType      mm_netlink_get_type     (void) G_GNUC_CONST;
+GType      mm_netlink_get_type     (void);
 MMNetlink *mm_netlink_get          (void);
 
 void     mm_netlink_setlink        (MMNetlink           *self,
