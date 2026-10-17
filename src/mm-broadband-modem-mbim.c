@@ -70,6 +70,7 @@ static MMIfaceModemLocationInterface  *iface_modem_location_parent;
 #endif
 static MMIfaceModemSignalInterface    *iface_modem_signal_parent;
 static MMIfaceModemInterface          *iface_modem_parent;
+static MMIfaceModem3gppInterface      *iface_modem_3gpp_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbim, mm_broadband_modem_mbim, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -7343,6 +7344,24 @@ visible_providers_query_ready (MbimDevice *device,
 }
 
 static void
+parent_scan_networks_ready (MMIfaceModem3gpp *self,
+                            GAsyncResult     *res,
+                            GTask            *task)
+{
+    GError *error = NULL;
+    GList  *scan_result;
+    scan_result = iface_modem_3gpp_parent->scan_networks_finish (self, res, &error);
+
+    if (!scan_result)
+        g_task_return_error (task, error);
+    else
+        g_task_return_pointer (task,
+                               scan_result,
+                               (GDestroyNotify)mm_3gpp_network_info_list_free);
+    g_object_unref (task);
+}
+
+static void
 modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
@@ -7350,21 +7369,43 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
     MbimDevice *device;
     MbimMessage *message;
     GTask *task;
-
-    if (!peek_device (self, &device, callback, user_data))
-        return;
+    MMPortSerialAt *primary;
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    mm_obj_dbg (self, "scanning networks...");
-    message = mbim_message_visible_providers_query_new (MBIM_VISIBLE_PROVIDERS_ACTION_FULL_SCAN, NULL);
-    mbim_device_command (device,
-                         message,
-                         300,
-                         NULL,
-                         (GAsyncReadyCallback)visible_providers_query_ready,
-                         task);
-    mbim_message_unref (message);
+    /* The MBIM scan results lack proper access technology information.
+     * So try the AT interface first to get more detailed information.
+     */
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    if (primary) {
+        mm_obj_dbg (self, "scanning for networks via AT...");
+        iface_modem_3gpp_parent->scan_networks (self,
+                                                (GAsyncReadyCallback)parent_scan_networks_ready,
+                                                task);
+        return;
+    }
+
+    /* If the AT port is not available fallback to MBIM scan.
+     * That only makes sense if the MBIM port is available.
+     */
+    if (peek_device (self, &device, callback, user_data)) {
+        mm_obj_dbg (self, "scanning for networks via MBIM...");
+        message = mbim_message_visible_providers_query_new (MBIM_VISIBLE_PROVIDERS_ACTION_FULL_SCAN, NULL);
+        mbim_device_command (device,
+                             message,
+                             300,
+                             NULL,
+                             (GAsyncReadyCallback)visible_providers_query_ready,
+                             task);
+        mbim_message_unref (message);
+        return;
+    }
+
+    g_task_return_new_error (task,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "3GPP network scan cannot be started");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -10600,6 +10641,8 @@ iface_modem_init (MMIfaceModemInterface *iface)
 static void
 iface_modem_3gpp_init (MMIfaceModem3gppInterface *iface)
 {
+    iface_modem_3gpp_parent = g_type_interface_peek_parent (iface);
+
     /* Initialization steps */
     iface->load_imei = modem_3gpp_load_imei;
     iface->load_imei_finish = modem_3gpp_load_imei_finish;
