@@ -34,26 +34,26 @@ udev_rule_match_clear (MMUdevRuleMatch *rule_match)
     g_free (rule_match->value);
 }
 
-static void
-udev_rule_clear (MMUdevRule *rule)
+void
+mm_kernel_device_generic_rule_clear (MMUdevRule *rule)
 {
     switch (rule->result.type) {
     case MM_UDEV_RULE_RESULT_TYPE_PROPERTY:
-        g_free (rule->result.content.property.name);
-        g_free (rule->result.content.property.value);
+        g_clear_pointer (&rule->result.content.property.name, g_free);
+        g_clear_pointer (&rule->result.content.property.value, g_free);
         break;
     case MM_UDEV_RULE_RESULT_TYPE_GOTO_TAG:
     case MM_UDEV_RULE_RESULT_TYPE_LABEL:
-        g_free (rule->result.content.tag);
+        g_clear_pointer (&rule->result.content.tag, g_free);
         break;
     case MM_UDEV_RULE_RESULT_TYPE_GOTO_INDEX:
     case MM_UDEV_RULE_RESULT_TYPE_UNKNOWN:
     default:
         break;
     }
+    rule->result.type = MM_UDEV_RULE_RESULT_TYPE_UNKNOWN;
 
-    if (rule->conditions)
-        g_array_unref (rule->conditions);
+    g_clear_pointer (&rule->conditions, g_array_unref);
 }
 
 static gboolean
@@ -67,6 +67,7 @@ split_item (const gchar  *item,
     gchar       *left = NULL;
     gchar       *operator = NULL;
     gchar       *right = NULL;
+    gsize        right_len;
     GError      *inner_error = NULL;
 
     g_assert (item && out_left && out_operator && out_right);
@@ -89,6 +90,33 @@ split_item (const gchar  *item,
     if (!left[0]) {
         inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                    "Invalid rule item, missing left field: '%s'", item);
+        goto out;
+    }
+    /* The left field (key/parameter name) cannot contain whitespace, quotes,
+     * or operator characters (e.g. if a comma was omitted after a preceding
+     * '=' assignment before a '=='/'!=' match). */
+    if (strpbrk (left, " \t\"=!")) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                   "Invalid rule item, invalid left field: '%s'", item);
+        goto out;
+    }
+
+    /* The right field must be non-empty before unquoting. */
+    g_strstrip (right);
+    right_len = strlen (right);
+    if (!right_len) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                   "Invalid rule item, missing right field: '%s'", item);
+        goto out;
+    }
+
+    /* The right field must be a single double-quoted string: it must start
+     * with '"' and the very next '"' must be the last character in the string
+     * (rejecting unquoted values, unterminated quotes, or multiple tokens merged
+     * due to a missing comma). */
+    if ((right[0] != '"') || (strchr (right + 1, '"') != &right[right_len - 1])) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                   "Invalid rule item, invalid right field: '%s'", item);
         goto out;
     }
 
@@ -206,10 +234,10 @@ load_rule_match (MMUdevRuleMatch  *rule_match,
     return TRUE;
 }
 
-static gboolean
-load_rule_from_line (MMUdevRule   *rule,
-                     const gchar  *line,
-                     GError      **error)
+gboolean
+mm_kernel_device_generic_rule_load_from_line (MMUdevRule   *rule,
+                                              const gchar  *line,
+                                              GError      **error)
 {
     gchar  **split;
     guint    n_items;
@@ -251,6 +279,7 @@ out:
     g_strfreev (split);
 
     if (inner_error) {
+        mm_kernel_device_generic_rule_clear (rule);
         g_propagate_error (error, inner_error);
         return FALSE;
     }
@@ -334,10 +363,10 @@ load_rules_from_file (GArray       *rules,
         if (*aux != '#' && *aux != '\0') {
             MMUdevRule rule = { 0 };
 
-            if (load_rule_from_line (&rule, aux, &inner_error))
+            if (mm_kernel_device_generic_rule_load_from_line (&rule, aux, &inner_error))
                 g_array_append_val (rules, rule);
             else
-                udev_rule_clear (&rule);
+                mm_kernel_device_generic_rule_clear (&rule);
         }
         g_free (line);
     }
@@ -406,7 +435,7 @@ mm_kernel_device_generic_rules_load (const gchar  *rules_dir,
     GError *inner_error = NULL;
 
     rules = g_array_new (FALSE, FALSE, sizeof (MMUdevRule));
-    g_array_set_clear_func (rules, (GDestroyNotify) udev_rule_clear);
+    g_array_set_clear_func (rules, (GDestroyNotify) mm_kernel_device_generic_rule_clear);
 
     /* List rule files in rules dir */
     rule_files = list_rule_files (rules_dir);
