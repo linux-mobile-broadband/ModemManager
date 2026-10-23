@@ -440,7 +440,44 @@ shared_cinterion_init (MMSharedCinterionInterface *iface)
     iface->peek_parent_time_interface     = peek_parent_time_interface;
 }
 
+/*****************************************************************************/
+
+static void
+fixup_rsrp_snr_info (MMBroadbandModemMbim *self,
+                     MbimRsrpSnrInfoArray *rsrp_snr,
+                     guint32               rsrp_snr_count)
+{
+    guint i;
+
+    /* MV32 */
+    if (mm_base_modem_get_product_id (MM_BASE_MODEM (self)) != 0x00f1)
+        return;
+
+    /*
+     * The MV32 always reports a 5G entry, even if no NR is in use.
+     * In this case RSRP and SNR are both 0 instead of 0xFFFFFFFF (unknown),
+     * so mark the entry as unknown.
+     */
+    for (i = 0; i < rsrp_snr_count; i++) {
+        MbimRsrpSnrInfo *info = rsrp_snr[i];
+
+        if (!(info->system_type & (MBIM_DATA_CLASS_5G_NSA | MBIM_DATA_CLASS_5G_SA)))
+            continue;
+
+        if (info->rsrp == 0 && info->snr == 0) {
+            mm_obj_dbg (self, "ignoring invalid 5G RSRP/SNR info");
+            info->rsrp = 0xFFFFFFFF;
+            info->snr = 0xFFFFFFFF;
+        }
+    }
+}
+
+/*****************************************************************************/
+
 static void
 mm_broadband_modem_mbim_cinterion_class_init (MMBroadbandModemMbimCinterionClass *klass)
 {
+    MMBroadbandModemMbimClass *broadband_modem_mbim_class = MM_BROADBAND_MODEM_MBIM_CLASS (klass);
+
+    broadband_modem_mbim_class->fixup_rsrp_snr_info = fixup_rsrp_snr_info;
 }
