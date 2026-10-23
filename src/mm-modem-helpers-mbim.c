@@ -929,7 +929,7 @@ mm_signal_rssi_from_coded_value (guint      coded_value,
         return FALSE;
     }
 
-    *out_rssi = (gdouble)coded_value - 113;
+    *out_rssi = -113 + 2 * (gdouble)coded_value;
     return TRUE;
 }
 
