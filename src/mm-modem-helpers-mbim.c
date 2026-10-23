@@ -1067,36 +1067,65 @@ mm_sms_state_from_mbim_message_status (MbimSmsStatus status)
 
 /*****************************************************************************/
 
+/* Full 3GPP measurement ranges, same as used for 5G in the QMI modem */
+#define RSRP_QUALITY_MIN -140
+#define RSRP_QUALITY_MAX  -44
+#define SNR_QUALITY_MIN   -23
+#define SNR_QUALITY_MAX    40
+
+static guint
+quality_from_range (gdouble value,
+                    gdouble min,
+                    gdouble max)
+{
+    return (guint) ((CLAMP (value, min, max) - min) * 100 / (max - min));
+}
+
 guint
 mm_signal_quality_from_mbim_signal_state (guint                 rssi,
                                           MbimRsrpSnrInfoArray *rsrp_snr,
                                           guint32               rsrp_snr_count,
                                           gpointer              log_object)
 {
-    guint quality;
+    guint quality = 0;
 
-    /* When MBIMEx is enabled we may get RSSI unset, but per access technology
-     * RSRP available. When more than one access technology in use (e.g. 4G+5G in
-     * 5G NSA), take the highest RSRP value reported. */
+    /*
+     * When MBIMEx is enabled we may get RSSI unset, but per access technology
+     * RSRP and SNR available. Like the QMI modem does for 5G, the quality of
+     * each access technology is the worst of the RSRP and SNR based quality.
+     * When more than one access technology in use (e.g. 4G+5G in 5G NSA),
+     * take the highest quality reported.
+     */
     if (rssi == 99 && rsrp_snr && rsrp_snr_count) {
         guint i;
-        gint  max_rsrp = G_MININT;
 
         for (i = 0; i < rsrp_snr_count; i++) {
             MbimRsrpSnrInfo  *info;
+            gdouble           rsrp;
+            gdouble           snr;
+            guint             entry_quality = 101;
+            g_autofree gchar *system_type_str = NULL;
 
             info = rsrp_snr[i];
-            /* scale the value to dBm */
-            if (info->rsrp < 127) {
-                gint rsrp;
 
-                rsrp = -157 + info->rsrp;
-                if (rsrp > max_rsrp)
-                    max_rsrp = rsrp;
-            }
+            if (mm_signal_rsrp_from_coded_value (info->rsrp, &rsrp, NULL))
+                entry_quality = MIN (entry_quality, quality_from_range (rsrp, RSRP_QUALITY_MIN, RSRP_QUALITY_MAX));
+
+            if (mm_signal_snr_from_coded_value (info->snr, &snr, NULL))
+                entry_quality = MIN (entry_quality, quality_from_range (snr, SNR_QUALITY_MIN, SNR_QUALITY_MAX));
+
+            /* neither RSRP nor SNR valid */
+            if (entry_quality > 100)
+                continue;
+
+            system_type_str = mbim_data_class_build_string_from_mask (info->system_type);
+            mm_obj_dbg (log_object, "signal state update (%s): coded rsrp %u, coded snr %u --> %u%%",
+                        system_type_str, info->rsrp, info->snr, entry_quality);
+
+            if (entry_quality > quality)
+                quality = entry_quality;
         }
-        quality = MM_RSRP_TO_QUALITY (max_rsrp);
-        mm_obj_dbg (log_object, "signal state update: %ddBm --> %u%%", max_rsrp, quality);
+        mm_obj_dbg (log_object, "signal state update: %u%%", quality);
     } else {
         /* Normalize the quality. 99 means unknown, we default it to 0 */
         quality = MM_CLAMP_HIGH (rssi == 99 ? 0 : rssi, 31) * 100 / 31;
