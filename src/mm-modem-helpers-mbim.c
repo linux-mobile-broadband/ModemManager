@@ -947,7 +947,7 @@ mm_signal_rsrp_from_coded_value (guint     coded_value,
         return FALSE;
     }
 
-    *out_rsrp = (gdouble)coded_value - 156;
+    *out_rsrp = (gdouble)coded_value - 157;
     return TRUE;
 }
 
@@ -965,7 +965,7 @@ mm_signal_snr_from_coded_value (guint     coded_value,
         return FALSE;
     }
 
-    *out_snr = ((gdouble)coded_value)/2 - 23;
+    *out_snr = ((gdouble)coded_value)/2 - 23.5;
     return TRUE;
 }
 
