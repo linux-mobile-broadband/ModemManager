@@ -81,6 +81,9 @@ struct _MMBroadbandModemMbimClass{
                                                                 guint32               nw_error);
     MMBroadbandModemMbimSetInitialEpsBearerSettingsFlag
                  (* load_set_initial_eps_bearer_settings_mask) (MMBroadbandModemMbim *self);
+    void         (* fixup_rsrp_snr_info)                       (MMBroadbandModemMbim *self,
+                                                                MbimRsrpSnrInfoArray *rsrp_snr,
+                                                                guint32               rsrp_snr_count);
 };
 
 GType mm_broadband_modem_mbim_get_type (void);
