@@ -80,6 +80,12 @@ void     mm_shared_qmi_set_packet_service_state        (MMIfaceModem3gpp        
 gboolean mm_shared_qmi_set_packet_service_state_finish (MMIfaceModem3gpp               *self,
                                                         GAsyncResult                   *res,
                                                         GError                        **error);
+void     mm_shared_qmi_3gpp_scan_networks              (MMIfaceModem3gpp               *self,
+                                                        GAsyncReadyCallback             callback,
+                                                        gpointer                        user_data);
+GList   *mm_shared_qmi_3gpp_scan_networks_finish       (MMIfaceModem3gpp               *self,
+                                                        GAsyncResult                   *res,
+                                                        GError                        **error);
 
 /* Shared QMI device management support */
 
