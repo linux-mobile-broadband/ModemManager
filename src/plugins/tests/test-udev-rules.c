@@ -216,6 +216,62 @@ test_netprisma (void)
 }
 #endif
 
+#if defined ENABLE_PLUGIN_BROADMOBI
+static void
+test_broadmobi (void)
+{
+    common_test (TESTUDEVRULESDIR_BROADMOBI);
+}
+#endif
+
+#if defined ENABLE_PLUGIN_DLINK
+static void
+test_dlink (void)
+{
+    common_test (TESTUDEVRULESDIR_DLINK);
+}
+#endif
+
+#if defined ENABLE_PLUGIN_FOXCONN
+static void
+test_foxconn (void)
+{
+    common_test (TESTUDEVRULESDIR_FOXCONN);
+}
+#endif
+
+#if defined ENABLE_PLUGIN_PANTECH
+static void
+test_pantech (void)
+{
+    common_test (TESTUDEVRULESDIR_PANTECH);
+}
+#endif
+
+#if defined ENABLE_PLUGIN_SIERRA
+static void
+test_sierra (void)
+{
+    common_test (TESTUDEVRULESDIR_SIERRA);
+}
+#endif
+
+#if defined ENABLE_PLUGIN_TPLINK
+static void
+test_tplink (void)
+{
+    common_test (TESTUDEVRULESDIR_TPLINK);
+}
+#endif
+
+#if defined ENABLE_PLUGIN_UBLOX
+static void
+test_ublox (void)
+{
+    common_test (TESTUDEVRULESDIR_UBLOX);
+}
+#endif
+
 /************************************************************/
 
 int main (int argc, char **argv)
@@ -285,6 +341,27 @@ int main (int argc, char **argv)
 #endif
 #if defined ENABLE_PLUGIN_NETPRISMA
     g_test_add_func ("/MM/test-udev-rules/netprisma", test_netprisma);
+#endif
+#if defined ENABLE_PLUGIN_BROADMOBI
+    g_test_add_func ("/MM/test-udev-rules/broadmobi", test_broadmobi);
+#endif
+#if defined ENABLE_PLUGIN_DLINK
+    g_test_add_func ("/MM/test-udev-rules/dlink", test_dlink);
+#endif
+#if defined ENABLE_PLUGIN_FOXCONN
+    g_test_add_func ("/MM/test-udev-rules/foxconn", test_foxconn);
+#endif
+#if defined ENABLE_PLUGIN_PANTECH
+    g_test_add_func ("/MM/test-udev-rules/pantech", test_pantech);
+#endif
+#if defined ENABLE_PLUGIN_SIERRA
+    g_test_add_func ("/MM/test-udev-rules/sierra", test_sierra);
+#endif
+#if defined ENABLE_PLUGIN_TPLINK
+    g_test_add_func ("/MM/test-udev-rules/tplink", test_tplink);
+#endif
+#if defined ENABLE_PLUGIN_UBLOX
+    g_test_add_func ("/MM/test-udev-rules/ublox", test_ublox);
 #endif
 
     return g_test_run ();

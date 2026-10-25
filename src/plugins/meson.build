@@ -855,6 +855,9 @@ endif
 
 # plugin: pantech
 if plugins_options['pantech']
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_PANTECH="@0@"'.format(plugins_dir / 'pantech')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
+
   sources = files(
     'pantech/mm-broadband-modem-pantech.c',
     'pantech/mm-plugin-pantech.c',
@@ -863,7 +866,7 @@ if plugins_options['pantech']
 
   plugins += {'plugin-pantech': {
     'plugin': true,
-    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': '-DMM_MODULE_NAME="pantech"'},
+    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="pantech"']},
   }}
 
   plugins_udev_rules += files('pantech/77-mm-pantech.rules')
@@ -955,9 +958,12 @@ endif
 
 # plugin: sierra (new QMI or MBIM modems)
 if plugins_options['sierra']
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_SIERRA="@0@"'.format(plugins_dir / 'sierra')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
+
   plugins += {'plugin-sierra': {
     'plugin': true,
-    'module': {'sources': files('sierra/mm-plugin-sierra.c'), 'include_directories': plugins_incs + [xmm_inc], 'c_args': '-DMM_MODULE_NAME="sierra"'},
+    'module': {'sources': files('sierra/mm-plugin-sierra.c'), 'include_directories': plugins_incs + [xmm_inc], 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="sierra"']},
   }}
 
   plugins_udev_rules += files('sierra/77-mm-sierra.rules')
@@ -1037,7 +1043,10 @@ endif
 if plugins_options['ublox']
   ublox_inc = include_directories('ublox')
 
-  common_c_args = '-DMM_MODULE_NAME="u-blox"'
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_UBLOX="@0@"'.format(plugins_dir / 'ublox')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
+
+  common_c_args = test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="u-blox"']
 
   headers = files('ublox/mm-modem-helpers-ublox.h')
 

@@ -56,7 +56,11 @@ typedef struct {
     MMUdevRuleResult  result;
 } MMUdevRule;
 
-GArray *mm_kernel_device_generic_rules_load (const gchar  *rules_dir,
-                                             GError      **error);
+GArray  *mm_kernel_device_generic_rules_load          (const gchar  *rules_dir,
+                                                       GError      **error);
+gboolean mm_kernel_device_generic_rule_load_from_line (MMUdevRule   *rule,
+                                                       const gchar  *line,
+                                                       GError      **error);
+void     mm_kernel_device_generic_rule_clear          (MMUdevRule   *rule);
 
 G_END_DECLS
