@@ -1174,6 +1174,9 @@ mm_base_manager_cleanup (MMBaseManager             *self,
 
     /* Cancel all ongoing auth requests */
     g_cancellable_cancel (self->priv->authp_cancellable);
+    g_clear_object (&self->priv->authp_cancellable);
+    if (!has_cleanup_flag(flags, MM_BASE_MANAGER_CLEANUP_EXIT))
+        self->priv->authp_cancellable = g_cancellable_new ();
 
     disable = has_cleanup_flag (flags, MM_BASE_MANAGER_CLEANUP_DISABLE);
     low_power = has_cleanup_flag (flags, MM_BASE_MANAGER_CLEANUP_LOW_POWER);
