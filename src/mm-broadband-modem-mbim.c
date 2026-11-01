@@ -418,6 +418,17 @@ mm_broadband_modem_mbim_normalize_nw_error (MMBroadbandModemMbim *self,
 
 /*****************************************************************************/
 
+static void
+fixup_rsrp_snr_info (MMBroadbandModemMbim *self,
+                     MbimRsrpSnrInfoArray *rsrp_snr,
+                     guint32               rsrp_snr_count)
+{
+    if (rsrp_snr && rsrp_snr_count && MM_BROADBAND_MODEM_MBIM_GET_CLASS (self)->fixup_rsrp_snr_info)
+        MM_BROADBAND_MODEM_MBIM_GET_CLASS (self)->fixup_rsrp_snr_info (self, rsrp_snr, rsrp_snr_count);
+}
+
+/*****************************************************************************/
+
 gboolean
 mm_broadband_modem_mbim_is_context_type_ext_supported (MMBroadbandModemMbim *self)
 {
@@ -2296,6 +2307,8 @@ signal_state_query_ready (MbimDevice   *device,
     if (error)
         g_task_return_error (task, error);
     else {
+        fixup_rsrp_snr_info (self, rsrp_snr, rsrp_snr_count);
+
         data_class = enabled_cache_best_available_data_class (self);
         if (mm_signal_from_mbim_signal_state (data_class, rssi, error_rate, rsrp_snr, rsrp_snr_count,
                                               self, &cdma, &evdo, &gsm, &umts, &lte, &nr5g))
@@ -4954,6 +4967,8 @@ basic_connect_notification_signal_state (MMBroadbandModemMbim *self,
                                  g_object_ref (self));
         }
     }
+
+    fixup_rsrp_snr_info (self, rsrp_snr, rsrp_snr_count);
 
     quality = mm_signal_quality_from_mbim_signal_state (coded_rssi, rsrp_snr, rsrp_snr_count, self);
     mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
@@ -7621,6 +7636,8 @@ mbimexv2_signal_state_query_ready (MbimDevice   *device,
         g_object_unref (task);
         return;
     }
+
+    fixup_rsrp_snr_info (self, rsrp_snr, rsrp_snr_count);
 
     result = g_slice_new0 (SignalLoadValuesResult);
 
