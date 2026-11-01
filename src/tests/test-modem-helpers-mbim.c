@@ -62,7 +62,7 @@ const SignalStateTestcase signal_tests[] = {
       16, 99,
       { { .system_type = MBIM_DATA_CLASS_NONE }, { .system_type = MBIM_DATA_CLASS_NONE } },
       { { MBIM_DATA_CLASS_5G_SA,
-          -97,
+          -81,
           MM_SIGNAL_UNKNOWN,
           MM_SIGNAL_UNKNOWN,
           MM_SIGNAL_UNKNOWN,
