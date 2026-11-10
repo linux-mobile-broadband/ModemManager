@@ -2260,7 +2260,7 @@ mm_port_qmi_setup_data_format (MMPortQmi                      *self,
     if ((action == MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_SET_DEFAULT) &&
         (((self->priv->kernel_data_modes & MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP) && (self->priv->llp == QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP)) ||
          ((self->priv->kernel_data_modes & MM_PORT_QMI_KERNEL_DATA_MODE_802_3)  && (self->priv->llp == QMI_WDA_LINK_LAYER_PROTOCOL_802_3))) &&
-        !MM_PORT_QMI_DAP_IS_SUPPORTED_QMAP (self->priv->dap)) {
+        (self->priv->dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_DISABLED)) {
         mm_obj_dbg (self, "multiplex support already disabled when setting up data format");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
