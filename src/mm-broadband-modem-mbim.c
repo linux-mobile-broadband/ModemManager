@@ -4209,9 +4209,12 @@ modem_3gpp_load_initial_eps_bearer_settings_finish (MMIfaceModem3gpp  *self,
 static MMBearerProperties *
 common_process_lte_attach_configuration (MMBroadbandModemMbim              *self,
                                          const MbimLteAttachConfiguration  *config,
+                                         const MbimLteAttachConfiguration  *partner,
+                                         const MbimLteAttachConfiguration  *non_partner,
                                          GError                           **error)
 {
     MMBearerProperties  *properties;
+    MbimContextIpType    ip_type;
     MMBearerIpFamily     ip_family = MM_BEARER_IP_FAMILY_NONE;
     MMBearerAllowedAuth  auth;
 
@@ -4223,7 +4226,14 @@ common_process_lte_attach_configuration (MMBroadbandModemMbim              *self
     if (config->password)
         mm_bearer_properties_set_password (properties, config->password);
 
-    ip_family = mm_bearer_ip_family_from_mbim_context_ip_type (config->ip_type);
+    ip_type = config->ip_type;
+    if (MM_BROADBAND_MODEM_MBIM_GET_CLASS (self)->normalize_lte_attach_configuration_ip_type)
+        ip_type = MM_BROADBAND_MODEM_MBIM_GET_CLASS (self)->normalize_lte_attach_configuration_ip_type (self,
+                                                                                                        config,
+                                                                                                        partner,
+                                                                                                        non_partner);
+
+    ip_family = mm_bearer_ip_family_from_mbim_context_ip_type (ip_type);
     if (ip_family != MM_BEARER_IP_FAMILY_NONE)
         mm_bearer_properties_set_ip_type (properties, ip_family);
 
@@ -4313,7 +4323,9 @@ lte_attach_configuration_query_ready (MbimDevice   *device,
     MMBearerProperties                         *properties = NULL;
     guint32                                     n_configurations = 0;
     g_autoptr(MbimLteAttachConfigurationArray)  configurations = NULL;
-    const MbimLteAttachConfiguration           *home;
+    const MbimLteAttachConfiguration           *home = NULL;
+    const MbimLteAttachConfiguration           *partner = NULL;
+    const MbimLteAttachConfiguration           *non_partner = NULL;
 
     self = g_task_get_source_object (task);
 
@@ -4334,8 +4346,8 @@ lte_attach_configuration_query_ready (MbimDevice   *device,
     home = lte_attach_configuration_response_detect_home_settings (self,
                                                                    (const MbimLteAttachConfiguration *const *)configurations,
                                                                    n_configurations,
-                                                                   NULL, /* partner */
-                                                                   NULL, /* non-partner */
+                                                                   &partner,
+                                                                   &non_partner,
                                                                    &error);
     if (!home) {
         g_task_return_error (task, error);
@@ -4343,7 +4355,7 @@ lte_attach_configuration_query_ready (MbimDevice   *device,
         return;
     }
 
-    properties = common_process_lte_attach_configuration (self, home, &error);
+    properties = common_process_lte_attach_configuration (self, home, partner, non_partner, &error);
     if (properties)
         g_task_return_pointer (task, properties, g_object_unref);
     else

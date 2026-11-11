@@ -74,16 +74,21 @@ struct _MMBroadbandModemMbim {
 struct _MMBroadbandModemMbimClass{
     MMBroadbandModemClass parent;
 
-    MMPortMbim * (* peek_port_mbim_for_data)                   (MMBroadbandModemMbim  *self,
-                                                                MMPort                *data,
-                                                                GError               **error);
-    guint32      (* normalize_nw_error)                        (MMBroadbandModemMbim *self,
-                                                                guint32               nw_error);
+    MMPortMbim * (* peek_port_mbim_for_data)                    (MMBroadbandModemMbim             *self,
+                                                                 MMPort                           *data,
+                                                                 GError                          **error);
+    guint32      (* normalize_nw_error)                         (MMBroadbandModemMbim             *self,
+                                                                 guint32                           nw_error);
     MMBroadbandModemMbimSetInitialEpsBearerSettingsFlag
-                 (* load_set_initial_eps_bearer_settings_mask) (MMBroadbandModemMbim *self);
-    void         (* fixup_rsrp_snr_info)                       (MMBroadbandModemMbim *self,
-                                                                MbimRsrpSnrInfoArray *rsrp_snr,
-                                                                guint32               rsrp_snr_count);
+                 (* load_set_initial_eps_bearer_settings_mask)  (MMBroadbandModemMbim             *self);
+    void         (* fixup_rsrp_snr_info)                        (MMBroadbandModemMbim             *self,
+                                                                 MbimRsrpSnrInfoArray             *rsrp_snr,
+                                                                 guint32                           rsrp_snr_count);
+    MbimContextIpType
+                 (* normalize_lte_attach_configuration_ip_type) (MMBroadbandModemMbim             *self,
+                                                                 const MbimLteAttachConfiguration *home,
+                                                                 const MbimLteAttachConfiguration *partner,
+                                                                 const MbimLteAttachConfiguration *non_partner);
 };
 
 GType mm_broadband_modem_mbim_get_type (void);
