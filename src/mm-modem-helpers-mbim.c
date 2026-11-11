@@ -1067,20 +1067,6 @@ mm_sms_state_from_mbim_message_status (MbimSmsStatus status)
 
 /*****************************************************************************/
 
-/* Full 3GPP measurement ranges, same as used for 5G in the QMI modem */
-#define RSRP_QUALITY_MIN -140
-#define RSRP_QUALITY_MAX  -44
-#define SNR_QUALITY_MIN   -23
-#define SNR_QUALITY_MAX    40
-
-static guint
-quality_from_range (gdouble value,
-                    gdouble min,
-                    gdouble max)
-{
-    return (guint) ((CLAMP (value, min, max) - min) * 100 / (max - min));
-}
-
 guint
 mm_signal_quality_from_mbim_signal_state (guint                 rssi,
                                           MbimRsrpSnrInfoArray *rsrp_snr,
@@ -1109,10 +1095,10 @@ mm_signal_quality_from_mbim_signal_state (guint                 rssi,
             info = rsrp_snr[i];
 
             if (mm_signal_rsrp_from_coded_value (info->rsrp, &rsrp, NULL))
-                entry_quality = MIN (entry_quality, quality_from_range (rsrp, RSRP_QUALITY_MIN, RSRP_QUALITY_MAX));
+                entry_quality = MIN (entry_quality, mm_signal_quality_from_range (rsrp, MM_RSRP_QUALITY_MIN, MM_RSRP_QUALITY_MAX));
 
             if (mm_signal_snr_from_coded_value (info->snr, &snr, NULL))
-                entry_quality = MIN (entry_quality, quality_from_range (snr, SNR_QUALITY_MIN, SNR_QUALITY_MAX));
+                entry_quality = MIN (entry_quality, mm_signal_quality_from_range (snr, MM_SNR_QUALITY_MIN, MM_SNR_QUALITY_MAX));
 
             /* neither RSRP nor SNR valid */
             if (entry_quality > 100)

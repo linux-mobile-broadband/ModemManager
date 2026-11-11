@@ -623,6 +623,17 @@ guint mm_sim_validate_mnc_length (const guint8  *bin,
 #define MM_RSSI_TO_QUALITY(rssi)                                   \
     (guint8)(100 - ((CLAMP (rssi, -113, -51) + 51) * 100 / (-113 + 51)))
 
+/* Full 3GPP measurement ranges of RSRP (dBm) and SNR (dB) */
+#define MM_RSRP_QUALITY_MIN -140
+#define MM_RSRP_QUALITY_MAX  -44
+#define MM_SNR_QUALITY_MIN   -23
+#define MM_SNR_QUALITY_MAX    40
+
+/* Limit the value between [min,max] and scale it to a percentage */
+guint mm_signal_quality_from_range (gdouble value,
+                                    gdouble min,
+                                    gdouble max);
+
 /*****************************************************************************/
 
 /* Helper function to decode eid read from esim */

@@ -1383,10 +1383,10 @@ modem_load_supported_ip_families (MMIfaceModem *self,
 
 #define RSSI_MAX -30
 #define RSSI_MIN -125
-#define RSRP_MAX -44
-#define RSRP_MIN -140
-#define SNR_MAX 40
-#define SNR_MIN -23
+#define RSRP_MAX MM_RSRP_QUALITY_MAX
+#define RSRP_MIN MM_RSRP_QUALITY_MIN
+#define SNR_MAX MM_SNR_QUALITY_MAX
+#define SNR_MIN MM_SNR_QUALITY_MIN
 #define RSRQ_MAX 20
 #define RSRQ_MIN -43
 
@@ -1490,19 +1490,19 @@ common_signal_info_get_quality (MMBroadbandModemQmi *self,
     if (nr5g_rsrp <= RSRP_MAX && nr5g_rsrp >= RSRP_MIN) {
         mm_obj_dbg (self, "RSRP (5G): %d dBm", nr5g_rsrp);
         nr5g_signal_quality_min = MIN (nr5g_signal_quality_min,
-                                       (guint8)((nr5g_rsrp - RSRP_MIN) * 100 / (RSRP_MAX - RSRP_MIN)));
+                                       (guint8) mm_signal_quality_from_range (nr5g_rsrp, RSRP_MIN, RSRP_MAX));
     }
 
     if (nr5g_snr <= SNR_MAX && nr5g_snr >= SNR_MIN) {
         mm_obj_dbg (self, "SNR (5G): %d dB", nr5g_snr);
         nr5g_signal_quality_min = MIN (nr5g_signal_quality_min,
-                                       (guint8)((nr5g_snr - SNR_MIN) * 100 / (SNR_MAX - SNR_MIN)));
+                                       (guint8) mm_signal_quality_from_range (nr5g_snr, SNR_MIN, SNR_MAX));
     }
 
     if (nr5g_rsrq <= RSRQ_MAX && nr5g_rsrq >= RSRQ_MIN) {
         mm_obj_dbg (self, "RSRQ (5G): %d dB", nr5g_rsrq);
         nr5g_signal_quality_min = MIN (nr5g_signal_quality_min,
-                                       (guint8)((nr5g_rsrq - RSRQ_MIN) * 100 / (RSRQ_MAX - RSRQ_MIN)));
+                                       (guint8) mm_signal_quality_from_range (nr5g_rsrq, RSRQ_MIN, RSRQ_MAX));
     }
 
     if (rssi_max < 0 && rssi_max > -125) {

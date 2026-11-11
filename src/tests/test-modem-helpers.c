@@ -4224,6 +4224,27 @@ test_cesq_response (void)
 }
 
 static void
+test_signal_quality_from_range (void)
+{
+    /* The ends of the range, the middle, and values outside it */
+    g_assert_cmpuint (mm_signal_quality_from_range (-140, MM_RSRP_QUALITY_MIN, MM_RSRP_QUALITY_MAX), ==, 0);
+    g_assert_cmpuint (mm_signal_quality_from_range (-44, MM_RSRP_QUALITY_MIN, MM_RSRP_QUALITY_MAX), ==, 100);
+    g_assert_cmpuint (mm_signal_quality_from_range (-92, MM_RSRP_QUALITY_MIN, MM_RSRP_QUALITY_MAX), ==, 50);
+    g_assert_cmpuint (mm_signal_quality_from_range (-150, MM_RSRP_QUALITY_MIN, MM_RSRP_QUALITY_MAX), ==, 0);
+    g_assert_cmpuint (mm_signal_quality_from_range (-30, MM_RSRP_QUALITY_MIN, MM_RSRP_QUALITY_MAX), ==, 100);
+    g_assert_cmpuint (mm_signal_quality_from_range (-23, MM_SNR_QUALITY_MIN, MM_SNR_QUALITY_MAX), ==, 0);
+    g_assert_cmpuint (mm_signal_quality_from_range (40, MM_SNR_QUALITY_MIN, MM_SNR_QUALITY_MAX), ==, 100);
+    g_assert_cmpuint (mm_signal_quality_from_range (55.5, MM_SNR_QUALITY_MIN, MM_SNR_QUALITY_MAX), ==, 100);
+
+    /* RSRP -106 dBm with SNR 9 dB is 35% (worst of 35 and 50) */
+    g_assert_cmpuint (mm_signal_quality_from_range (-106, MM_RSRP_QUALITY_MIN, MM_RSRP_QUALITY_MAX), ==, 35);
+    g_assert_cmpuint (mm_signal_quality_from_range (9, MM_SNR_QUALITY_MIN, MM_SNR_QUALITY_MAX), ==, 50);
+    /* RSRP -101 dBm with SNR -3 dB is 31% (worst of 40 and 31) */
+    g_assert_cmpuint (mm_signal_quality_from_range (-101, MM_RSRP_QUALITY_MIN, MM_RSRP_QUALITY_MAX), ==, 40);
+    g_assert_cmpuint (mm_signal_quality_from_range (-3, MM_SNR_QUALITY_MIN, MM_SNR_QUALITY_MAX), ==, 31);
+}
+
+static void
 test_cesq_response_to_signal (void)
 {
     guint i;
@@ -5517,6 +5538,7 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_csim_response, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cesq_response, NULL));
+    g_test_suite_add (suite, TESTCASE (test_signal_quality_from_range, NULL));
     g_test_suite_add (suite, TESTCASE (test_cesq_response_to_signal, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_clip_indication, NULL));
