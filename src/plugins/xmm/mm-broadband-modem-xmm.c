@@ -32,6 +32,7 @@ static void shared_xmm_init           (MMSharedXmmInterface          *iface);
 static void iface_modem_signal_init   (MMIfaceModemSignalInterface   *iface);
 static void iface_modem_location_init (MMIfaceModemLocationInterface *iface);
 
+static MMIfaceModemInterface         *iface_modem_parent;
 static MMIfaceModemLocationInterface *iface_modem_location_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemXmm, mm_broadband_modem_xmm, MM_TYPE_BROADBAND_MODEM, 0,
@@ -71,6 +72,11 @@ mm_broadband_modem_xmm_init (MMBroadbandModemXmm *self)
 static void
 iface_modem_init (MMIfaceModemInterface *iface)
 {
+    iface_modem_parent = g_type_interface_peek_parent (iface);
+
+    iface->load_signal_quality         = mm_shared_xmm_load_signal_quality;
+    iface->load_signal_quality_finish  = mm_shared_xmm_load_signal_quality_finish;
+
     iface->load_supported_modes        = mm_shared_xmm_load_supported_modes;
     iface->load_supported_modes_finish = mm_shared_xmm_load_supported_modes_finish;
     iface->load_current_modes          = mm_shared_xmm_load_current_modes;
@@ -136,11 +142,18 @@ iface_modem_signal_init (MMIfaceModemSignalInterface *iface)
     iface->load_values_finish   = mm_shared_xmm_signal_load_values_finish;
 }
 
+static MMIfaceModemInterface *
+peek_parent_modem_interface (MMSharedXmm *self)
+{
+    return iface_modem_parent;
+}
+
 static void
 shared_xmm_init (MMSharedXmmInterface *iface)
 {
     iface->peek_parent_broadband_modem_class = peek_parent_broadband_modem_class;
     iface->peek_parent_location_interface    = peek_parent_location_interface;
+    iface->peek_parent_modem_interface       = peek_parent_modem_interface;
 }
 
 static void

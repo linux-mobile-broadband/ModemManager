@@ -39,6 +39,10 @@ struct _MMSharedXmmInterface {
     /* Peek location interface of the parent class of the object */
     MMIfaceModemLocationInterface *  (* peek_parent_location_interface) (MMSharedXmm *self);
 
+    /* Peek modem interface of the parent class of the object (optional, needed
+     * by mm_shared_xmm_load_signal_quality()) */
+    MMIfaceModemInterface *  (* peek_parent_modem_interface) (MMSharedXmm *self);
+
     void (* nmea_parser_register) (MMSharedXmm *self, MMPortSerialAt *gps_port,
                                    gboolean is_register);
 };
@@ -104,6 +108,12 @@ void              mm_shared_xmm_load_power_state        (MMIfaceModem         *s
 MMModemPowerState mm_shared_xmm_load_power_state_finish (MMIfaceModem         *self,
                                                          GAsyncResult         *res,
                                                          GError              **error);
+void              mm_shared_xmm_load_signal_quality     (MMIfaceModem         *self,
+                                                         GAsyncReadyCallback   callback,
+                                                         gpointer              user_data);
+guint             mm_shared_xmm_load_signal_quality_finish (MMIfaceModem      *self,
+                                                            GAsyncResult      *res,
+                                                            GError           **error);
 void              mm_shared_xmm_power_up                (MMIfaceModem         *self,
                                                          GAsyncReadyCallback   callback,
                                                          gpointer              user_data);

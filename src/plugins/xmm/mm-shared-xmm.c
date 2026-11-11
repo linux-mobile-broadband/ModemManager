@@ -55,9 +55,10 @@ typedef struct {
     GRegex *xbipi_regex;
 
     /* Modem interface support */
-    GArray      *supported_modes;
-    GArray      *supported_bands;
-    MMModemMode  allowed_modes;
+    MMIfaceModemInterface *iface_modem_parent;
+    GArray                *supported_modes;
+    GArray                *supported_bands;
+    MMModemMode            allowed_modes;
 
     /* Location interface support */
     MMIfaceModemLocationInterface *iface_modem_location_parent;
@@ -120,6 +121,10 @@ get_private (MMSharedXmm *self)
         /* Setup parent class' MMIfaceModemLocation */
         g_assert (MM_SHARED_XMM_GET_IFACE (self)->peek_parent_location_interface);
         priv->iface_modem_location_parent = MM_SHARED_XMM_GET_IFACE (self)->peek_parent_location_interface (self);
+
+        /* Setup parent class' MMIfaceModem, optional */
+        if (MM_SHARED_XMM_GET_IFACE (self)->peek_parent_modem_interface)
+            priv->iface_modem_parent = MM_SHARED_XMM_GET_IFACE (self)->peek_parent_modem_interface (self);
 
         g_object_set_qdata_full (G_OBJECT (self), private_quark, priv, (GDestroyNotify)private_free);
     }
@@ -637,6 +642,123 @@ mm_shared_xmm_load_power_state (MMIfaceModem        *self,
                               FALSE,
                               callback,
                               user_data);
+}
+
+/*****************************************************************************/
+/* Signal quality loading (Modem interface) */
+
+/* Full 3GPP measurement ranges, as used by the MBIM and QMI modems */
+#define RSRP_QUALITY_MIN -140
+#define RSRP_QUALITY_MAX  -44
+#define SNR_QUALITY_MIN   -23
+#define SNR_QUALITY_MAX    40
+
+static guint
+quality_from_range (gdouble value,
+                    gdouble min,
+                    gdouble max)
+{
+    return (guint) ((CLAMP (value, min, max) - min) * 100 / (max - min));
+}
+
+guint
+mm_shared_xmm_load_signal_quality_finish (MMIfaceModem  *self,
+                                          GAsyncResult  *res,
+                                          GError       **error)
+{
+    gssize value;
+
+    value = g_task_propagate_int (G_TASK (res), error);
+    return value < 0 ? 0 : value;
+}
+
+static void
+parent_load_signal_quality_ready (MMIfaceModem *self,
+                                  GAsyncResult *res,
+                                  GTask        *task)
+{
+    Private *priv;
+    GError  *error = NULL;
+    guint    quality;
+
+    priv = get_private (MM_SHARED_XMM (self));
+
+    quality = priv->iface_modem_parent->load_signal_quality_finish (self, res, &error);
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_int (task, quality);
+    g_object_unref (task);
+}
+
+static void
+xcesq_signal_quality_ready (MMBaseModem  *self,
+                            GAsyncResult *res,
+                            GTask        *task)
+{
+    Private             *priv;
+    const gchar         *response;
+    g_autoptr(MMSignal)  gsm = NULL;
+    g_autoptr(MMSignal)  umts = NULL;
+    g_autoptr(MMSignal)  lte = NULL;
+    gdouble              rsrp;
+    gdouble              snr;
+    guint                quality = 101;
+
+    priv = get_private (MM_SHARED_XMM (self));
+
+    /* The +CSQ value of these modems is the LTE RSRP put on the GSM RSSI scale,
+     * so a usable LTE signal shows as a very low quality, e.g. -100 dBm as 22%.
+     * Like the MBIM and QMI modems, use RSRP and SNR over their full 3GPP
+     * ranges and take the worse of both. */
+    response = mm_base_modem_at_command_finish (self, res, NULL);
+    if (response &&
+        mm_xmm_xcesq_response_to_signal_info (response, self, &gsm, &umts, &lte, NULL) &&
+        lte) {
+        rsrp = mm_signal_get_rsrp (lte);
+        if (rsrp != MM_SIGNAL_UNKNOWN)
+            quality = MIN (quality, quality_from_range (rsrp, RSRP_QUALITY_MIN, RSRP_QUALITY_MAX));
+
+        snr = mm_signal_get_snr (lte);
+        if (snr != MM_SIGNAL_UNKNOWN)
+            quality = MIN (quality, quality_from_range (snr, SNR_QUALITY_MIN, SNR_QUALITY_MAX));
+
+        if (quality <= 100) {
+            mm_obj_dbg (self, "signal quality from LTE RSRP/SNR: %u%%", quality);
+            g_task_return_int (task, quality);
+            g_object_unref (task);
+            return;
+        }
+    }
+
+    /* No LTE values (other access technology, or +XCESQ failed): use the
+     * parent's +CSQ based quality */
+    priv->iface_modem_parent->load_signal_quality (MM_IFACE_MODEM (self),
+                                                   (GAsyncReadyCallback)parent_load_signal_quality_ready,
+                                                   task);
+}
+
+void
+mm_shared_xmm_load_signal_quality (MMIfaceModem        *self,
+                                   GAsyncReadyCallback  callback,
+                                   gpointer             user_data)
+{
+    Private *priv;
+    GTask   *task;
+
+    priv = get_private (MM_SHARED_XMM (self));
+    g_assert (priv->iface_modem_parent);
+    g_assert (priv->iface_modem_parent->load_signal_quality);
+    g_assert (priv->iface_modem_parent->load_signal_quality_finish);
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+XCESQ?",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)xcesq_signal_quality_ready,
+                              task);
 }
 
 /*****************************************************************************/
