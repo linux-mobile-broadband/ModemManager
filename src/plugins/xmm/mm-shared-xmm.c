@@ -647,20 +647,6 @@ mm_shared_xmm_load_power_state (MMIfaceModem        *self,
 /*****************************************************************************/
 /* Signal quality loading (Modem interface) */
 
-/* Full 3GPP measurement ranges, as used by the MBIM and QMI modems */
-#define RSRP_QUALITY_MIN -140
-#define RSRP_QUALITY_MAX  -44
-#define SNR_QUALITY_MIN   -23
-#define SNR_QUALITY_MAX    40
-
-static guint
-quality_from_range (gdouble value,
-                    gdouble min,
-                    gdouble max)
-{
-    return (guint) ((CLAMP (value, min, max) - min) * 100 / (max - min));
-}
-
 guint
 mm_shared_xmm_load_signal_quality_finish (MMIfaceModem  *self,
                                           GAsyncResult  *res,
@@ -717,11 +703,11 @@ xcesq_signal_quality_ready (MMBaseModem  *self,
         lte) {
         rsrp = mm_signal_get_rsrp (lte);
         if (rsrp != MM_SIGNAL_UNKNOWN)
-            quality = MIN (quality, quality_from_range (rsrp, RSRP_QUALITY_MIN, RSRP_QUALITY_MAX));
+            quality = MIN (quality, mm_signal_quality_from_range (rsrp, MM_RSRP_QUALITY_MIN, MM_RSRP_QUALITY_MAX));
 
         snr = mm_signal_get_snr (lte);
         if (snr != MM_SIGNAL_UNKNOWN)
-            quality = MIN (quality, quality_from_range (snr, SNR_QUALITY_MIN, SNR_QUALITY_MAX));
+            quality = MIN (quality, mm_signal_quality_from_range (snr, MM_SNR_QUALITY_MIN, MM_SNR_QUALITY_MAX));
 
         if (quality <= 100) {
             mm_obj_dbg (self, "signal quality from LTE RSRP/SNR: %u%%", quality);

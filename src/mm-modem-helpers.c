@@ -5809,6 +5809,18 @@ mm_sim_validate_mnc_length (const guint8  *bin,
 
 #define EID_BYTE_LENGTH 16
 
+/*****************************************************************************/
+
+guint
+mm_signal_quality_from_range (gdouble value,
+                              gdouble min,
+                              gdouble max)
+{
+    return (guint) ((CLAMP (value, min, max) - min) * 100 / (max - min));
+}
+
+/*****************************************************************************/
+
 gchar *
 mm_decode_eid (const gchar *eid, gsize eid_len)
 {
