@@ -526,12 +526,16 @@ net_attach_command (GTask *task)
 
     body = pack_uta_ms_net_attach_req ();
 
+    /* The modem answers the attach only once it has finished registering in
+     * the network, which can be several seconds after it reported the
+     * registration (7 s seen on one boot). A shorter timeout tears the whole
+     * connection down and starts it again. */
     mm_broadband_modem_xmm7360_rpc_command_full (modem,
                                                  ctx->port,
                                                  XMM7360_RPC_CALL_UTA_MS_NET_ATTACH_REQ,
                                                  TRUE,
                                                  body,
-                                                 3,
+                                                 20,
                                                  FALSE,
                                                  NULL,  /* cancellable */
                                                  (GAsyncReadyCallback)net_attach_command_ready,
