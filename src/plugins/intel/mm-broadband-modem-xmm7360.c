@@ -56,6 +56,9 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemXmm7360, mm_broadband_modem_xmm7360, MM_
 struct _MMBroadbandModemXmm7360Private {
     MMUnlockRetries *unlock_retries;
     GRegex *nmea_regex_full, *nmea_regex_trace;
+    /* The modem sends SIM_INIT_IND only once after it is set up, not on every
+     * power-up, so a later power-up must not wait for it again. */
+    gboolean sim_initialized;
 };
 
 /*****************************************************************************/
@@ -863,13 +866,16 @@ power_up_unsol_handler (MMPortSerialXmmrpcXmm7360 *port,
                         Xmm7360RpcResponse *response,
                         GTask *task)
 {
+    MMBroadbandModemXmm7360 *self;
     PowerUpContext *ctx;
     Xmm7360RpcMsgArg *arg;
     gint32 value;
 
     ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
 
     if (response->unsol_id == XMM7360_RPC_UNSOL_UTA_MS_SIM_INIT_IND_CB) {
+        self->priv->sim_initialized = TRUE;
         ctx->is_sim_initialized = TRUE;
     } else if (response->unsol_id == XMM7360_RPC_UNSOL_UTA_MODE_SET_RSP_CB) {
         if (!ctx->awaiting_uta_mode_set_rsp_cb) {
@@ -927,7 +933,7 @@ modem_power_up (MMIfaceModem        *iface,
     ctx->port = mm_broadband_modem_xmm7360_get_port_xmmrpc (self);
     ctx->is_fcc_unlocked = FALSE;
     ctx->is_uta_mode_set = FALSE;
-    ctx->is_sim_initialized = FALSE;
+    ctx->is_sim_initialized = self->priv->sim_initialized;
     ctx->awaiting_uta_mode_set_rsp_cb = FALSE;
     ctx->timeout_id = 0;
     g_task_set_task_data (task, ctx, (GDestroyNotify)power_up_context_free);
@@ -1083,14 +1089,17 @@ init_unsol_handler (MMPortSerialXmmrpcXmm7360 *port,
                     Xmm7360RpcResponse *response,
                     GTask *task)
 {
+    MMBroadbandModemXmm7360 *self;
     InitializationStartedContext *ctx;
 
     ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
 
     if (response->unsol_id != XMM7360_RPC_UNSOL_UTA_MS_SIM_INIT_IND_CB) {
         return FALSE;
     }
 
+    self->priv->sim_initialized = TRUE;
     ctx->is_sim_initialized = TRUE;
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
