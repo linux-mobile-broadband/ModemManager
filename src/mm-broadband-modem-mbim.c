@@ -7365,8 +7365,8 @@ parent_scan_networks_ready (MMIfaceModem3gpp *self,
 {
     GError *error = NULL;
     GList  *scan_result;
-    scan_result = iface_modem_3gpp_parent->scan_networks_finish (self, res, &error);
 
+    scan_result = iface_modem_3gpp_parent->scan_networks_finish (self, res, &error);
     if (!scan_result)
         g_task_return_error (task, error);
     else
@@ -7375,6 +7375,26 @@ parent_scan_networks_ready (MMIfaceModem3gpp *self,
                                (GDestroyNotify)mm_3gpp_network_info_list_free);
     g_object_unref (task);
 }
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+static void
+shared_qmi_3gpp_scan_networks_ready (MMIfaceModem3gpp *self,
+                                     GAsyncResult     *res,
+                                     GTask            *task)
+{
+    GList  *scan_result;
+    GError *error = NULL;
+
+    scan_result = mm_shared_qmi_3gpp_scan_networks_finish (self, res, &error);
+    if (!scan_result)
+        g_task_return_error (task, error);
+    else
+        g_task_return_pointer (task,
+                               scan_result,
+                               (GDestroyNotify)mm_3gpp_network_info_list_free);
+    g_object_unref (task);
+}
+#endif
 
 static void
 modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
@@ -7389,8 +7409,20 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
     task = g_task_new (self, NULL, callback, user_data);
 
     /* The MBIM scan results lack proper access technology information.
-     * So try the AT interface first to get more detailed information.
+     * So try QMI or AT interfaces first to get more detailed information.
      */
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    if (mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
+                                   QMI_SERVICE_NAS,
+                                   MM_PORT_QMI_FLAG_DEFAULT,
+                                   NULL)) {
+        mm_shared_qmi_3gpp_scan_networks (self,
+                                          (GAsyncReadyCallback)shared_qmi_3gpp_scan_networks_ready,
+                                          task);
+        return;
+    }
+#endif
+
     primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
     if (primary) {
         mm_obj_dbg (self, "scanning for networks via AT...");
