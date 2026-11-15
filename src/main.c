@@ -277,7 +277,8 @@ main (int argc, char *argv[])
                                           inner);
 
         mm_base_manager_cleanup (manager,
-                                 MM_BASE_MANAGER_CLEANUP_DISABLE | MM_BASE_MANAGER_CLEANUP_REMOVE,
+                                 MM_BASE_MANAGER_CLEANUP_DISABLE | MM_BASE_MANAGER_CLEANUP_REMOVE |
+                                 MM_BASE_MANAGER_CLEANUP_EXIT,
                                  ctx);
 
         /* Wait for all modems to be disabled and removed, but don't wait
