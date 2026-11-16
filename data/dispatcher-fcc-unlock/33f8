@@ -1,0 +1,213 @@
+#!/bin/sh
+
+# SPDX-License-Identifier: CC0-1.0
+# 2023 Thilo-Alexander Ginkel <thilo@ginkel.com>
+# 2025 Jongmin Kim <jmkim@debian.org>
+# 2026 Wayne Hendricks <twh@waynehendricks.com>
+#
+# Lenovo-shipped Rolling RW101R-GL FCC unlock
+#  RW101R-GL, 33f8:01a4
+#  RW101R-GL, 33f8:01a8
+#  RW101R-GL, 33f8:01a9
+#  RW101R-GL, 33f8:0301
+#  RW101R-GL, 33f8:0302
+#
+# Lenovo's libmodemauthRW101.so.1.1 maps the Rolling usb pids to device type 3
+# in its modules table (01a8, 01a9, 0301, 0302 -> 3; 01a4 is not in that table,
+# but Lenovo's own fcc-unlock.d ships an entry for it), and init_modemauth_srvc
+# dispatches type 3 to fcc_at_modem_unlock_101r on /dev/cdc-wdm0, which runs
+# event_monitor_at_101r. One sequence therefore serves all of them; only which
+# port answers differs, hence the fallback in the port loop.
+#
+# Transcribed from event_monitor_at_101r, which is what the vendor's own unlock
+# program runs for this module:
+#
+#   ate0                      send_at_of_mm
+#   at+gtfcclockgen           obtain the challenge
+#   at+gtfcclockver=0x<hex>   answer it, sent as a hex string
+#   at+cfun=1                 send_at_of_mm
+#   AT+GTFCCEFFSTATUS?        strtoul base 16 of the reply, non-zero = unlocked
+#
+# None of those is best effort in the vendor library: every failure branch LOGEs
+# and then ends in exit(1). There is no at+gtfcclockmodeunlock on this path and
+# no at+gtfcclockstate, and the at+gtfcclockver reply is never inspected; the
+# status read is what decides. This script departs in one place, deliberately:
+#
+#   at+cfun=1 is not sent. ModemManager sets the power state itself once this
+#   dispatcher returns 0.
+#
+# The response is sha256 truncated to 8 hex digits over the challenge and the
+# vendor id hash. That hash is sha256 of the machine's "model id in bios", the
+# first OEM string in SMBIOS type 133, so it is derived here the way 14c3
+# derives it rather than carried as a constant.
+#
+# Nothing is byte swapped here. libmodemauthRW101 carries one hash function per
+# device: compute_sha256 (device type 2) and compute_sha256_350 (type 1) place
+# the challenge bytes before hashing, while compute_sha256_101r, which
+# event_monitor_at_101r calls, works on hex strings throughout. It runs
+# StrSHA256 over the model id, appends its first 8 hex characters to the
+# challenge's 8, converts those 16 characters back to 8 bytes, runs StrSHA256
+# over those, and returns the first 8 hex characters as text, which the caller
+# sends as at+gtfcclockver=0x<hex>.
+#
+# Where the serial AT port is used, the option driver must have bound to the
+# device. Linux 6.18 added 33f8:01a8, 01a9, 0301 and 0302 to that driver's id
+# table (commit 523bf0a59e67, also in the stable backports); only 33f8:01a4 is
+# older. On an earlier kernel no /dev/ttyUSB is created and this script exits 2.
+#
+# On such a kernel the id can be bound for the current boot with:
+#
+#   modprobe option
+#   echo 33f8 0301 > /sys/bus/usb-serial/drivers/option1/new_id
+#
+# or persistently, with a udev rule, one line per id:
+#
+#   ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="33f8", ATTR{idProduct}=="0301", \
+#     RUN+="/bin/sh -c '/sbin/modprobe option; echo 33f8 0301 > /sys/bus/usb-serial/drivers/option1/new_id'"
+#
+# The modprobe belongs inside the rule because /sys/bus/usb-serial/drivers/option1/
+# does not exist until the module is loaded. Neither usbserial nor usb_wwan needs
+# loading separately: option selects USB_SERIAL_WWAN and links its symbols.
+
+[ "$FCC_UNLOCK_DEBUG_LOG" = '1' ] && {
+    exec 3>&1 4>&2
+    trap 'exec 2>&4 1>&3' 0 1 2 3
+    exec 1>>'/var/log/mm-rw101-fcc.log' 2>&1
+}
+
+# require program name and at least 2 arguments
+[ $# -lt 2 ] && exit 1
+
+# first argument is DBus path, not needed here
+shift
+
+# second and next arguments are control port names
+# prefer the serial AT port: on 33f8:0301 the wwan AT service answers
+# at+gtfcclockgen with ERROR while the serial port returns a valid challenge
+for PORT in "$@"; do
+  echo "$PORT" | grep -q '^ttyUSB' && {
+    AT_PORT="$PORT"
+    break
+  }
+done
+
+# otherwise fall back to a wwan AT port
+[ -n "$AT_PORT" ] || for PORT in "$@"; do
+  grep -q AT "/sys/class/wwan/$PORT/type" 2>/dev/null ||
+  echo "$PORT" | grep -qi AT && {
+    AT_PORT="$PORT"
+    break
+  }
+done
+
+# fail if no serial AT port exposed
+[ -n "$AT_PORT" ] || exit 2
+
+DEVICE="/dev/$AT_PORT"
+
+at_command() {
+    exec 9<>"$DEVICE"
+    printf "%s\r" "$1" >&9
+    read answer <&9
+    read answer <&9
+    echo "$answer"
+    exec 9>&-
+}
+
+log() {
+    echo "$1"
+}
+
+error() {
+    echo "$1" >&2
+}
+
+# First string of SMBIOS type 133, the "model id in bios" the modem hashes.
+# Read from DMI sysfs rather than dmidecode, to avoid executing another binary.
+# Hex string to raw bytes. xxd would do this, but it comes from vim on most
+# distributions and is not a dependency of ModemManager, and when it is missing
+# the hash is computed over an empty input, which looks exactly like a wrong
+# vendor ID hash. printf understands \0ooo octal escapes in POSIX, so no
+# external tool is needed.
+hex_to_bin() {
+    _h="$1"
+    while [ -n "$_h" ]; do
+        _b="${_h%"${_h#??}"}"
+        _h="${_h#??}"
+        printf '%b' "\\0$(printf '%o' "$((0x$_b))")"
+    done
+}
+
+dmi_oem_string() {
+    entry='/sys/firmware/dmi/entries/133-0'
+    len="$(cat "$entry/length" 2>/dev/null)" || return 1
+    [ -n "$len" ] || return 1
+    tail -c "+$((len + 1))" "$entry/raw" 2>/dev/null | tr '\000' '\n' | head -n 1
+}
+
+# Vendor id hash for firmware that does not publish the model id in SMBIOS.
+# 3df8c719 is SHA-256("KHOIHGIUCCHHII"), which Lenovo firmware does publish and
+# which Lenovo uses for every module it ships.
+#
+# No Dell value is listed. Dell keys the id to the WWAN card rather than the
+# machine and names it after the card: libmodemauth pairs 8086:7560 with Dell
+# subsystem 1028:5823 (DW5823EFCCLOCK) and 14c3:4d75 with 1028:5931
+# (DW5931EFCCLOCK). Neither can apply to a Rolling module, and no Dell id for
+# one is known.
+KNOWN_VENDOR_ID_HASHES='3df8c719'
+
+VENDOR_ID_HASHES=''
+DEVCODE="$(dmi_oem_string)"
+if [ -n "$DEVCODE" ]; then
+    VENDOR_ID_HASHES="$(printf '%s' "$DEVCODE" | sha256sum | cut -c '1-8')"
+    log "Derived vendor ID hash $VENDOR_ID_HASHES from SMBIOS type 133"
+else
+    log "No OEM string in SMBIOS type 133, falling back to known vendor ID hashes"
+fi
+
+for KNOWN_VENDOR_ID_HASH in $KNOWN_VENDOR_ID_HASHES; do
+    case " $VENDOR_ID_HASHES " in
+        *" $KNOWN_VENDOR_ID_HASH "*) ;;
+        *) VENDOR_ID_HASHES="$VENDOR_ID_HASHES $KNOWN_VENDOR_ID_HASH" ;;
+    esac
+done
+
+at_command 'ate0' >/dev/null
+
+i=1
+for VENDOR_ID_HASH in $VENDOR_ID_HASHES; do
+    while [ "$i" -le 9 ]; do
+        log "Requesting challenge from WWAN modem (attempt #$i, hash $VENDOR_ID_HASH)"
+        RAW_CHALLENGE="$(at_command 'at+gtfcclockgen')"
+        CHALLENGE="$(echo "$RAW_CHALLENGE" | grep -o '0x[0-9a-fA-F]\+' | awk '{print $1}')"
+
+        [ -n "$CHALLENGE" ] && {
+            log "Got challenge from modem: $CHALLENGE"
+            HEX_CHALLENGE="$(printf '%08x' "$CHALLENGE")"
+            COMBINED_CHALLENGE="$HEX_CHALLENGE$(printf '%.8s' "$VENDOR_ID_HASH")"
+            RESPONSE_HASH="$(hex_to_bin "$COMBINED_CHALLENGE" | sha256sum | cut -d ' ' -f 1)"
+            RESPONSE="$(printf '%.8s' "$RESPONSE_HASH")"
+
+            log "Sending response to WWAN modem: 0x$RESPONSE"
+            at_command "at+gtfcclockver=0x$RESPONSE" >/dev/null
+
+            # The vendor ignores the gtfcclockver reply and reads the effective
+            # status instead, requiring a non-zero value.
+            STATUS="$(at_command 'AT+GTFCCEFFSTATUS?')"
+            VALUE="$(echo "$STATUS" | tr -d '\r' | sed 's/.*[:=] *//')"
+            case "$VALUE" in
+                ''|0|00|0x0)
+                    error "FCC unlock failed. Status: $STATUS"
+                    break ;;
+                *)
+                    log "FCC unlock succeeded. Status: $STATUS"
+                    exit 0 ;;
+            esac
+        } || error "Failed to obtain FCC challenge. Got: $RAW_CHALLENGE"
+
+        sleep 0.5
+        i="$((i + 1))"
+    done
+done
+
+exit 2
