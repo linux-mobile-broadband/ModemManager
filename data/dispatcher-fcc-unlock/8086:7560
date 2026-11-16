@@ -1,0 +1,311 @@
+#!/bin/bash
+
+# SPDX-License-Identifier: CC0-1.0
+# 2024 Stoica Floris <floris@nusunt.eu>
+# 2026 Andreas Haerter <ah@foundata.com>
+# 2026 Wayne Hendricks <twh@waynehendricks.com>
+#
+# Intel L860R+ (8086:7560) FCC unlock
+#
+# Lenovo and Dell both ship this module. Linux binds it through
+# drivers/net/wwan/iosm, whose id table carries { PCI_DEVICE(0x8086, 0x7560) }
+# with no subsystem match, so both land on this one file, and iosm exposes AT
+# and MBIM control ports for it on either. The two OEMs unlock it differently:
+#
+#   Lenovo   AT +GTFCCLOCK commands    SMBIOS type 133, 3df8c719, bb23be7f
+#   Dell     Intel FCC Lock over MBIM  bb23be7f
+#
+# The Lenovo method first hashes the "model id in bios", the first string of
+# SMBIOS type 133, which chapter 17.4 of Fibocom's FM350 AT command manual gives
+# as KHOIHGIUCCHHII. Firmware that publishes no string falls through to known
+# values. 3df8c719 is SHA-256("KHOIHGIUCCHHII"), the model id Lenovo's
+# libmodemauth.so hashes on Lenovo machines. bb23be7f is
+# SHA-256("DW5823EFCCLOCK"), the model id Dell's ModemAuthenticator.exe hashes
+# for its DW5823e. ThinkPad owners have also reported this module unlocking with
+# bb23be7f over AT, in
+# https://gitlab.freedesktop.org/mobile-broadband/ModemManager/-/issues/751
+# and https://gitlab.freedesktop.org/mobile-broadband/ModemManager/-/merge_requests/1141,
+# so it is tried last.
+#
+# The OEM is read from the DMI system vendor, the string Lenovo's
+# libmodemauth.so searches for "Dell" and "Lenovo" in init_modemauth_srvc. When
+# it is neither, each method is tried in turn, Lenovo first. Another OEM's
+# sequence goes in as one more unlock_* function and one more case below.
+#
+# Lenovo, from libmodemauth.so. init_modemauth_srvc finds PCI device 0x7560,
+# sets wireless_module 2 and calls fcc_at_modem_unlock on the AT port, which
+# starts event_monitor_at:
+#
+#   at+gtfcclockgen             the reply is the challenge, in hex
+#   sha256(challenge, id)       the challenge little endian, then the id hash
+#   at+gtfcclockver=N           N is the digest's first 4 bytes little endian,
+#                               in decimal; the reply is 1 when accepted, and
+#                               anything else restarts at at+gtfcclockgen
+#   at+gtfcclockmodeunlock      must answer OK
+#   at+gtfcclockstate
+#
+# Both swaps are Lenovo's: compute_sha256, which it uses for this module, stores
+# the challenge and the response little endian. Lenovo also sends at+cfun=1
+# before reading the state; ModemManager powers the radio up itself once this
+# script returns.
+#
+# Dell, from DoFccUnlock in Dell's ModemAuthenticator.exe, from the DW5823e
+# package whose Ude.inf binds PCI\VEN_8086&DEV_7560. It sends CID 1 of the Intel
+# Mutual Authentication service through the Windows command session:
+#
+#   query, empty payload        unlock only if byte 0 of the reply is nonzero
+#                               and byte 4 is 0, or if the query fails
+#   set, ResponsePresent = 0    reply bytes 4 to 7 are the challenge
+#   sha256(challenge, id)       those 4 bytes as sent, then the id hash
+#   set, ResponsePresent = 1    Response = first 4 bytes of that digest
+#   unlocked when byte 0 of the reply to the second set is 0
+#
+# Dell copies every byte ascending. Bytes 0 and 4 are the ChallengePresent and
+# Challenge u32 fields mbimcli prints as numbers, while the modem hashes their
+# little endian bytes, so the swaps exist only at that boundary. mbimcli accepts
+# only decimal for the response.
+
+if [[ "$FCC_UNLOCK_DEBUG_LOG" == '1' ]]; then
+    exec 3>&1 4>&2
+    trap 'exec 2>&4 1>&3' 0 1 2 3
+    exec 1>>/var/log/mm-l860r-fcc.log 2>&1
+fi
+
+# require program name and at least 2 arguments
+[ $# -lt 2 ] && exit 1
+
+# first argument is DBus path, not needed here
+shift
+
+# second and next arguments are control port names
+for PORT in "$@"; do
+  # match port type in Linux 5.14 and newer, port name in Linux 5.13
+  TYPE="$(cat "/sys/class/wwan/$PORT/type" 2>/dev/null || echo "$PORT")"
+  case "$TYPE" in
+    MBIM|*mbim*) [ -n "$MBIM_PORT" ] || MBIM_PORT=$PORT ;;
+    AT|*at[0-9]*) [ -n "$AT_PORT" ] || AT_PORT=$PORT ;;
+  esac
+done
+
+# fail if no usable port exposed
+[ -n "$AT_PORT" ] || [ -n "$MBIM_PORT" ] || exit 2
+
+log() {
+    echo "$1"
+}
+
+error() {
+    echo "$1" >&2
+}
+
+# The timeout lets a silent AT port fall through to the next method within the
+# 5 seconds ModemManager allows this script.
+at_command() {
+    exec 99<>"$DEVICE"
+    printf '%s\r' "$1" >&99
+    read -r -t 2 answer <&99 && read -r -t 2 answer <&99 || answer=''
+    echo "$answer"
+    exec 99>&-
+}
+
+mbim_command() {
+    mbimcli --device-open-proxy --device="$DEVICE" "$1" 2>&1
+}
+
+# Hex string to raw bytes. xxd would do this, but it comes from vim on most
+# distributions and is not a dependency of ModemManager, and when it is missing
+# the hash is computed over an empty input, which looks exactly like a wrong
+# vendor ID hash. printf understands \0ooo octal escapes in POSIX, so no
+# external tool is needed.
+hex_to_bin() {
+    _h="$1"
+    while [ -n "$_h" ]; do
+        _b="${_h%"${_h#??}"}"
+        _h="${_h#??}"
+        printf '%b' "\\0$(printf '%o' "$((0x$_b))")"
+    done
+}
+
+reverseWithLittleEndian() {
+    num="$1"
+    printf "%08x" $(("0x${num:6:2}${num:4:2}${num:2:2}${num:0:2}"))
+}
+
+challenge_of() {
+    echo "$1" | sed -n 's/.*Challenge: *\([0-9][0-9]*\).*/\1/p'
+}
+
+# The "model id in bios" the modem hashes: a 14 character string in the string
+# table of an SMBIOS type 133 record. Read from DMI sysfs rather than dmidecode,
+# to avoid executing another binary.
+#
+# A machine can carry more than one type 133 record, and only one of them holds
+# the model id. HP's own firmware tool distinguishes them by formatted length:
+# SMBIOS::ProcFCCType in WWANFirmwareFlash.dll matches type 0x85 with length 5
+# and copies 14 bytes out of its string table, while
+# SMBIOS::ProcWWANConfigIDType matches type 0x85 with length 0x2c, a structured
+# record of GUID, WwanModelId and product id that carries no model id string.
+# Dell machines have been reported with the 44 byte record alone. So walk every
+# entry rather than assuming 133-0, and take the first 14 character string.
+dmi_oem_string() {
+    for entry in /sys/firmware/dmi/entries/133-*; do
+        [ -d "$entry" ] || continue
+        len="$(cat "$entry/length" 2>/dev/null)" || continue
+        [ -n "$len" ] || continue
+        s="$(tail -c "+$((len + 1))" "$entry/raw" 2>/dev/null | tr '\000' '\n' | head -n 1)"
+        [ "${#s}" = '14' ] && { printf '%s' "$s"; return 0; }
+    done
+    return 1
+}
+
+unlock_lenovo() {
+    [ -n "$AT_PORT" ] || {
+        error "No AT port exposed."
+        return 1
+    }
+    DEVICE=/dev/${AT_PORT}
+
+    # Vendor ID hashes for firmware that does not publish the model id in SMBIOS.
+    KNOWN_VENDOR_ID_HASHES='3df8c719 bb23be7f'
+
+    VENDOR_ID_HASHES=''
+    DEVCODE="$(dmi_oem_string)"
+    if [ -n "$DEVCODE" ]; then
+        VENDOR_ID_HASHES="$(printf '%s' "$DEVCODE" | sha256sum | cut -c '1-8')"
+        log "Derived vendor ID hash $VENDOR_ID_HASHES from SMBIOS type 133"
+    else
+        log "No OEM string in SMBIOS type 133, falling back to known vendor ID hashes"
+    fi
+
+    for KNOWN_VENDOR_ID_HASH in $KNOWN_VENDOR_ID_HASHES; do
+        case " $VENDOR_ID_HASHES " in
+            *" $KNOWN_VENDOR_ID_HASH "*) ;;
+            *) VENDOR_ID_HASHES="$VENDOR_ID_HASHES $KNOWN_VENDOR_ID_HASH" ;;
+        esac
+    done
+
+    i=1
+    while [ "$i" -le 3 ]; do
+        for VENDOR_ID_HASH in $VENDOR_ID_HASHES; do
+            log "Requesting challenge from WWAN modem (attempt #$i, hash $VENDOR_ID_HASH)"
+            RAW_CHALLENGE="$(at_command 'at+gtfcclockgen')"
+            CHALLENGE="$(echo "$RAW_CHALLENGE" | grep -o '0x[0-9a-fA-F]\+' | awk '{print $1}')"
+
+            [ -n "$CHALLENGE" ] || {
+                error "Failed to obtain FCC challenge. Got: $RAW_CHALLENGE"
+                return 1
+            }
+
+            log "Got challenge from modem: $CHALLENGE"
+            HEX_CHALLENGE="$(printf '%08x' "$CHALLENGE")"
+            REVERSE_HEX_CHALLENGE="$(reverseWithLittleEndian "$HEX_CHALLENGE")"
+            COMBINED_CHALLENGE="$REVERSE_HEX_CHALLENGE$VENDOR_ID_HASH"
+            RESPONSE_HASH="$(hex_to_bin "$COMBINED_CHALLENGE" | sha256sum | cut -d ' ' -f 1)"
+            TRUNCATED_RESPONSE="$(printf '%.8s' "$RESPONSE_HASH")"
+            REVERSED_RESPONSE="$(reverseWithLittleEndian "$TRUNCATED_RESPONSE")"
+            RESPONSE="$(printf '%d' "0x$REVERSED_RESPONSE")"
+
+            log "Sending response to WWAN modem: $RESPONSE"
+            UNLOCK_RESPONSE="$(at_command "at+gtfcclockver=$RESPONSE")"
+
+            UNLOCK_RESULT="$(echo "$UNLOCK_RESPONSE" | tr -d '\r' | grep -o '[0-9][0-9]*' | tail -1)"
+            [ "$UNLOCK_RESULT" = '1' ] && {
+                log "FCC unlock succeeded"
+                MODE_RESPONSE="$(at_command 'at+gtfcclockmodeunlock')"
+                case "$MODE_RESPONSE" in
+                    OK*) ;;
+                    *)
+                        error "at+gtfcclockmodeunlock failed. Got: $MODE_RESPONSE"
+                        return 1 ;;
+                esac
+                log "FCC lock state: $(at_command 'at+gtfcclockstate')"
+                return 0
+            }
+
+            error "FCC unlock failed. Got result: $UNLOCK_RESULT"
+        done
+
+        sleep 0.5
+        i="$((i + 1))"
+    done
+
+    return 1
+}
+
+unlock_dell() {
+    [ -n "$MBIM_PORT" ] || {
+        error "No MBIM port exposed."
+        return 1
+    }
+    DEVICE=/dev/${MBIM_PORT}
+    VENDOR_ID_HASH='bb23be7f'
+
+    i=1
+    while [ "$i" -le 3 ]; do
+        log "Querying FCC lock state (attempt #$i)"
+        STATUS="$(mbim_command '--intel-query-fcc-lock')"
+
+        # Dell reads byte 0 of the reply as the lock mode and byte 4, the low
+        # byte of Challenge, as the lock state, and unlocks only in a nonzero
+        # mode with state 0. When the query fails it unlocks anyway.
+        case "$STATUS" in
+            *'FCC lock status: unlocked'*)
+                log 'FCC lock is not engaged, nothing to do.'
+                return 0 ;;
+            *'FCC lock status: locked'*)
+                LOCK_STATE="$(challenge_of "$STATUS")"
+                [ "$((${LOCK_STATE:-0} % 256))" = '0' ] || {
+                    log 'FCC lock state is set, nothing to do.'
+                    return 0
+                } ;;
+            *)
+                error "Could not read FCC lock state, unlocking anyway. Got: $STATUS" ;;
+        esac
+
+        # Dell asks for the challenge with a set carrying no response. The reply
+        # to that is what contains it.
+        CHALLENGE="$(challenge_of "$(mbim_command '--intel-set-fcc-lock=0,0')")"
+        [ -n "$CHALLENGE" ] || {
+            error "Modem did not return a challenge."
+            sleep 0.5
+            i="$((i + 1))"
+            continue
+        }
+
+        log "Got challenge from modem: $CHALLENGE"
+        WIRE_CHALLENGE="$(reverseWithLittleEndian "$(printf '%08x' "$CHALLENGE")")"
+        COMBINED_CHALLENGE="$WIRE_CHALLENGE$VENDOR_ID_HASH"
+        RESPONSE_HASH="$(hex_to_bin "$COMBINED_CHALLENGE" | sha256sum | cut -d ' ' -f 1)"
+        RESPONSE="$(printf '%u' "0x$(reverseWithLittleEndian "$(printf '%.8s' "$RESPONSE_HASH")")")"
+
+        log "Sending response to WWAN modem: $RESPONSE"
+        RESULT="$(mbim_command "--intel-set-fcc-lock=1,$RESPONSE")"
+
+        case "$RESULT" in
+            *'FCC lock status: unlocked'*)
+                log 'FCC unlock succeeded.'
+                return 0 ;;
+            *)
+                error "FCC unlock failed. Got: $RESULT" ;;
+        esac
+
+        sleep 0.5
+        i="$((i + 1))"
+    done
+
+    return 1
+}
+
+SYS_VENDOR="$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null)"
+case "$(echo "$SYS_VENDOR" | tr '[:upper:]' '[:lower:]')" in
+    *lenovo*) METHODS='lenovo' ;;
+    *dell*) METHODS='dell' ;;
+    *) METHODS='lenovo dell' ;;
+esac
+
+for METHOD in $METHODS; do
+    log "Trying the $METHOD unlock (system vendor: ${SYS_VENDOR:-unknown})"
+    "unlock_$METHOD" && exit 0
+done
+
+exit 2
