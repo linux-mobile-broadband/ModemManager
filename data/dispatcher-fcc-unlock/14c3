@@ -52,6 +52,20 @@ error() {
     echo "$1" >&2
 }
 
+# Hex string to raw bytes. xxd would do this, but it comes from vim on most
+# distributions and is not a dependency of ModemManager, and when it is missing
+# the hash is computed over an empty input, which looks exactly like a wrong
+# vendor ID hash. printf understands \0ooo octal escapes in POSIX, so no
+# external tool is needed.
+hex_to_bin() {
+    _h="$1"
+    while [ -n "$_h" ]; do
+        _b="${_h%"${_h#??}"}"
+        _h="${_h#??}"
+        printf '%b' "\\0$(printf '%o' "$((0x$_b))")"
+    done
+}
+
 # The "model id in bios" the modem hashes, from SMBIOS type 133. There can be
 # several type 133 records in any order: a small one whose string table holds
 # the 14 character id, and a 44 byte WWAN config id record that holds none. Walk
@@ -102,7 +116,7 @@ for VENDOR_ID_HASH in $VENDOR_ID_HASHES; do
             log "Got challenge from modem: $CHALLENGE"
             HEX_CHALLENGE="$(printf '%08x' "$CHALLENGE")"
             COMBINED_CHALLENGE="$HEX_CHALLENGE$(printf '%.8s' "$VENDOR_ID_HASH")"
-            RESPONSE_HASH="$(echo "$COMBINED_CHALLENGE" | xxd -r -p | sha256sum | cut -d ' ' -f 1)"
+            RESPONSE_HASH="$(hex_to_bin "$COMBINED_CHALLENGE" | sha256sum | cut -d ' ' -f 1)"
             TRUNCATED_RESPONSE="$(printf '%.8s' "$RESPONSE_HASH")"
             RESPONSE="$(printf '%d' "0x$TRUNCATED_RESPONSE")"
 
