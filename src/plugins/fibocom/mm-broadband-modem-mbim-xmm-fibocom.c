@@ -139,16 +139,14 @@ load_revision (MMIfaceModem        *self,
 
 /******************************************************************************/
 
-static MMBroadbandModemMbimSetInitialEpsBearerSettingsFlag
-load_set_initial_eps_bearer_settings_mask (MMBroadbandModemMbim *_self)
+static gboolean
+check_custom_att_310280_attach (MMBroadbandModemMbimXmmFibocom *self)
 {
-    MMBroadbandModemMbimXmmFibocom                      *self = MM_BROADBAND_MODEM_MBIM_XMM_FIBOCOM (_self);
-    MMBroadbandModemMbimSetInitialEpsBearerSettingsFlag  mask = MM_BROADBAND_MODEM_MBIM_SET_INITIAL_EPS_BEARER_SETTINGS_FLAG_DEFAULT;
-    g_autoptr(MMBaseSim)                                 modem_sim = NULL;
-    const gchar                                         *operator_identifier = NULL;
+    g_autoptr(MMBaseSim)  modem_sim = NULL;
+    const gchar          *operator_identifier = NULL;
 
     if (!self->priv->custom_att_310280_attach)
-        return mask;
+        return FALSE;
 
     g_object_get (self,
                   MM_IFACE_MODEM_SIM, &modem_sim,
@@ -160,15 +158,55 @@ load_set_initial_eps_bearer_settings_mask (MMBroadbandModemMbim *_self)
     /* Fix for attach APN issue with ATT SIM cards MCC/MNC 310/280
      * is available on L850 MR8. Execute custom attach logic only
      * for old versions */
-    if (mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)) == 0x2cb7 &&
-        mm_base_modem_get_product_id (MM_BASE_MODEM (self)) == 0x0007 &&
-        !g_strcmp0 (operator_identifier, "310280")) {
+    return (mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)) == 0x2cb7 &&
+            mm_base_modem_get_product_id (MM_BASE_MODEM (self)) == 0x0007 &&
+            !g_strcmp0 (operator_identifier, "310280"));
+}
+
+static MMBroadbandModemMbimSetInitialEpsBearerSettingsFlag
+load_set_initial_eps_bearer_settings_mask (MMBroadbandModemMbim *_self)
+{
+    MMBroadbandModemMbimXmmFibocom                      *self = MM_BROADBAND_MODEM_MBIM_XMM_FIBOCOM (_self);
+    MMBroadbandModemMbimSetInitialEpsBearerSettingsFlag  mask = MM_BROADBAND_MODEM_MBIM_SET_INITIAL_EPS_BEARER_SETTINGS_FLAG_DEFAULT;
+
+    if (check_custom_att_310280_attach (self)) {
         mm_obj_dbg (self, "requesting LTE attach configuration update without partner section");
         mask &= ~MM_BROADBAND_MODEM_MBIM_SET_INITIAL_EPS_BEARER_SETTINGS_FLAG_UPDATE_PARTNER;
         mask |= MM_BROADBAND_MODEM_MBIM_SET_INITIAL_EPS_BEARER_SETTINGS_FLAG_SKIP_PARTNER;
     }
 
     return mask;
+}
+
+static MbimContextIpType
+normalize_lte_attach_configuration_ip_type (MMBroadbandModemMbim             *_self,
+                                            const MbimLteAttachConfiguration *home,
+                                            const MbimLteAttachConfiguration *partner,
+                                            const MbimLteAttachConfiguration *non_partner)
+{
+    MMBroadbandModemMbimXmmFibocom *self = MM_BROADBAND_MODEM_MBIM_XMM_FIBOCOM (_self);
+
+    g_assert (home);
+
+    /* When updating LTE attach configuration without the 'partner' section on
+     * L850 pre-MR8 firmware with an AT&T 310280 SIM, the modem may report an
+     * invalid 0xffffffff MbimContextIpType on the 'home' context while storing
+     * the valid IP type on the 'non-partner' context. */
+    if (!mbim_context_ip_type_get_string (home->ip_type) &&
+        check_custom_att_310280_attach (self)) {
+        if (partner && mbim_context_ip_type_get_string (partner->ip_type)) {
+            mm_obj_dbg (self, "'home' LTE attach configuration has invalid IP type (0x%x); using 'partner' IP type '%s'",
+                        home->ip_type, mbim_context_ip_type_get_string (partner->ip_type));
+            return partner->ip_type;
+        }
+        if (non_partner && mbim_context_ip_type_get_string (non_partner->ip_type)) {
+            mm_obj_dbg (self, "'home' LTE attach configuration has invalid IP type (0x%x); using 'non-partner' IP type '%s'",
+                        home->ip_type, mbim_context_ip_type_get_string (non_partner->ip_type));
+            return non_partner->ip_type;
+        }
+    }
+
+    return home->ip_type;
 }
 
 /******************************************************************************/
@@ -265,4 +303,5 @@ mm_broadband_modem_mbim_xmm_fibocom_class_init (MMBroadbandModemMbimXmmFibocomCl
     base_modem_class->create_wwan_port = mm_shared_fibocom_create_wwan_port;
     broadband_modem_class->setup_ports = mm_shared_fibocom_setup_ports;
     broadband_modem_mbim_class->load_set_initial_eps_bearer_settings_mask = load_set_initial_eps_bearer_settings_mask;
+    broadband_modem_mbim_class->normalize_lte_attach_configuration_ip_type = normalize_lte_attach_configuration_ip_type;
 }
