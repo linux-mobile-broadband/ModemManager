@@ -13,6 +13,7 @@ mm_fccunlockdirpackage = mm_pkglibdir / 'fcc-unlock.d'
 examples = files(
   '105b',
   '1199',
+  '14c0:4d75',
   '14c3',
   '2c7c',
   '33f8',
