@@ -3,8 +3,9 @@
 # SPDX-License-Identifier: CC0-1.0
 # 2023 Thilo-Alexander Ginkel <thilo@ginkel.com>
 # 2025 Jongmin Kim <jmkim@debian.org>
+# 2026 Andreas Haerter <ah@foundata.com>
 #
-# Lenovo-shipped Fibocom FM350-GL (14c3:4d75) FCC unlock
+# Fibocom FM350-GL and Rolling Wireless RW350R-GL (14c3:4d75) FCC unlock
 
 [ "$FCC_UNLOCK_DEBUG_LOG" = '1' ] && {
     exec 3>&1 4>&2
@@ -51,36 +52,92 @@ error() {
     echo "$1" >&2
 }
 
-VENDOR_ID_HASH='3df8c719'
+# Hex string to raw bytes. xxd would do this, but it comes from vim on most
+# distributions and is not a dependency of ModemManager, and when it is missing
+# the hash is computed over an empty input, which looks exactly like a wrong
+# vendor ID hash. printf understands \0ooo octal escapes in POSIX, so no
+# external tool is needed.
+hex_to_bin() {
+    _h="$1"
+    while [ -n "$_h" ]; do
+        _b="${_h%"${_h#??}"}"
+        _h="${_h#??}"
+        printf '%b' "\\0$(printf '%o' "$((0x$_b))")"
+    done
+}
+
+# The "model id in bios" the modem hashes, from SMBIOS type 133. There can be
+# several type 133 records in any order: a small one whose string table holds
+# the 14 character id, and a 44 byte WWAN config id record that holds none. Walk
+# them all and take the first 14 character string, which is the same test the
+# vendor tools apply. Read from DMI sysfs rather than dmidecode, to avoid
+# executing another binary.
+dmi_oem_string() {
+    for entry in /sys/firmware/dmi/entries/133-*; do
+        [ -d "$entry" ] || continue
+        len="$(cat "$entry/length" 2>/dev/null)" || continue
+        [ -n "$len" ] || continue
+        s="$(tail -c "+$((len + 1))" "$entry/raw" 2>/dev/null | tr '\000' '\n' | head -n 1)"
+        [ "${#s}" = '14' ] && { printf '%s' "$s"; return 0; }
+    done
+    return 1
+}
+
+# Vendor ID hashes for OEMs that do not publish the model id in SMBIOS.
+# 3df8c719 is SHA-256("KHOIHGIUCCHHII"), the Lenovo value, which Lenovo firmware
+# does publish. 4909b5a4 is SHA-256("DW5931EFCCLOCK"), confirmed on a Dell
+# Latitude 5540 whose type 133 carries no string at all.
+KNOWN_VENDOR_ID_HASHES='3df8c719 4909b5a4'
+
+VENDOR_ID_HASHES=''
+DEVCODE="$(dmi_oem_string)"
+if [ -n "$DEVCODE" ]; then
+    VENDOR_ID_HASHES="$(printf '%s' "$DEVCODE" | sha256sum | cut -c '1-8')"
+    log "Derived vendor ID hash $VENDOR_ID_HASHES from SMBIOS type 133"
+else
+    log "No OEM string in SMBIOS type 133, falling back to known vendor ID hashes"
+fi
+
+for KNOWN_VENDOR_ID_HASH in $KNOWN_VENDOR_ID_HASHES; do
+    case " $VENDOR_ID_HASHES " in
+        *" $KNOWN_VENDOR_ID_HASH "*) ;;
+        *) VENDOR_ID_HASHES="$VENDOR_ID_HASHES $KNOWN_VENDOR_ID_HASH" ;;
+    esac
+done
 
 i=1
-while [ "$i" -le 9 ]; do
-    log "Requesting challenge from WWAN modem (attempt #$i)"
-    RAW_CHALLENGE="$(at_command 'at+gtfcclockgen')"
-    CHALLENGE="$(echo "$RAW_CHALLENGE" | grep -o '0x[0-9a-fA-F]\+' | awk '{print $1}')"
+for VENDOR_ID_HASH in $VENDOR_ID_HASHES; do
+    while [ "$i" -le 9 ]; do
+        log "Requesting challenge from WWAN modem (attempt #$i, hash $VENDOR_ID_HASH)"
+        RAW_CHALLENGE="$(at_command 'at+gtfcclockgen')"
+        CHALLENGE="$(echo "$RAW_CHALLENGE" | grep -o '0x[0-9a-fA-F]\+' | awk '{print $1}')"
 
-    [ -n "$CHALLENGE" ] && {
-        log "Got challenge from modem: $CHALLENGE"
-        HEX_CHALLENGE="$(printf '%08x' "$CHALLENGE")"
-        COMBINED_CHALLENGE="$HEX_CHALLENGE$(printf '%.8s' "$VENDOR_ID_HASH")"
-        RESPONSE_HASH="$(echo "$COMBINED_CHALLENGE" | xxd -r -p | sha256sum | cut -d ' ' -f 1)"
-        TRUNCATED_RESPONSE="$(printf '%.8s' "$RESPONSE_HASH")"
-        RESPONSE="$(printf '%d' "0x$TRUNCATED_RESPONSE")"
+        [ -n "$CHALLENGE" ] && {
+            log "Got challenge from modem: $CHALLENGE"
+            HEX_CHALLENGE="$(printf '%08x' "$CHALLENGE")"
+            COMBINED_CHALLENGE="$HEX_CHALLENGE$(printf '%.8s' "$VENDOR_ID_HASH")"
+            RESPONSE_HASH="$(hex_to_bin "$COMBINED_CHALLENGE" | sha256sum | cut -d ' ' -f 1)"
+            TRUNCATED_RESPONSE="$(printf '%.8s' "$RESPONSE_HASH")"
+            RESPONSE="$(printf '%d' "0x$TRUNCATED_RESPONSE")"
 
-        log "Sending response to WWAN modem: $RESPONSE"
-        UNLOCK_RESPONSE="$(at_command "at+gtfcclockver=$RESPONSE")"
+            log "Sending response to WWAN modem: $RESPONSE"
+            UNLOCK_RESPONSE="$(at_command "at+gtfcclockver=$RESPONSE")"
 
-        echo "$UNLOCK_RESPONSE" | grep -q '^+GTFCCLOCKVER:' && {
-            UNLOCK_RESULT="$(echo "$UNLOCK_RESPONSE" | grep -o '[0-9]*')"
-            [ "$UNLOCK_RESULT" = '1' ] && {
-                log "FCC unlock succeeded"
-                exit 0
-            } || error "FCC unlock failed. Got result: $UNLOCK_RESULT"
-        } || error "Unlock failed. Got response: $UNLOCK_RESPONSE"
-    } || error "Failed to obtain FCC challenge. Got: $RAW_CHALLENGE"
+            echo "$UNLOCK_RESPONSE" | grep -q '^+GTFCCLOCKVER:' && {
+                UNLOCK_RESULT="$(echo "$UNLOCK_RESPONSE" | grep -o '[0-9]*')"
+                [ "$UNLOCK_RESULT" = '1' ] && {
+                    log "FCC unlock succeeded"
+                    exit 0
+                } || {
+                    error "FCC unlock failed. Got result: $UNLOCK_RESULT"
+                    break
+                }
+            } || error "Unlock failed. Got response: $UNLOCK_RESPONSE"
+        } || error "Failed to obtain FCC challenge. Got: $RAW_CHALLENGE"
 
-    sleep 0.5
-    i="$((i + 1))"
+        sleep 0.5
+        i="$((i + 1))"
+    done
 done
 
 exit 2
