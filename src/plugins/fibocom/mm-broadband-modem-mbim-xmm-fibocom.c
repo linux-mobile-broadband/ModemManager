@@ -178,6 +178,10 @@ load_set_initial_eps_bearer_settings_mask (MMBroadbandModemMbim *_self)
     return mask;
 }
 
+#define MBIM_CONTEXT_IP_TYPE_VALID(val) \
+    ((gint)(val) >= MBIM_CONTEXT_IP_TYPE_DEFAULT && \
+     (gint)(val) <= MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6)
+
 static MbimContextIpType
 normalize_lte_attach_configuration_ip_type (MMBroadbandModemMbim             *_self,
                                             const MbimLteAttachConfiguration *home,
@@ -192,14 +196,14 @@ normalize_lte_attach_configuration_ip_type (MMBroadbandModemMbim             *_s
      * L850 pre-MR8 firmware with an AT&T 310280 SIM, the modem may report an
      * invalid 0xffffffff MbimContextIpType on the 'home' context while storing
      * the valid IP type on the 'non-partner' context. */
-    if (!mbim_context_ip_type_get_string (home->ip_type) &&
+    if (!MBIM_CONTEXT_IP_TYPE_VALID (home->ip_type) &&
         check_custom_att_310280_attach (self)) {
-        if (partner && mbim_context_ip_type_get_string (partner->ip_type)) {
+        if (partner && MBIM_CONTEXT_IP_TYPE_VALID (partner->ip_type)) {
             mm_obj_dbg (self, "'home' LTE attach configuration has invalid IP type (0x%x); using 'partner' IP type '%s'",
                         home->ip_type, mbim_context_ip_type_get_string (partner->ip_type));
             return partner->ip_type;
         }
-        if (non_partner && mbim_context_ip_type_get_string (non_partner->ip_type)) {
+        if (non_partner && MBIM_CONTEXT_IP_TYPE_VALID (non_partner->ip_type)) {
             mm_obj_dbg (self, "'home' LTE attach configuration has invalid IP type (0x%x); using 'non-partner' IP type '%s'",
                         home->ip_type, mbim_context_ip_type_get_string (non_partner->ip_type));
             return non_partner->ip_type;
